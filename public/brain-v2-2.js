@@ -257,30 +257,25 @@
     sections.push(`<p>${report.shared.length} of ${Math.max(report.leftCount, report.rightCount)} scheduled slots match exactly`
       + `${request.scopeDay ? "" : ` · weekly load: ${kernel.durationLabel(report.leftMinutes)} vs ${kernel.durationLabel(report.rightMinutes)}`}</p>`);
 
-    if (report.leftOnly.length || report.rightOnly.length || report.changedDetail.length) {
-      let diffHtml = `<div class="diff-card">`;
-      if (report.changedDetail.length) {
-        diffHtml += `<div class="diff-section" style="margin-bottom:8px;"><strong>Room/Teacher Changes (${report.changedDetailTotal}):</strong>`;
-        report.changedDetail.forEach(pair => {
-           diffHtml += `<div class="diff-row" style="margin-top:4px;"><div class="diff-cell unique">${kernel.escapeHtml(pair.left.day)} ${kernel.humanTime(pair.left.start)}<br>${kernel.escapeHtml(pair.left.subject)} (${kernel.escapeHtml(pair.left.room || "TBA")})</div><div class="diff-cell unique">${kernel.escapeHtml(pair.right.day)} ${kernel.humanTime(pair.right.start)}<br>${kernel.escapeHtml(pair.right.subject)} (${kernel.escapeHtml(pair.right.room || "TBA")})</div></div>`;
-        });
-        diffHtml += `</div>`;
-      }
-      
-      const maxLength = Math.max(report.leftOnly.length, report.rightOnly.length);
-      if (maxLength > 0) {
-        diffHtml += `<div class="diff-section"><strong>Unique Classes:</strong>`;
-        for (let i = 0; i < maxLength; i++) {
-          const l = report.leftOnly[i];
-          const r = report.rightOnly[i];
-          const lHtml = l ? `${kernel.escapeHtml(l.day)} ${kernel.humanTime(l.start)}<br>${kernel.escapeHtml(l.subject)}` : `<em>Free Slot</em>`;
-          const rHtml = r ? `${kernel.escapeHtml(r.day)} ${kernel.humanTime(r.start)}<br>${kernel.escapeHtml(r.subject)}` : `<em>Free Slot</em>`;
-          diffHtml += `<div class="diff-row" style="margin-top:4px;"><div class="diff-cell ${l ? 'unique' : 'common'}">${lHtml}</div><div class="diff-cell ${r ? 'unique' : 'common'}">${rHtml}</div></div>`;
-        }
-        diffHtml += `</div>`;
-      }
-      diffHtml += `</div>`;
-      sections.push(diffHtml);
+    if (report.changedDetail.length) {
+      const rows = report.changedDetail.map((pair) =>
+        `<li>${kernel.escapeHtml(pair.left.day)}: ${kernel.escapeHtml(detailFor(pair.left))} <em>vs</em> ${kernel.escapeHtml(detailFor(pair.right))}</li>`
+      ).join("");
+      sections.push(`<p><strong>Different teacher/room (${report.changedDetailTotal}):</strong></p><ul>${rows}</ul>`);
+    }
+
+    if (report.leftOnly.length) {
+      const rows = report.leftOnly.map((item) =>
+        `<li>${kernel.escapeHtml(item.day)} ${kernel.escapeHtml(detailFor(item))}</li>`
+      ).join("");
+      sections.push(`<p><strong>Only in ${kernel.escapeHtml(leftSel.code)} (${report.leftOnlyTotal}):</strong></p><ul>${rows}</ul>`);
+    }
+
+    if (report.rightOnly.length) {
+      const rows = report.rightOnly.map((item) =>
+        `<li>${kernel.escapeHtml(item.day)} ${kernel.escapeHtml(detailFor(item))}</li>`
+      ).join("");
+      sections.push(`<p><strong>Only in ${kernel.escapeHtml(rightSel.code)} (${report.rightOnlyTotal}):</strong></p><ul>${rows}</ul>`);
     }
 
     if (!report.changedDetail.length && !report.leftOnly.length && !report.rightOnly.length) {

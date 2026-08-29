@@ -1185,6 +1185,38 @@
     return longWeekends;
   }
 
+  // --- New Data Domains (Transport, Library, Placements, Clubs) ---
+  const TRANSPORT_ROUTES = [
+    { id: "route-1", name: "Ludhiana City - Campus", departure: 480, return: 1020, stops: ["Bus Stand", "Bharat Nagar Chowk", "GNDEC"] },
+    { id: "route-2", name: "Samrala Chowk - Campus", departure: 495, return: 1035, stops: ["Samrala Chowk", "Cheema Chowk", "GNDEC"] }
+  ];
+
+  const LIBRARY_HOURS = {
+    weekday: { open: "08:00 AM", close: "08:00 PM" },
+    weekend: { open: "09:00 AM", close: "02:00 PM" },
+    notice: "Bring your ID card for entry. Books can be issued for 14 days."
+  };
+
+  const CLUBS = [
+    { name: "SCIE", full: "Student Chapter of Institution of Engineers", type: "Technical", contact: "scie@gndec.ac.in", nextEvent: "TechTalk on AI (Friday, 2:00 PM)" },
+    { name: "LUG", full: "Linux User Group", type: "Technical", contact: "lug@gndec.ac.in", nextEvent: "InstallFest (Saturday, 10:00 AM)" },
+    { name: "Cultural", full: "Cultural Committee", type: "Cultural", contact: "cultural@gndec.ac.in", nextEvent: "Bhangra Auditions (Thursday, 4:00 PM)" }
+  ];
+
+  const PLACEMENT_INFO = {
+    eligibility: "60% or 6.0 CGPA throughout (10th, 12th, B.Tech) with no active backlogs.",
+    upcoming: [
+      { company: "TCS", role: "Ninja", date: "2026-09-15" },
+      { company: "Infosys", role: "System Engineer", date: "2026-09-20" }
+    ]
+  };
+
+  // --- Exam Scenario Mode ---
+  function isExamSeason(date) {
+    const month = date ? new Date(date).getMonth() : new Date().getMonth();
+    return month === 4 || month === 5 || month === 10 || month === 11; // May, June, Nov, Dec
+  }
+
   globalScope.CompassBrainKernel = Object.freeze({
     VERSION,
     LIMITS,
@@ -1260,42 +1292,11 @@
     CAMPUS_ROOM_DIRECTORY,
     lookupCampusRoom,
     CAMPUS_ADMINISTRATION_DIRECTORY,
-    lookupCampusAdministration
+    lookupCampusAdministration,
+    TRANSPORT_ROUTES,
+    LIBRARY_HOURS,
+    CLUBS,
+    PLACEMENT_INFO,
+    isExamSeason
   });
-})(globalThis);
-
-  // --- New Data Domains (Transport, Library, Placements, Clubs) ---
-  const TRANSPORT_ROUTES = [
-    { id: "route-1", name: "Ludhiana City - Campus", departure: 480, return: 1020, stops: ["Bus Stand", "Bharat Nagar Chowk", "GNDEC"] },
-    { id: "route-2", name: "Samrala Chowk - Campus", departure: 495, return: 1035, stops: ["Samrala Chowk", "Cheema Chowk", "GNDEC"] }
-  ];
-
-  const LIBRARY_HOURS = {
-    weekday: { open: "08:00 AM", close: "08:00 PM" },
-    weekend: { open: "09:00 AM", close: "02:00 PM" },
-    notice: "Bring your ID card for entry. Books can be issued for 14 days."
-  };
-
-  const CLUBS = [
-    { name: "SCIE", full: "Student Chapter of Institution of Engineers", type: "Technical", contact: "scie@gndec.ac.in", nextEvent: "TechTalk on AI (Friday, 2:00 PM)" },
-    { name: "LUG", full: "Linux User Group", type: "Technical", contact: "lug@gndec.ac.in", nextEvent: "InstallFest (Saturday, 10:00 AM)" },
-    { name: "Cultural", full: "Cultural Committee", type: "Cultural", contact: "cultural@gndec.ac.in", nextEvent: "Bhangra Auditions (Thursday, 4:00 PM)" }
-  ];
-
-  const PLACEMENT_INFO = {
-    eligibility: "60% or 6.0 CGPA throughout (10th, 12th, B.Tech) with no active backlogs.",
-    upcoming: [
-      { company: "TCS", role: "Ninja", date: "2026-09-15" },
-      { company: "Infosys", role: "System Engineer", date: "2026-09-20" }
-    ]
-  };
-
-  // Expose them to brains
-  Object.assign(window.CompassBrainKernel || {}, { TRANSPORT_ROUTES, LIBRARY_HOURS, CLUBS, PLACEMENT_INFO });
-
-  // --- Exam Scenario Mode ---
-  function isExamSeason(date) {
-    const month = date ? new Date(date).getMonth() : new Date().getMonth();
-    return month === 4 || month === 5 || month === 10 || month === 11; // May, June, Nov, Dec
-  }
-  Object.assign(window.CompassBrainKernel || {}, { isExamSeason });
+})(typeof globalThis !== "undefined" ? globalThis : window);

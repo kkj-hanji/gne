@@ -494,10 +494,24 @@ function teacherNames(value) {
 
 function classTypeLabel(value) {
   const type = String(value || "").trim().toUpperCase();
-  if (type === "L") return "Lecture";
-  if (type === "T") return "Tutorial";
-  if (type === "P") return "Practical/Lab";
+  if (type === "L") return "Lecture (L)";
+  if (type === "T") return "Tutorial (T)";
+  if (type === "P") return "Practical/Lab (P)";
   return type || "Class";
+}
+
+function expandRoomLocation(room) {
+  if (!room) return "";
+  let r = room;
+  // Expand common lab abbreviations
+  r = r.replace(/\bCOMP LAB\b/gi, "Computer Lab");
+  r = r.replace(/\bMECH LAB\b/gi, "Mechanical Lab");
+  r = r.replace(/\bCHEM LAB\b/gi, "Chemistry Lab");
+  r = r.replace(/\bPHY LAB\b/gi, "Physics Lab");
+  r = r.replace(/\bCIVIL LAB\b/gi, "Civil Lab");
+  r = r.replace(/\bELEC LAB\b/gi, "Electrical Lab");
+  r = r.replace(/\bWORKSHOP\b/gi, "Workshop");
+  return r;
 }
 
 function buildScheduleIndex() {
@@ -739,7 +753,7 @@ function activeTimetableLabel() {
 }
 
 function renderClassDetails(item) {
-  return `<h2>${escapeHtml(item.subject)}</h2><div class="class-details"><span><strong>${escapeHtml(item.type || "Class")}</strong></span><span>${escapeHtml(item.teacher)}</span><span>${escapeHtml(item.room)}</span></div>`;
+  return `<h2>${escapeHtml(item.subject)}</h2><div class="class-details"><span><strong>${escapeHtml(classTypeLabel(item.type))}</strong></span><span>${escapeHtml(item.teacher)}</span><span>${escapeHtml(expandRoomLocation(item.room))}</span></div>`;
 }
 
 function indiaCalendarDate(offset = 0) {
@@ -783,33 +797,49 @@ function renderLive() {
   if (topbarGroup) topbarGroup.textContent = profile || "Choose your timetable";
   $("now-label").textContent = "LIVE STATUS";
 
-  // Holiday Alert Banner rendering
+  // Holiday Alert Banner rendering (Full-day / Gazetted holidays only, within 5 days before holiday till that specific holiday)
   const holidayBanner = $("holiday-banner");
   if (holidayBanner) {
     const todayIso = indiaCalendarDate(0).date.toISOString().slice(0, 10);
-    const tomorrowIso = indiaCalendarDate(1).date.toISOString().slice(0, 10);
     const kernel = globalThis.CompassBrainKernel;
-    const todayHoliday = kernel?.checkDateHoliday ? kernel.checkDateHoliday(todayIso) : null;
-    const tomorrowHoliday = kernel?.checkDateHoliday ? kernel.checkDateHoliday(tomorrowIso) : null;
-    const nextHoli = kernel?.getNextHoliday ? kernel.getNextHoliday(todayIso, state.settings?.showRestrictedHolidays !== false) : null;
-    if (state.settings?.holidayAlerts !== false && (todayHoliday || tomorrowHoliday || nextHoli)) {
-      if (todayHoliday) {
-        holidayBanner.hidden = false;
+    const fullDayHolidays = kernel?.OFFICIAL_HOLIDAYS_2026
+      ? kernel.OFFICIAL_HOLIDAYS_2026.filter((h) => h.type !== "Restricted" && h.closed !== false && h.date >= todayIso).sort((a, b) => a.date.localeCompare(b.date))
+      : [];
+    const nextHoli = fullDayHolidays[0] || null;
+
+    let diffDays = -1;
+    if (nextHoli) {
+      const [y1, m1, d1] = todayIso.split("-").map(Number);
+      const [y2, m2, d2] = nextHoli.date.split("-").map(Number);
+      const utc1 = Date.UTC(y1, m1 - 1, d1);
+      const utc2 = Date.UTC(y2, m2 - 1, d2);
+      diffDays = Math.round((utc2 - utc1) / (24 * 60 * 60 * 1000));
+    }
+
+    if (state.settings?.holidayAlerts !== false && nextHoli && diffDays >= 0 && diffDays <= 5) {
+      holidayBanner.hidden = false;
+      holidayBanner.setAttribute("role", "button");
+      holidayBanner.setAttribute("tabindex", "0");
+      holidayBanner.dataset.holidayName = nextHoli.name;
+      holidayBanner.dataset.holidayDate = nextHoli.date;
+
+      if (diffDays === 0) {
         holidayBanner.className = "holiday-banner active-holiday";
-        holidayBanner.innerHTML = `<span class="holiday-icon">🎉</span><div class="holiday-text"><strong>Today is a Holiday: ${escapeHtml(todayHoliday.name)}</strong><p>${escapeHtml(todayHoliday.description || "College teaching is suspended.")}</p></div>`;
-      } else if (tomorrowHoliday) {
-        holidayBanner.hidden = false;
+        holidayBanner.setAttribute("aria-label", `Today is a holiday: ${nextHoli.name}. Tap to ask Compass details.`);
+        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">🎉</span><div class="holiday-text"><strong>Today is a Holiday: ${escapeHtml(nextHoli.name)}</strong><p>${escapeHtml(nextHoli.description || "College teaching is suspended.")} · Full-day Gazetted Holiday</p></div><div class="holiday-action"><span>Ask Compass</span> <span aria-hidden="true">→</span></div>`;
+      } else if (diffDays === 1) {
         holidayBanner.className = "holiday-banner upcoming-holiday";
-        holidayBanner.innerHTML = `<span class="holiday-icon">📅</span><div class="holiday-text"><strong>Tomorrow is a Holiday: ${escapeHtml(tomorrowHoliday.name)}</strong><p>${escapeHtml(tomorrowHoliday.description || "Enjoy your day off.")}</p></div>`;
-      } else if (nextHoli) {
-        holidayBanner.hidden = false;
-        holidayBanner.className = "holiday-banner info-holiday";
-        holidayBanner.innerHTML = `<span class="holiday-icon">🏖️</span><div class="holiday-text"><strong>Upcoming Holiday: ${escapeHtml(nextHoli.name)}</strong><p>${escapeHtml(nextHoli.date)} (${escapeHtml(nextHoli.day)}) · ${escapeHtml(nextHoli.type)} holiday</p></div>`;
+        holidayBanner.setAttribute("aria-label", `Tomorrow is a holiday: ${nextHoli.name}. Tap to ask Compass details.`);
+        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">📅</span><div class="holiday-text"><strong>Tomorrow is a Holiday: ${escapeHtml(nextHoli.name)}</strong><p>${escapeHtml(nextHoli.date)} (${escapeHtml(nextHoli.day)}) · Full-day Gazetted Holiday</p></div><div class="holiday-action"><span>Ask Compass</span> <span aria-hidden="true">→</span></div>`;
       } else {
-        holidayBanner.hidden = true;
+        holidayBanner.className = "holiday-banner info-holiday";
+        holidayBanner.setAttribute("aria-label", `Upcoming holiday in ${diffDays} days: ${nextHoli.name}. Tap to ask Compass details.`);
+        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">🏖️</span><div class="holiday-text"><strong>Upcoming Holiday: ${escapeHtml(nextHoli.name)} (in ${diffDays} days)</strong><p>${escapeHtml(nextHoli.date)} (${escapeHtml(nextHoli.day)}) · Full-day Gazetted Holiday</p></div><div class="holiday-action"><span>Ask Compass</span> <span aria-hidden="true">→</span></div>`;
       }
     } else {
       holidayBanner.hidden = true;
+      delete holidayBanner.dataset.holidayName;
+      delete holidayBanner.dataset.holidayDate;
     }
   }
 
@@ -911,7 +941,7 @@ function renderDaySchedule() {
   $("day-heading").textContent = state.selectedGroup ? (showNextDay ? `${profile} · ${nextStudyDay.compactLabel}` : `${profile} schedule`) : "Your schedule";
   $("day-schedule").innerHTML = classes.length ? plan.map((item) => item.free
     ? `<article class="schedule-item free-slot"><div class="schedule-time">${humanTime(item.start)}<br /><span>${humanTime(item.end)}</span></div><div><div class="schedule-name">Free lecture</div><div class="schedule-sub">No class listed in the official timetable</div></div><div class="schedule-teacher">Open study time</div><div class="schedule-room">Available</div></article>`
-    : `<article class="schedule-item ${!showNextDay && item.start <= now.minutes && item.end > now.minutes ? "current" : ""}"><div class="schedule-time">${humanTime(item.start)}<br /><span>${humanTime(item.end)}</span></div><div><div class="schedule-name">${escapeHtml(item.subject)}</div><div class="schedule-sub">${escapeHtml(item.type || "Class")}</div></div><div class="schedule-teacher">${escapeHtml(item.teacher)}</div><div class="schedule-room">${escapeHtml(item.room)}</div></article>`).join("") : "<div class=\"empty-list\">No classes are listed for this day.</div>";
+    : `<article class="schedule-item ${!showNextDay && item.start <= now.minutes && item.end > now.minutes ? "current" : ""}"><div class="schedule-time">${humanTime(item.start)}<br /><span>${humanTime(item.end)}</span></div><div><div class="schedule-name">${escapeHtml(item.subject)}</div><div class="schedule-sub">${escapeHtml(classTypeLabel(item.type))}</div></div><div class="schedule-teacher">${escapeHtml(item.teacher)}</div><div class="schedule-room">${escapeHtml(expandRoomLocation(item.room))}</div></article>`).join("") : "<div class=\"empty-list\">No classes are listed for this day.</div>";
   const toggle = $("day-plan-toggle");
   if (toggle) {
     toggle.hidden = !afterCollegeHours || !todayClasses.length || !nextStudyDay;
@@ -949,7 +979,7 @@ function renderWeek() {
     const classCountStr = `${dayEntries.length} ${dayEntries.length === 1 ? "class" : "classes"}`;
     const freeCountStr = freeSlots ? `, ${freeSlots} free` : "";
     return `<section class="week-list-day"><div class="week-list-head"><h3>${day}</h3><span>${classCountStr}${freeCountStr}</span></div>${dayEntries.length
-      ? `<div class="week-list-cards">${dayEntries.map((item) => `<article class="week-list-card"><div class="week-list-time"><strong>${humanTime(item.start)}</strong><span>${humanTime(item.end)}</span></div><div class="week-list-body"><strong>${escapeHtml(item.subject)}</strong><span>${escapeHtml(item.teacher)}</span><span>${escapeHtml(item.room)}${item.type ? ` · ${escapeHtml(item.type)}` : ""}</span></div></article>`).join("")}</div>`
+      ? `<div class="week-list-cards">${dayEntries.map((item) => `<article class="week-list-card"><div class="week-list-time"><strong>${humanTime(item.start)}</strong><span>${humanTime(item.end)}</span></div><div class="week-list-body"><strong>${escapeHtml(item.subject)}</strong><span>${escapeHtml(item.teacher)}</span><span>${escapeHtml(expandRoomLocation(item.room))}${item.type ? ` · ${escapeHtml(classTypeLabel(item.type))}` : ""}</span></div></article>`).join("")}</div>`
       : "<div class=\"week-list-empty\">No class listed for this day.</div>"}</section>`;
   }).join("")}</div>`;
   // Always keep every official bell row visible, including rows that are free
@@ -2003,7 +2033,7 @@ function answerQuestion(question) {
     const timeMatches = exact.length ? exact : overlapping;
     if (timeMatches.length) {
       const matchedStart = exact.length ? exact[0].start : overlapping[0].start;
-      return `<p><strong><u>${escapeHtml(state.selectedGroup)} · ${escapeHtml(timeDay)} · ${humanTime(matchedStart)}</u></strong></p>${timeMatches.map((item) => `<p><strong>${escapeHtml(item.subject)}</strong> <span>(${escapeHtml(item.type || "Class")})</span><br />${escapeHtml(item.teacher)} · ${escapeHtml(item.room)}</p>`).join("")}<p class="answer-source">Official GNDEC weekly timetable.</p>`;
+      return `<p><strong><u>${escapeHtml(state.selectedGroup)} · ${escapeHtml(timeDay)} · ${humanTime(matchedStart)}</u></strong></p>${timeMatches.map((item) => `<p><strong>${escapeHtml(item.subject)}</strong> <span>(${escapeHtml(classTypeLabel(item.type))})</span><br />${escapeHtml(item.teacher)} · ${escapeHtml(item.room)}</p>`).join("")}<p class="answer-source">Official GNDEC weekly timetable.</p>`;
     }
   }
   if ((asksToday || explicitDay || isScheduleQuestion) && !asksNext && !asksCurrent && !asksWhere && !asksTeacher) {
@@ -4503,6 +4533,7 @@ function activatePage(page, updateHash = true) {
     $("main-content")?.scrollTo?.({ top: 0, left: 0, behavior: "instant" });
   }
   if (updateHash && location.hash !== `#${page}`) history.pushState(null, "", `#${page}`);
+  localStorage.setItem("gndec-compass-last-page", page);
   const pageTitles = { today: "Today", chat: "Ask Compass", timetable: "Timetable", profile: "Profile", settings: "Settings" };
   document.title = `${pageTitles[page] || "Today"} | GNDEC Compass`;
   if (page === "timetable") renderWeek();
@@ -4806,6 +4837,34 @@ function initEvents() {
       window.setTimeout(submitQuestionForm, 60);
     });
   });
+  const holidayBanner = $("holiday-banner");
+  if (holidayBanner) {
+    const handleHolidayBannerAction = (event) => {
+      event.preventDefault();
+      const holidayName = holidayBanner.dataset.holidayName;
+      if (!holidayName) return;
+      const questionInput = $("question-input");
+      if (questionInput) {
+        questionInput.value = `when is ${holidayName.toLowerCase()}`;
+      }
+      activatePage("chat");
+      window.setTimeout(submitQuestionForm, 60);
+    };
+    holidayBanner.addEventListener("click", handleHolidayBannerAction);
+    holidayBanner.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        handleHolidayBannerAction(event);
+      }
+    });
+  }
+  $("source-status-button")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const officialUrl = (state.sourceRegistry?.sources || []).find((source) => source.id === "groups")?.url
+      || state.sourceRegistry?.sources?.[0]?.url
+      || "https://appsc.gndec.ac.in/time_tables";
+    window.open(officialUrl, "_blank", "noopener,noreferrer");
+  });
   document.querySelector(".menu-button").addEventListener("click", (event) => {
     if (!mobileNavigationEnabled()) return;
     const sidebar = document.querySelector(".sidebar");
@@ -4920,7 +4979,13 @@ registerOfflineShell();
 restoreChat();
 renderStudentHistory();
 const initialHashPage = location.hash.slice(1);
-activatePage(["today", "chat", "timetable", "profile", "settings"].includes(initialHashPage) ? initialHashPage : (hasStudentProfile() ? "today" : "profile"), false);
+const savedPage = localStorage.getItem("gndec-compass-last-page") || "";
+const validPages = ["today", "chat", "timetable", "profile", "settings"];
+let pageToActivate = validPages.includes(initialHashPage) ? initialHashPage : null;
+if (!pageToActivate) {
+  pageToActivate = validPages.includes(savedPage) ? savedPage : (hasStudentProfile() ? "today" : "profile");
+}
+activatePage(pageToActivate, false);
 renderEverything();
 synchronizeOfficialData();
 const warmSyllabusIndex = () => { if (!state.syllabus.length) loadOfficialSyllabus().catch(() => { /* PDF fallback remains available when asked */ }); };
