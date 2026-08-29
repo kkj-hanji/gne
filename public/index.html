@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0e14" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="GNDEC Compass — verified timetable, student profile lookup, syllabus help, and a private college-day assistant." />
+    <title>GNDEC Compass | Your college day, schedule, and assistant</title>
+    <link rel="manifest" href="manifest.webmanifest?v=20260821-13" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg?v=20260821-13" />
+    <link rel="apple-touch-icon" href="icon.svg?v=20260821-13" />
+    <link rel="stylesheet" href="styles.css?v=20260829-2" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <noscript><p class="noscript-message">GNDEC Compass needs JavaScript to read the verified timetable saved on this device. Enable JavaScript, then reload this page.</p></noscript>
+    <div class="app-shell">
+      <aside class="sidebar" id="primary-sidebar" aria-label="Primary navigation">
+        <div class="sidebar-head">
+          <a class="brand" href="#today" aria-label="GNDEC Compass home">
+            <span class="brand-mark" aria-hidden="true">G</span>
+            <span class="brand-text"><strong>GNDEC</strong><small>COMPASS</small></span>
+          </a>
+          <button class="sidebar-close-button" id="sidebar-close-button" type="button" aria-label="Close navigation">&times;</button>
+        </div>
+        <nav class="nav-links">
+          <a class="nav-link active" href="#today" data-page-link="today"><span aria-hidden="true">&#9678;</span> Today</a>
+          <a class="nav-link" href="#chat" data-page-link="chat"><span aria-hidden="true">&#9993;</span> Ask Compass</a>
+          <a class="nav-link" href="#timetable" data-page-link="timetable"><span aria-hidden="true">&#9638;</span> Timetable</a>
+          <a class="nav-link" href="#profile" data-page-link="profile"><span aria-hidden="true">&#9787;</span> Profile</a>
+          <a class="nav-link" href="#settings" data-page-link="settings"><span aria-hidden="true">&#9881;</span> Settings</a>
+        </nav>
+        <div class="sidebar-foot">
+          <p>GURU NANAK DEV<br />ENGINEERING COLLEGE</p>
+          <a href="https://gndec.ac.in/" target="_blank" rel="noreferrer noopener">Official website <span aria-hidden="true">&#8599;</span></a>
+        </div>
+      </aside>
+      <button class="sidebar-scrim" type="button" tabindex="-1" aria-hidden="true" aria-label="Close navigation"></button>
+
+      <main class="main-content" id="main-content" tabindex="-1">
+        <header class="topbar">
+          <button class="menu-button" type="button" aria-label="Open navigation" aria-controls="primary-sidebar" aria-expanded="false">&#9776;</button>
+          <div class="topbar-brand"><span class="brand-dot" aria-hidden="true"></span><strong id="topbar-group">Choose your timetable</strong></div>
+          <div class="topbar-time"><span class="pulse" aria-hidden="true"></span><span id="header-date">Loading date</span><span class="divider" aria-hidden="true"></span><time class="clock" id="clock">--:-- PM</time></div>
+        </header>
+
+        <section class="page active" id="today" data-page="today">
+          <div class="hero">
+            <div class="hero-copy">
+              <p class="eyebrow" id="hero-eyebrow">GNDEC COMPASS</p>
+              <h1 id="greeting">Good day.</h1>
+              <p id="intro-copy">Your live timetable is ready for India Standard Time.</p>
+            </div>
+            <div class="hero-status">
+              <div class="hero-chip"><span class="live-dot" aria-hidden="true"></span><strong id="hero-group">Choose your timetable</strong><span class="hero-chip-date" id="hero-date">Loading date</span></div>
+              <button class="freshness-chip" id="source-status-button" type="button" data-go="profile" aria-label="Open data source status"><span class="freshness-dot" aria-hidden="true"></span><span id="source-status-text">Checking official data</span></button>
+            </div>
+          </div>
+
+          <div id="holiday-banner" class="holiday-banner" hidden></div>
+
+          <section class="live-stack" aria-label="Live schedule">
+            <article class="live-card now-card">
+              <div class="card-kicker"><span class="live-dot" aria-hidden="true"></span><span id="now-label">LIVE STATUS</span><span class="kicker-end" id="data-status">No timetable loaded</span></div>
+              <div class="class-state" id="current-state">Your timetable will appear here.</div>
+              <div class="current-class" id="current-class"><strong>Loading the official timetable.</strong><p>Your private, on-device view will be ready in a moment.</p></div>
+              <div class="progress-wrap"><div class="progress-track"><div id="class-progress"></div></div><div class="progress-labels"><span id="progress-start">--:--</span><span id="progress-end">--:--</span></div></div>
+            </article>
+            <div class="next-grid">
+              <article class="live-card next-card">
+                <div class="card-kicker">UP NEXT</div>
+                <div id="next-class" class="agenda-slot"><strong>Waiting for data</strong><span>Refresh from the source page</span></div>
+              </article>
+              <article class="live-card next-card">
+                <div class="card-kicker">THEN</div>
+                <div id="after-next-class" class="agenda-slot muted"><strong>No class selected</strong><span>Choose a group</span></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="quick-ask" aria-label="Quick questions">
+            <div class="quick-ask-head"><p class="eyebrow">ASK COMPASS</p><button class="text-button" type="button" data-go="chat">Open chat <span aria-hidden="true">&#8594;</span></button></div>
+            <div class="question-chips">
+              <button type="button" data-quick="What is my next class?">Next class?</button>
+              <button type="button" data-quick="Aaj ka timetable batao">Aaj ka timetable</button>
+              <button type="button" data-quick="Physics kahan hai?">Physics kahan hai?</button>
+              <button type="button" data-quick="ਅਗਲੀ ਕਲਾਸ ਕਿੱਥੇ ਹੈ?">ਅਗਲੀ ਕਲਾਸ?</button>
+              <button type="button" data-quick="Who is my mentor?">My mentor</button>
+              <button type="button" data-quick="Kal ka timetable batao">Kal ka timetable</button>
+              <button type="button" data-quick="Give me some study tips for physics">Study tips</button>
+            </div>
+          </section>
+
+          <section class="day-section">
+            <div class="section-header">
+              <div><p class="eyebrow" id="day-eyebrow">TODAY'S PLAN</p><h2 id="day-heading">Your schedule</h2></div>
+              <div class="day-actions"><button class="text-button" type="button" id="day-plan-toggle" hidden></button><button class="text-button" type="button" data-go="timetable">View timetable <span aria-hidden="true">&#8594;</span></button></div>
+            </div>
+            <div id="day-schedule" class="schedule-list"><div class="empty-list">Load the official group timetable to see your day here.</div></div>
+          </section>
+        </section>
+
+        <section class="page chat-page" id="chat" data-page="chat">
+          <div class="chat-head">
+            <div>
+              <p class="eyebrow">COMPASS ASSISTANT</p>
+              <h2>Ask Compass</h2>
+              <p class="chat-sub"></p>
+            </div>
+            <div class="chat-actions">
+              <button class="text-button" type="button" id="clear-chat">Clear chat</button>
+              <label class="admin-ai-control" id="admin-ai-control" hidden><span>Admin mode</span><select id="admin-ai-mode"><option value="local-first">Local-first</option><option value="local-only">Local only</option><option value="muse">Fast · Muse</option><option value="gpt-oss">Deep · GPT-OSS</option></select></label>
+              <div class="chat-model-badge" id="chat-model-badge" title="Admin model diagnostics" hidden><span class="live-dot" aria-hidden="true"></span><span id="chat-model-name">AI model</span></div>
+            </div>
+          </div>
+          <div class="chat-window" id="chat-window" role="log" aria-live="polite" aria-relevant="additions" aria-label="Compass conversation">
+            <div class="chat-welcome" id="chat-welcome">
+              <div class="compass-icon" aria-hidden="true">&#10022;</div>
+              <h2>What do you need to know?</h2>
+              <p>Ask about your timetable, syllabus, teacher, room, profile, or a student in the current verified roster. Student searches in chat are read-only and never change your profile. It understands English, Hindi, Punjabi, and Hinglish — even a mix of all four.</p>
+              <div class="question-chips">
+                <button type="button" data-quick="What is my next class?">What is my next class?</button>
+                <button type="button" data-quick="Aaj ka timetable batao">Aaj ka timetable</button>
+                <button type="button" data-quick="Physics kahan hai?">Physics kahan hai?</button>
+                <button type="button" data-quick="ਅਗਲੀ ਕਲਾਸ ਕਿੱਥੇ ਹੈ?">ਅਗਲੀ ਕਲਾਸ ਕਿੱਥੇ ਹੈ?</button>
+              <button type="button" data-quick="Who is my mentor?">Who is my mentor?</button>
+              <button type="button" data-quick="Tomorrow next to next class?">Tomorrow next to next?</button>
+              <button type="button" data-quick="Physics syllabus">Physics syllabus</button>
+              <button type="button" data-quick="Math units">Math units</button>
+              <button type="button" data-quick="who am i?">who am i?</button>
+              </div>
+            </div>
+          </div>
+          <form id="question-form" class="question-form">
+            <label class="visually-hidden" for="question-input">Ask about your timetable</label>
+            <div class="chat-input-wrap">
+              <input id="question-input" role="combobox" list="compass-question-suggestions" autocomplete="off" autocapitalize="sentences" enterkeyhint="send" spellcheck="true" maxlength="1200" aria-autocomplete="list" aria-controls="question-live-suggestions" aria-expanded="false" aria-haspopup="listbox" placeholder="Ask anything in English, Hindi, Punjabi, or Hinglish..." style="background:transparent; position:relative; z-index:2; width:100%;" />
+              <div id="ghost-text-wrap" class="ghost-text"></div>
+            </div>
+            <div class="question-live-suggestions" id="question-live-suggestions" role="listbox" aria-label="Suggested Compass questions" hidden></div>
+            <datalist id="compass-question-suggestions">
+              <option value="What is my next class?"></option><option value="Aaj ka timetable batao"></option><option value="Free lectures today"></option><option value="Physics kahan hai?"></option><option value="Physics syllabus"></option><option value="Math units"></option><option value="PPS course outcomes"></option><option value="Who is my mentor?"></option><option value="Find a student by name or CRN"></option><option value="who am i?"></option><option value="What can you do?"></option>
+            </datalist>
+            <button class="ask-button" type="submit" aria-label="Send question"><span class="ask-send" aria-hidden="true">&#8593;</span></button>
+          </form>
+          <p class="chat-disclaimer">Roster, timetable, and syllabus facts use verified local data. Only open-ended study questions may use external AI, without student identifiers.</p>
+        </section>
+
+        <section class="page" id="timetable" data-page="timetable">
+          <div class="page-intro"><p class="eyebrow">WEEK VIEW</p><h1>Your timetable</h1><p>Filter the timetable by group, day, subject, teacher, or room.</p></div>
+          <div class="timetable-toolbar"><div class="field"><label for="timetable-group">Group / section</label><select id="timetable-group" disabled><option>Load data first</option></select></div><div class="field"><label for="timetable-search">Find a class</label><input id="timetable-search" type="search" inputmode="search" enterkeyhint="search" list="timetable-search-suggestions" autocomplete="off" spellcheck="false" placeholder="Subject, teacher, room..." /><datalist id="timetable-search-suggestions"></datalist></div></div>
+          <p class="timetable-result-status" id="timetable-result-status" role="status" aria-live="polite">No timetable data loaded yet.</p>
+          <div id="week-table" class="week-table" role="region" aria-label="Weekly timetable" aria-describedby="timetable-result-status" tabindex="0"><div class="empty-list">No timetable data loaded yet.</div></div>
+          <div id="week-grid-view" class="week-grid-view" role="region" aria-label="Weekly timetable grid" hidden></div>
+        </section>
+
+        <section class="page" id="profile" data-page="profile">
+          <div class="page-intro">
+            <p class="eyebrow">STUDENT PROFILE</p>
+            <h1 id="profile-name">Set up this device</h1>
+            <p id="profile-tagline">Your name, group, and timetable remain only in this browser.</p>
+          </div>
+
+          <section class="panel onboarding-note" id="onboarding-note">
+            <p class="eyebrow">WELCOME</p>
+            <h2>Make Compass yours</h2>
+            <p>Find your official section using your name, CRN, registration number, or serial number—or choose your timetable manually. This does not change any other student's Compass.</p>
+          </section>
+
+          <section class="panel profile-panel">
+            <div class="profile-grid">
+              <span>CRN <strong id="profile-crn">—</strong></span>
+              <span>Current serial <strong id="profile-serial">—</strong></span>
+              <span>Previous serial history <strong id="profile-old-serials">—</strong></span>
+              <span>Registration <strong id="profile-registration">—</strong></span>
+              <span>Section <strong id="profile-section">Not selected</strong></span>
+              <span>Academic group <strong id="profile-academic-group">Choose a group below</strong></span>
+              <span>Mentor <strong id="profile-mentor">—</strong></span>
+              <span>Mentor phone <strong id="profile-mentor-phone">—</strong></span>
+              <span>Mentor venue <strong id="profile-venue">—</strong></span>
+            </div>
+            <p class="profile-sync-status" id="profile-sync-status" role="status"></p>
+            <p class="profile-data-note">Registration and previous serial history appear only when a verified source publishes them or this device has saved a verified serial change. Compass never guesses missing identifiers.</p>
+          </section>
+
+          <section class="panel">
+            <div class="section-header"><div><p class="eyebrow">TIMETABLE VIEW</p><h2>Change group</h2></div></div>
+            <p class="panel-note">Choose any official branch, section, and subgroup. The selection is saved only in this browser and stays your default.</p>
+            <div class="selection-strip">
+              <div class="field"><label for="group-select">Your group / section</label><select id="group-select" disabled><option>Load timetable data first</option></select></div>
+              <div class="field"><label for="subgroup-select">Your subgroup</label><select id="subgroup-select" disabled><option>All students</option></select></div>
+            </div>
+            <button class="outline-button manual-profile-button" id="save-manual-profile" type="button">Use selected timetable</button>
+          </section>
+
+          <section class="panel">
+            <div class="section-header"><div><p class="eyebrow">VERIFIED PROFILE LOOKUP</p><h2>Find or update my profile</h2></div></div>
+            <p class="panel-note">Search current official rosters using your name, CRN, registration number, current serial, or a previously published serial when that history is available. Duplicate matches are never selected silently.</p>
+            <form class="lookup-form" id="student-lookup-form">
+              <label class="visually-hidden" for="student-name-input">Name, CRN, registration number, or serial number</label>
+              <input id="student-name-input" autocomplete="off" list="student-history" placeholder="Name, CRN, registration, or serial" />
+              <datalist id="student-history"></datalist>
+              <button class="primary-button" type="submit">Find <span aria-hidden="true">&#8594;</span></button>
+            </form>
+            <div class="lookup-result" id="student-lookup-result" aria-live="polite"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-header"><div><p class="eyebrow">DATA & SOURCES</p><h2>Verified data updates</h2></div></div>
+            <p class="panel-note">Compass rechecks verified GNDEC sources automatically when you return to this tab and every 15 minutes. Revised timetable and roster files are detected by content, even when GNDEC keeps the same link or effective date.</p>
+            <div class="source-actions">
+              <button class="primary-button" id="refresh-button" type="button">Check for updates &amp; reload <span aria-hidden="true">&#8635;</span></button>
+              <span id="admin-html-import" hidden>
+                <label class="outline-button file-button" for="file-import">Import timetable HTML <span aria-hidden="true">&#8593;</span></label>
+                <input id="file-import" type="file" accept=".html,.htm,text/html" hidden />
+              </span>
+            </div>
+            <p class="source-error" id="source-error" role="alert" hidden></p>
+            <p class="source-meta" id="refresh-meta">Not loaded yet</p>
+          </section>
+
+          <section class="panel reference-panel">
+            <div class="section-header"><div><p class="eyebrow">OFFICIAL REFERENCES</p><h2>College links</h2></div></div>
+            <p class="panel-note">Current verified GNDEC sources, organised for quick access. Weekly views, one-day schedules, and new notices open only on the official website in a new tab.</p>
+            <div class="reference-links" id="reference-links">
+              <div class="empty-list">Loading current official references…</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" id="settings" data-page="settings">
+          <div class="page-intro page-intro-flex">
+            <div>
+              <p class="eyebrow">PREFERENCES &amp; CONTROLS</p>
+              <h1>Settings</h1>
+              <p>Customize your visual appearance, timetable layout, and device preferences.</p>
+            </div>
+            <div class="settings-header-badge">
+              <span class="pulse" aria-hidden="true"></span>
+              <span>100% Local &amp; Private</span>
+            </div>
+          </div>
+
+          <!-- Section: Display, Theme & Timetable Views -->
+          <section class="panel settings-card">
+            <div class="section-header"><div><p class="eyebrow">DISPLAY &amp; THEME</p><h2>Visual appearance &amp; layout</h2></div></div>
+            <p class="panel-note">Tailor the visual theme, accent colors, and layout formats for your device.</p>
+            <div class="settings-group">
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <strong>Color accent theme</strong>
+                  <p>Personalize highlight colors across navigation, status cards, and badges.</p>
+                </div>
+                <div class="theme-accent-picker" id="theme-accent-picker">
+                  <button type="button" class="accent-dot active" data-accent="emerald" title="Emerald Green" style="--accent-color: #10b981;"></button>
+                  <button type="button" class="accent-dot" data-accent="azure" title="Azure Blue" style="--accent-color: #38bdf8;"></button>
+                  <button type="button" class="accent-dot" data-accent="amber" title="Amber Gold" style="--accent-color: #f59e0b;"></button>
+                  <button type="button" class="accent-dot" data-accent="rose" title="Cyber Rose" style="--accent-color: #f43f5e;"></button>
+                </div>
+              </div>
+
+              <div class="settings-preview-card" id="settings-preview-card">
+                <div class="preview-header">
+                  <span class="preview-tag">LIVE THEME PREVIEW</span>
+                  <span class="preview-badge">ACTIVE THEME</span>
+                </div>
+                <div class="preview-content">
+                  <strong>GNDEC Compass Companion</strong>
+                  <p>Sample schedule card and action pill rendered in your selected accent color.</p>
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <strong>Week-grid timetable view</strong>
+                  <p>Display Monday–Friday in a visual weekly matrix instead of separate cards.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="settings-timetable-grid" checked />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="settings-row" id="settings-swap-axes-row">
+                <div class="settings-row-text">
+                  <strong>Swap Day &amp; Time axes (Transposed Grid)</strong>
+                  <p>Display Days as rows on the left and Time slots as columns across the top (notice-board &amp; Gantt timeline format).</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="settings-timetable-swap-axes" />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <strong>Compact timetable cards</strong>
+                  <p>Render timetable schedule cards with tighter spacing for denser information display.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="settings-compact-view" />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <strong>Answer freshness badges</strong>
+                  <p>Show source revision and verified timestamp below Compass answers.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="settings-freshness-tag" checked />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div id="admin-dashboard-panel" style="display:none;" class="admin-dashboard">
+                <h3>Admin AI Curation Dashboard</h3>
+                <div class="admin-grid">
+                  <div class="admin-stat">
+                    <h4>System Integrity</h4>
+                    <p>Roster Anomalies: <strong id="admin-anomaly-count" style="color:var(--coral);">0</strong></p>
+                    <p>Kernel Version: <strong>2.2</strong></p>
+                  </div>
+                  <div class="admin-stat">
+                    <h4>Active Cache</h4>
+                    <p>Loaded Timetables: <strong>3</strong></p>
+                    <p>Syllabus Nodes: <strong>42</strong></p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-actions" style="margin-top: 16px;">
+                <button class="outline-button" id="reset-conversation-btn" type="button"><span aria-hidden="true">&#8635;</span> Clear conversation memory</button>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <nav class="bottom-nav" aria-label="Mobile navigation">
+      <a class="bottom-link active" href="#today" data-page-link="today"><span aria-hidden="true">&#9678;</span> Today</a>
+      <a class="bottom-link" href="#chat" data-page-link="chat"><span aria-hidden="true">&#9993;</span> Ask Compass</a>
+      <a class="bottom-link" href="#timetable" data-page-link="timetable"><span aria-hidden="true">&#9638;</span> Timetable</a>
+      <a class="bottom-link" href="#profile" data-page-link="profile"><span aria-hidden="true">&#9787;</span> Profile</a>
+    </nav>
+
+    <div class="toast" id="toast" role="status"></div>
+    <script src="brain-kernel.js?v=20260829-2"></script>
+    <script src="brain-v1-2.js?v=20260829-2"></script>
+    <script src="brain-v2-2.js?v=20260829-2"></script>
+    <script src="brain-v2.js?v=20260829-2"></script>
+    <script src="app.js?v=20260829-2"></script>
+  </body>
+</html>
+

@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gndec-compass",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-11",
+  "secrets": {
+    "required": ["MY_NVIDIA_API_KEY"]
+  },
+  "triggers": {
+    "crons": ["17 */4 * * *"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SOURCE_REGISTRY",
+      "id": "bc362ddd3c40427a9e182490f1c35432"
+    }
+  ],
+  "assets": {
+    "directory": "public",
+    "not_found_handling": "single-page-application"
+  }
+}
