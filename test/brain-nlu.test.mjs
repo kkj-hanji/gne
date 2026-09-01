@@ -15,7 +15,7 @@ const sourceUnderTest = appSource.replace(
   ""
 ).replace(
   /function kbClean/,
-  "globalThis.__brainNluTest = { state, buildScheduleIndex, answerWithoutAi, runCompassBrain, canonicalTimetableQuestion, studentLookupRequest, facultyLookupRequest, answerFromKnowledgeBase, resolveChatStudentLookup, resolveChatFacultyLookup, looksLikePlainStudentNameQuery };\nfunction kbClean"
+  "globalThis.__brainNluTest = { state, buildScheduleIndex, answerWithoutAi, runCompassBrain, canonicalTimetableQuestion, isHolidayCalendarQuestion, studentLookupRequest, facultyLookupRequest, answerFromKnowledgeBase, resolveChatStudentLookup, resolveChatFacultyLookup, looksLikePlainStudentNameQuery };\nfunction kbClean"
 );
 
 function createHarness() {
@@ -111,6 +111,15 @@ test("NLU: Student vs Faculty lookup differentiation", () => {
   // Explicit student keyword must not be captured as faculty lookup
   const facultyQFromStudent = api.facultyLookupRequest("student roll 12345");
   assert.equal(facultyQFromStudent, null, "Student query must not route to faculty");
+});
+
+test("NLU: holiday phrases are never routed to a student or faculty search", () => {
+  const { api } = createHarness();
+  ["all holidays", "september holidays", "holidays in september", "gazetted", "restricted holiday", "is 4 september a holiday"].forEach((question) => {
+    assert.equal(api.isHolidayCalendarQuestion(question), true, question);
+    assert.equal(api.studentLookupRequest(question), null, `${question} must not become a student lookup`);
+    assert.equal(api.facultyLookupRequest(question), null, `${question} must not become a faculty lookup`);
+  });
 });
 
 test("NLU: Knowledge Base answers for hostel rules, links, and portals", () => {

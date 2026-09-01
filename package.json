@@ -6,6 +6,7 @@
   "description": "Live GNDEC timetable companion",
   "scripts": {
     "dev": "wrangler dev --port 3000 --ip 0.0.0.0",
+    "start": "wrangler dev --port 3000 --ip 0.0.0.0",
     "deploy": "wrangler deploy",
     "build": "echo 'Applet build successful'",
     "lint": "node --test",
@@ -14,10 +15,10 @@
     "build:syllabus-index": "node scripts/build-syllabus-index.mjs"
   },
   "devDependencies": {
-    "linkedom": "^0.18.13",
-    "wrangler": "^4.68.0"
+    "linkedom": "^0.18.13"
   },
   "dependencies": {
-    "pdfjs-dist": "^4.10.38"
+    "pdfjs-dist": "^4.10.38",
+    "wrangler": "^4.68.0"
   }
 }

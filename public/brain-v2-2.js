@@ -81,17 +81,49 @@
 
   function comparisonRequest(question, context) {
     const q = kernel.normalize(question);
-    if (!/\bcompare\b|\bvs\b|\bversus\b/.test(q)) return null;
+    if (!/\bcompare\b|\bcomparison\b|\bvs\b|\bversus\b|\bdifference\b|\bdifferent\b/.test(q)) return null;
     const parts = q.split(/\bvs\b|\bversus\b/).map((part) => part.trim()).filter(Boolean);
-    if (parts.length !== 2) return null;
+    const symbol = kernel.extractDaySymbol(q);
+    const day = symbol ? kernel.resolveDaySymbol(symbol, String(context?.calendarDate ? kernel.weekdayOfIso(context.calendarDate) : "")) : "";
+    // Natural comparison phrasing also uses “and”, “or”, or “between”, not
+    // only “vs”. Resolve exactly two verified timetable codes; never guess a
+    // pair when three or more were supplied.
+    if (parts.length !== 2) {
+      const codes = [...new Set(codesIn(q))];
+      const own = mentionsOwnTimetable(q);
+      if (codes.length > 2) return { tooMany: codes, day, scopeDay: day };
+      if (codes.length === 2) {
+        return {
+          left: resolveSelection(codes[0], context),
+          right: resolveSelection(codes[1], context),
+          leftOwn: false,
+          rightOwn: false,
+          rawLeft: codes[0],
+          rawRight: codes[1],
+          day,
+          scopeDay: day
+        };
+      }
+      if (own && codes.length === 1) {
+        return {
+          left: activeProfileSelection(context),
+          right: resolveSelection(codes[0], context),
+          leftOwn: true,
+          rightOwn: false,
+          rawLeft: "",
+          rawRight: codes[0],
+          day,
+          scopeDay: day
+        };
+      }
+      return null;
+    }
     // "my timetable vs ECB2" resolves the own side from the device profile.
     const leftOwn = mentionsOwnTimetable(parts[0]);
     const rightOwn = mentionsOwnTimetable(parts[1]);
     const leftToken = leftOwn ? "" : lastCode(parts[0]);
     const rightToken = rightOwn ? "" : firstCode(parts[1]);
     if ((!leftToken && !leftOwn) || (!rightToken && !rightOwn)) return null;
-    const symbol = kernel.extractDaySymbol(q);
-    const day = symbol ? kernel.resolveDaySymbol(symbol, String(context?.calendarDate ? kernel.weekdayOfIso(context.calendarDate) : "")) : "";
     return {
       left: leftOwn ? activeProfileSelection(context) : resolveSelection(leftToken, context),
       right: rightOwn ? activeProfileSelection(context) : resolveSelection(rightToken, context),
@@ -212,6 +244,13 @@
   function comparisonAnswer(question, context) {
     const request = comparisonRequest(question, context);
     if (!request) return null;
+    if (Array.isArray(request.tooMany) && request.tooMany.length > 2) {
+      return kernel.result("COMPARE_CLARIFY", 0.95,
+        `<p>I found ${kernel.escapeHtml(String(request.tooMany.length))} timetable codes: <strong>${kernel.escapeHtml(request.tooMany.join(", "))}</strong>.</p><p>Compass compares two at a time. Try: <strong>Compare ${kernel.escapeHtml(request.tooMany[0])} vs ${kernel.escapeHtml(request.tooMany[1])}</strong>.</p><p class="answer-source">Only verified timetable codes are used; Compass does not choose a pair silently.</p>`,
+        { codes: request.tooMany, scopeDay: request.scopeDay || "" },
+        ["detect all supplied timetable codes", "keep comparison bounded to two verified selections", "ask for a precise pair"],
+        { comparison: null });
+    }
     if (!request.left?.match || !request.right?.match) {
       const failedSide = !request.left?.match ? request.left : request.right;
       const missing = !request.left?.match ? "first" : "second";
@@ -470,6 +509,18 @@
       const holiday = kernel.checkDateHoliday(targetIso);
       if (holiday) {
         const formatted = kernel.formatIsoFull(targetIso);
+        if (kernel.isHalfDayNotice?.(holiday)) {
+          return kernel.result("TIMETABLE_HALF_DAY_NOTICE", 0.98,
+            `<p><strong>${kernel.escapeHtml(formatted)} has a second-half-day GNDEC notice.</strong></p><p>${kernel.escapeHtml(holiday.name)} is not a full-day closure. Check the GNDEC notice before assuming your classes are cancelled.</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`,
+            { iso: targetIso, partialDay: true, notice: holiday.name },
+            ["resolve requested schedule date", "check official half-day notice", "avoid claiming a cancelled timetable"]);
+        }
+        if (String(holiday.type || "").toLowerCase() === "restricted") {
+          return kernel.result("TIMETABLE_RESTRICTED_HOLIDAY_NOTICE", 0.98,
+            `<p><strong>${kernel.escapeHtml(formatted)} is listed as a Restricted Holiday.</strong></p><p>${kernel.escapeHtml(holiday.name)} is optional leave; college may be open, so classes may happen. Check the GNDEC notice.</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`,
+            { iso: targetIso, restricted: true, notice: holiday.name },
+            ["resolve requested schedule date", "check restricted holiday entry", "avoid claiming a cancelled timetable"]);
+        }
         return kernel.result("TIMETABLE_HOLIDAY_ALERT", 0.98,
           `<p><strong>🎉 No classes scheduled on ${kernel.escapeHtml(formatted)}!</strong></p><p>It is an official <strong>${kernel.escapeHtml(holiday.type)} Holiday</strong> for <strong>${kernel.escapeHtml(holiday.name)}</strong>.</p><p>College remains closed for this gazetted occasion (${kernel.escapeHtml(holiday.description)}).</p><p class="answer-source">Official GNDEC Academic & Gazetted Holiday Calendar.</p>`,
           { iso: targetIso, isHoliday: true, holiday: holiday.name },

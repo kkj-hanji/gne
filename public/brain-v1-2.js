@@ -118,11 +118,13 @@
     if (!asksHoliday) return null;
     const restrictedHolidayExplanation = "Optional leave. College may be open, so classes may happen. Check the GNDEC notice.";
     const gazettedHolidayExplanation = "Official holiday. College is normally closed. Check the GNDEC notice if anything changes.";
+    const halfDayNoticeExplanation = "Second-half-day notice only. Do not assume the full day or all classes are cancelled; check the GNDEC notice.";
     const holidayCategoryNote = (holidays = []) => {
       const list = Array.isArray(holidays) ? holidays : [holidays];
       const notes = [];
       if (list.some((holiday) => String(holiday?.type || "").toLowerCase() === "gazetted")) notes.push(`<strong>Gazetted:</strong> ${kernel.escapeHtml(gazettedHolidayExplanation)}`);
-      if (list.some((holiday) => holiday?.closed === false || String(holiday?.type || "").toLowerCase() === "restricted")) notes.push(`<strong>Restricted:</strong> ${kernel.escapeHtml(restrictedHolidayExplanation)}`);
+      if (list.some((holiday) => String(holiday?.type || "").toLowerCase() === "restricted")) notes.push(`<strong>Restricted:</strong> ${kernel.escapeHtml(restrictedHolidayExplanation)}`);
+      if (list.some((holiday) => kernel.isHalfDayNotice?.(holiday))) notes.push(`<strong>Second-half-day notice:</strong> ${kernel.escapeHtml(halfDayNoticeExplanation)}`);
       return notes.length ? `<p class="kb-tip"><strong>Holiday labels</strong><br />${notes.join("<br />")}</p>` : "";
     };
     const asksRestrictedHolidayMeaning = /^(?:restricted|restricted\s+holiday)$/.test(q) || /(?:\b(?:what(?:\s+is|'s)?|meaning|mean|define|definition|explain)\b.*\brestricted\s+holiday\b)|(?:\brestricted\s+holiday\b.*\b(?:meaning|mean|definition)\b)/.test(q);
@@ -189,7 +191,13 @@
       const holiday = kernel.checkDateHoliday(checkIso);
       const formattedDate = kernel.formatIsoFull(checkIso);
       if (holiday) {
-        if (holiday.closed === false) {
+        if (kernel.isHalfDayNotice?.(holiday)) {
+          return kernel.result("HOLIDAY_HALF_DAY_NOTICE", 0.99,
+            `<p><strong>${kernel.escapeHtml(formattedDate)} has a GNDEC second-half-day notice:</strong></p><p><strong>${kernel.escapeHtml(holiday.name)}</strong></p><p>${kernel.escapeHtml(halfDayNoticeExplanation)}</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`,
+            { iso: checkIso, isHoliday: false, partialDay: true, holiday: holiday.name, type: holiday.type },
+            ["resolve target date", "match official GNDEC half-day notice", "avoid claiming a full-day closure"]);
+        }
+        if (String(holiday.type || "").toLowerCase() === "restricted") {
           return kernel.result("HOLIDAY_DATE_CHECK", 0.99,
             `<p><strong>${kernel.escapeHtml(formattedDate)} is listed as a Restricted Holiday:</strong></p><p><strong>${kernel.escapeHtml(holiday.name)}</strong> (${kernel.escapeHtml(holiday.type)} Holiday)</p>${holidayCategoryNote([holiday])}<p class="answer-source">Official GNDEC & Punjab Government Holiday Calendar.</p>`,
             { iso: checkIso, isHoliday: true, closed: false, holiday: holiday.name, type: holiday.type },
@@ -217,6 +225,7 @@
       const monthIndex = kernel.MONTHS[mentionedMonth];
       const monthName = kernel.MONTH_NAMES[monthIndex];
       const list = kernel.getHolidaysForMonth(monthIndex, requestedYear);
+      const notices = kernel.getHolidayNoticesForMonth?.(monthIndex, requestedYear) || [];
       if (!list.length) {
         return kernel.result("HOLIDAY_COUNT_MONTH", 0.98,
           `<p><strong>There are no gazetted holidays listed in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(requestedYear))}.</strong></p><p>Regular classes and academic sessions run as scheduled.</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
@@ -225,8 +234,9 @@
       }
       const items = list.map((h) => `<li><strong>${kernel.escapeHtml(h.date.slice(8, 10))} ${kernel.escapeHtml(monthName)} (${kernel.escapeHtml(h.day)})</strong>: ${kernel.escapeHtml(h.name)} <em>(${kernel.escapeHtml(h.type)})</em></li>`).join("");
       const categoryNote = holidayCategoryNote(list);
+      const noticeNote = notices.length ? `<p class="kb-tip"><strong>Also published:</strong> ${notices.map((h) => `${kernel.escapeHtml(h.date.slice(8, 10))} ${kernel.escapeHtml(monthName)} — ${kernel.escapeHtml(h.name)} (second-half-day notice)`).join("; ")}. ${kernel.escapeHtml(halfDayNoticeExplanation)}</p>` : "";
       return kernel.result("HOLIDAY_COUNT_MONTH", 0.99,
-        `<p><strong><u>Official Holidays in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(requestedYear))} (${list.length})</u></strong></p><ul>${items}</ul>${categoryNote}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
+        `<p><strong><u>Official Holidays in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(requestedYear))} (${list.length})</u></strong></p><ul>${items}</ul>${noticeNote}${categoryNote}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
         { month: monthName, count: list.length, holidays: list.map((h) => h.name) },
         ["identify requested month", "query gazetted calendar", "list verified holidays with days and dates"]);
     }
@@ -251,10 +261,12 @@
       || /\bsaal\s+me\s+kitni\s+chutti\b/.test(q);
     if (asksFullYearHolidays) {
       const allHolidays = kernel.getHolidaysForYear(requestedYear, true);
+      const notices = kernel.getHolidayNoticesForYear?.(requestedYear) || [];
       const items = allHolidays.map((h) => `<li><strong>${kernel.escapeHtml(kernel.formatIsoFull(h.date))}</strong>: ${kernel.escapeHtml(h.name)} <em>(${kernel.escapeHtml(h.type)})</em></li>`).join("");
       const categoryNote = holidayCategoryNote(allHolidays);
+      const noticeNote = notices.length ? `<p class="kb-tip"><strong>Separate second-half-day notices (${notices.length}):</strong> ${notices.map((h) => `${kernel.escapeHtml(kernel.formatIsoFull(h.date))} — ${kernel.escapeHtml(h.name)}`).join("; ")}. ${kernel.escapeHtml(halfDayNoticeExplanation)}</p>` : "";
       return kernel.result("HOLIDAY_YEAR_TOTAL", 0.99,
-        `<p><strong><u>GNDEC Official Holidays for ${kernel.escapeHtml(String(requestedYear))} (${allHolidays.length} Total)</u></strong></p><p>Includes Gazetted, National, and Restricted entries from the official list.</p><ol>${items}</ol>${categoryNote}<p class="answer-source"><a href="${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.pdf)}" target="_blank" rel="noopener noreferrer">${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`,
+        `<p><strong><u>GNDEC Official Holidays for ${kernel.escapeHtml(String(requestedYear))} (${allHolidays.length} official-list entries)</u></strong></p><p>Includes Gazetted, National, and Restricted entries from the official list.</p><ol>${items}</ol>${noticeNote}${categoryNote}<p class="answer-source"><a href="${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.pdf)}" target="_blank" rel="noopener noreferrer">${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`,
         { year: requestedYear, total: allHolidays.length },
         ["query full-year official calendar", "format complete holiday list"]);
     }
@@ -276,8 +288,9 @@
     if (searchResults.length) {
       const h = searchResults[0];
       const categoryNote = holidayCategoryNote([h]);
+      const status = kernel.isHalfDayNotice?.(h) ? "Second-half-day notice; check the GNDEC notice." : h.closed ? "College normally closed." : "Restricted holiday; college may be open.";
       return kernel.result("HOLIDAY_FESTIVAL_SEARCH", 0.98,
-        `<p><strong>${kernel.escapeHtml(h.name)} (${kernel.escapeHtml(String(baseYear))}):</strong></p><p><strong>Date:</strong> ${kernel.escapeHtml(kernel.formatIsoFull(h.date))}<br /><strong>Category:</strong> ${kernel.escapeHtml(h.type)} Holiday (${h.closed ? "College closed" : "Restricted holiday"})<br /><strong>Significance:</strong> ${kernel.escapeHtml(h.description)}</p>${categoryNote}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`,
+        `<p><strong>${kernel.escapeHtml(h.name)} (${kernel.escapeHtml(String(baseYear))}):</strong></p><p><strong>Date:</strong> ${kernel.escapeHtml(kernel.formatIsoFull(h.date))}<br /><strong>Category:</strong> ${kernel.escapeHtml(h.type)}<br /><strong>Status:</strong> ${kernel.escapeHtml(status)}<br /><strong>Significance:</strong> ${kernel.escapeHtml(h.description)}</p>${categoryNote}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`,
         { holiday: h.name, date: h.date },
         ["search holiday registry by keyword", "render exact verified date and category"]);
     }

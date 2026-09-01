@@ -509,47 +509,89 @@
     label: "GNDEC List of Holidays Year 2026"
   });
   const OFFICIAL_HOLIDAYS_2026 = Object.freeze([
-    { date: "2026-01-26", month: 0, day: "Monday", name: "Republic Day", nameHi: "गणतंत्र दिवस", namePa: "ਗਣਤੰਤਰ ਦਿਵਸ", type: "National", closed: true, description: "National holiday celebrating the Constitution of India." },
-    { date: "2026-03-03", month: 2, day: "Tuesday", name: "Maha Shivratri", nameHi: "महाशिवरात्रि", namePa: "ਮਹਾ ਸ਼ਿਵਰਾਤਰੀ", type: "Gazetted", closed: true, description: "Gazetted festival holiday." },
+    { date: "2026-01-26", month: 0, day: "Monday", name: "Republic Day", nameHi: "गणतंत्र दिवस", namePa: "ਗਣਤੰਤਰ ਦਿਵਸ", type: "National", closed: true, description: "National holiday." },
+    { date: "2026-02-01", month: 1, day: "Sunday", name: "Birthday Sri Guru Ravidass Ji", nameHi: "श्री गुरु रविदास जयंती", namePa: "ਸ੍ਰੀ ਗੁਰੂ ਰਵਿਦਾਸ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-02-15", month: 1, day: "Sunday", name: "Maha Shivratri", nameHi: "महाशिवरात्रि", namePa: "ਮਹਾ ਸ਼ਿਵਰਾਤਰੀ", type: "Gazetted", closed: true, description: "Gazetted festival holiday." },
     { date: "2026-03-04", month: 2, day: "Wednesday", name: "Holi", nameHi: "होली", namePa: "ਹੋਲੀ", type: "Gazetted", closed: true, description: "Festival of colours." },
-    { date: "2026-03-23", month: 2, day: "Monday", name: "Shaheedi Diwas of S. Bhagat Singh, Rajguru & Sukhdev Ji", nameHi: "शहीदी दिवस", namePa: "ਸ਼ਹੀਦੀ ਦਿਵਸ", type: "Gazetted", closed: true, description: "State holiday commemorating the martyrs." },
-    { date: "2026-03-30", month: 2, day: "Monday", name: "Id-ul-Fitr", nameHi: "ईद-उल-फ़ित्र", namePa: "ਈਦ-ਉਲ-ਫਿਤਰ", type: "Gazetted", closed: true, description: "Gazetted religious holiday." },
+    { date: "2026-03-21", month: 2, day: "Saturday", name: "Id-Ul-Fiter", nameHi: "ईद-उल-फ़ित्र", namePa: "ਈਦ-ਉਲ-ਫਿਤਰ", type: "Gazetted", closed: true, description: "Gazetted religious holiday." },
+    { date: "2026-03-23", month: 2, day: "Monday", name: "Martyrdom Day of Shaheed-e-Azam Bhagat Singh, Sukhdev and Rajguru Ji", nameHi: "शहीदी दिवस", namePa: "ਸ਼ਹੀਦੀ ਦਿਵਸ", type: "Gazetted", closed: true, description: "State holiday commemorating the martyrs." },
+    { date: "2026-03-26", month: 2, day: "Thursday", name: "Ram Navmi", nameHi: "राम नवमी", namePa: "ਰਾਮ ਨਵਮੀ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-03-30", month: 2, day: "Monday", name: "Nagar Kirtan (Mahavir Jayanti)", nameHi: "नगर कीर्तन", namePa: "ਨਗਰ ਕੀਰਤਨ", type: "Half-day", closed: false, description: "Second half-day holiday to join Nagar Kirtan." },
+    { date: "2026-03-31", month: 2, day: "Tuesday", name: "Mahavir Jayanti", nameHi: "महावीर जयंती", namePa: "ਮਹਾਵੀਰ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
     { date: "2026-04-03", month: 3, day: "Friday", name: "Good Friday", nameHi: "गुड फ्राइडे", namePa: "ਗੁੱਡ ਫਰਾਈਡੇ", type: "Gazetted", closed: true, description: "Gazetted Christian holiday." },
-    { date: "2026-04-08", month: 3, day: "Wednesday", name: "Birthday of Sri Guru Nabha Dass Ji", nameHi: "गुरु नाभा दास जयंती", namePa: "ਗੁਰੂ ਨਾਭਾ ਦਾਸ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Punjab state gazetted holiday." },
-    { date: "2026-04-13", month: 3, day: "Monday", name: "Vaisakhi", nameHi: "बैसाखी", namePa: "ਵਿਸਾਖੀ", type: "Gazetted", closed: true, description: "Harvest festival and Khalsa Sirjana Diwas." },
-    { date: "2026-04-14", month: 3, day: "Tuesday", name: "Birthday of Dr. B.R. Ambedkar", nameHi: "डॉ. बी.आर. अम्बेडकर जयंती", namePa: "ਡਾ. ਬੀ.ਆਰ. ਅੰਬੇਡਕਰ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "National commemoration." },
-    { date: "2026-05-01", month: 4, day: "Friday", name: "May Day / Labour Day", nameHi: "मई दिवस", namePa: "ਮਈ ਦਿਵਸ", type: "Gazetted", closed: true, description: "International Workers' Day." },
-    { date: "2026-05-31", month: 4, day: "Sunday", name: "Martyrdom Day of Sri Guru Arjan Dev Ji", nameHi: "गुरु अर्जुन देव जी शहीदी दिवस", namePa: "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਸ਼ਹੀਦੀ ਦਿਹਾੜਾ", type: "Gazetted", closed: true, description: "Commemoration of the 5th Sikh Guru." },
-    { date: "2026-06-07", month: 5, day: "Sunday", name: "Id-ul-Zuha (Bakrid)", nameHi: "बकरीद", namePa: "ਬਕਰੀਦ", type: "Gazetted", closed: true, description: "Gazetted Islamic festival." },
-    { date: "2026-07-07", month: 6, day: "Tuesday", name: "Muharram", nameHi: "मोहर्रम", namePa: "ਮੁਹੱਰਮ", type: "Gazetted", closed: true, description: "Gazetted religious commemoration." },
+    { date: "2026-04-14", month: 3, day: "Tuesday", name: "Baisakhi & Birthday Dr. B.R. Ambedkar", nameHi: "बैसाखी और डॉ. बी.आर. अम्बेडकर जयंती", namePa: "ਵਿਸਾਖੀ ਅਤੇ ਡਾ. ਬੀ.ਆਰ. ਅੰਬੇਡਕਰ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Baisakhi and Birthday of Dr. B.R. Ambedkar." },
+    { date: "2026-04-19", month: 3, day: "Sunday", name: "Bhagwan Parshu Ram Janam Utsav", nameHi: "भगवान परशुराम जन्म उत्सव", namePa: "ਭਗਵਾਨ ਪਰਸ਼ੂਰਾਮ ਜਨਮ ਉਤਸਵ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-05-01", month: 4, day: "Friday", name: "May Diwas", nameHi: "मई दिवस", namePa: "ਮਈ ਦਿਵਸ", type: "Gazetted", closed: true, description: "May Day / Labour Day." },
+    { date: "2026-05-27", month: 4, day: "Wednesday", name: "Id-ul-Juha (Bakreed)", nameHi: "बकरीद", namePa: "ਬਕਰੀਦ", type: "Gazetted", closed: true, description: "Gazetted Islamic festival." },
+    { date: "2026-06-17", month: 5, day: "Wednesday", name: "Nagar Kirtan (Sri Guru Arjan Dev Ji)", nameHi: "नगर कीर्तन", namePa: "ਨਗਰ ਕੀਰਤਨ", type: "Half-day", closed: false, description: "Second half-day holiday to join Nagar Kirtan." },
+    { date: "2026-06-18", month: 5, day: "Thursday", name: "Martyrdom Day of Sri Guru Arjan Dev JI", nameHi: "गुरु अर्जुन देव जी शहीदी दिवस", namePa: "ਗੁਰੂ ਅਰਜਨ ਦੇਵ ਜੀ ਸ਼ਹੀਦੀ ਦਿਹਾੜਾ", type: "Gazetted", closed: true, description: "Commemoration of the 5th Sikh Guru." },
+    { date: "2026-06-29", month: 5, day: "Monday", name: "Kabir Jayanti", nameHi: "कबीर जयंती", namePa: "ਕਬੀਰ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-07-31", month: 6, day: "Friday", name: "Martyrdom Day Shaheed Udham Singh Ji", nameHi: "शहीद उधम सिंह शहीदी दिवस", namePa: "ਸ਼ਹੀਦ ਊਧਮ ਸਿੰਘ ਸ਼ਹੀਦੀ ਦਿਹਾੜਾ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
     { date: "2026-08-15", month: 7, day: "Saturday", name: "Independence Day", nameHi: "स्वतंत्रता दिवस", namePa: "ਸੁਤੰਤਰਤਾ ਦਿਵਸ", type: "National", closed: true, description: "National Independence Day of India." },
-    { date: "2026-08-27", month: 7, day: "Thursday", name: "Parkash Utsav of Sri Guru Granth Sahib Ji", nameHi: "प्रकाश उत्सव गुरु ग्रंथ साहिब", namePa: "ਪ੍ਰਕਾਸ਼ ਪੁਰਬ ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ", type: "Gazetted", closed: true, description: "First installation of Sri Guru Granth Sahib Ji." },
-    { date: "2026-09-01", month: 8, day: "Tuesday", name: "Teej", nameHi: "तीज", namePa: "ਤੀਜ", type: "Restricted", closed: false, description: "Restricted festival holiday — Hartalika Teej." },
-    { date: "2026-10-02", month: 9, day: "Friday", name: "Mahatma Gandhi Jayanti", nameHi: "गांधी जयंती", namePa: "ਗਾਂਧੀ ਜੈਅੰਤੀ", type: "National", closed: true, description: "Birth anniversary of Mahatma Gandhi." },
-    { date: "2026-10-20", month: 9, day: "Tuesday", name: "Dussehra (Vijay Dashami)", nameHi: "दशहरा", namePa: "ਦੁਸਹਿਰਾ", type: "Gazetted", closed: true, description: "Victory of good over evil." },
-    { date: "2026-10-27", month: 9, day: "Tuesday", name: "Parkash Gurparab of Sri Guru Ram Dass Sahib Ji", nameHi: "गुरु राम दास जी प्रकाश पर्व", namePa: "ਸ੍ਰੀ ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ ਪ੍ਰਕਾਸ਼ ਪੁਰਬ", type: "Restricted", closed: false, description: "Restricted holiday commemorating Sri Guru Ram Dass Ji." },
-    { date: "2026-10-29", month: 9, day: "Thursday", name: "Birthday of Maharishi Valmiki Ji", nameHi: "महर्षि वाल्मीकि जयंती", namePa: "ਮਹਾਰਿਸ਼ੀ ਵਾਲਮੀਕਿ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Birth anniversary of Maharishi Valmiki Ji." },
-    { date: "2026-11-08", month: 10, day: "Sunday", name: "Diwali", nameHi: "दीवाली", namePa: "ਦੀਵਾਲੀ", type: "Gazetted", closed: true, description: "Festival of lights & Bandi Chhor Diwas." },
-    { date: "2026-11-09", month: 10, day: "Monday", name: "Vishwakarma Day / Goverdhan Pooja", nameHi: "विश्वकर्मा दिवस", namePa: "ਵਿਸ਼ਵਕਰਮਾ ਦਿਵਸ", type: "Gazetted", closed: true, description: "Day honoring Lord Vishwakarma and craftsmanship." },
-    { date: "2026-11-11", month: 10, day: "Wednesday", name: "Gurgaddi Diwas of Sri Guru Granth Sahib Ji", nameHi: "गुरु ग्रंथ साहिब गुरुगद्दी दिवस", namePa: "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਗੁਰਗੱਦੀ ਦਿਵਸ", type: "Restricted", closed: false, description: "Restricted holiday honoring Gurgaddi Diwas." },
-    { date: "2026-11-24", month: 10, day: "Tuesday", name: "Birthday of Sri Guru Nanak Dev Ji (Gurpurab)", nameHi: "गुरु नानक जयंती", namePa: "ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਪ੍ਰਕਾਸ਼ ਪੁਰਬ", type: "Gazetted", closed: true, description: "Birth anniversary of the first Sikh Guru." },
-    { date: "2026-12-08", month: 11, day: "Tuesday", name: "Martyrdom Day of Sri Guru Teg Bahadur Ji", nameHi: "गुरु तेग बहादुर शहीदी दिवस", namePa: "ਗੁਰੂ ਤੇਗ ਬਹਾਦਰ ਜੀ ਸ਼ਹੀਦੀ ਦਿਹਾੜਾ", type: "Gazetted", closed: true, description: "Commemoration of the 9th Sikh Guru." },
-    { date: "2026-12-24", month: 11, day: "Thursday", name: "Christmas Eve", nameHi: "क्रिसमस पूर्व संध्या", namePa: "ਕ੍ਰਿਸਮਿਸ ਦੀ ਪੂਰਵ ਸੰਧਿਆ", type: "Restricted", closed: false, description: "Restricted holiday — Christmas Eve." },
-    { date: "2026-12-25", month: 11, day: "Friday", name: "Christmas Day", nameHi: "क्रिसमस", namePa: "ਕ੍ਰਿਸਮਿਸ", type: "Gazetted", closed: true, description: "Christmas celebration." }
+    { date: "2026-09-03", month: 8, day: "Thursday", name: "Nagar Kirtan (Janam Ashtami)", nameHi: "नगर कीर्तन", namePa: "ਨਗਰ ਕੀਰਤਨ", type: "Half-day", closed: false, description: "Second half-day holiday to join Nagar Kirtan." },
+    { date: "2026-09-04", month: 8, day: "Friday", name: "Janam Ashtami", nameHi: "जन्माष्टमी", namePa: "ਜਨਮ ਅਸ਼ਟਮੀ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-10-02", month: 9, day: "Friday", name: "Birthday Mahatma Gandhi Ji", nameHi: "गांधी जयंती", namePa: "ਗਾਂਧੀ ਜੈਅੰਤੀ", type: "National", closed: true, description: "Birth anniversary of Mahatma Gandhi." },
+    { date: "2026-10-11", month: 9, day: "Sunday", name: "Maharaj Aggarsain Jayanti", nameHi: "महाराज अग्रसेन जयंती", namePa: "ਮਹਾਰਾਜ ਅਗਰਸੈਨ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-10-20", month: 9, day: "Tuesday", name: "Dussehra", nameHi: "दशहरा", namePa: "ਦੁਸਹਿਰਾ", type: "Gazetted", closed: true, description: "Victory of good over evil." },
+    { date: "2026-10-26", month: 9, day: "Monday", name: "Birthday Maharishi Balmiki Ji", nameHi: "महर्षि वाल्मीकि जयंती", namePa: "ਮਹਾਰਿਸ਼ੀ ਵਾਲਮੀਕਿ ਜੈਅੰਤੀ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-10-27", month: 9, day: "Tuesday", name: "Parkash Gurparab Sri Guru Ram Dass Sahib Ji", nameHi: "गुरु राम दास जी प्रकाश पर्व", namePa: "ਸ੍ਰੀ ਗੁਰੂ ਰਾਮ ਦਾਸ ਜੀ ਪ੍ਰਕਾਸ਼ ਪੁਰਬ", type: "Restricted", closed: false, description: "Restricted holiday." },
+    { date: "2026-11-08", month: 10, day: "Sunday", name: "Diwali", nameHi: "दीवाली", namePa: "ਦੀਵਾਲੀ", type: "Gazetted", closed: true, description: "Festival of lights." },
+    { date: "2026-11-09", month: 10, day: "Monday", name: "Vishwakarma Day", nameHi: "विश्वकर्मा दिवस", namePa: "ਵਿਸ਼ਵਕਰਮਾ ਦਿਵਸ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-11-11", month: 10, day: "Wednesday", name: "Gurgaddi Diwas Sri Guru Granth Sahib Ji", nameHi: "गुरु ग्रंथ साहिब गुरुगद्दी दिवस", namePa: "ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਗੁਰਗੱਦੀ ਦਿਵਸ", type: "Restricted", closed: false, description: "Restricted holiday." },
+    { date: "2026-11-16", month: 10, day: "Monday", name: "Martyrdom Day of S. Kartar Singh Sarabha Ji", nameHi: "शहीद करतार सिंह सराभा शहीदी दिवस", namePa: "ਸ਼ਹੀਦ ਕਰਤਾਰ ਸਿੰਘ ਸਰਾਭਾ ਸ਼ਹੀਦੀ ਦਿਹਾੜਾ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-11-23", month: 10, day: "Monday", name: "Nagar Kirtan (Sri Guru Nanak Dev Ji)", nameHi: "नगर कीर्तन", namePa: "ਨਗਰ ਕੀਰਤਨ", type: "Half-day", closed: false, description: "Second half-day holiday to join Nagar Kirtan." },
+    { date: "2026-11-24", month: 10, day: "Tuesday", name: "Birthday Sri Guru Nanak Dev Sahib Ji", nameHi: "गुरु नानक जयंती", namePa: "ਗੁਰੂ नानਕ ਦੇਵ ਜੀ ਪ੍ਰਕਾਸ਼ ਪੁਰਬ", type: "Gazetted", closed: true, description: "Gazetted holiday." },
+    { date: "2026-12-14", month: 11, day: "Monday", name: "Martyrdom Day of Sri Guru Teg Bahadur Ji", nameHi: "गुरु तेग बहादुर शहीदी दिवस", namePa: "ਗੁਰੂ ਤੇਗ ਬਹਾਦਰ ਜੀ ਸ਼ਹੀਦੀ ਦਿਹਾੜਾ", type: "Gazetted", closed: true, description: "Commemoration of the 9th Sikh Guru." },
+    { date: "2026-12-25", month: 11, day: "Friday", name: "Christmas Day", nameHi: "क्रिसमस", namePa: "ਕ੍ਰਿਸਮਿਸ", type: "Gazetted", closed: true, description: "Christmas celebration." },
+    { date: "2026-12-28", month: 11, day: "Monday", name: "Shaheedi Sabha Fatehgarh Sahib", nameHi: "शहीदी सभा फतेहगढ़ साहिब", namePa: "ਸ਼ਹੀਦੀ ਸਭਾ ਫਤਹਿਗੜ੍ਹ ਸਾਹਿਬ", type: "Gazetted", closed: true, description: "Gazetted holiday." }
   ]);
 
-  function getHolidaysForYear(year = 2026, includeRestricted = true) {
-    return OFFICIAL_HOLIDAYS_2026.filter((h) => Number(h.date.slice(0, 4)) === Number(year) && (includeRestricted || h.type !== "Restricted"));
+  function officialHolidayEntries() {
+    // The source lists Baisakhi and Dr. B. R. Ambedkar's birthday as two
+    // entries on 14 April. Older bundled data combined them, so expand that
+    // historic representation before any answer, count, or search uses it.
+    return OFFICIAL_HOLIDAYS_2026.flatMap((holiday) => holiday.name === "Baisakhi & Birthday Dr. B.R. Ambedkar"
+      ? [
+        { ...holiday, name: "Baisakhi", description: "Gazetted holiday." },
+        { ...holiday, name: "Birthday Dr. B.R. Ambedkar", description: "Gazetted holiday." }
+      ]
+      : [holiday]);
   }
 
-  function getHolidaysForMonth(monthIndex, year = 2026, includeRestricted = true) {
+  function isHalfDayNotice(holiday) {
+    return String(holiday?.type || "").toLowerCase() === "half-day";
+  }
+
+  function officialHolidayFilter(holiday, includeRestricted = true, includeHalfDayNotices = false) {
+    if (!includeHalfDayNotices && isHalfDayNotice(holiday)) return false;
+    if (!includeRestricted && String(holiday?.type || "").toLowerCase() === "restricted") return false;
+    return true;
+  }
+
+  // A second-half-day notice is important, but it is not a whole holiday.
+  // Keep it separate from normal counts/lists so it cannot be called
+  // "Restricted" or interpreted as an all-day closure.
+  function getHolidaysForYear(year = 2026, includeRestricted = true, includeHalfDayNotices = false) {
+    return officialHolidayEntries().filter((h) => Number(h.date.slice(0, 4)) === Number(year) && officialHolidayFilter(h, includeRestricted, includeHalfDayNotices));
+  }
+
+  function getHolidaysForMonth(monthIndex, year = 2026, includeRestricted = true, includeHalfDayNotices = false) {
     const numericMonth = Number(monthIndex);
-    return OFFICIAL_HOLIDAYS_2026.filter((h) => h.month === numericMonth && Number(h.date.slice(0, 4)) === Number(year) && (includeRestricted || h.type !== "Restricted"));
+    return officialHolidayEntries().filter((h) => h.month === numericMonth && Number(h.date.slice(0, 4)) === Number(year) && officialHolidayFilter(h, includeRestricted, includeHalfDayNotices));
+  }
+
+  function getHolidayNoticesForYear(year = 2026) {
+    return officialHolidayEntries().filter((h) => Number(h.date.slice(0, 4)) === Number(year) && isHalfDayNotice(h));
+  }
+
+  function getHolidayNoticesForMonth(monthIndex, year = 2026) {
+    const numericMonth = Number(monthIndex);
+    return officialHolidayEntries().filter((h) => h.month === numericMonth && Number(h.date.slice(0, 4)) === Number(year) && isHalfDayNotice(h));
   }
 
   function checkDateHoliday(isoDate) {
     if (!isValidIsoDate(isoDate)) return null;
-    const match = OFFICIAL_HOLIDAYS_2026.find((h) => h.date === isoDate);
+    const match = officialHolidayEntries().find((h) => h.date === isoDate);
     return match || null;
   }
 
@@ -557,16 +599,16 @@
     return Boolean(checkDateHoliday(isoDate));
   }
 
-  function getNextHoliday(currentIsoDate, includeRestricted = true) {
+  function getNextHoliday(currentIsoDate, includeRestricted = true, includeHalfDayNotices = false) {
     const base = isValidIsoDate(currentIsoDate) ? currentIsoDate : new Date().toISOString().slice(0, 10);
-    const future = OFFICIAL_HOLIDAYS_2026.filter((h) => h.date >= base && (includeRestricted || h.type !== "Restricted")).sort((a, b) => a.date.localeCompare(b.date));
+    const future = officialHolidayEntries().filter((h) => h.date >= base && officialHolidayFilter(h, includeRestricted, includeHalfDayNotices)).sort((a, b) => a.date.localeCompare(b.date));
     return future[0] || null;
   }
 
   function getHolidayByName(keyword) {
     const q = clean(keyword).toLowerCase();
     if (!q) return null;
-    const direct = OFFICIAL_HOLIDAYS_2026.find((h) => {
+    const direct = officialHolidayEntries().find((h) => {
       return h.name.toLowerCase() === q || (h.nameHi && h.nameHi.toLowerCase() === q) || (h.namePa && h.namePa.toLowerCase() === q);
     });
     if (direct) return direct;
@@ -585,7 +627,7 @@
   function searchHolidays(keyword) {
     const q = clean(keyword).toLowerCase();
     if (!q) return [];
-    return OFFICIAL_HOLIDAYS_2026.filter((h) => {
+    return officialHolidayEntries().filter((h) => {
       const allText = `${h.name} ${h.nameHi} ${h.namePa} ${h.description} ${h.type}`.toLowerCase();
       return allText.includes(q) || q.split(" ").some((term) => term.length >= 4 && allText.includes(term));
     });
@@ -1278,8 +1320,12 @@
     ordinalIndex,
     HOLIDAY_SOURCE,
     OFFICIAL_HOLIDAYS_2026,
+    officialHolidayEntries,
+    isHalfDayNotice,
     getHolidaysForYear,
     getHolidaysForMonth,
+    getHolidayNoticesForYear,
+    getHolidayNoticesForMonth,
     checkDateHoliday,
     isHolidayDate,
     getNextHoliday,

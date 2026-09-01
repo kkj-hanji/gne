@@ -206,6 +206,17 @@ test("brain 2.2 compares two timetables with scope, revision, and profile safety
   assert.equal(outcome.context.comparison.sourceVersion, "rev-42");
 });
 
+test("brain 2.2 accepts natural and/or comparison wording but never silently chooses among three codes", () => {
+  const brain = createBrainHarness().CompassBrainV2_2;
+  const natural = brain.process("Compare ECB1 and ECB2 timetable Tuesday", comparisonContext());
+  assert.equal(natural.intent, "TIMETABLE_COMPARISON");
+  assert.match(natural.answer, /Tuesday only/);
+  const tooMany = brain.process("Compare ECB1 or ECB2 or CSD2 timetable", comparisonContext());
+  assert.equal(tooMany.intent, "COMPARE_CLARIFY");
+  assert.match(tooMany.answer, /compares two at a time/i);
+  assert.match(tooMany.answer, /ECB1, ECB2, CSD2/);
+});
+
 test("brain 2.2 comparison follow-up reuses stored selections for a scoped day", () => {
   const brain = createBrainHarness().CompassBrainV2_2;
   const first = brain.process("Compare ECB1 vs ECB2", comparisonContext());
@@ -639,16 +650,20 @@ test("app mentoring answer honors an explicitly named section", () => {
 
 test("brain-kernel holiday registry and calculations", () => {
   const kernel = createBrainHarness().CompassBrainKernel;
-  assert.equal(kernel.getHolidaysForYear(2026).length, 27);
+  assert.equal(kernel.getHolidaysForYear(2026).length, 32);
   const augustHolidays = kernel.getHolidaysForMonth(7, 2026);
-  assert.equal(augustHolidays.length, 2);
+  assert.equal(augustHolidays.length, 1);
   assert.equal(augustHolidays[0].name, "Independence Day");
   assert.equal(augustHolidays[0].date, "2026-08-15");
   const septemberHolidays = kernel.getHolidaysForMonth(8, 2026);
   assert.equal(septemberHolidays.length, 1);
-  assert.equal(septemberHolidays[0].name, "Teej");
-  assert.equal(septemberHolidays[0].type, "Restricted");
-  assert.equal(septemberHolidays[0].closed, false);
+  assert.equal(septemberHolidays[0].name, "Janam Ashtami");
+  assert.equal(septemberHolidays[0].type, "Gazetted");
+  assert.equal(septemberHolidays[0].closed, true);
+  const septemberNotices = kernel.getHolidayNoticesForMonth(8, 2026);
+  assert.equal(septemberNotices.length, 1);
+  assert.equal(septemberNotices[0].date, "2026-09-03");
+  assert.equal(septemberNotices[0].type, "Half-day");
 
   const holidayCheck = kernel.checkDateHoliday("2026-08-15");
   assert.ok(holidayCheck);
@@ -679,7 +694,7 @@ test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and
   const augEng = brain.process("how many holidays in august", context);
   assert.equal(augEng.handled, true);
   assert.equal(augEng.intent, "HOLIDAY_COUNT_MONTH");
-  assert.match(augEng.answer, /Official Holidays in August 2026 \(2\)/);
+  assert.match(augEng.answer, /Official Holidays in August 2026 \(1\)/);
   assert.match(augEng.answer, /Independence Day/);
 
   // Month count in Hinglish
@@ -694,14 +709,14 @@ test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and
   assert.equal(augPa.intent, "HOLIDAY_COUNT_MONTH");
   assert.match(augPa.answer, /August 2026/);
 
-  // September has one official-list entry, but it is restricted rather than
-  // an automatic college closure. Keep that distinction visible to students.
+  // September has Janam Ashtami plus a separately published second-half-day
+  // notice. Those two kinds of official entries must not be conflated.
   const september = brain.process("how many holidays in september", context);
   assert.equal(september.handled, true);
   assert.equal(september.intent, "HOLIDAY_COUNT_MONTH");
   assert.match(september.answer, /Official Holidays in September 2026 \(1\)/);
-  assert.match(september.answer, /Teej.*Restricted/is);
-  assert.match(september.answer, /College may be open/i);
+  assert.match(september.answer, /Janam Ashtami.*Gazetted/is);
+  assert.match(september.answer, /Second-half-day notice/i);
 
   const restrictedMeaning = brain.process("what is a restricted holiday", context);
   assert.equal(restrictedMeaning.handled, true);
@@ -724,9 +739,9 @@ test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and
   assert.match(dateEng.answer, /Yes! Saturday, August 15, 2026 is an official holiday/);
   assert.match(dateEng.answer, /Independence Day/);
 
-  const gazettedDate = brain.process("is 27 august holiday", context);
+  const gazettedDate = brain.process("is 4 september holiday", context);
   assert.equal(gazettedDate.intent, "HOLIDAY_DATE_CHECK");
-  assert.match(gazettedDate.answer, /Parkash Utsav of Sri Guru Granth Sahib Ji/);
+  assert.match(gazettedDate.answer, /Janam Ashtami/);
   assert.match(gazettedDate.answer, /Gazetted:.*College is normally closed/is);
 
   // Date check in Hinglish
@@ -739,16 +754,14 @@ test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and
   assert.equal(tomorrow.handled, true);
   assert.equal(tomorrow.intent, "HOLIDAY_DATE_CHECK");
   assert.equal(tomorrow.facts.iso, "2026-09-01");
-  assert.equal(tomorrow.facts.closed, false);
-  assert.match(tomorrow.answer, /Teej/);
-  assert.match(tomorrow.answer, /Restricted Holiday/);
-  assert.match(tomorrow.answer, /College may be open/i);
+  assert.equal(tomorrow.facts.isHoliday, false);
+  assert.match(tomorrow.answer, /not an official gazetted festival holiday/i);
 
   const weekdayAndDate = brain.process("is Tuesday 1 September 2026 a holiday", context);
   assert.equal(weekdayAndDate.handled, true);
   assert.equal(weekdayAndDate.facts.iso, "2026-09-01");
   assert.match(weekdayAndDate.answer, /Tuesday, September 1, 2026/);
-  assert.match(weekdayAndDate.answer, /Teej/);
+  assert.match(weekdayAndDate.answer, /not an official gazetted festival holiday/i);
 
   // Non-holiday check
   const nonHoli = brain.process("is 18 august a holiday", context);
@@ -764,19 +777,18 @@ test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and
 
   const restrictedNext = brain.process("when is the next holiday", { calendarDate: "2026-08-31" });
   assert.equal(restrictedNext.handled, true);
-  assert.match(restrictedNext.answer, /Teej/);
-  assert.match(restrictedNext.answer, /College may be open/i);
+  assert.match(restrictedNext.answer, /Janam Ashtami/);
 
   // Year total
   const yearTotal = brain.process("how many holidays in a year", context);
   assert.equal(yearTotal.handled, true);
   assert.equal(yearTotal.intent, "HOLIDAY_YEAR_TOTAL");
-  assert.match(yearTotal.answer, /27 Total/);
+  assert.match(yearTotal.answer, /32 official-list entries/);
 
   for (const question of ["holidays", "all holidays", "all holidays 2026", "list official holidays"]) {
     const allHolidays = brain.process(question, context);
     assert.equal(allHolidays.intent, "HOLIDAY_YEAR_TOTAL", question);
-    assert.match(allHolidays.answer, /GNDEC Official Holidays for 2026 \(27 Total\)/, question);
+    assert.match(allHolidays.answer, /GNDEC Official Holidays for 2026 \(32 official-list entries\)/, question);
     assert.match(allHolidays.answer, /Saturday, August 15, 2026/, question);
     assert.match(allHolidays.answer, /Independence Day/, question);
   }
@@ -791,10 +803,10 @@ test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and
   assert.equal(diwali.intent, "HOLIDAY_FESTIVAL_SEARCH");
   assert.match(diwali.answer, /Diwali/);
 
-  const teej = brain.process("when is teej", context);
-  assert.equal(teej.handled, true);
-  assert.equal(teej.intent, "HOLIDAY_FESTIVAL_SEARCH");
-  assert.match(teej.answer, /College may be open/i);
+  const halfDay = brain.process("is 3 september a holiday", context);
+  assert.equal(halfDay.handled, true);
+  assert.equal(halfDay.intent, "HOLIDAY_HALF_DAY_NOTICE");
+  assert.match(halfDay.answer, /second-half-day notice/i);
 });
 
 test("brain 1.2 answers marking scheme and CGPA calculations", () => {
