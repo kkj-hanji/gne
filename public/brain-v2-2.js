@@ -76,7 +76,7 @@
   }
 
   function mentionsOwnTimetable(text) {
-    return /\bmy\b|\bmine\b|\bapna\b|\bapni\b/.test(String(text || ""));
+    return /\bmy\b|\bmine\b|\bme\b|\bapna\b|\bapni\b/.test(String(text || ""));
   }
 
   function comparisonRequest(question, context) {
@@ -535,7 +535,7 @@
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
 
-    const asksBusiest = /\b(?:busiest|heaviest|most\s+classes|sabse\s+zyada\s+classes?)\b/.test(q);
+    const asksBusiest = /\b(?:busiest|heaviest|most\s+classes|sabse\s+zyada\s+class(?:es)?)\b/.test(q);
     const asksAggregate = asksBusiest || /\b(?:most\s+used\s+room|popular\s+room)\b/.test(q);
     if (!asksAggregate) return null;
 

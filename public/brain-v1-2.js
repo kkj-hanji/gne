@@ -422,7 +422,7 @@
     const q = kernel.normalize(raw);
 
     const asksAttendance = /\b(?:attendance|bunk|bunks|bunking|shortage|safe\s*bunk)\b/i.test(raw)
-      || (/\b(?:classes?|lectures?)\b/i.test(raw) && /\b(?:miss|skip|bunk|attend|percentage|75|kitni|chutti|how\s+many|lage)\b/i.test(raw))
+      || (/\b(?:class(?:es)?|lectures?)\b/i.test(raw) && /\b(?:miss|skip|bunk|attend|percentage|75|kitni|chutti|how\s+many|lage)\b/i.test(raw))
       || (/\bchutti\b/i.test(raw) && /\b(?:lecture|class|me\s*se|lage|lagi|kitni)\b/i.test(raw))
       || /\b(?:attendance|bunk)\b/.test(q);
     if (!asksAttendance) return null;

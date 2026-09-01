@@ -621,6 +621,11 @@ test("brain 2.2 personal comparison resolves from the device profile or asks saf
   }));
   assert.equal(withProfile.intent, "TIMETABLE_COMPARISON");
   assert.match(withProfile.answer, /Compared: ECB1 and ECB2/);
+  const withMe = brain.process("me vs ECB2 tomorrow", hierarchyContext({
+    profile: { name: "TEST STUDENT", section: "ECB", subsection: "ECB1" }
+  }));
+  assert.equal(withMe.intent, "TIMETABLE_COMPARISON");
+  assert.match(withMe.answer, /Compared: ECB1 and ECB2/);
   const withoutProfile = brain.process("my timetable vs ECB2", hierarchyContext({ profile: {} }));
   assert.equal(withoutProfile.intent, "COMPARE_CLARIFY");
   assert.match(withoutProfile.answer, /Profile page/i);
