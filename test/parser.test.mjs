@@ -857,7 +857,7 @@ test("service worker caches only an unused response copy and absorbs cache-write
   assert.match(serviceWorkerSource, /response\.bodyUsed/);
   assert.match(serviceWorkerSource, /copy = response\.clone\(\)/);
   assert.match(serviceWorkerSource, /cache\.put\(request, copy\)\)\.catch\(\(\) => \{\}\)/);
-  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260901-2"/);
+  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260901-3"/);
 });
 
 test("keeps actual Hindi and Punjabi timetable questions on the fast local path", () => {

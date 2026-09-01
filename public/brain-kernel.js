@@ -606,10 +606,10 @@
   }
 
   function getHolidayByName(keyword) {
-    const q = clean(keyword).toLowerCase();
+    const q = normalizeHolidayLookup(keyword);
     if (!q) return null;
     const direct = officialHolidayEntries().find((h) => {
-      return h.name.toLowerCase() === q || (h.nameHi && h.nameHi.toLowerCase() === q) || (h.namePa && h.namePa.toLowerCase() === q);
+      return [h.name, h.nameHi, h.namePa].some((name) => normalizeHolidayLookup(name) === q);
     });
     if (direct) return direct;
     const matches = searchHolidays(keyword);
@@ -624,13 +624,52 @@
     return { total: list.length, national, gazetted, restricted, totalMandatory: national + gazetted };
   }
 
+  const HOLIDAY_LOOKUP_STOP_WORDS = new Set([
+    "a", "about", "all", "an", "and", "calendar", "college", "date", "day", "days",
+    "festival", "for", "gndec", "hai", "holiday", "holidays", "in", "is", "ka", "ki",
+    "ko", "list", "me", "of", "official", "on", "please", "show", "tell", "the", "this",
+    "what", "when", "which", "year", "gazetted", "restricted", "birthday", "martyrdom", "sri", "ji"
+  ]);
+
+  function normalizeHolidayLookup(value) {
+    return clean(value)
+      .replace(/\bjanmashtami\b|\bjanamastami\b/g, "janam ashtami")
+      .replace(/\bvaisakhi\b/g, "baisakhi")
+      .replace(/\beid\b/g, "id")
+      .replace(/\bfitr\b/g, "fiter")
+      .replace(/\bbakrid\b/g, "bakreed")
+      .replace(/\bravidas\b/g, "ravidass")
+      .replace(/\bvalmiki\b/g, "balmiki")
+      .replace(/\bparshuram\b/g, "parshu ram")
+      .replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function searchHolidays(keyword) {
-    const q = clean(keyword).toLowerCase();
+    const q = normalizeHolidayLookup(keyword);
     if (!q) return [];
-    return officialHolidayEntries().filter((h) => {
-      const allText = `${h.name} ${h.nameHi} ${h.namePa} ${h.description} ${h.type}`.toLowerCase();
-      return allText.includes(q) || q.split(" ").some((term) => term.length >= 4 && allText.includes(term));
-    });
+    const queryTerms = q.split(" ").filter((term) => term.length >= 4 && !HOLIDAY_LOOKUP_STOP_WORDS.has(term));
+    if (!queryTerms.length) return [];
+    const paddedQuery = ` ${q} `;
+    return officialHolidayEntries().map((holiday, index) => {
+      const names = [holiday.name, holiday.nameHi, holiday.namePa].map(normalizeHolidayLookup).filter(Boolean);
+      const searchable = normalizeHolidayLookup(`${holiday.name} ${holiday.nameHi || ""} ${holiday.namePa || ""}`);
+      const matchedTerms = queryTerms.filter((term) => searchable.includes(term));
+      if (!matchedTerms.length || (queryTerms.length > 1 && matchedTerms.length < queryTerms.length)) return null;
+      const exactName = names.some((name) => q === name);
+      const completeNameInQuestion = names.some((name) => name.length >= 4 && paddedQuery.includes(` ${name} `));
+      const questionInName = names.some((name) => q.length >= 4 && (` ${name} `).includes(` ${q} `));
+      const score = (exactName ? 10000 : 0)
+        + (completeNameInQuestion ? 8000 : 0)
+        + (questionInName ? 4000 : 0)
+        + (matchedTerms.length * 100)
+        + queryTerms.reduce((sum, term) => sum + term.length, 0)
+        - (isHalfDayNotice(holiday) ? 1 : 0);
+      return { holiday, score, index };
+    }).filter(Boolean)
+      .sort((left, right) => right.score - left.score || left.index - right.index)
+      .map((item) => item.holiday);
   }
 
   // ---- GNDEC Autonomous / IKGPTU Grading & CGPA Engine ----
@@ -1331,6 +1370,7 @@
     getNextHoliday,
     getHolidayByName,
     getHolidayStats,
+    normalizeHolidayLookup,
     searchHolidays,
     getLongWeekends,
     GRADE_POINTS,

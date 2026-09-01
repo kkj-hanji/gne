@@ -3789,8 +3789,15 @@ function legacyHolidayAnswer(question) {
   const baseYear = Number(baseIso.slice(0, 4)) || 2026;
   const requestedYearMatch = q.match(/\b(?:in|for|of|year)?\s*(20\d{2})\b/);
   const requestedYear = requestedYearMatch ? Number(requestedYearMatch[1]) : baseYear;
+  const holidaySearchResults = kernel.searchHolidays(question);
+  const normalizedHolidayQuery = kernel.normalizeHolidayLookup?.(question) || q;
+  const exactRegistryName = holidaySearchResults.some((holiday) => [holiday.name, holiday.nameHi, holiday.namePa]
+    .some((name) => name && (kernel.normalizeHolidayLookup?.(name) || kernel.normalize(name)) === normalizedHolidayQuery));
+  const registryHolidayQuestion = holidaySearchResults.length > 0 && (exactRegistryName
+    || /\b(?:when|date|holiday|festival|show|tell|what|which)\b/.test(q));
   const asksHoliday = /\b(?:holiday|holidays|vacation|vacations|chutti|chhutti|off\s+day|gazetted|restricted)\b/.test(q)
-    || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q);
+    || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q)
+    || registryHolidayQuestion;
   if (!asksHoliday) return "";
   if (requestedYear !== 2026) return `<p><strong><u>Official GNDEC holiday list for ${escapeHtml(String(requestedYear))} is not loaded.</u></strong></p><p>Compass currently has the verified 2026 list only, so it will not guess dates for another year.</p><p class="answer-source"><a href="${escapeHtml(kernel.HOLIDAY_SOURCE.page)}" target="_blank" rel="noopener noreferrer">${escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`;
 
@@ -3840,6 +3847,18 @@ function legacyHolidayAnswer(question) {
     const allHolidays = kernel.getHolidaysForYear(requestedYear);
     const items = allHolidays.map((h) => `<li><strong>${escapeHtml(kernel.formatIsoFull(h.date))}</strong>: ${escapeHtml(h.name)} <em>(${escapeHtml(h.type)})</em></li>`).join("");
     return `<p><strong><u>GNDEC Official Holidays for ${requestedYear} (${allHolidays.length} official-list entries)</u></strong></p><ol>${items}</ol><p class="answer-source"><a href="${escapeHtml(kernel.HOLIDAY_SOURCE.pdf)}" target="_blank" rel="noopener noreferrer">${escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`;
+  }
+  // Named official holiday. Keep this in the independent legacy route so the
+  // holiday-card action still works if every newer Brain is disabled.
+  if (holidaySearchResults.length) {
+    const holiday = holidaySearchResults[0];
+    const isHalfDay = kernel.isHalfDayNotice?.(holiday);
+    const status = isHalfDay
+      ? "Second-half-day notice only. Check the GNDEC notice before assuming classes are cancelled."
+      : String(holiday.type || "").toLowerCase() === "restricted"
+        ? "Optional leave. College may be open, so classes may happen."
+        : "Official holiday. College is normally closed.";
+    return `<p><strong>${escapeHtml(holiday.name)} (${requestedYear})</strong></p><p><strong>Date:</strong> ${escapeHtml(kernel.formatIsoFull(holiday.date))}<br /><strong>Category:</strong> ${escapeHtml(holiday.type)}<br /><strong>Status:</strong> ${escapeHtml(status)}</p><p class="answer-source"><a href="${escapeHtml(kernel.HOLIDAY_SOURCE.pdf)}" target="_blank" rel="noopener noreferrer">${escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`;
   }
   return "";
 }
@@ -4449,8 +4468,16 @@ function isHolidayCalendarQuestion(question = "") {
   // This guard is intentionally broad. A holiday question must never fall
   // through into a name-only student/faculty lookup just because it is short
   // (for example, “all holidays” or “September holidays”).
-  return /\b(?:holiday|holidays|vacation|vacations|gazetted|restricted|half\s*-?\s*day|off\s+day|chutti|chhutti|chuttiyan)\b/.test(q)
-    || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|janam\s+ashtami|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q);
+  if (/\b(?:holiday|holidays|vacation|vacations|gazetted|restricted|half\s*-?\s*day|off\s+day|chutti|chhutti|chuttiyan)\b/.test(q)
+    || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|janam\s+ashtami|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q)) return true;
+  const kernel = globalThis.CompassBrainKernel;
+  if (!kernel?.searchHolidays) return false;
+  const matches = kernel.searchHolidays(q);
+  if (!matches.length) return false;
+  const normalized = kernel.normalizeHolidayLookup?.(q) || q;
+  const exactName = matches.some((holiday) => [holiday.name, holiday.nameHi, holiday.namePa]
+    .some((name) => name && (kernel.normalizeHolidayLookup?.(name) || kernel.normalize(name)) === normalized));
+  return exactName || /\b(?:when|date|festival|show|tell|what|which)\b/.test(q);
 }
 
 function studentLookupRequest(question = "", rememberedRecord = null) {
@@ -5404,7 +5431,7 @@ function syncMobileViewport() {
 function registerOfflineShell() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js?v=20260901-2", { scope: "/" }).catch(() => {
+    navigator.serviceWorker.register("/sw.js?v=20260901-3", { scope: "/" }).catch(() => {
       // Service workers are an optional enhancement. The live app and its
       // deterministic fallback continue normally when registration is blocked.
     });

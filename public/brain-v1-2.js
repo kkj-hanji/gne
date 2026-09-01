@@ -112,9 +112,16 @@
     const baseYear = Number(baseIso.slice(0, 4)) || 2026;
     const requestedYearMatch = q.match(/\b(?:in|for|of|year)?\s*(20\d{2})\b/);
     const requestedYear = requestedYearMatch ? Number(requestedYearMatch[1]) : baseYear;
+    const holidaySearchResults = kernel.searchHolidays(raw);
+    const normalizedHolidayQuery = kernel.normalizeHolidayLookup?.(raw) || q;
+    const exactRegistryName = holidaySearchResults.some((holiday) => [holiday.name, holiday.nameHi, holiday.namePa]
+      .some((name) => name && (kernel.normalizeHolidayLookup?.(name) || kernel.normalize(name)) === normalizedHolidayQuery));
+    const registryHolidayQuestion = holidaySearchResults.length > 0 && (exactRegistryName
+      || /\b(?:when|date|holiday|festival|show|tell|what|which)\b/.test(q));
 
     const asksHoliday = /\b(?:holiday|holidays|vacation|vacations|closed|chutti|chhutti|off\s+day|gazetted|restricted)\b/.test(q)
-      || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|teej|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q);
+      || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|teej|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q)
+      || registryHolidayQuestion;
     if (!asksHoliday) return null;
     const restrictedHolidayExplanation = "Optional leave. College may be open, so classes may happen. Check the GNDEC notice.";
     const gazettedHolidayExplanation = "Official holiday. College is normally closed. Check the GNDEC notice if anything changes.";
@@ -284,7 +291,7 @@
     }
 
     // 6. Named festival search: e.g. "when is diwali", "baisakhi date", "gurpurab date", "diwali kab hai"
-    const searchResults = kernel.searchHolidays(raw);
+    const searchResults = holidaySearchResults;
     if (searchResults.length) {
       const h = searchResults[0];
       const categoryNote = holidayCategoryNote([h]);
