@@ -222,6 +222,25 @@ test("human-style timetable questions stay specific, personalized, and source gr
   });
 });
 
+test("today's lecture total and free periods use the active India day", () => {
+  const { api } = createHarness();
+  // Monday, 17 Aug 2026 at 10:00 AM India time.
+  api.state.nowOverride = "2026-08-17T04:30:00.000Z";
+
+  const totalLectures = api.answerWithoutAi("how many lectures do I have today?");
+  assert.match(totalLectures, /Monday class summary/i);
+  assert.match(totalLectures, /You have <strong>3<\/strong> timetable periods/i);
+  assert.match(totalLectures, /Official timetable/i);
+
+  const freePeriods = api.answerWithoutAi("free periods today");
+  assert.match(freePeriods, /Monday free timetable time/i);
+  assert.match(freePeriods, /8:30 AM - 9:30 AM/i);
+  assert.match(freePeriods, /11:30 AM - 12:30 PM/i);
+  assert.match(freePeriods, /1:30 PM - 2:30 PM/i);
+  assert.match(freePeriods, /3:30 PM - 4:20 PM/i);
+  assert.match(freePeriods, /4 hr 50 min/i);
+});
+
 test("the reported chat sequence keeps timetable commands out of roster lookup and resolves ranked next classes", () => {
   const { api, context } = createHarness();
   api.state.nowOverride = "2026-08-21T03:30:00.000Z"; // Friday 9:00 AM IST
@@ -889,7 +908,7 @@ test("faculty lookup renders directory facts before profile enrichment and reuse
   const base = await api.resolveChatFacultyLookup("full details of DR JASMEET KAUR", { includeProfile: false });
   assert.equal(base.status, "single");
   assert.equal(calls.length, 1, "the profile request must not block the first verified answer");
-  assert.equal(calls[0].cache, "default");
+  assert.equal(calls[0].cache, "no-cache");
   const baseAnswer = api.legacyFacultyLookupAnswer(base);
   assert.match(baseAnswer, /Showing verified directory facts now/i);
   assert.doesNotMatch(baseAnswer, /<img|Experience[\s\S]*Not published/i);
@@ -904,7 +923,7 @@ test("faculty lookup renders directory facts before profile enrichment and reuse
 
   api.state.facultyCache = null;
   const restored = await api.loadFacultyDirectory();
-  assert.equal(calls.length, 2, "the verified 24-hour device cache should avoid another network lookup");
+  assert.equal(calls.length, 2, "the verified four-hour device cache should avoid another network lookup");
   assert.equal(restored.records[0].photoUrl, "https://gndec.ac.in/images/jasmeet.jpg");
 });
 
@@ -977,6 +996,9 @@ test("subjects, teachers, locations, rooms, and buildings compose without unrela
   }
   assert.equal(api.facultyLookupRequest("math teacher"), null);
   assert.equal(api.facultyLookupRequest("math teacher name"), null);
+  ["next holiday", "all holidays", "all september holidays"].forEach((question) => {
+    assert.equal(api.facultyLookupRequest(question), null, question);
+  });
   const mathTeacherProfile = api.facultyLookupRequest("full profile of my math teacher");
   assert.equal(mathTeacherProfile.term, "sukhminder singh");
   assert.equal(mathTeacherProfile.department, "Applied Science");

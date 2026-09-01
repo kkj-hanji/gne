@@ -13,7 +13,7 @@
     <link rel="manifest" href="manifest.webmanifest?v=20260821-13" />
     <link rel="icon" type="image/svg+xml" href="icon.svg?v=20260821-13" />
     <link rel="apple-touch-icon" href="icon.svg?v=20260821-13" />
-    <link rel="stylesheet" href="styles.css?v=20260829-2" />
+    <link rel="stylesheet" href="styles.css?v=20260831-2" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -138,7 +138,7 @@
           <form id="question-form" class="question-form">
             <label class="visually-hidden" for="question-input">Ask about your timetable</label>
             <div class="chat-input-wrap">
-              <input id="question-input" role="combobox" list="compass-question-suggestions" autocomplete="off" autocapitalize="sentences" enterkeyhint="send" spellcheck="true" maxlength="1200" aria-autocomplete="list" aria-controls="question-live-suggestions" aria-expanded="false" aria-haspopup="listbox" placeholder="Ask anything in English, Hindi, Punjabi, or Hinglish..." style="background:transparent; position:relative; z-index:2; width:100%;" />
+              <input id="question-input" role="combobox" list="compass-question-suggestions" autocomplete="off" autocapitalize="sentences" enterkeyhint="send" spellcheck="true" maxlength="1200" aria-autocomplete="list" aria-controls="question-live-suggestions" aria-expanded="false" aria-haspopup="listbox" placeholder="Ask here" style="background:transparent; position:relative; z-index:2; width:100%;" />
               <div id="ghost-text-wrap" class="ghost-text"></div>
             </div>
             <div class="question-live-suggestions" id="question-live-suggestions" role="listbox" aria-label="Suggested Compass questions" hidden></div>
@@ -166,9 +166,13 @@
           </div>
 
           <section class="panel onboarding-note" id="onboarding-note">
-            <p class="eyebrow">WELCOME</p>
+            <p class="eyebrow">START IN 3 QUICK STEPS</p>
             <h2>Make Compass yours</h2>
-            <p>Find your official section using your name, CRN, registration number, or serial number—or choose your timetable manually. This does not change any other student's Compass.</p>
+            <ol class="onboarding-steps">
+              <li id="onboarding-step-profile"><span>1</span><div><strong>Find your official profile</strong><p>Search by name, CRN, registration number, or serial number. No other student's device is changed.</p><button type="button" class="text-button" data-focus="student-name-input">Find my profile</button></div></li>
+              <li id="onboarding-step-timetable"><span>2</span><div><strong>Confirm your group and subgroup</strong><p id="onboarding-step-timetable-text">Choose the section and subgroup that should be used on this device.</p><button type="button" class="text-button" data-focus="group-select">Choose timetable</button></div></li>
+              <li id="onboarding-step-next"><span>3</span><div><strong>See your next class immediately</strong><p>Compass uses this device's active selection to show the next verified class on Today.</p><button type="button" class="text-button" data-go="today">Open Today</button></div></li>
+            </ol>
           </section>
 
           <section class="panel profile-panel">
@@ -211,7 +215,7 @@
 
           <section class="panel">
             <div class="section-header"><div><p class="eyebrow">DATA & SOURCES</p><h2>Verified data updates</h2></div></div>
-            <p class="panel-note">Compass rechecks verified GNDEC sources automatically when you return to this tab and every 15 minutes. Revised timetable and roster files are detected by content, even when GNDEC keeps the same link or effective date.</p>
+            <p class="panel-note">Compass refreshes the official GNDEC source registry on its four-hour cycle. This browser also checks when you return to this tab and every 15 minutes. Revised timetable and roster files are detected by content, even when GNDEC keeps the same link or effective date.</p>
             <div class="source-actions">
               <button class="primary-button" id="refresh-button" type="button">Check for updates &amp; reload <span aria-hidden="true">&#8635;</span></button>
               <span id="admin-html-import" hidden>
@@ -221,6 +225,10 @@
             </div>
             <p class="source-error" id="source-error" role="alert" hidden></p>
             <p class="source-meta" id="refresh-meta">Not loaded yet</p>
+            <div class="profile-timetable-update" id="profile-timetable-update" hidden>
+              <div><strong>New timetable detected</strong><p id="profile-timetable-update-text"></p></div>
+              <button class="outline-button" id="review-timetable-update" type="button">Review update</button>
+            </div>
           </section>
 
           <section class="panel reference-panel">
@@ -244,6 +252,30 @@
               <span>100% Local &amp; Private</span>
             </div>
           </div>
+
+          <section class="panel settings-card timetable-update-center" id="timetable-update-center">
+            <div class="section-header"><div><p class="eyebrow">VERIFIED UPDATES</p><h2>What changed?</h2></div></div>
+            <p class="panel-note">Compass shows this only after two verified GNDEC timetable releases differ. Mark it seen when you have reviewed it; the next card appears only after a later verified change.</p>
+            <div class="timetable-update-empty" id="timetable-update-empty">
+              <strong>No unread timetable updates</strong>
+              <p>Your current verified timetable is shown above. This is not a source-health dashboard.</p>
+            </div>
+            <article class="timetable-update-card" id="timetable-update-card" aria-live="polite" hidden>
+              <div class="timetable-update-card-head"><div><span class="timetable-update-badge">New timetable detected</span><p id="timetable-update-detected-at"></p></div></div>
+              <p class="timetable-update-summary" id="timetable-update-summary"></p>
+              <dl class="timetable-update-release">
+                <div><dt>Previous release</dt><dd id="timetable-update-old-version"></dd></div>
+                <div><dt>New release</dt><dd id="timetable-update-new-version"></dd></div>
+                <div><dt>Old FET footer</dt><dd id="timetable-update-old-footer"></dd></div>
+                <div><dt>New FET footer</dt><dd id="timetable-update-new-footer"></dd></div>
+              </dl>
+              <ul class="timetable-update-changes" id="timetable-update-changes"></ul>
+              <div class="settings-actions">
+                <a class="outline-button" id="timetable-update-source" target="_blank" rel="noopener noreferrer" hidden>Open official timetable</a>
+                <button class="primary-button" id="mark-timetable-update-seen" type="button">Mark update as seen</button>
+              </div>
+            </article>
+          </section>
 
           <!-- Section: Display, Theme & Timetable Views -->
           <section class="panel settings-card">
@@ -351,11 +383,10 @@
     </nav>
 
     <div class="toast" id="toast" role="status"></div>
-    <script src="brain-kernel.js?v=20260829-2"></script>
-    <script src="brain-v1-2.js?v=20260829-2"></script>
-    <script src="brain-v2-2.js?v=20260829-2"></script>
-    <script src="brain-v2.js?v=20260829-2"></script>
-    <script src="app.js?v=20260829-2"></script>
+    <script src="brain-kernel.js?v=20260831-2"></script>
+    <script src="brain-v1-2.js?v=20260831-3"></script>
+    <script src="brain-v2-2.js?v=20260831-2"></script>
+    <script src="brain-v2.js?v=20260831-2"></script>
+    <script src="app.js?v=20260831-4"></script>
   </body>
 </html>
-

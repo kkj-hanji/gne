@@ -1,16 +1,16 @@
 "use strict";
 
 const CACHE_PREFIX = "gndec-compass-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}20260829-4`;
+const CACHE_NAME = `${CACHE_PREFIX}20260831-4`;
 const SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=20260829-4",
-  "/brain-kernel.js?v=20260829-4",
-  "/brain-v1-2.js?v=20260829-4",
-  "/brain-v2-2.js?v=20260829-4",
-  "/brain-v2.js?v=20260829-4",
-  "/app.js?v=20260829-4",
+  "/styles.css?v=20260831-2",
+  "/brain-kernel.js?v=20260831-2",
+  "/brain-v1-2.js?v=20260831-3",
+  "/brain-v2-2.js?v=20260831-2",
+  "/brain-v2.js?v=20260831-2",
+  "/app.js?v=20260831-4",
   "/manifest.webmanifest?v=20260821-13",
   "/icon.svg?v=20260821-13"
 ];
@@ -27,6 +27,17 @@ self.addEventListener("activate", (event) => {
     .then(() => self.clients.claim()));
 });
 
+function cacheResponse(event, request, response) {
+  if (!response?.ok || response.type !== "basic" || response.bodyUsed) return;
+  let copy;
+  try { copy = response.clone(); }
+  catch { return; }
+  // Cache writes are best-effort. A browser can cancel a response while the
+  // tab changes pages, so never allow cache cloning/writing to create an
+  // unhandled service-worker error or affect the response sent to the page.
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {}));
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -35,7 +46,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).then((response) => {
-      if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put("/", response.clone()));
+      cacheResponse(event, "/", response);
       return response;
     }).catch(async () => (await caches.match("/")) || (await caches.match("/index.html")) || new Response(
       "GNDEC Compass is offline and its app shell has not been cached yet.",
@@ -47,10 +58,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(caches.match(request).then((cached) => {
     if (cached) return cached;
     return fetch(request).then((response) => {
-      if (response.ok && response.type === "basic") {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-      }
+      cacheResponse(event, request, response);
       return response;
     });
   }));

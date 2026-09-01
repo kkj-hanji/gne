@@ -1,0 +1,81 @@
+{
+  "version": "2026.1.0",
+  "verifiedDate": "2026-08-24",
+  "portalLinks": [
+    {
+      "category": "Timetables & Views",
+      "items": [
+        { "title": "Latest official timetable index", "badge": "Verified 24-08-2026", "description": "Current and archived timetable releases", "url": "https://gndec.ac.in/?q=node/34" },
+        { "title": "Section-wise timetable", "badge": "Verified current view", "description": "Group, section, and semester lecture grids", "url": "https://gndec.ac.in/?q=node/34#section" },
+        { "title": "Subsection-wise timetable", "badge": "Verified current view", "description": "Lab cohorts and mentoring subsection grids", "url": "https://gndec.ac.in/?q=node/34#subsection" },
+        { "title": "Subject-wise timetable", "badge": "Verified current view", "description": "Course-specific schedules across all first-year branches", "url": "https://gndec.ac.in/?q=node/34#subject" },
+        { "title": "Faculty timetable", "badge": "Verified current view", "description": "Instructor-wise lecture and laboratory slots", "url": "https://gndec.ac.in/?q=node/34#faculty" },
+        { "title": "Room timetable", "badge": "Verified current view", "description": "Classroom and laboratory occupancy grids", "url": "https://gndec.ac.in/?q=node/34#room" },
+        { "title": "Programme timetable", "badge": "Verified current view", "description": "Degree and department program master schedules", "url": "https://gndec.ac.in/?q=node/34#programme" }
+      ]
+    },
+    {
+      "category": "Current student rosters",
+      "items": [
+        { "title": "CE current student roster", "branch": "CE", "badge": "Verified official PDF", "description": "Civil Engineering 1st year verified roster", "url": "https://gndec.ac.in/sites/default/files/roster_ce_2026.pdf" },
+        { "title": "CS current student roster", "branch": "CS", "badge": "Verified official PDF", "description": "Computer Science & Engineering 1st year verified roster", "url": "https://gndec.ac.in/sites/default/files/roster_cs_2026.pdf" },
+        { "title": "EC current student roster", "branch": "EC", "badge": "Verified official PDF", "description": "Electronics & Communication Engg 1st year verified roster", "url": "https://gndec.ac.in/sites/default/files/roster_ec_2026.pdf" },
+        { "title": "EE current student roster", "branch": "EE", "badge": "Verified official PDF", "description": "Electrical Engineering 1st year verified roster", "url": "https://gndec.ac.in/sites/default/files/roster_ee_2026.pdf" },
+        { "title": "IT current student roster", "branch": "IT", "badge": "Verified official PDF", "description": "Information Technology 1st year verified roster", "url": "https://gndec.ac.in/sites/default/files/roster_it_2026.pdf" },
+        { "title": "ME current student roster", "branch": "ME", "badge": "Verified official PDF", "description": "Mechanical Engineering 1st year verified roster", "url": "https://gndec.ac.in/sites/default/files/roster_me_2026.pdf" },
+        { "title": "RAI current student roster", "branch": "RAI", "badge": "Verified official PDF", "description": "Robotics & Artificial Intelligence 1st year verified roster", "url": "https://gndec.ac.in/sites/default/files/roster_rai_2026.pdf" }
+      ]
+    },
+    {
+      "category": "Academic resources & syllabus",
+      "items": [
+        { "title": "First-year study scheme & syllabus", "badge": "Current verified official PDF", "description": "Complete 33-page autonomous study scheme and course outcomes", "url": "https://gndec.ac.in/sites/default/files/syllabus_first_year_2026.pdf" },
+        { "title": "First-year syllabus page", "badge": "Official syllabus index", "description": "Online subject index, course codes, and credit schemes", "url": "https://gndec.ac.in/?q=node/30" },
+        { "title": "Academic information", "badge": "Syllabus and academic resources", "description": "Curriculum structures, electives, and evaluation policies", "url": "https://gndec.ac.in/?q=node/4" },
+        { "title": "Applied Sciences Department & Notice Board", "badge": "Live notice board", "description": "Applied Science notices, assignments, and faculty notifications", "url": "https://appsc.gndec.ac.in/notice-board" }
+      ]
+    },
+    {
+      "category": "Academic calendar & holidays",
+      "items": [
+        { "title": "GNDEC List of Holidays 2026 (PDF)", "badge": "Gazetted & Restricted holidays list", "description": "Official autonomous holiday schedule (LoH26.pdf)", "url": "https://gndec.ac.in/sites/default/files/LoH26.pdf" },
+        { "title": "GNDEC Holidays Official Portal", "badge": "Live statutory notices", "description": "College holiday notifications and circulars", "url": "https://gndec.ac.in/?q=node/31" },
+        { "title": "Academic Calendar Jul-Dec 2026 (PDF)", "badge": "Session timeline & exams", "description": "Teaching schedule, MSTs, and term-end exam dates", "url": "https://gndec.ac.in/sites/default/files/academic_calendar_jul_dec_2026.pdf" },
+        { "title": "Academic Calendar Jan-Jun 2026 (PDF)", "badge": "Even semester timeline", "description": "Even semester academic schedule and exam calendar", "url": "https://gndec.ac.in/sites/default/files/academic_calendar_jan_jun_2026.pdf" },
+        { "title": "GNDEC Academic Calendars Archive", "badge": "All autonomous revisions", "description": "Historical academic calendar releases and revisions", "url": "https://gndec.ac.in/?q=node/32" },
+        { "title": "IKGPTU Academic Notifications", "badge": "University circulars", "description": "Official I.K. Gujral Punjab Technical University notifications", "url": "https://ptu.ac.in/notifications" }
+      ]
+    },
+    {
+      "category": "College services & autonomous portals",
+      "items": [
+        { "title": "GNDEC Main Website", "badge": "Official college portal", "description": "Official Guru Nanak Dev Engineering College website", "url": "https://gndec.ac.in" },
+        { "title": "GNDEC Information Brochure 2026 (PDF)", "badge": "Autonomous guidelines & rules", "description": "Course details, eligibility, hostel rules, and campus facilities", "url": "https://gndec.ac.in/sites/default/files/information_brochure_2026.pdf" },
+        { "title": "Academics & Autonomous Regulations", "badge": "Credit schemes & exam rules", "description": "Autonomous regulations, attendance criteria (75%), and grading rules", "url": "https://gndec.ac.in/?q=node/4" },
+        { "title": "Campus Facilities & Hostels", "badge": "Hostel notices & amenities", "description": "Library, dispensary, sports complex, boy/girl hostel rules and allotments", "url": "https://gndec.ac.in/?q=node/34" },
+        { "title": "GNDEC Faculty Directory", "badge": "Faculty & staff profiles", "description": "Current public faculty directories, email addresses, and departments", "url": "https://gndec.ac.in/?q=node/9" }
+      ]
+    }
+  ],
+  "hostelRules": {
+    "title": "GNDEC Campus Facilities & Hostel Guidelines",
+    "summary": "GNDEC provides on-campus residential hostel facilities for both boys (Hostel 1, 2, 5) and girls (Hostel 4). Allotment is merit/distance based during admission. Key guidelines include strictly observed study hours (9:00 PM - 11:00 PM), curfew entry by 8:30 PM (girls hostel) / 10:00 PM (boys hostel), mandatory biometric/register attendance, cooperative mess amenities, strict anti-ragging compliance, and guest room rules.",
+    "links": [
+      { "title": "Campus Facilities & Hostels", "url": "https://gndec.ac.in/?q=node/34" },
+      { "title": "Information Brochure 2026", "url": "https://gndec.ac.in/sites/default/files/information_brochure_2026.pdf" }
+    ]
+  },
+  "autonomousRegulations": {
+    "attendance": {
+      "mandatoryPercent": 75,
+      "cushionPercent": 76,
+      "rule": "Every candidate is required to attend a minimum of 75% of the total lectures delivered in each course (theory, tutorial, practical) to appear in the End Semester Examination (ESE).",
+      "shortageRule": "Shortage can only be condoned up to 10% on genuine medical grounds upon submission of verified medical certificates within 7 days of illness."
+    },
+    "cgpaScale": {
+      "gndecFormula": "Percentage = CGPA × 9.5",
+      "ptuFormula": "Percentage = CGPA × 10.0",
+      "passingCriteria": "Minimum 40% in ESE (24/60) and 40% aggregate in each subject."
+    }
+  }
+}

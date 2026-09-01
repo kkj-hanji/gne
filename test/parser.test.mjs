@@ -16,7 +16,7 @@ const sourceUnderTest = appSource.replace(
   ""
 ).replace(
   /function kbClean/,
-  "globalThis.__parserTest = { parseFetTimetable, state, classFor, subgroupsFor, preferredGroup, groupLabel, activeTimetableLabel, buildScheduleIndex, renderWeek, renderReferenceLinks, safeStoredChatHtml, answerQuestion, isStructuredQuestion, isHeavyQuestion, shouldUseActualAi, requestedTime, formatAiAnswer, assistantContext, redactSensitiveAiText, normalizeStudentName, normalizeStudentIdentifier, normalizeStudentRecord, studentIdentifierValues, studentIdentifierMatch, resolveStudentIdentifierMatches, mergeStudentRecord, mergeStudentRosterHistory, studentMatchScore, parseStudentSectionText, answerSyllabusQuestion, answerSyllabusFollowup, contextualLocalFollowupAnswer, parseSyllabusText, answerSyllabusPageSearch, syllabusQuestionSuggestions, localQuestionSuggestions, rankQuestionSuggestions, normalizeQuestionSuggestion, chooseQuestionSuggestion, activateQuestionSuggestion, followupSuggestions, answerCompassQuestion, answerFromKnowledgeBase, answerWithoutAi, legacyAnswerWithoutAi, isSyllabusQuestion, getIndiaNow, indiaCalendarDate, nextStudyDayInfo, nextScheduledDay, officialFreeLectureSlots, dayPlanEntries, dayScheduleAnswer, engineeringBranchesAnswer, verifiedAiAnswerOverride, localClarificationAnswer, isKaushikAdminProfile, adminProfileFingerprint, revokeAdminAiView, hasAdminAiView, adminAiMode, adminRequestedModel, adminForcesActualAi, isStudentRosterReference, currentTimetableNoticeLinks, studentDetailFlags, studentLookupRequest, safeRosterLookupRecord, studentLookupContextFromRecords, legacyStudentLookupAnswer, facultyLookupRequest, legacyFacultyLookupAnswer, saveManualProfile, profileMatchesTimetableSelection, populateStudentLookupInput, mentoringClassAnswer, officialTimetableViewAnswer, requestedOfficialTimetableView };\nfunction kbClean"
+  "globalThis.__parserTest = { parseFetTimetable, state, classFor, subgroupsFor, preferredGroup, groupLabel, activeTimetableLabel, buildScheduleIndex, renderWeek, renderReferenceLinks, safeStoredChatHtml, answerQuestion, isStructuredQuestion, isHeavyQuestion, shouldUseActualAi, requestedTime, formatAiAnswer, assistantContext, redactSensitiveAiText, normalizeStudentName, normalizeStudentIdentifier, normalizeStudentRecord, studentIdentifierValues, studentIdentifierMatch, resolveStudentIdentifierMatches, mergeStudentRecord, mergeStudentRosterHistory, studentMatchScore, parseStudentSectionText, answerSyllabusQuestion, answerSyllabusFollowup, contextualLocalFollowupAnswer, parseSyllabusText, answerSyllabusPageSearch, syllabusQuestionSuggestions, localQuestionSuggestions, rankQuestionSuggestions, normalizeQuestionSuggestion, chooseQuestionSuggestion, activateQuestionSuggestion, followupSuggestions, answerCompassQuestion, answerFromKnowledgeBase, answerWithoutAi, legacyAnswerWithoutAi, isSyllabusQuestion, getIndiaNow, indiaCalendarDate, nextStudyDayInfo, nextScheduledDay, officialFreeLectureSlots, dayPlanEntries, dayScheduleAnswer, engineeringBranchesAnswer, verifiedAiAnswerOverride, localClarificationAnswer, isKaushikAdminProfile, adminProfileFingerprint, revokeAdminAiView, hasAdminAiView, adminAiMode, adminRequestedModel, adminForcesActualAi, isStudentRosterReference, currentTimetableNoticeLinks, studentDetailFlags, looksLikePlainStudentNameQuery, studentLookupRequest, safeRosterLookupRecord, studentLookupContextFromRecords, legacyStudentLookupAnswer, facultyLookupRequest, legacyFacultyLookupAnswer, saveManualProfile, profileMatchesTimetableSelection, populateStudentLookupInput, mentoringClassAnswer, officialTimetableViewAnswer, requestedOfficialTimetableView, compareTimetableReleases, detectedTimetableUpdate, timetableUpdateAnswer, namedPersonTimetableRequest, timetablePersonCaption, readOnlyStudentTimetableAnswer, readOnlyTeacherTimetableAnswer, scheduleAnswer };\nfunction kbClean"
 );
 const { document } = parseHTML("<!doctype html><html><body></body></html>");
 const storage = new Map();
@@ -71,6 +71,45 @@ test("parses nested FET subgroup cells without losing teacher, room, or cohort",
   assert.deepEqual([...classFor("CSA", "Monday")].map((item) => item.subject), ["PHYSICS"]);
   state.selectedSubgroup = "";
   assert.equal(classFor("CSA", "Monday").length, 2);
+});
+
+test("records a dismissible update only for a real verified timetable release difference", () => {
+  const { state, parseFetTimetable, detectedTimetableUpdate, timetableUpdateAnswer, answerCompassQuestion } = context.__parserTest;
+  const previousSchedule = parseFetTimetable(FET_FIXTURE);
+  const nextSchedule = previousSchedule.map((entry) => entry.subject === "MATH I" ? { ...entry, room: "A12", teacher: "DR NEW TEACHER" } : entry);
+  state.selectedGroup = "CSA";
+  state.selectedSubgroup = "CSA1";
+  const sourceInfo = {
+    version: "Revised w.e.f. 01-09-2026",
+    sources: [
+      { id: "groups", contentHash: "new-groups", sourceFooter: "FET 7.6.4 · 9/1/26 9:00 AM", url: "https://appsc.gndec.ac.in/time_tables" },
+      { id: "subgroups", contentHash: "new-subgroups" }
+    ]
+  };
+  const update = detectedTimetableUpdate({
+    source: "Official GNDEC group timetable",
+    sourceInfo,
+    previousSchedule,
+    previousOverlay: [],
+    previousMetadata: { sourceRevision: "old-groups|old-subgroups", version: "Revised w.e.f. 24-08-2026", sourceFooter: "FET 7.6.4 · 8/30/26 10:39 PM" },
+    nextSchedule,
+    nextOverlay: []
+  });
+  assert.ok(update);
+  assert.equal(update.selectedAffected, true);
+  assert.deepEqual([...update.affectedGroups], ["CSA"]);
+  assert.equal(update.oldFooter, "FET 7.6.4 · 8/30/26 10:39 PM");
+  assert.equal(update.newFooter, "FET 7.6.4 · 9/1/26 9:00 AM");
+  assert.ok(update.changes.some((change) => change.fields?.includes("room") && change.fields?.includes("teacher")));
+  assert.equal(detectedTimetableUpdate({
+    source: "Official GNDEC group timetable", sourceInfo: { ...sourceInfo, fallback: { version: "previous" } }, previousSchedule, previousOverlay: [],
+    previousMetadata: { sourceRevision: "old-groups|old-subgroups" }, nextSchedule, nextOverlay: []
+  }), null, "a temporary fallback must never announce a new timetable");
+  state.timetableUpdate = update;
+  assert.match(timetableUpdateAnswer(), /New timetable detected/);
+  assert.match(timetableUpdateAnswer(), /FET 7\.6\.4/);
+  assert.match(answerCompassQuestion("What changed in my timetable?"), /New timetable detected/);
+  state.timetableUpdate = null;
 });
 
 test("defaults to ECB when the official group list includes ECE sections", () => {
@@ -321,6 +360,85 @@ test("answers an explicitly requested subgroup without changing the active profi
   assert.match(answer, /ECB2 timetable/);
   assert.match(answer, /ECB2 ONLY/);
   assert.doesNotMatch(answer, /ECB1 ONLY/);
+  assert.equal(state.selectedGroup, "ECB");
+  assert.equal(state.selectedSubgroup, "ECB1");
+  state.student = null;
+});
+
+test("answers timetable verification directly and never substitutes the active timetable for a named friend", () => {
+  const { state, buildScheduleIndex, answerWithoutAi } = context.__parserTest;
+  state.schedule = [
+    { id: "ecb1-monday", group: "ECB", day: "Monday", start: 510, end: 570, subject: "ACTIVE MONDAY COURSE", teacher: "Teacher One", room: "A1", type: "L", cohorts: "ECB1" },
+    { id: "ecb1-tuesday", group: "ECB", day: "Tuesday", start: 570, end: 630, subject: "ACTIVE TUESDAY COURSE", teacher: "Teacher One", room: "A1", type: "L", cohorts: "ECB1" },
+    { id: "ecb2-tuesday", group: "ECB", day: "Tuesday", start: 570, end: 630, subject: "ECB2 TUESDAY COURSE", teacher: "Teacher Two", room: "A2", type: "L", cohorts: "ECB2" }
+  ];
+  state.selectedGroup = "ECB";
+  state.selectedSubgroup = "ECB1";
+  state.student = { name: "Active Student", section: "ECB", subsection: "ECB1" };
+  state.metadata = { source: "Official GNDEC group timetable", version: "24-08-2026", sourceFooter: "FET 7.6.4 · 8/30/26 10:39 PM", fallback: null };
+  state.sourceRegistry = { checkedAt: "2026-08-31T14:59:40.133Z", sources: [{ id: "groups", verified: true, url: "https://appsc.gndec.ac.in/current-groups.html", sourceFooter: "FET 7.6.4 · 8/30/26 10:39 PM" }] };
+  buildScheduleIndex();
+
+  const verification = answerWithoutAi("Is my timetable verified?");
+  assert.match(verification, /Yes — your selected ECB1 timetable is verified/);
+  assert.match(verification, /FET file footer/);
+  assert.doesNotMatch(verification, /ACTIVE MONDAY COURSE/);
+
+  const friend = answerWithoutAi("Mohitveer or Mohitveer Singh Tuesday timetable");
+  assert.match(friend, /cannot verify mohitveer mohitveer singh’s timetable from a name alone/i);
+  assert.match(friend, /will not show your active/i);
+  assert.doesNotMatch(friend, /ACTIVE TUESDAY COURSE/);
+
+  const explicit = answerWithoutAi("ECB2 Tuesday timetable");
+  assert.match(explicit, /ECB2 timetable · Tuesday/);
+  assert.match(explicit, /ECB2 TUESDAY COURSE/);
+  assert.equal(state.selectedGroup, "ECB");
+  assert.equal(state.selectedSubgroup, "ECB1");
+  state.sourceRegistry = null;
+  state.metadata = null;
+  state.student = null;
+});
+
+test("resolves a named student or faculty timetable from verified source data without changing the active profile", () => {
+  const { state, buildScheduleIndex, namedPersonTimetableRequest, studentLookupContextFromRecords, readOnlyStudentTimetableAnswer, timetablePersonCaption, readOnlyTeacherTimetableAnswer } = context.__parserTest;
+  state.schedule = [
+    { id: "active-tuesday", group: "ECB", day: "Tuesday", start: 510, end: 570, subject: "ACTIVE TUESDAY COURSE", teacher: "Teacher One", room: "A1", type: "L", cohorts: "ECB1" },
+    { id: "mohitveer-tuesday", group: "CSD", day: "Tuesday", start: 570, end: 630, subject: "MOHITVEER TUESDAY COURSE", teacher: "Teacher Two", room: "C2", type: "L", cohorts: "CSD2" },
+    { id: "mohitveer-friday", group: "CSD", day: "Friday", start: 630, end: 690, subject: "MOHITVEER FRIDAY COURSE", teacher: "Teacher Three", room: "C3", type: "L", cohorts: "CSD2" }
+  ];
+  state.selectedGroup = "ECB";
+  state.selectedSubgroup = "ECB1";
+  state.student = { name: "Active Student", section: "ECB", subsection: "ECB1" };
+  buildScheduleIndex();
+
+  const studentRequest = namedPersonTimetableRequest("Mohitveer or Mohitveer Singh Tuesday or tomorrow timetable");
+  assert.deepEqual({ term: studentRequest.term, day: studentRequest.day, teacherCue: studentRequest.teacherCue }, { term: "mohitveer singh", day: "Tuesday", teacherCue: false });
+  const studentLookup = studentLookupContextFromRecords(`find student ${studentRequest.term}`, [
+    { name: "Mohitveer Singh", crn: "2601001", branch: "Computer Science", section: "CSD", subsection: "CSD2" }
+  ], { version: "31-08-2026" });
+  const studentAnswer = readOnlyStudentTimetableAnswer(studentRequest, studentLookup);
+  assert.match(studentAnswer, /MOHITVEER TUESDAY COURSE/);
+  assert.match(studentAnswer, /current official GNDEC roster/i);
+  assert.doesNotMatch(studentAnswer, /ACTIVE TUESDAY COURSE/);
+  assert.equal(state.selectedGroup, "ECB");
+  assert.equal(state.selectedSubgroup, "ECB1");
+
+  const fridayRequest = namedPersonTimetableRequest("Mohitveer Singh Friday timetable");
+  const fridayAnswer = readOnlyStudentTimetableAnswer(fridayRequest, studentLookup);
+  assert.match(fridayAnswer, /MOHITVEER FRIDAY COURSE/);
+  assert.doesNotMatch(fridayAnswer, /MOHITVEER TUESDAY COURSE/);
+
+  const weekRequest = namedPersonTimetableRequest("Mohitveer Singh timetable");
+  const weekAnswer = readOnlyStudentTimetableAnswer(weekRequest, studentLookup);
+  assert.match(weekAnswer, /MOHITVEER TUESDAY COURSE/);
+  assert.match(weekAnswer, /MOHITVEER FRIDAY COURSE/);
+
+  const teacherRequest = namedPersonTimetableRequest("Dr Test Faculty Tuesday timetable");
+  const facultySchedule = [{ id: "faculty-tuesday", group: "DR TEST FACULTY", day: "Tuesday", start: 630, end: 690, subject: "FACULTY TUESDAY COURSE", teacher: "DR TEST FACULTY", room: "F1", type: "L", cohorts: "" }];
+  const facultyAnswer = readOnlyTeacherTimetableAnswer(teacherRequest, timetablePersonCaption(teacherRequest.term, facultySchedule), facultySchedule);
+  assert.match(facultyAnswer, /FACULTY TUESDAY COURSE/);
+  assert.match(facultyAnswer, /official GNDEC faculty timetable/i);
+  assert.doesNotMatch(facultyAnswer, /ACTIVE TUESDAY COURSE/);
   assert.equal(state.selectedGroup, "ECB");
   assert.equal(state.selectedSubgroup, "ECB1");
   state.student = null;
@@ -684,6 +802,14 @@ test("uses DOM selectors that exist in the application shell", () => {
   assert.doesNotMatch(appSource, /\$\("class-state"\)/);
 });
 
+test("service worker caches only an unused response copy and absorbs cache-write failures", () => {
+  assert.match(serviceWorkerSource, /function cacheResponse\(event, request, response\)/);
+  assert.match(serviceWorkerSource, /response\.bodyUsed/);
+  assert.match(serviceWorkerSource, /copy = response\.clone\(\)/);
+  assert.match(serviceWorkerSource, /cache\.put\(request, copy\)\)\.catch\(\(\) => \{\}\)/);
+  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260831-4"/);
+});
+
 test("keeps actual Hindi and Punjabi timetable questions on the fast local path", () => {
   const { isStructuredQuestion } = context.__parserTest;
   assert.equal(isStructuredQuestion("\u092e\u0947\u0930\u0940 \u0905\u0917\u0932\u0940 \u0915\u094d\u0932\u093e\u0938 \u0915\u094d\u092f\u093e \u0939\u0948?"), true);
@@ -726,6 +852,14 @@ test("parses Permanent Sections mentor phone and venue without retaining parent 
   assert.doesNotMatch(JSON.stringify(record), /FATHER NAME|MOTHER NAME/);
 });
 
+test("parses the current Permanent Sections layout with CRN and registration number", () => {
+  const { parseStudentSectionText } = context.__parserTest;
+  const row = ["42", "2615231", "26012797", "MOHITVEER SINGH", "KARAMJIT SINGH", "ARPINDER KAUR", "CS", "CSD", "CSD2", "CSDM2", "ER. JAGDEEP KAUR", "9592007098", "G17"].join("\t");
+  const [record] = [...parseStudentSectionText(row, "CS")].map((value) => ({ ...value, oldSerialNos: [...value.oldSerialNos] }));
+  assert.deepEqual(record, { serialNo: "42", currentSerialNo: "42", newSerialNo: "", oldSerialNos: [], crn: "2615231", name: "MOHITVEER SINGH", registrationNo: "26012797", branch: "CS", section: "CSD", subsection: "CSD2", mentor: "ER. JAGDEEP KAUR", mentorPhone: "9592007098", academicGroup: "CSDM2", mentorVenue: "G17", venue: "G17", rosterVersion: "", rosterRevision: "", rosterSchemaVersion: 3 });
+  assert.doesNotMatch(JSON.stringify(record), /KARAMJIT SINGH|ARPINDER KAUR/);
+});
+
 test("matches every supported exact student identifier and preserves serial history on roster refresh", () => {
   const { studentIdentifierMatch, mergeStudentRecord } = context.__parserTest;
   const previous = { name: "TEST STUDENT", crn: "1234567", registrationNo: "26010000", serialNo: "41", currentSerialNo: "41", oldSerialNos: ["19"], branch: "EC", section: "ECA", subsection: "ECA1" };
@@ -761,7 +895,7 @@ test("read-only chat lookup finds verified students fuzzily without changing the
 });
 
 test("student chat lookup understands English, Hinglish, Hindi, and Punjabi commands", () => {
-  const { studentLookupRequest } = context.__parserTest;
+  const { studentLookupRequest, looksLikePlainStudentNameQuery } = context.__parserTest;
   [
     "find student Kaushik Jain",
     "Kaushik Jain ki poori jankari batao",
@@ -783,6 +917,9 @@ test("student chat lookup understands English, Hinglish, Hindi, and Punjabi comm
   assert.equal(studentLookupRequest("serial 7").term, "7");
   assert.equal(studentLookupRequest("old serial: 68").term, "68");
   assert.equal(studentLookupRequest("CRN: 2617070").term, "2617070");
+  assert.equal(studentLookupRequest("Mohitveer").term, "mohitveer");
+  assert.equal(looksLikePlainStudentNameQuery("Mohitveer"), true);
+  assert.equal(looksLikePlainStudentNameQuery("math"), false);
   assert.equal(studentLookupRequest("good morning"), null);
 });
 

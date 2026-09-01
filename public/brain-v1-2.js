@@ -110,10 +110,45 @@
     const q = kernel.normalize(raw);
     const baseIso = String(context?.calendarDate || "");
     const baseYear = Number(baseIso.slice(0, 4)) || 2026;
+    const requestedYearMatch = q.match(/\b(?:in|for|of|year)?\s*(20\d{2})\b/);
+    const requestedYear = requestedYearMatch ? Number(requestedYearMatch[1]) : baseYear;
 
-    const asksHoliday = /\b(?:holiday|holidays|vacation|vacations|closed|chutti|chhutti|off\s+day)\b/.test(q)
-      || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q);
+    const asksHoliday = /\b(?:holiday|holidays|vacation|vacations|closed|chutti|chhutti|off\s+day|gazetted|restricted)\b/.test(q)
+      || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|teej|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q);
     if (!asksHoliday) return null;
+    const restrictedHolidayExplanation = "Optional leave. College may be open, so classes may happen. Check the GNDEC notice.";
+    const gazettedHolidayExplanation = "Official holiday. College is normally closed. Check the GNDEC notice if anything changes.";
+    const holidayCategoryNote = (holidays = []) => {
+      const list = Array.isArray(holidays) ? holidays : [holidays];
+      const notes = [];
+      if (list.some((holiday) => String(holiday?.type || "").toLowerCase() === "gazetted")) notes.push(`<strong>Gazetted:</strong> ${kernel.escapeHtml(gazettedHolidayExplanation)}`);
+      if (list.some((holiday) => holiday?.closed === false || String(holiday?.type || "").toLowerCase() === "restricted")) notes.push(`<strong>Restricted:</strong> ${kernel.escapeHtml(restrictedHolidayExplanation)}`);
+      return notes.length ? `<p class="kb-tip"><strong>Holiday labels</strong><br />${notes.join("<br />")}</p>` : "";
+    };
+    const asksRestrictedHolidayMeaning = /^(?:restricted|restricted\s+holiday)$/.test(q) || /(?:\b(?:what(?:\s+is|'s)?|meaning|mean|define|definition|explain)\b.*\brestricted\s+holiday\b)|(?:\brestricted\s+holiday\b.*\b(?:meaning|mean|definition)\b)/.test(q);
+    const asksGazettedHolidayMeaning = /^(?:gazetted|gazetted\s+holiday)$/.test(q) || /(?:\b(?:what(?:\s+is|'s)?|meaning|mean|define|definition|explain)\b.*\bgazetted\s+holiday\b)|(?:\bgazetted\s+holiday\b.*\b(?:meaning|mean|definition)\b)/.test(q);
+    if (asksRestrictedHolidayMeaning) {
+      return kernel.result("RESTRICTED_HOLIDAY_EXPLANATION", 0.99,
+        `<p><strong><u>What “Restricted Holiday” means</u></strong></p><p>${kernel.escapeHtml(restrictedHolidayExplanation)}</p><p class="answer-source">Official GNDEC & Punjab Government Holiday Calendar.</p>`,
+        { closed: false, definition: "not an automatic GNDEC-wide closure" },
+        ["identify the official holiday category", "explain its closure status without assuming a day off"]);
+    }
+    if (asksGazettedHolidayMeaning) {
+      return kernel.result("GAZETTED_HOLIDAY_EXPLANATION", 0.99,
+        `<p><strong><u>What “Gazetted Holiday” means</u></strong></p><p>${kernel.escapeHtml(gazettedHolidayExplanation)}</p><p class="answer-source">Official GNDEC & Punjab Government Holiday Calendar.</p>`,
+        { definition: "official published public holiday" },
+        ["identify the official holiday category", "explain verified calendar status without overriding GNDEC notices"]);
+    }
+
+    // The local registry intentionally contains only the official GNDEC
+    // calendar that has been verified and bundled with Compass.  Never turn a
+    // missing year's list into a confident “not a holiday” answer.
+    if (requestedYear !== 2026) {
+      return kernel.result("HOLIDAY_YEAR_UNAVAILABLE", 0.99,
+        `<p><strong><u>Official GNDEC holiday list for ${kernel.escapeHtml(String(requestedYear))} is not loaded.</u></strong></p><p>Compass currently has the verified <strong>2026</strong> list only. It will not guess dates for another year.</p><p class="answer-source"><a href="${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.page)}" target="_blank" rel="noopener noreferrer">${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`,
+        { requestedYear, availableYear: 2026 },
+        ["identify requested calendar year", "check verified GNDEC holiday registry", "avoid unverified dates"]);
+    }
 
     // 1. Is specific date a holiday? e.g., "is on 15 august holiday", "is 15 august a holiday", "15 august ko chutti hai kya"
     const monthNameMatch = q.match(/(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
@@ -154,8 +189,14 @@
       const holiday = kernel.checkDateHoliday(checkIso);
       const formattedDate = kernel.formatIsoFull(checkIso);
       if (holiday) {
+        if (holiday.closed === false) {
+          return kernel.result("HOLIDAY_DATE_CHECK", 0.99,
+            `<p><strong>${kernel.escapeHtml(formattedDate)} is listed as a Restricted Holiday:</strong></p><p><strong>${kernel.escapeHtml(holiday.name)}</strong> (${kernel.escapeHtml(holiday.type)} Holiday)</p>${holidayCategoryNote([holiday])}<p class="answer-source">Official GNDEC & Punjab Government Holiday Calendar.</p>`,
+            { iso: checkIso, isHoliday: true, closed: false, holiday: holiday.name, type: holiday.type },
+            ["resolve target date", "match against GNDEC holiday registry", "distinguish restricted entry from a college-wide closure"]);
+        }
         return kernel.result("HOLIDAY_DATE_CHECK", 0.99,
-          `<p><strong>Yes! ${kernel.escapeHtml(formattedDate)} is an official holiday:</strong></p><p><strong>${kernel.escapeHtml(holiday.name)}</strong> (${kernel.escapeHtml(holiday.type)} Holiday)</p><p>${kernel.escapeHtml(holiday.description)}</p><p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
+          `<p><strong>Yes! ${kernel.escapeHtml(formattedDate)} is an official holiday:</strong></p><p><strong>${kernel.escapeHtml(holiday.name)}</strong> (${kernel.escapeHtml(holiday.type)} Holiday)</p><p>${kernel.escapeHtml(holiday.description)}</p>${holidayCategoryNote([holiday])}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
           { iso: checkIso, isHoliday: true, holiday: holiday.name },
           ["resolve target date", "match against GNDEC gazetted calendar", "format verified holiday details"]);
       } else {
@@ -175,16 +216,17 @@
     if (asksMonthHolidays) {
       const monthIndex = kernel.MONTHS[mentionedMonth];
       const monthName = kernel.MONTH_NAMES[monthIndex];
-      const list = kernel.getHolidaysForMonth(monthIndex, baseYear);
+      const list = kernel.getHolidaysForMonth(monthIndex, requestedYear);
       if (!list.length) {
         return kernel.result("HOLIDAY_COUNT_MONTH", 0.98,
-          `<p><strong>There are no gazetted holidays listed in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(baseYear))}.</strong></p><p>Regular classes and academic sessions run as scheduled.</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
+          `<p><strong>There are no gazetted holidays listed in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(requestedYear))}.</strong></p><p>Regular classes and academic sessions run as scheduled.</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
           { month: monthName, count: 0, holidays: [] },
           ["identify requested month", "query GNDEC calendar", "format zero-holiday result"]);
       }
       const items = list.map((h) => `<li><strong>${kernel.escapeHtml(h.date.slice(8, 10))} ${kernel.escapeHtml(monthName)} (${kernel.escapeHtml(h.day)})</strong>: ${kernel.escapeHtml(h.name)} <em>(${kernel.escapeHtml(h.type)})</em></li>`).join("");
+      const categoryNote = holidayCategoryNote(list);
       return kernel.result("HOLIDAY_COUNT_MONTH", 0.99,
-        `<p><strong><u>Official Holidays in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(baseYear))} (${list.length})</u></strong></p><ul>${items}</ul><p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
+        `<p><strong><u>Official Holidays in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(requestedYear))} (${list.length})</u></strong></p><ul>${items}</ul>${categoryNote}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
         { month: monthName, count: list.length, holidays: list.map((h) => h.name) },
         ["identify requested month", "query gazetted calendar", "list verified holidays with days and dates"]);
     }
@@ -193,20 +235,27 @@
     if (/\b(?:next|upcoming|aage|agle|agli|agla)\s+holiday\b/.test(q) || /\bagli\s+chutti\b/.test(q) || /\bwhen\b.*\b(?:next\s+holiday|holiday\s+next)\b/.test(q)) {
       const nextH = kernel.getNextHoliday(baseIso);
       if (nextH) {
+        const categoryNote = holidayCategoryNote([nextH]);
         return kernel.result("HOLIDAY_NEXT", 0.99,
-          `<p><strong>Next official holiday: ${kernel.escapeHtml(nextH.name)}</strong></p><p><strong>Date:</strong> ${kernel.escapeHtml(kernel.formatIsoFull(nextH.date))}<br /><strong>Type:</strong> ${kernel.escapeHtml(nextH.type)} Holiday<br /><strong>Occasion:</strong> ${kernel.escapeHtml(nextH.description)}</p><p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`,
+          `<p><strong>Next official holiday: ${kernel.escapeHtml(nextH.name)}</strong></p><p><strong>Date:</strong> ${kernel.escapeHtml(kernel.formatIsoFull(nextH.date))}<br /><strong>Type:</strong> ${kernel.escapeHtml(nextH.type)} Holiday<br /><strong>Occasion:</strong> ${kernel.escapeHtml(nextH.description)}</p>${categoryNote}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`,
           { nextHoliday: nextH.name, date: nextH.date },
           ["read current India date", "find next chronological holiday", "format verified details"]);
       }
     }
 
-    // 4. Yearly total: "how many holidays in a year", "total holidays in 2026", "saal me kitni chuttiya hai", "all holidays this year"
-    if (/\b(?:how many|total|count|kitne|kitni|kinne|all|list)\s+holidays?\s+(?:in\s+(?:a|the|this)\s+year|in\s+\d{4}|this\s+year|saal\s+me)\b/.test(q) || /\bsaal\s+me\s+kitni\s+chutti\b/.test(q)) {
-      const allHolidays = kernel.getHolidaysForYear(baseYear, true);
-      const items = allHolidays.map((h) => `<li><strong>${kernel.escapeHtml(h.date.slice(5))} (${kernel.escapeHtml(h.day)})</strong>: ${kernel.escapeHtml(h.name)} <em>(${kernel.escapeHtml(h.type)})</em></li>`).join("");
+    // 4. Full-year list or total: “all holidays”, “all September holidays”,
+    // “holidays for 2026”, and “how many holidays in a year”.
+    const asksFullYearHolidays = /^(?:(?:all|list|show|display|full|complete)\s+)?(?:official\s+)?holidays?(?:\s+2026)?\b/.test(q)
+      || /\b(?:holidays?|calendar)\s+(?:in|for|of)\s+2026\b/.test(q)
+      || /\b(?:how many|total|count|kitne|kitni|kinne|all|list)\s+holidays?\s+(?:in\s+(?:a|the|this)\s+year|in\s+\d{4}|this\s+year|saal\s+me)\b/.test(q)
+      || /\bsaal\s+me\s+kitni\s+chutti\b/.test(q);
+    if (asksFullYearHolidays) {
+      const allHolidays = kernel.getHolidaysForYear(requestedYear, true);
+      const items = allHolidays.map((h) => `<li><strong>${kernel.escapeHtml(kernel.formatIsoFull(h.date))}</strong>: ${kernel.escapeHtml(h.name)} <em>(${kernel.escapeHtml(h.type)})</em></li>`).join("");
+      const categoryNote = holidayCategoryNote(allHolidays);
       return kernel.result("HOLIDAY_YEAR_TOTAL", 0.99,
-        `<p><strong><u>GNDEC & Punjab Gazetted & Official Holidays for ${kernel.escapeHtml(String(baseYear))} (${allHolidays.length} Total)</u></strong></p><ol>${items}</ol><p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
-        { year: baseYear, total: allHolidays.length },
+        `<p><strong><u>GNDEC Official Holidays for ${kernel.escapeHtml(String(requestedYear))} (${allHolidays.length} Total)</u></strong></p><p>Includes Gazetted, National, and Restricted entries from the official list.</p><ol>${items}</ol>${categoryNote}<p class="answer-source"><a href="${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.pdf)}" target="_blank" rel="noopener noreferrer">${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`,
+        { year: requestedYear, total: allHolidays.length },
         ["query full-year official calendar", "format complete holiday list"]);
     }
 
@@ -226,8 +275,9 @@
     const searchResults = kernel.searchHolidays(raw);
     if (searchResults.length) {
       const h = searchResults[0];
+      const categoryNote = holidayCategoryNote([h]);
       return kernel.result("HOLIDAY_FESTIVAL_SEARCH", 0.98,
-        `<p><strong>${kernel.escapeHtml(h.name)} (${kernel.escapeHtml(String(baseYear))}):</strong></p><p><strong>Date:</strong> ${kernel.escapeHtml(kernel.formatIsoFull(h.date))}<br /><strong>Category:</strong> ${kernel.escapeHtml(h.type)} Holiday (${h.closed ? "College closed" : "Restricted holiday"})<br /><strong>Significance:</strong> ${kernel.escapeHtml(h.description)}</p><p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`,
+        `<p><strong>${kernel.escapeHtml(h.name)} (${kernel.escapeHtml(String(baseYear))}):</strong></p><p><strong>Date:</strong> ${kernel.escapeHtml(kernel.formatIsoFull(h.date))}<br /><strong>Category:</strong> ${kernel.escapeHtml(h.type)} Holiday (${h.closed ? "College closed" : "Restricted holiday"})<br /><strong>Significance:</strong> ${kernel.escapeHtml(h.description)}</p>${categoryNote}<p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`,
         { holiday: h.name, date: h.date },
         ["search holiday registry by keyword", "render exact verified date and category"]);
     }
@@ -881,8 +931,6 @@
       "Is on 15 August holiday?",
       "When is the next holiday?",
       "What is the marking scheme for Physics?",
-      "How is CGPA calculated?",
-      "Attended 24 out of 30 classes, can I bunk?",
       "Where is G6 room located?",
       "Where is Physics lab?",
       "Who is the Principal of GNDEC?",

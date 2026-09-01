@@ -1,0 +1,19 @@
+{
+  "B.Tech CSE 2nd Year": {
+    "Monday": [
+      "09:00 - Data Structures (Room S1)",
+      "10:00 - OOPS (Room S2)",
+      "11:00 - DBMS Lab (Lab 3)"
+    ],
+    "Tuesday": [
+      "09:00 - Math III (Room S3)",
+      "10:00 - Data Structures (Room S1)"
+    ]
+  },
+  "B.Tech IT 3rd Year": {
+    "Monday": [
+      "09:00 - Computer Networks (Room IT1)",
+      "11:00 - Web Tech Lab (Lab 1)"
+    ]
+  }
+}

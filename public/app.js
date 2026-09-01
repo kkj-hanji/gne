@@ -11,11 +11,12 @@ const SYLLABUS_STORAGE_KEY = "gndec-compass-syllabus-v2";
 const SYLLABUS_CONVERSATION_KEY = "gndec-compass-syllabus-conversation-v1";
 const BRAIN_V2_STORAGE_KEY = "gndec-compass-brain-v2-enabled-v1";
 const BRAIN_CONTEXT_STORAGE_KEY = "gndec-compass-brain-context-v1";
-const FACULTY_DIRECTORY_STORAGE_KEY = "gndec-compass-faculty-directory-v1";
-const FACULTY_DIRECTORY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const FACULTY_DIRECTORY_STORAGE_KEY = "gndec-compass-faculty-directory-v2";
+const FACULTY_DIRECTORY_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 const SYLLABUS_INDEX_URL = "/data/first-year-syllabus-index.json";
 const DEVICE_STORAGE_KEY = "gndec-compass-device-v1";
 const SETTINGS_STORAGE_KEY = "gndec-compass-settings-v1";
+const TIMETABLE_UPDATE_STORAGE_KEY = "gndec-compass-timetable-update-v1";
 const AI_ADMIN_VIEW_STORAGE_KEY = "gndec-compass-ai-admin-view-v1";
 const ADMIN_AI_MODE_STORAGE_KEY = "gndec-compass-admin-ai-mode-v1";
 const ADMIN_OWNER_CRN = "2617070";
@@ -92,6 +93,7 @@ const state = {
   student: null,
   settings: loadSettings(),
   sourceRegistry: null,
+  timetableUpdate: null,
   sourceSyncing: false,
   profileSyncing: false,
   profileSyncStatus: "",
@@ -101,6 +103,9 @@ const state = {
   rosterCache: null,
   rosterLookupConversation: null,
   facultyCache: null,
+  collegeEventsCache: null,
+  noticesCache: null,
+  timetablesCache: null,
   activeFacultyAiContext: null,
   nowOverride: null,
   dayPlanOverride: "",
@@ -279,14 +284,104 @@ function persistTimetableCache() {
   } catch { /* browser storage is an optional offline cache */ }
 }
 
+function loadPendingTimetableUpdate() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TIMETABLE_UPDATE_STORAGE_KEY));
+    if (!saved || typeof saved !== "object" || !saved.id || !Array.isArray(saved.changes)) return null;
+    return saved;
+  } catch {
+    localStorage.removeItem(TIMETABLE_UPDATE_STORAGE_KEY);
+    return null;
+  }
+}
+
+function persistTimetableUpdate(update) {
+  state.timetableUpdate = update || null;
+  try {
+    if (update) localStorage.setItem(TIMETABLE_UPDATE_STORAGE_KEY, JSON.stringify(update));
+    else localStorage.removeItem(TIMETABLE_UPDATE_STORAGE_KEY);
+  } catch { /* local update notices are optional in private browsing */ }
+}
+
+function timetableComparisonEntries(schedule, overlay = []) {
+  const entries = new Map();
+  [...sanitizeSchedule(schedule), ...sanitizeSchedule(overlay)].forEach((item) => {
+    // A cohort belongs in the identity: two verified lab batches can share a
+    // time slot without being the same class.
+    const key = [item.group, item.day, item.start, item.end, cleanText(item.cohorts)].join("|");
+    entries.set(key, item);
+  });
+  return entries;
+}
+
+function compareTimetableReleases(previousSchedule, previousOverlay, nextSchedule, nextOverlay) {
+  const previous = timetableComparisonEntries(previousSchedule, previousOverlay);
+  const next = timetableComparisonEntries(nextSchedule, nextOverlay);
+  const changes = [];
+  const keys = new Set([...previous.keys(), ...next.keys()]);
+  keys.forEach((key) => {
+    const before = previous.get(key) || null;
+    const after = next.get(key) || null;
+    const base = after || before;
+    if (!base) return;
+    if (!before) {
+      changes.push({ kind: "added", group: base.group, day: base.day, start: base.start, end: base.end, after });
+      return;
+    }
+    if (!after) {
+      changes.push({ kind: "removed", group: base.group, day: base.day, start: base.start, end: base.end, before });
+      return;
+    }
+    const fields = ["subject", "teacher", "room"].filter((field) => cleanText(before[field]) !== cleanText(after[field]));
+    if (fields.length) changes.push({ kind: "changed", group: base.group, day: base.day, start: base.start, end: base.end, before, after, fields });
+  });
+  return changes.sort((left, right) => left.group.localeCompare(right.group) || DAY_NAMES.indexOf(left.day) - DAY_NAMES.indexOf(right.day) || left.start - right.start);
+}
+
+function detectedTimetableUpdate({ source, sourceInfo, previousSchedule, previousOverlay, previousMetadata, nextSchedule, nextOverlay }) {
+  const revision = timetableSourceRevision(sourceInfo);
+  const previousRevision = cleanText(previousMetadata?.sourceRevision || "");
+  // Imports and temporary fallback reads must never create a misleading
+  // "official change" notice. Only two independently verified releases are
+  // compared here.
+  if (source !== "Official GNDEC group timetable" || sourceInfo?.fallback || !revision || !previousRevision || revision === previousRevision || !previousSchedule.length) return null;
+  const changes = compareTimetableReleases(previousSchedule, previousOverlay, nextSchedule, nextOverlay);
+  if (!changes.length) return null;
+  const groups = [...new Set(changes.map((change) => change.group).filter(Boolean))];
+  const primary = (sourceInfo.sources || []).find((item) => item.id === "groups") || {};
+  return {
+    id: `${previousRevision}->${revision}`,
+    detectedAt: new Date().toISOString(),
+    oldVersion: cleanText(previousMetadata?.version || "Previously loaded release"),
+    newVersion: cleanText(sourceInfo.version || "New verified release"),
+    oldFooter: cleanText(previousMetadata?.sourceFooter || "Not published"),
+    newFooter: cleanText(primary.sourceFooter || "Not published"),
+    sourceUrl: cleanText(primary.url || ""),
+    selectedGroup: cleanText(state.selectedGroup),
+    selectedSubgroup: cleanText(state.selectedSubgroup),
+    selectedAffected: Boolean(state.selectedGroup && groups.includes(state.selectedGroup)),
+    affectedGroups: groups.slice(0, 12),
+    totalAffectedGroups: groups.length,
+    totalChanges: changes.length,
+    changes: changes.slice(0, 18)
+  };
+}
+
 function saveData(schedule, source, sourceInfo = {}, academicOverlay = []) {
-  state.schedule = sanitizeSchedule(schedule);
+  const previousSchedule = state.schedule;
+  const previousOverlay = state.academicOverlay;
+  const previousMetadata = state.metadata;
+  const nextSchedule = sanitizeSchedule(schedule);
+  const nextOverlay = sanitizeSchedule(academicOverlay);
+  const update = detectedTimetableUpdate({ source, sourceInfo, previousSchedule, previousOverlay, previousMetadata, nextSchedule, nextOverlay });
+  state.schedule = nextSchedule;
   state.timetableViews.clear();
-  state.academicOverlay = sanitizeSchedule(academicOverlay);
+  state.academicOverlay = nextOverlay;
   state.academicOverlayGroup = cleanText(activeStudentProfile().academicGroup);
   state.groups = [...new Set(schedule.map((entry) => entry.group))].sort((a, b) => a.localeCompare(b));
   buildScheduleIndex();
   renderTimetableSearchSuggestions();
+  const primarySource = Array.isArray(sourceInfo?.sources) ? sourceInfo.sources.find((item) => item.id === "groups") : null;
   state.metadata = {
     source,
     version: sourceInfo.version || "",
@@ -294,9 +389,16 @@ function saveData(schedule, source, sourceInfo = {}, academicOverlay = []) {
     // Persist the verified group-file hash so that this device reloads it.
     sourceRevision: timetableSourceRevision(sourceInfo),
     checkedAt: sourceInfo.checkedAt || null,
+    // This is copied verbatim from the official FET file footer. It is not
+    // converted to a local date because GNDEC does not label its numeric date
+    // order. The official effective date remains the primary timetable date.
+    sourceFooter: cleanText(primarySource?.sourceFooter || "").slice(0, 100),
+    sourceGenerator: cleanText(primarySource?.sourceGenerator || "").slice(0, 40),
+    fallback: sourceInfo.fallback || null,
     updatedAt: new Date().toISOString()
   };
   persistTimetableCache();
+  if (update && state.timetableUpdate?.id !== update.id) persistTimetableUpdate(update);
   if (!state.groups.includes(state.selectedGroup)) state.selectedGroup = preferredGroup(state.groups);
   localStorage.setItem(GROUP_STORAGE_KEY, state.selectedGroup);
   hydrateGroupControls();
@@ -317,6 +419,7 @@ function restoreData() {
       renderTimetableSearchSuggestions();
     }
   } catch { localStorage.removeItem(STORAGE_KEY); }
+  state.timetableUpdate = loadPendingTimetableUpdate();
   try {
     const savedStudent = JSON.parse(localStorage.getItem(STUDENT_STORAGE_KEY));
     if (savedStudent?.name && savedStudent?.section && savedStudent?.subsection) state.student = normalizeStudentRecord(savedStudent);
@@ -1159,19 +1262,20 @@ function syllabusQuestionSuggestions(question) {
 
 const CORE_QUESTION_SUGGESTIONS = Object.freeze([
   "What is my next class?",
-  "2nd next class",
   "Aaj ka timetable batao",
+  "Free lectures today",
+  "Show all official holidays",
+  "Who is my mentor?",
+  "Math units",
+  "Where is my next class?",
+  "Is my timetable verified?",
+  "Check for official updates",
+  "What can you do?",
   "Kal ka timetable batao",
   "Parson ka timetable batao",
+  "When is the next holiday?",
   "How many holidays in August?",
   "Is on 15 August holiday?",
-  "When is the next holiday?",
-  "What is the marking scheme for Physics?",
-  "How is CGPA calculated?",
-  "What date is day after tomorrow?",
-  "What time is it in India?",
-  "Free lectures today",
-  "Who is my mentor?",
   "Where and when is my mentoring class?",
   "Faculty timetable",
   "Room timetable",
@@ -1179,11 +1283,24 @@ const CORE_QUESTION_SUGGESTIONS = Object.freeze([
   "Section timetable",
   "Subsection timetable",
   "Show my full profile",
-  "Math units",
   "Physics syllabus",
+  "What is the marking scheme for Physics?",
+  "What date is day after tomorrow?",
+  "What time is it in India?",
+  "When was the official timetable source generated?",
+  "What changed in my timetable?",
+  "Show tomorrow as a simple card",
+  "What should I do in my next free period?",
+  "Which classes are in the same building today?",
+  "Make a 45-minute study plan before my next class",
+  "Show all official sources used for this answer",
+  "Is this from timetable, roster, syllabus, or general advice?",
+  "Compare my timetable with last week's verified release",
+  "What do I need for tomorrow?",
+  "Explain my next class with room, teacher, and syllabus unit",
+  "2nd next class",
   "Solve 2x + 3 = 11",
-  "Calculate 25% of 240",
-  "What can you do?"
+  "Calculate 25% of 240"
 ]);
 
 function normalizeQuestionSuggestion(value = "") {
@@ -1274,6 +1391,25 @@ function localQuestionSuggestions(input) {
     "Section timetable",
     "Subsection timetable"
   ];
+  const verifiedDataSuggestions = [
+    "Is my timetable verified?",
+    "When was the official timetable source generated?",
+    "Check for official updates",
+    "What official data updates automatically?",
+    "What changed in my timetable?",
+    "Compare my timetable with last week's verified release",
+    "Show all official sources used for this answer",
+    "Is this from timetable, roster, syllabus, or general advice?",
+    ...(hasStudentProfile() ? ["Which current official roster is my profile using?"] : [])
+  ];
+  const compassWorkflowSuggestions = [
+    "Show tomorrow as a simple card",
+    "What should I do in my next free period?",
+    "Which classes are in the same building today?",
+    "Make a 45-minute study plan before my next class",
+    "What do I need for tomorrow?",
+    "Explain my next class with room, teacher, and syllabus unit"
+  ];
   const calendarSuggestions = [
     "What time is it in India?",
     "What date is day after tomorrow?",
@@ -1290,6 +1426,8 @@ function localQuestionSuggestions(input) {
   const pool = [
     ...CORE_QUESTION_SUGGESTIONS,
     ...profileSuggestions,
+    ...verifiedDataSuggestions,
+    ...compassWorkflowSuggestions,
     ...officialViewSuggestions,
     ...calendarSuggestions,
     ...timetableSuggestions,
@@ -1301,6 +1439,7 @@ function localQuestionSuggestions(input) {
 
 function questionSuggestionKind(suggestion) {
   const q = normalizeQuestionSuggestion(suggestion);
+  if (/official|verified|source|updates?|roster.*using/.test(q)) return "Verified data";
   if (/solve|calculate|sqrt|percentage|percent/.test(q)) return "Calculation";
   if (/date|day after tomorrow|parson|parso|time is it/.test(q)) return "Date & time";
   if (/syllabus|unit|outcome|credit|assessment|exam|textbook|laboratory/.test(q)) return "Syllabus";
@@ -1397,18 +1536,27 @@ function renderStatus() {
   const subgroupCount = subgroupsFor(state.selectedGroup).length;
   $("data-status").innerHTML = `<span class="status-dot ${loaded ? "" : "warning"}"></span><span>${loaded ? `${state.groups.length} sections loaded${subgroupCount ? ` · ${subgroupCount} subsections` : ""}` : "No timetable loaded"}</span>`;
   const version = state.metadata?.version ? ` · Effective ${state.metadata.version}` : "";
+  const sourceFooter = cleanText(state.metadata?.sourceFooter || currentTimetableSourceFooter()).slice(0, 100);
+  const footer = sourceFooter ? ` · Official FET footer ${sourceFooter}` : "";
+  const fallback = state.metadata?.fallback;
   const registryCheckedAt = state.sourceRegistry?.checkedAt ? new Date(state.sourceRegistry.checkedAt) : null;
   const checked = registryCheckedAt && !Number.isNaN(registryCheckedAt.valueOf()) ? ` · Official links verified ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(registryCheckedAt)} IST` : "";
-  $("refresh-meta").textContent = state.metadata ? `Loaded on this device ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(state.metadata.updatedAt))} IST${version}${checked}. Compass checks again when this tab returns and every 15 minutes.` : "Not loaded yet";
+  const fallbackNotice = fallback ? ` · Serving ${fallback.version || "the previous verified timetable"} while the newer file is unavailable` : "";
+  $("refresh-meta").textContent = state.metadata ? `Loaded on this device ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(new Date(state.metadata.updatedAt))} IST${version}${footer}${checked}${fallbackNotice}. Compass checks again when this tab returns and every 15 minutes.` : "Not loaded yet";
   const sourceButton = $("source-status-button");
   const sourceText = $("source-status-text");
   if (sourceButton && sourceText) {
     const officialSources = state.sourceRegistry?.sources || [];
     const rosterSources = state.sourceRegistry?.studentSectionSources || [];
     const verified = loaded && officialSources.length >= 6 && officialSources.every((source) => source.verified) && rosterSources.length >= SECTION_LIST_BRANCHES.length && rosterSources.every((source) => source.verified);
-    sourceButton.classList.toggle("verified", verified);
-    sourceButton.classList.toggle("warning", Boolean(state.sourceRegistry) && !verified);
-    sourceText.textContent = verified ? `Official data verified · ${state.sourceRegistry.version || "current"}` : state.sourceRegistry ? "Official data needs attention" : "Checking official data";
+    sourceButton.classList.toggle("verified", verified && !fallback);
+    sourceButton.classList.toggle("warning", Boolean(state.sourceRegistry) && (!verified || fallback));
+    sourceText.textContent = fallback
+      ? `Previous verified timetable · ${fallback.version || "retrying latest"}`
+      : verified ? `Official data verified · ${state.sourceRegistry.version || "current"}` : state.sourceRegistry ? "Official data needs attention" : "Checking official data";
+    sourceButton.title = fallback
+      ? "The newer official timetable could not be read. Compass is temporarily using the previous verified release and will retry automatically."
+      : sourceFooter ? `Verified official FET footer: ${sourceFooter}` : "Open official GNDEC timetable page";
   }
 }
 
@@ -1435,8 +1583,7 @@ function renderQuestionChips() {
       { text: "Free lectures today", query: "Free lectures today" },
       { text: "Next holiday kab hai?", query: "When is the next holiday?" },
       { text: "My mentor", query: "Who is my mentor?" },
-      { text: "Physics syllabus", query: "Physics syllabus" },
-      { text: "CGPA calculation", query: "How is CGPA calculated?" }
+      { text: "Physics syllabus", query: "Physics syllabus" }
     ];
   } else if (lang === "punjabi") {
     chips = [
@@ -1465,10 +1612,11 @@ function renderQuestionChips() {
       { text: "Free periods today", query: "Free lectures today" },
       { text: "Next holiday", query: "When is the next holiday?" },
       { text: "My mentor", query: "Who is my mentor?" },
-      { text: "Physics syllabus", query: "Physics syllabus" },
-      { text: "Calculate CGPA", query: "How is CGPA calculated?" }
+      { text: "Physics syllabus", query: "Physics syllabus" }
     ];
   }
+  if (state.timetableUpdate?.id) chips.push({ text: "What changed?", query: "What changed in my timetable?" });
+  else chips.push({ text: "Tomorrow card", query: "Show tomorrow as a simple card" });
   if (showDynamic && state.selectedGroup) {
     const now = getIndiaNow();
     const todayClasses = classFor(state.selectedGroup, now.day);
@@ -1504,7 +1652,72 @@ function renderQuestionChips() {
   containers.forEach((container) => { container.innerHTML = markup; });
 }
 
-function renderEverything() { applySettings(); renderStatus(); renderLive(); renderDaySchedule(); renderWeek(); renderQuestionChips(); renderProfileSummary(); renderReferenceLinks(); renderSettingsPage(); renderAdminAiVisibility(); }
+function updateChangeMarkup(change) {
+  const before = change.before || {};
+  const after = change.after || {};
+  const current = after.subject ? after : before;
+  const cohort = cleanText(current.cohorts || "");
+  const slot = `${change.day} ${humanTime(change.start)}-${humanTime(change.end)}`;
+  let detail = "";
+  if (change.kind === "added") detail = `${after.subject || "Class"} · ${after.room || "Room not listed"} · ${after.teacher || "Teacher not listed"}`;
+  else if (change.kind === "removed") detail = `${before.subject || "Class"} · ${before.room || "Room not listed"} · ${before.teacher || "Teacher not listed"}`;
+  else {
+    const fields = (change.fields || []).map((field) => `${field[0].toUpperCase()}${field.slice(1)}: ${before[field] || "Not listed"} → ${after[field] || "Not listed"}`);
+    detail = fields.join(" · ");
+  }
+  const kind = change.kind === "added" ? "Added" : change.kind === "removed" ? "Removed" : "Changed";
+  return `<li class="timetable-update-change"><span class="timetable-update-kind ${change.kind}">${kind}</span><div><strong>${escapeHtml(change.group)}${cohort ? ` / ${escapeHtml(cohort)}` : ""} · ${escapeHtml(slot)}</strong><p>${escapeHtml(detail)}</p></div></li>`;
+}
+
+function renderTimetableUpdateCenter() {
+  const update = state.timetableUpdate;
+  const hasUpdate = Boolean(update?.id && Array.isArray(update.changes) && update.changes.length);
+  const card = $("timetable-update-card");
+  const empty = $("timetable-update-empty");
+  if (card) card.hidden = !hasUpdate;
+  if (empty) empty.hidden = hasUpdate;
+  const profileNotice = $("profile-timetable-update");
+  if (profileNotice) profileNotice.hidden = !hasUpdate;
+  if (!hasUpdate) return;
+  const selectedLabel = [update.selectedGroup, update.selectedSubgroup].filter(Boolean).join(" / ");
+  const affectedGroups = Array.isArray(update.affectedGroups) ? update.affectedGroups : [];
+  const affectedText = update.selectedAffected && selectedLabel
+    ? `Your selected timetable (${selectedLabel}) is affected.`
+    : `Affected group${update.totalAffectedGroups === 1 ? "" : "s"}: ${affectedGroups.join(", ") || "listed in the change details"}.`;
+  const summary = $("timetable-update-summary");
+  if (summary) summary.textContent = `${update.totalChanges || update.changes.length} verified class change${(update.totalChanges || update.changes.length) === 1 ? "" : "s"} found. ${affectedText}`;
+  const profileText = $("profile-timetable-update-text");
+  if (profileText) profileText.textContent = `New timetable detected · ${update.selectedAffected ? "your selected group is affected" : `${update.totalChanges || update.changes.length} verified class changes`}.`;
+  const oldFooter = $("timetable-update-old-footer");
+  const newFooter = $("timetable-update-new-footer");
+  const oldVersion = $("timetable-update-old-version");
+  const newVersion = $("timetable-update-new-version");
+  if (oldFooter) oldFooter.textContent = update.oldFooter || "Not published";
+  if (newFooter) newFooter.textContent = update.newFooter || "Not published";
+  if (oldVersion) oldVersion.textContent = update.oldVersion || "Previously loaded release";
+  if (newVersion) newVersion.textContent = update.newVersion || "New verified release";
+  const detected = $("timetable-update-detected-at");
+  if (detected) {
+    const date = new Date(update.detectedAt);
+    detected.textContent = Number.isNaN(date.valueOf()) ? "Just detected" : `Detected ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(date)} IST`;
+  }
+  const changes = $("timetable-update-changes");
+  if (changes) changes.innerHTML = update.changes.map(updateChangeMarkup).join("");
+  const source = $("timetable-update-source");
+  if (source) {
+    source.hidden = !update.sourceUrl;
+    if (update.sourceUrl) source.href = update.sourceUrl;
+  }
+}
+
+function markTimetableUpdateSeen() {
+  if (!state.timetableUpdate) return;
+  persistTimetableUpdate(null);
+  renderTimetableUpdateCenter();
+  showToast("Timetable update marked as seen. A new notice will appear only after another verified change.");
+}
+
+function renderEverything() { applySettings(); renderStatus(); renderLive(); renderDaySchedule(); renderWeek(); renderQuestionChips(); renderProfileSummary(); renderReferenceLinks(); renderSettingsPage(); renderTimetableUpdateCenter(); renderAdminAiVisibility(); }
 
 function renderProfileSummary() {
   const profile = activeStudentProfile();
@@ -1529,6 +1742,15 @@ function renderProfileSummary() {
   if (tagline) tagline.textContent = configured ? `${profile.branch} / ${[profile.section, profile.subsection].filter(Boolean).join(" / ")}` : "Your name, group, and timetable remain only in this browser.";
   const onboarding = $("onboarding-note");
   if (onboarding) onboarding.hidden = configured;
+  const profileStep = $("onboarding-step-profile");
+  const timetableStep = $("onboarding-step-timetable");
+  const nextStep = $("onboarding-step-next");
+  const groupSelected = Boolean(state.selectedGroup);
+  if (profileStep) profileStep.classList.toggle("complete", configured);
+  if (timetableStep) timetableStep.classList.toggle("complete", groupSelected);
+  if (nextStep) nextStep.classList.toggle("complete", configured && groupSelected);
+  const timetableStepText = $("onboarding-step-timetable-text");
+  if (timetableStepText) timetableStepText.textContent = groupSelected ? `Selected: ${[state.selectedGroup, state.selectedSubgroup].filter(Boolean).join(" / ")}.` : "Choose the section and subgroup that should be used on this device.";
 }
 
 function currentAndNext(dayOffset = 0) {
@@ -1979,7 +2201,8 @@ function answerQuestion(question) {
   const asksAfterNext = asksNext && upcomingPosition > 1;
   const asksWhere = /where|room|venue|location|place|kahan|kahaan|kithe|kithhe|कहाँ|कहा|कमरा|किथੇ|ਕਿੱਥੇ/.test(q);
   const asksTeacher = /teacher|faculty|sir|maam|mam|kaun padh|शिक्षक|टीचर|अध्यापक|ਕੌਣ ਪੜ੍ਹਾ|ਅਧਿਆਪਕ|ਟੀਚਰ/.test(q);
-  const isScheduleQuestion = /time\s*table|timetable|schedule|classes|class hai/i.test(q);
+  const isPortalLinkQuestion = /\b(?:index|link|links|portal|website|downloads?|pdf|rules?|hostels?|notices?)\b/i.test(q);
+  const isScheduleQuestion = !isPortalLinkQuestion && /time\s*table|timetable|schedule|classes|class hai/i.test(q);
   const asksFreePeriod = /free\s*(lecture|lectures|period|periods|class|classes|slots?|time)|empty\s*(period|lecture|slot)|breaks?\s*(today|tomorrow|on|for)?|\bgaps?\b(?:\s*(?:between|in)\s*classes)?/.test(q);
   const asksFirstClass = /\b(?:first|earliest)\b.*\b(?:class|lecture|period)\b|\b(?:class|lecture|period)\b.*\b(?:first|earliest)\b/.test(q);
   const asksLastClass = /\b(?:last|final|latest)\b.*\b(?:class|lecture|period)\b|\bwhen\b.*\b(?:finish|end|leave)\b|\bwhat time\b.*\b(?:finish|end|leave)\b/.test(q);
@@ -2053,7 +2276,7 @@ function answerQuestion(question) {
   const match = (asksNext || asksCurrent || asksAfterNext) ? null : (referencedClasses[0] || null);
   if (!match && !asksNext && !asksCurrent && !asksAfterNext && !asksTomorrow) return "";
   const target = match || (asksCurrent ? selection.current : asksNext ? selection.upcoming[upcomingPosition - 1] : selection.next);
-  if ((asksToday || /timetable|schedule|classes|class hai|टाइमटेबल|समय सारणी|ਟਾਈਮਟੇਬਲ|ਸਮਾਂ ਸਾਰਣੀ/.test(q)) && !asksNext && !asksCurrent && !asksWhere && !asksTeacher && !match) {
+  if ((asksToday || /timetable|schedule|classes|class hai|टाइमटेबल|समय सारणी|ਟਾਈਮਟੇਬਲ|ਸਮਾਂ ਸਾਰਣੀ/.test(q)) && !isPortalLinkQuestion && !asksNext && !asksCurrent && !asksWhere && !asksTeacher && !match) {
     const futureStudyDay = asksTomorrow ? nextStudyDayInfo(false) : null;
     const day = futureStudyDay?.day || (asksTomorrow ? selection.day : getIndiaNow().day);
     const classes = classFor(state.selectedGroup, day);
@@ -2363,20 +2586,29 @@ function parseStudentSectionText(text, fallbackBranch = "") {
   return text.split(/\r?\n/).flatMap((rawLine) => {
     const columns = rawLine.split(/\t+/).map(cleanText).filter(Boolean);
     if (columns.length >= 10 && /^\d+$/.test(columns[0]) && /^[A-Z0-9-]{4,20}$/i.test(columns[1])) {
-      const branch = String(columns[5] || fallbackBranch).toUpperCase();
-      const looksLikePermanentRoster = /^[A-Z]{2,8}$/.test(branch) && /^[A-Z0-9]{2,12}$/i.test(columns[6] || "") && /^[A-Z0-9]{2,16}$/i.test(columns[7] || "");
-      if (looksLikePermanentRoster && columns[2]) {
+      // GNDEC's newest permanent-section PDFs add the registration number
+      // after CRN. Older releases do not, so support both official layouts.
+      const hasRegistrationColumn = /^26\d{6,10}$/.test(columns[2] || "");
+      const offset = hasRegistrationColumn ? 1 : 0;
+      const nameIndex = 2 + offset;
+      const branchIndex = 5 + offset;
+      const sectionIndex = 6 + offset;
+      const subsectionIndex = 7 + offset;
+      const branch = String(columns[branchIndex] || fallbackBranch).toUpperCase();
+      const looksLikePermanentRoster = /^[A-Z]{2,8}$/.test(branch) && /^[A-Z0-9]{2,12}$/i.test(columns[sectionIndex] || "") && /^[A-Z0-9]{2,16}$/i.test(columns[subsectionIndex] || "");
+      if (looksLikePermanentRoster && columns[nameIndex]) {
         return [normalizeStudentRecord({
           serialNo: columns[0],
           crn: columns[1],
-          name: columns[2],
+          registrationNo: hasRegistrationColumn ? columns[2] : "",
+          name: columns[nameIndex],
           branch,
-          section: columns[6],
-          subsection: columns[7],
-          academicGroup: columns[8] || "",
-          mentor: columns[9] || "",
-          mentorPhone: columns[10] || "",
-          mentorVenue: columns[11] || "",
+          section: columns[sectionIndex],
+          subsection: columns[subsectionIndex],
+          academicGroup: columns[8 + offset] || "",
+          mentor: columns[9 + offset] || "",
+          mentorPhone: columns[10 + offset] || "",
+          mentorVenue: columns[11 + offset] || "",
           rosterSchemaVersion: ROSTER_SCHEMA_VERSION
         })];
       }
@@ -2937,7 +3169,277 @@ function answerSyllabusQuestion(question) {
   return `${summary}<p class="answer-source">Official GNDEC syllabus.</p>`;
 }
 
+function timetableUpdateAnswer() {
+  const update = state.timetableUpdate;
+  if (!update?.id || !Array.isArray(update.changes) || !update.changes.length) return "<p><strong><u>No saved timetable change comparison.</u></strong></p><p>Compass stores a comparison only after this device receives two different verified GNDEC timetable releases. When a future release changes, open Settings → What changed? to compare it with the prior verified release.</p>";
+  const groupLabel = update.selectedAffected && update.selectedGroup
+    ? `Your selected group (${[update.selectedGroup, update.selectedSubgroup].filter(Boolean).join(" / ")}) is affected.`
+    : `Affected group${update.totalAffectedGroups === 1 ? "" : "s"}: ${(update.affectedGroups || []).join(", ") || "shown below"}.`;
+  const source = update.sourceUrl ? `<p><a class="reference-link" href="${escapeHtml(update.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open the official timetable release</a></p>` : "";
+  return `<p><strong><u>New timetable detected</u></strong></p><p>${escapeHtml(groupLabel)} ${update.totalChanges || update.changes.length} verified class change${(update.totalChanges || update.changes.length) === 1 ? "" : "s"} found.</p><p><strong>FET footer:</strong> ${escapeHtml(update.oldFooter || "Not published")} → ${escapeHtml(update.newFooter || "Not published")}</p><ul>${update.changes.slice(0, 8).map((change) => {
+    const before = change.before || {}; const after = change.after || {}; const current = after.subject ? after : before;
+    const label = `${change.group} · ${change.day} ${humanTime(change.start)} · ${current.subject || "Class"}`;
+    const detail = change.kind === "changed" ? (change.fields || []).map((field) => `${field}: ${before[field] || "Not listed"} → ${after[field] || "Not listed"}`).join("; ") : change.kind;
+    return `<li><strong>${escapeHtml(label)}</strong>${detail ? ` — ${escapeHtml(detail)}` : ""}</li>`;
+  }).join("")}</ul>${source}<p class="answer-source">Compared locally from two verified GNDEC timetable releases saved on this device.</p>`;
+}
+
+function tomorrowSimpleCardAnswer() {
+  if (!state.schedule.length || !state.selectedGroup) return "";
+  const tomorrow = indiaCalendarDate(1);
+  const classes = classFor(state.selectedGroup, tomorrow.day);
+  if (!classes.length) return `<p><strong><u>Tomorrow · ${escapeHtml(tomorrow.compactLabel)}</u></strong></p><p>No classes are listed in the verified weekly timetable for ${escapeHtml(activeTimetableLabel())}.</p><p class="answer-source">Official GNDEC weekly timetable. A date-specific notice can override a regular week, so Compass does not guess one.</p>`;
+  return `<p><strong><u>Tomorrow · ${escapeHtml(tomorrow.compactLabel)}</u></strong></p><div class="answer-day-card">${classes.map((item) => `<p><strong>${humanTime(item.start)}-${humanTime(item.end)}</strong><br />${escapeHtml(item.subject)}<br /><span>${escapeHtml(item.room)} · ${escapeHtml(item.teacher)}</span></p>`).join("")}</div><p class="answer-source">Official GNDEC weekly timetable.</p>`;
+}
+
+function nextFreePeriodAdviceAnswer() {
+  if (!state.schedule.length || !state.selectedGroup) return "";
+  const now = getIndiaNow();
+  const todayFree = officialFreeLectureSlots(classFor(state.selectedGroup, now.day));
+  const currentOrNextFree = todayFree.find((slot) => slot.end > now.minutes);
+  if (!currentOrNextFree) return `<p><strong><u>No remaining verified free lecture today.</u></strong></p><p>Use the next class break for water, food, or a short walk. Ask “Free lectures tomorrow” to see tomorrow’s exact open slots.</p><p class="answer-source">Official GNDEC weekly timetable.</p>`;
+  const remaining = currentOrNextFree.start <= now.minutes ? currentOrNextFree.end - now.minutes : currentOrNextFree.end - currentOrNextFree.start;
+  const available = Math.max(0, remaining);
+  const action = available >= 45
+    ? "Use 5 minutes to choose one syllabus unit, 25 minutes for focused study, 10 minutes for recall questions, then 5 minutes to pack for the next class."
+    : `You have about ${available} minutes. Review today’s notes, make three recall questions, then get ready for the next class.`;
+  return `<p><strong><u>Your next free timetable slot</u></strong></p><p><strong>${escapeHtml(now.day)} · ${humanTime(Math.max(now.minutes, currentOrNextFree.start))}-${humanTime(currentOrNextFree.end)}</strong></p><p>${escapeHtml(action)}</p><p class="answer-source">Time window from the official GNDEC timetable; study advice is general guidance.</p>`;
+}
+
+function fortyFiveMinutePlanAnswer() {
+  if (!state.schedule.length || !state.selectedGroup) return "";
+  const { now, day, next } = currentAndNext();
+  if (!next) return "<p><strong><u>No next class is listed.</u></strong></p><p>Compass cannot safely make a before-class plan without a verified next timetable entry.</p>";
+  const timeUntil = day === now.day ? next.start - now.minutes : 45;
+  const fits = timeUntil >= 45;
+  const target = `${next.subject} · ${humanTime(next.start)} · ${next.room}`;
+  return `<p><strong><u>${fits ? "45-minute plan before your next class" : "Short plan before your next class"}</u></strong></p><p>Your next verified class is <strong>${escapeHtml(target)}</strong>.</p><ol>${fits
+    ? "<li>5 min: choose one small topic or syllabus unit.</li><li>25 min: study without notifications.</li><li>10 min: write five recall questions or solve one problem.</li><li>5 min: pack up and leave for the room.</li>"
+    : `<li>Use the available ${Math.max(0, timeUntil)} minutes to review notes from the last class.</li><li>Write three recall questions.</li><li>Leave a few minutes early for ${escapeHtml(next.room)}.</li>`
+  }</ol><p class="answer-source">Next-class time and room from the official GNDEC timetable; the study steps are general guidance.</p>`;
+}
+
+function sameBuildingTodayAnswer() {
+  if (!state.schedule.length || !state.selectedGroup) return "";
+  const now = getIndiaNow();
+  const classes = classFor(state.selectedGroup, now.day);
+  if (!classes.length) return `<p><strong><u>No classes are listed for ${escapeHtml(now.day)}.</u></strong></p><p class="answer-source">Official GNDEC weekly timetable.</p>`;
+  const kernel = globalThis.CompassBrainKernel;
+  const grouped = new Map();
+  const unmatched = [];
+  classes.forEach((item) => {
+    const roomInfo = kernel?.lookupCampusRoom?.(item.room);
+    const building = cleanText(roomInfo?.block || "");
+    if (!building) { unmatched.push(item); return; }
+    grouped.set(building, [...(grouped.get(building) || []), item]);
+  });
+  const groups = [...grouped.entries()].filter(([, entries]) => entries.length > 1);
+  if (!groups.length) return `<p><strong><u>No verified same-building grouping is available for ${escapeHtml(now.day)}.</u></strong></p><p>The official timetable publishes these room labels: ${escapeHtml([...new Set(classes.map((item) => item.room))].join(", "))}. Compass will not infer a building when the local verified room directory has no match.</p><p class="answer-source">Official GNDEC timetable and verified local room directory.</p>`;
+  return `<p><strong><u>Classes in the same verified building today</u></strong></p>${groups.map(([building, entries]) => `<p><strong>${escapeHtml(building)}</strong><br />${entries.map((item) => `${humanTime(item.start)} ${escapeHtml(item.subject)} (${escapeHtml(item.room)})`).join(" · ")}</p>`).join("")}${unmatched.length ? `<p class="kb-tip">${unmatched.length} class${unmatched.length === 1 ? "" : "es"} use room labels without a verified building match, so they are not grouped.</p>` : ""}<p class="answer-source">Official GNDEC timetable and verified local room directory.</p>`;
+}
+
+function tomorrowNeedsAnswer() {
+  if (!state.schedule.length || !state.selectedGroup) return "";
+  const tomorrow = indiaCalendarDate(1);
+  const classes = classFor(state.selectedGroup, tomorrow.day);
+  const calendarUrl = state.sourceRegistry?.academicCalendarSource?.url || "https://gndec.ac.in/?q=node/23";
+  const classList = classes.length
+    ? `<ul>${classes.map((item) => `<li><strong>${humanTime(item.start)}:</strong> ${escapeHtml(item.subject)} · ${escapeHtml(item.room)}</li>`).join("")}</ul>`
+    : "<p>No regular weekly classes are listed for tomorrow.</p>";
+  return `<p><strong><u>What you need for tomorrow · ${escapeHtml(tomorrow.compactLabel)}</u></strong></p>${classList}<p>Bring the material your teacher has instructed for each listed class. Compass has not inferred materials or a special-day cancellation.</p><p><a class="reference-link" href="${escapeHtml(calendarUrl)}" target="_blank" rel="noopener noreferrer">Open the current official academic calendar</a></p><p class="answer-source">Official GNDEC weekly timetable and current academic-calendar link only.</p>`;
+}
+
+function nextClassSyllabusBriefAnswer(question) {
+  if (!state.schedule.length || !state.selectedGroup) return "";
+  const referenced = findReferencedClass(question);
+  const item = referenced || currentAndNext().current || currentAndNext().next;
+  if (!item) return "";
+  const course = state.syllabus.length ? syllabusCoursesForQuestion(item.subject)[0] : null;
+  const syllabus = course
+    ? (course.units.length ? `<p><strong>Official syllabus unit 1:</strong> ${escapeHtml(course.units[0].title)}</p>` : `<p>The loaded official syllabus has no unit list for ${escapeHtml(course.title)}.</p>`)
+    : "<p>The matching official syllabus unit is not loaded yet, so Compass will not guess one. Ask this again after the syllabus finishes loading.</p>";
+  return `<p><strong><u>${escapeHtml(item.subject)} · class brief</u></strong></p><p><strong>When:</strong> ${escapeHtml(item.day)} ${humanTime(item.start)}-${humanTime(item.end)}<br /><strong>Room:</strong> ${escapeHtml(item.room)}<br /><strong>Teacher:</strong> ${escapeHtml(item.teacher)}</p>${syllabus}<p class="answer-source">Class facts from the official GNDEC timetable${course ? "; syllabus unit from the official GNDEC syllabus" : ""}.</p>`;
+}
+
+function officialSourcesUsedAnswer() {
+  const groupSource = (state.sourceRegistry?.sources || []).find((source) => source.id === "groups");
+  const calendar = state.sourceRegistry?.academicCalendarSource;
+  return `<p><strong><u>How Compass labels sources</u></strong></p><ul><li><strong>Timetable answers:</strong> the active official GNDEC group/subgroup timetable${groupSource?.url ? ` · <a class="reference-link" href="${escapeHtml(groupSource.url)}" target="_blank" rel="noopener noreferrer">open current source</a>` : ""}</li><li><strong>Profile answers:</strong> the current branch roster for this device</li><li><strong>Syllabus answers:</strong> the official first-year syllabus PDF</li><li><strong>Calendar answers:</strong> ${calendar?.url ? `<a class="reference-link" href="${escapeHtml(calendar.url)}" target="_blank" rel="noopener noreferrer">current official academic calendar</a>` : "the verified academic-calendar link"}</li><li><strong>General advice:</strong> clearly labelled Compass guidance, not an official college fact</li></ul><p>Every factual response names its source at the bottom; Compass does not blend source types silently.</p>`;
+}
+
+function timetableVerificationAnswer(question = "") {
+  const q = canonicalTimetableQuestion(question);
+  if (!/(?:is|are|check|confirm|verify).*(?:my|the)?\s*(?:time\s*table|timetable|official\s+data).*(?:verified|official|real|latest)|\b(?:verified|official)\s+(?:timetable|time\s*table)\b/.test(q)) return "";
+  if (!state.schedule.length || !state.selectedGroup) return "<p><strong><u>No timetable is loaded yet.</u></strong></p><p>Compass cannot call a timetable verified until it has loaded an official GNDEC source for your selected group.</p>";
+  const sources = Array.isArray(state.sourceRegistry?.sources) ? state.sourceRegistry.sources : [];
+  const activeSource = sources.find((source) => source.id === "groups") || null;
+  const footer = cleanText(state.metadata?.sourceFooter || activeSource?.sourceFooter || "").slice(0, 100);
+  const version = cleanText(state.metadata?.version || state.sourceRegistry?.version || "Not published");
+  const fallback = state.metadata?.fallback;
+  if (fallback) return `<p><strong><u>Not the newest verified release yet.</u></strong></p><p>Compass is temporarily showing the previous verified timetable (${escapeHtml(fallback.version || "version not published")}) because the newer official file could not be read. It will retry automatically and will not present the fallback as current.</p><p class="answer-source">Previous verified GNDEC timetable.</p>`;
+  if (!activeSource?.verified) return "<p><strong><u>Verification is still pending.</u></strong></p><p>The timetable is loaded on this device, but Compass does not yet have a verified current GNDEC group-timetable source. Refresh official data before relying on it.</p>";
+  const checkedAt = state.sourceRegistry?.checkedAt ? new Date(state.sourceRegistry.checkedAt) : null;
+  const checked = checkedAt && !Number.isNaN(checkedAt.valueOf())
+    ? `<br /><strong>Official links checked:</strong> ${escapeHtml(new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(checkedAt))} IST`
+    : "";
+  const sourceLink = activeSource.url ? `<p><a class="reference-link" href="${escapeHtml(activeSource.url)}" target="_blank" rel="noopener noreferrer">Open the verified official timetable</a></p>` : "";
+  return `<p><strong><u>Yes — your selected ${escapeHtml(activeTimetableLabel())} timetable is verified.</u></strong></p><p><strong>Official effective date:</strong> ${escapeHtml(version)}${footer ? `<br /><strong>FET file footer:</strong> ${escapeHtml(footer)}` : ""}${checked}</p>${sourceLink}<p class="answer-source">Official GNDEC group timetable; Compass did not substitute a weekly view for a verification result.</p>`;
+}
+
+// A named-person schedule is deliberately separate from the active device
+// profile. The name is first resolved against a current official roster or
+// official faculty timetable; only then may it select a section/subsection.
+function namedPersonTimetableRequest(question = "") {
+  const q = canonicalTimetableQuestion(question);
+  const asksTimetable = /\b(?:time\s*table|timetable|schedule|classes?|lectures?|periods?)\b/.test(q);
+  if (!asksTimetable || requestedTimetableSelection(q)) return null;
+  const teacherCue = /\b(?:teacher|faculty|prof(?:essor)?|dr\.?|doctor|instructor)\b/.test(q);
+  const friendCue = /\b(?:friend|classmate|batchmate|peer|student)\b/.test(q);
+  const refersToOwnTimetable = /\b(?:my|mine|mera|meri|mere)\b/.test(q) && !friendCue;
+  if (refersToOwnTimetable) return null;
+  const ignored = new Set(["a", "after", "afternoon", "am", "an", "and", "are", "around", "as", "at", "before", "between", "can", "check", "class", "classes", "current", "day", "does", "do", "doctor", "dr", "duration", "earlier", "evening", "faculty", "first", "for", "free", "friend", "from", "give", "had", "has", "have", "her", "his", "how", "i", "instructor", "is", "its", "last", "later", "latest", "lecture", "lectures", "many", "me", "mine", "morning", "most", "my", "new", "next", "night", "of", "official", "on", "or", "parso", "parson", "period", "periods", "please", "pm", "prof", "professor", "schedule", "shanivar", "show", "student", "table", "teacher", "tell", "that", "the", "their", "this", "time", "timetabel", "timetble", "timetabl", "timetable", "to", "today", "tomorrow", "total", "until", "update", "updated", "verified", "week", "what", "when", "which", "who", "with", "your", "aaj", "ajj", "batao", "kal", "kalle", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+  const selectionCodes = new Set([
+    ...state.schedule.map((item) => String(item.group || "").toUpperCase()),
+    ...state.schedule.flatMap((item) => cohortTokens(item.cohorts || ""))
+  ]);
+  const words = normalizeStudentName(question).split(/\s+/).filter((word) => {
+    const resemblesWeekday = DAY_NAMES.some((day) => editDistance(word, day.toLowerCase()) <= 2);
+    return word.length >= 3 && !ignored.has(word) && !resemblesWeekday && !selectionCodes.has(word.toUpperCase());
+  });
+  if (!words.length) return null;
+  const referenced = findReferencedClasses(q);
+  const hasKnownTimetableReference = referenced.some((item) => {
+    const entityWords = normalizeStudentName(`${item.subject || ""} ${item.teacher || ""}`).split(/\s+/).filter((word) => word.length >= 3);
+    return words.some((word) => entityWords.some((entity) => entity === word || entity.startsWith(word) || word.startsWith(entity) || editDistance(entity, word) <= (Math.max(entity.length, word.length) >= 8 ? 2 : 1)));
+  });
+  if (hasKnownTimetableReference && !teacherCue) return null;
+  const term = [...new Set(words)].slice(0, 4).join(" ");
+  if (!looksLikePlainStudentNameQuery(term)) return null;
+  const activeName = normalizeStudentName(activeStudentProfile()?.name || "");
+  if (activeName && (term === activeName || activeName.includes(term) || term.includes(activeName))) return null;
+  const day = requestedWeekday(q) || (/\b(?:tomorrow|kal)\b/.test(q) ? indiaCalendarDate(1).day : "");
+  return { term, label: term.replace(/\b[a-z]/g, (letter) => letter.toUpperCase()), day, teacherCue };
+}
+
+function timetablePersonCaption(term = "", schedule = []) {
+  const wanted = canonicalFacultyName(term);
+  const captions = [...new Set((Array.isArray(schedule) ? schedule : []).map((item) => cleanText(item.group)).filter(Boolean))];
+  if (!wanted || !captions.length) return { status: "none", captions: [] };
+  const exact = captions.filter((caption) => canonicalFacultyName(caption) === wanted);
+  const wantedWords = wanted.split(/\s+/).filter((word) => word.length >= 3);
+  const contained = captions.filter((caption) => {
+    const candidate = canonicalFacultyName(caption);
+    return wantedWords.length && wantedWords.every((word) => candidate === word || candidate.split(/\s+/).some((part) => part === word || part.startsWith(word) || word.startsWith(part)));
+  });
+  const matches = [...new Set(exact.length ? exact : contained)];
+  return { status: matches.length === 1 ? "single" : matches.length > 1 ? "multiple" : "none", captions: matches };
+}
+
+function readOnlyStudentTimetableAnswer(request, lookup) {
+  if (!lookup?.handled) return "";
+  if (lookup.status === "error") return `<p><strong><u>Official roster lookup is unavailable.</u></strong></p><p>I will not substitute your active timetable for ${escapeHtml(request.label)}. Please try again when the official roster can be read.</p>`;
+  if (lookup.status === "multiple") return `<p><strong><u>More than one official roster match was found for ${escapeHtml(request.label)}.</u></strong></p><p>Please provide the student’s exact CRN or registration number. Compass will not guess a section/subsection or show your own timetable.</p>`;
+  if (lookup.status !== "single" || !lookup.records?.[0]) return "";
+  const record = lookup.records[0];
+  const group = cleanText(record.section).toUpperCase();
+  const subgroup = cleanText(record.subsection).toUpperCase();
+  if (!group || !subgroup) return `<p><strong><u>${escapeHtml(record.name || request.label)} has no verified section/subsection in the current roster.</u></strong></p><p>Compass will not infer a timetable from incomplete roster data.</p>`;
+  const days = request.day ? [request.day] : DAY_NAMES;
+  const entries = days.flatMap((day) => classFor(group, day, subgroup));
+  const heading = `${record.name || request.label} · ${subgroup}${request.day ? ` · ${request.day}` : " timetable"}`;
+  const note = `<p class="answer-source">Read-only result: ${escapeHtml(subgroup)} came from the current official GNDEC roster (${escapeHtml(lookup.version || "current")}). It did not change your profile or selected timetable.</p>`;
+  return `${scheduleAnswer(entries, heading)}${note}`;
+}
+
+function readOnlyTeacherTimetableAnswer(request, match, schedule) {
+  if (match?.status === "multiple") return `<p><strong><u>More than one faculty timetable matches ${escapeHtml(request.label)}.</u></strong></p><p>Please use the faculty member’s full official name. Compass will not guess a timetable.</p>`;
+  if (match?.status !== "single" || !match.captions?.[0]) return "";
+  const caption = match.captions[0];
+  const entries = (Array.isArray(schedule) ? schedule : []).filter((item) => item.group === caption && (!request.day || item.day === request.day));
+  const heading = `${caption} · Faculty timetable${request.day ? ` · ${request.day}` : ""}`;
+  return `${scheduleAnswer(entries, heading)}<p class="answer-source">Read-only result from the current official GNDEC faculty timetable. It did not change your profile or selected timetable.</p>`;
+}
+
+async function resolveNamedPersonTimetableAnswer(question = "") {
+  const request = namedPersonTimetableRequest(question);
+  if (!request) return "";
+  const teacherResult = async () => {
+    try {
+      const schedule = await loadOfficialTimetableView("teachers");
+      return readOnlyTeacherTimetableAnswer(request, timetablePersonCaption(request.term, schedule), schedule);
+    } catch { return ""; }
+  };
+  if (request.teacherCue) {
+    const answer = await teacherResult();
+    return answer || `<p><strong><u>No verified faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>Please use the faculty member’s full official name. Compass will not show your timetable as theirs.</p>`;
+  }
+  try {
+    const rosterData = await loadCurrentRosterRecords();
+    const lookup = studentLookupContextFromRecords(`find student ${request.term}`, rosterData.records, rosterData);
+    const studentAnswer = readOnlyStudentTimetableAnswer(request, lookup);
+    if (studentAnswer) return studentAnswer;
+  } catch { /* Try the official faculty timetable below before failing safely. */ }
+  const facultyAnswer = await teacherResult();
+  if (facultyAnswer) return facultyAnswer;
+  return `<p><strong><u>No verified student or faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>Please check the spelling or provide a student CRN. Compass will not substitute your active timetable.</p>`;
+}
+
+function namedStudentTimetableAnswer(question = "") {
+  const q = canonicalTimetableQuestion(question);
+  const asksTimetable = /\b(?:time\s*table|timetable|schedule|classes?|lectures?|periods?)\b/.test(q);
+  if (!asksTimetable || requestedTimetableSelection(q)) return "";
+  const friendCue = /\b(?:friend|classmate|batchmate|peer|student)\b/.test(q);
+  const refersToOwnTimetable = /\b(?:my|mine|mera|meri|mere)\b/.test(q) && !friendCue;
+  if (refersToOwnTimetable) return "";
+  const ignored = new Set(["a", "an", "and", "are", "as", "at", "can", "check", "class", "classes", "day", "for", "friend", "from", "give", "his", "her", "i", "is", "its", "lecture", "lectures", "me", "mine", "my", "of", "on", "or", "period", "periods", "please", "schedule", "show", "student", "table", "tell", "the", "their", "time", "timetable", "to", "today", "tomorrow", "week", "what", "when", "which", "who", "with", "your", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "official", "latest", "new", "update", "updated", "verified"]);
+  const selectionCodes = new Set([
+    ...state.schedule.map((item) => String(item.group || "").toUpperCase()),
+    ...state.schedule.flatMap((item) => cohortTokens(item.cohorts || ""))
+  ]);
+  const words = normalizeStudentName(question).split(/\s+/).filter((word) => {
+    const resemblesWeekday = DAY_NAMES.some((day) => editDistance(word, day.toLowerCase()) <= 2);
+    return word.length >= 3 && !ignored.has(word) && !resemblesWeekday && !selectionCodes.has(word.toUpperCase());
+  });
+  if (!words.length) return "";
+  // A verified subject or teacher in the active timetable is a timetable
+  // query, not a person's name. Only inspect the non-day candidate words so
+  // a subject title containing “Tuesday” cannot hide a named-student request.
+  const referenced = findReferencedClasses(q);
+  const hasKnownTimetableReference = referenced.some((item) => {
+    const entityWords = normalizeStudentName(`${item.subject || ""} ${item.teacher || ""}`).split(/\s+/).filter((word) => word.length >= 3);
+    return words.some((word) => entityWords.some((entity) => entity === word || entity.startsWith(word) || word.startsWith(entity) || editDistance(entity, word) <= (Math.max(entity.length, word.length) >= 8 ? 2 : 1)));
+  });
+  if (hasKnownTimetableReference) return "";
+  const candidate = words.slice(0, 4).join(" ");
+  if (!looksLikePlainStudentNameQuery(candidate)) return "";
+  const activeName = normalizeStudentName(activeStudentProfile()?.name || "");
+  if (activeName && (candidate === activeName || activeName.includes(candidate) || candidate.includes(activeName))) return "";
+  return `<p><strong><u>I cannot verify ${escapeHtml(candidate)}’s timetable from a name alone.</u></strong></p><p>I will not show your active <strong>${escapeHtml(activeTimetableLabel())}</strong> timetable as another student’s timetable. Timetables are verified by the official section/subsection, not by a guessed name.</p><p>Ask your friend for their official code, then use a request such as <strong>“CSD2 Tuesday timetable”</strong>. That view will not change your saved profile or selected timetable.</p>`;
+}
+
+// These requested Compass workflows must always remain deterministic.  They
+// run before either Brain path so a generic comparison or planning intent can
+// never displace the verified update/source answer with an AI response.
+function approvedCompassWorkflowAnswer(question) {
+  const q = canonicalTimetableQuestion(question);
+  const namedStudentAnswer = namedStudentTimetableAnswer(question);
+  if (namedStudentAnswer) return namedStudentAnswer;
+  const verificationAnswer = timetableVerificationAnswer(question);
+  if (verificationAnswer) return verificationAnswer;
+  if (/(?:what|which|show|tell|compare).*(?:changed|change|difference|diff).*(?:my|the)?\s*timetable|(?:timetable).*(?:changed|change|difference|diff)|compare.*(?:last|previous).*(?:verified|release|timetable)/.test(q)) return timetableUpdateAnswer();
+  if (/(?:show|give|make).*(?:tomorrow|kal).*(?:simple|card)|(?:simple|card).*(?:tomorrow|kal).*(?:timetable|schedule|class)/.test(q)) return tomorrowSimpleCardAnswer();
+  if (/(?:what|which).*(?:should|can).*(?:do|study).*(?:next)?\s*free\s*(?:period|lecture|slot)|next\s+free\s*(?:period|lecture|slot).*(?:do|study|suggest)/.test(q)) return nextFreePeriodAdviceAnswer();
+  if (/(?:same|which).*(?:building|block).*(?:today|aaj|classes)|(?:classes).*(?:same).*(?:building|block)/.test(q)) return sameBuildingTodayAnswer();
+  if (/45\s*(?:minute|min).*(?:study\s*)?plan|(?:study\s*)?plan.*45\s*(?:minute|min)|plan.*before.*next\s+class/.test(q)) return fortyFiveMinutePlanAnswer();
+  if (/(?:what|which|show|all).*(?:official\s+)?sources?.*(?:used|use|answer)|(?:is|was).*(?:this|that).*(?:timetable|roster|syllabus|general\s+advice|source)/.test(q)) return officialSourcesUsedAnswer();
+  if (/(?:what|do).*(?:need|prepare|bring).*(?:tomorrow|kal)|(?:tomorrow|kal).*(?:need|prepare|bring)/.test(q)) return tomorrowNeedsAnswer();
+  if (/(?:explain|show|tell).*(?:next|upcoming).*(?:class).*(?:room|teacher|syllabus)|(?:next|upcoming).*(?:class).*(?:room|teacher).*(?:syllabus)/.test(q)) return nextClassSyllabusBriefAnswer(question);
+  return "";
+}
+
 function answerCompassQuestion(question) {
+  const workflowAnswer = approvedCompassWorkflowAnswer(question);
+  if (workflowAnswer) return workflowAnswer;
   const q = canonicalTimetableQuestion(question);
   const now = getIndiaNow();
   const branchAnswer = engineeringBranchesAnswer(q);
@@ -2947,6 +3449,18 @@ function answerCompassQuestion(question) {
   if (/what\s+(can|do)\s+you|how\s+can\s+you\s+help|help\s+me|features/.test(q)) return "<p><strong>Compass can help with:</strong></p><ul><li>today, tomorrow, week, next/current class, rooms, teachers, and free periods</li><li>your verified CRN, serial, section, subsection, mentor, and profile details</li><li>first-year syllabus units, outcomes, course codes, and credits</li><li>study help when a detailed explanation or plan is genuinely needed</li></ul><p>Try: “Math units”, “where is Physics?”, “my CRN”, or “my next class”.</p>";
   if (/how.*(?:set|find|change).*(?:group|section|profile)|(?:group|section).*(?:not|missing|wrong)/.test(q)) return "<p>Open <strong>Profile</strong>, then search using your name, CRN, registration number, or serial number. Choose the verified official match if needed. Your active profile stays only on this device.</p>";
   if (/(?:forget|forgot|reset|change).*(?:profile|name|registration|section)|(?:profile|section).*(?:change|wrong)/.test(q)) return "<p>Open <strong>Profile</strong> and run the verified profile lookup again using your name, CRN, registration number, or serial number. Selecting a current official record updates only this device.</p>";
+  const sourceFooter = cleanText(state.metadata?.sourceFooter || currentTimetableSourceFooter()).slice(0, 100);
+  if (/(?:when|what).*(?:timetable|official\s+source).*(?:generated|generation|footer|date|time)|(?:timetable|official\s+source).*(?:generated|generation|footer)/.test(q)) return `<p><strong><u>Current official timetable source</u></strong></p><p><strong>Effective from:</strong> ${escapeHtml(state.metadata?.version || state.sourceRegistry?.version || "Not published in the loaded registry")}</p>${sourceFooter ? `<p><strong>FET file footer:</strong> ${escapeHtml(sourceFooter)}</p><p class="answer-source">Copied exactly from the official published timetable file; its numeric date format is left unchanged.</p>` : "<p>The loaded official file does not publish a FET generation footer. Compass is showing the official effective date and verification time instead.</p>"}`;
+  if (/(?:is|are).*(?:my|the)?\s*(?:timetable|official\s+data).*(?:verified)|\bverified\s+(?:timetable|data)\b/.test(q)) return `<p><strong>${state.sourceRegistry?.sources?.every((source) => source.verified) ? "Yes — the currently loaded timetable views are verified against official GNDEC sources." : "Compass is still checking the official timetable sources."}</strong></p><p><strong>Effective from:</strong> ${escapeHtml(state.metadata?.version || state.sourceRegistry?.version || "Not available")}</p><p class="answer-source">${escapeHtml(state.metadata?.source || "Official GNDEC timetable")}.</p>`;
+  if (/(?:which|what).*(?:official\s+)?(?:roster|student\s+list).*(?:my\s+)?(?:profile|using|use)|(?:my\s+)?(?:profile|roster).*(?:official\s+)?(?:source|using)/.test(q)) {
+    const branch = branchCodeForProfile(activeStudentProfile());
+    const rosterSource = branch ? rosterSourceForBranch(branch) : null;
+    if (!branch) return "<p>Set up or verify your Profile first. Then Compass can show the current official branch roster used for this device.</p>";
+    if (!rosterSource?.url) return `<p>The current official ${escapeHtml(branch)} roster is not available in the verified source registry yet. Your saved profile was not changed.</p>`;
+    return `<p><strong><u>Your current verified roster</u></strong></p><p><strong>${escapeHtml(branch)} Branch Students</strong> is the official roster used to check this device profile.</p><p><a class="reference-link" href="${escapeHtml(rosterSource.url)}" target="_blank" rel="noopener">Open the official ${escapeHtml(branch)} roster</a></p><p class="answer-source">The roster link is discovered from GNDEC’s current timetable index.</p>`;
+  }
+  if (/(?:what|which).*(?:official\s+)?(?:data|sources?).*(?:update|automatic|regular)|(?:data|sources?).*(?:update|automatic|regular).*(?:official|gndec)/.test(q)) return "<p><strong>Automatically refreshed from official GNDEC pages:</strong></p><ul><li>the complete timetable release and its FET footer</li><li>current branch rosters used for Profile checks</li><li>the current first-year syllabus PDF</li><li>the newest dated academic-calendar PDF</li></ul><p>Compass rechecks this source registry every four hours; this browser also checks when the tab returns and every 15 minutes.</p><p><strong>Not automatic:</strong> built-in Brain rules, holiday data, and hand-curated college-link lists only change after a verified app update. Compass deliberately does not import unreviewed pages or PDFs as facts.</p>";
+  if (/check.*(?:official\s+)?updates?/.test(q)) return "<p>Use the <strong>Check for updates & reload</strong> button on Today to run a fresh official-source check now. Your last verified timetable stays available if that check fails.</p>";
   if (/how.*(?:update|refresh)|(?:official|data).*(?:updated|fresh|latest)|when.*update/.test(q)) return `<p>Compass checks GNDEC’s official timetable, roster, and syllabus sources automatically every four hours. This browser also checks for a newer verified revision when the tab returns and every 15 minutes. The timetable currently loaded on this device came from ${escapeHtml(state.metadata?.source || "the official GNDEC source")}.</p>`;
   if (/(?:is|are).*(?:data|profile|chat).*(?:private|safe)|privacy|who.*see.*(?:profile|chat)/.test(q)) return "<p>Your saved profile, selected group, roster search history, syllabus cache, and chat history stay in this browser. Open-ended study questions may use the configured external AI, but Compass removes your name, CRN, registration, serial history, and mentor first. Only branch/section context and an anonymous device/network usage counter are used.</p>";
   if (/how.*(?:share|send).*(?:compass|link)|friend.*(?:use|share)/.test(q)) return "<p>Share the Compass website link. Each friend sets up their own profile on their own browser, so their group, subsection, and chat history do not replace yours.</p>";
@@ -3101,19 +3615,22 @@ function legacyHolidayAnswer(question) {
   const q = kernel.normalize(question);
   const baseIso = indiaCalendarDate(0).date.toISOString().slice(0, 10);
   const baseYear = Number(baseIso.slice(0, 4)) || 2026;
+  const requestedYearMatch = q.match(/\b(?:in|for|of|year)?\s*(20\d{2})\b/);
+  const requestedYear = requestedYearMatch ? Number(requestedYearMatch[1]) : baseYear;
   const asksHoliday = /\b(?:holiday|holidays|vacation|vacations|chutti|chhutti|off\s+day)\b/.test(q)
     || /\b(?:diwali|dussehra|holi|vaisakhi|baisakhi|gurpurab|independence\s+day|republic\s+day|gandhi\s+jayanti|shivratri|eid|bakrid|christmas|muharram|shaheedi\s+diwas)\b/.test(q);
   if (!asksHoliday) return "";
+  if (requestedYear !== 2026) return `<p><strong><u>Official GNDEC holiday list for ${escapeHtml(String(requestedYear))} is not loaded.</u></strong></p><p>Compass currently has the verified 2026 list only, so it will not guess dates for another year.</p><p class="answer-source"><a href="${escapeHtml(kernel.HOLIDAY_SOURCE.page)}" target="_blank" rel="noopener noreferrer">${escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`;
 
   // Month queries
   const mentionedMonth = Object.keys(kernel.MONTHS).find((m) => new RegExp(`\\b${m}\\b`, "i").test(q) && m.length >= 3);
   if (mentionedMonth !== undefined) {
     const mIdx = kernel.MONTHS[mentionedMonth];
     const mName = kernel.MONTH_NAMES[mIdx];
-    const list = kernel.getHolidaysForMonth(mIdx, baseYear);
-    if (!list.length) return `<p><strong>There are no gazetted holidays listed in ${escapeHtml(mName)} ${baseYear}.</strong></p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`;
+    const list = kernel.getHolidaysForMonth(mIdx, requestedYear);
+    if (!list.length) return `<p><strong>There are no gazetted holidays listed in ${escapeHtml(mName)} ${requestedYear}.</strong></p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`;
     const items = list.map((h) => `<li><strong>${h.date.slice(8, 10)} ${mName} (${h.day})</strong>: ${escapeHtml(h.name)} <em>(${escapeHtml(h.type)})</em></li>`).join("");
-    return `<p><strong><u>Official Holidays in ${escapeHtml(mName)} ${baseYear} (${list.length})</u></strong></p><ul>${items}</ul><p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`;
+    return `<p><strong><u>Official Holidays in ${escapeHtml(mName)} ${requestedYear} (${list.length})</u></strong></p><ul>${items}</ul><p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`;
   }
 
   // Specific date check
@@ -3142,10 +3659,13 @@ function legacyHolidayAnswer(question) {
     }
   }
 
-  // Year total
-  if (/\b(?:how many|total|count|kitne|kitni)\s+holidays?\s+(?:in\s+(?:a|this)\s+year|this\s+year|saal\s+me)\b/.test(q)) {
-    const allHolidays = kernel.getHolidaysForYear(baseYear);
-    return `<p><strong>Total official gazetted holidays in ${baseYear}: ${allHolidays.length}</strong>.</p><p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`;
+  // Full-year list and total
+  if (/^(?:(?:all|list|show|display|full|complete)\s+)?(?:official\s+)?holidays?(?:\s+2026)?\b/.test(q)
+    || /\b(?:holidays?|calendar)\s+(?:in|for|of)\s+2026\b/.test(q)
+    || /\b(?:how many|total|count|kitne|kitni)\s+holidays?\s+(?:in\s+(?:a|this)\s+year|this\s+year|saal\s+me)\b/.test(q)) {
+    const allHolidays = kernel.getHolidaysForYear(requestedYear);
+    const items = allHolidays.map((h) => `<li><strong>${escapeHtml(kernel.formatIsoFull(h.date))}</strong>: ${escapeHtml(h.name)} <em>(${escapeHtml(h.type)})</em></li>`).join("");
+    return `<p><strong><u>GNDEC Official Holidays for ${requestedYear} (${allHolidays.length} Total)</u></strong></p><ol>${items}</ol><p class="answer-source"><a href="${escapeHtml(kernel.HOLIDAY_SOURCE.pdf)}" target="_blank" rel="noopener noreferrer">${escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`;
   }
   return "";
 }
@@ -3201,6 +3721,8 @@ function legacyAcademicMarkingAnswer(question) {
 // Brain v2 may answer first, but every unsupported, uncertain, malformed, or
 // failing Brain result returns here without changing existing factual logic.
 function legacyAnswerWithoutAi(question, studentLookup = null, facultyLookup = null) {
+  const workflowAnswer = approvedCompassWorkflowAnswer(question);
+  if (workflowAnswer) return workflowAnswer;
   const facultyAnswer = legacyFacultyLookupAnswer(facultyLookup);
   if (facultyAnswer) return facultyAnswer;
   const rosterAnswer = legacyStudentLookupAnswer(studentLookup);
@@ -3414,6 +3936,9 @@ function compassBrainContext(overrides = {}) {
     allClasses: state.schedule,
     studentRoster: Array.isArray(state.rosterCache?.records) ? state.rosterCache.records : [],
     facultyDirectory: Array.isArray(state.facultyCache?.records) ? state.facultyCache.records : [],
+    collegeEvents: Array.isArray(state.collegeEventsCache) ? state.collegeEventsCache : [],
+    notices: Array.isArray(state.noticesCache) ? state.noticesCache : [],
+    timetables: state.timetablesCache || {},
     syllabus: Array.isArray(state.syllabus) ? state.syllabus : [],
     ...overrides
   };
@@ -3474,6 +3999,8 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 // One public local-answer entry point. Brain v2 is tried first and the legacy
 // engine is always retained as the transparent fallback.
 function answerWithoutAi(question, engine = null, contextOverrides = {}) {
+  const workflowAnswer = approvedCompassWorkflowAnswer(question);
+  if (workflowAnswer) return workflowAnswer;
   const mentoringAnswer = mentoringClassAnswer(question);
   if (mentoringAnswer) return mentoringAnswer;
   const officialViewAnswer = officialTimetableViewAnswer(question);
@@ -3705,8 +4232,12 @@ function studentDetailFlags(question = "") {
 function looksLikePlainStudentNameQuery(question = "") {
   const q = normalizeStudentName(question);
   const words = q.split(" ").filter(Boolean);
-  if (words.length < 2 || words.length > 5 || words.some((word) => !/^[a-z][a-z-]{1,29}$/.test(word))) return false;
-  const blocked = new Set(["timetable", "schedule", "class", "classes", "teacher", "faculty", "room", "location", "syllabus", "subject", "physics", "chemistry", "maths", "mathematics", "economics", "workshop", "computer", "science", "college", "gndec", "hostel", "admission", "fees", "exam", "today", "tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "where", "when", "what", "which", "how", "hello", "good", "morning", "evening", "night", "thank", "thanks", "welcome", "please", "help", "tell", "show", "explain"]);
+  if (words.length < 1 || words.length > 5 || words.some((word) => !/^[a-z][a-z-]{1,29}$/.test(word))) return false;
+  // A one-word lookup is useful for names such as “Mohitveer”, but it must
+  // not turn ordinary timetable language into a guessed person. This list is
+  // deliberately conservative; explicit “find student …” requests still
+  // work through their explicit intent path above.
+  const blocked = new Set(["a", "after", "afternoon", "am", "an", "and", "are", "around", "as", "at", "before", "between", "can", "check", "class", "classes", "college", "computer", "current", "day", "does", "do", "duration", "earlier", "economics", "evening", "exam", "explain", "faculty", "fees", "first", "for", "free", "from", "give", "gndec", "good", "had", "has", "have", "help", "hello", "hostel", "how", "i", "in", "is", "it", "its", "last", "later", "latest", "lecture", "lectures", "location", "many", "math", "maths", "mathematics", "me", "mine", "morning", "my", "new", "next", "night", "of", "on", "or", "parso", "parson", "period", "periods", "physics", "please", "room", "schedule", "science", "shanivar", "show", "subject", "syllabus", "table", "teacher", "tell", "thank", "thanks", "the", "their", "this", "time", "timetable", "timetabel", "timetabl", "timetble", "to", "today", "tomorrow", "total", "update", "verified", "week", "welcome", "what", "when", "where", "which", "who", "with", "workshop", "your", "aaj", "ajj", "batao", "kal", "kalle", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
   return !words.some((word) => blocked.has(word));
 }
 
@@ -3715,7 +4246,7 @@ function studentLookupRequest(question = "", rememberedRecord = null) {
   const q = canonicalTimetableQuestion(original);
   const refersToSelf = /\b(?:my|mine|mera|meri|mere)\b|\u092e\u0947\u0930[\u093e\u0940\u0947]|\u0a2e\u0947\u0a30[\u0a3e\u0a40\u0a47]/u.test(q);
   if (refersToSelf) return null;
-  const explicitStudentCue = /\b(?:student|user|person|profile|record)\b/.test(q);
+  const explicitStudentCue = /\b(?:student|user|person|profile|record|roll|crn|urn|roster|classmate|peer|batchmate|fresher|freshman)\b/i.test(q);
   const genericReferenceFollowup = /^(?:and\s+)?(?:list|show|name|tell)(?:\s+me)?\s+(?:them|those|these|all)(?:\s+please)?\??$/.test(q);
   if (genericReferenceFollowup && !explicitStudentCue) return null;
   // "ECB vs CS" is a timetable comparison, never a student named "Ec Vs Cs".
@@ -3729,7 +4260,7 @@ function studentLookupRequest(question = "", rememberedRecord = null) {
   const bareShortSerial = /^\d{1,3}\??$/.test(q);
   const identifierOnly = longIdentifierOnly || serialIdentifierOnly || bareShortSerial;
   const studentSpecificField = flags.crn || flags.registration || flags.serial || flags.previousSerials || flags.section || flags.subsection || flags.branch || flags.academicGroup || flags.mentor || flags.mentorPhone || flags.mentorVenue;
-  const explicitFacultyCue = /\b(?:faculty|teacher|professor|designation|research|qualification|experience|publications?|vidwan)\b|\b(?:dr|prof)\.?\s+[a-z]/i.test(q);
+  const explicitFacultyCue = /\b(?:faculty|teacher|professor|prof|dr|doctor|sir|mam|maam|madam|hod|dean|instructor|designation|research|qualification|experience|publications?|vidwan)\b|\b(?:dr|prof)\.?\s+[a-z]/i.test(q);
   if (explicitFacultyCue && !explicitStudentCue && !studentSpecificField) return null;
   const timetableTeacher = state.selectedGroup && referencedTeacherName(q);
   if (timetableTeacher && !explicitStudentCue && !studentSpecificField) return null;
@@ -3739,7 +4270,8 @@ function studentLookupRequest(question = "", rememberedRecord = null) {
     || /\b(?:find|search|lookup|locate|verify)\b.*\b(?:student|user|person|profile|record)?\b|\b(?:show|tell|give)\b.*\b(?:student|user|person|profile|record|details?|information|info)\b|\bwho\s+is\b|\btell\s+me\s+about\b|\b(?:details?|profile|record|mentor(?:\s+(?:phone|mobile|contact|venue|room|location))?|section|crn|registration|serial)\s+(?:of|for)\b|\b(?:dhundo|dhoondo|khojo|labho|labh|dasso|batao|dikhao)\b|\u0922\u0942\u0901\u0922|\u0916\u094b\u091c|\u092c\u0924\u093e\u0913|\u0926\u093f\u0916\u093e\u0913|\u0a32\u0a71\u0a2d|\u0a26\u0a71\u0a38\u0a4b|\u0a26\u0a3f\u0a16\u0a3e\u0a13/u.test(q)
     || namedPossessiveField
     || plainName
-    || (flags.any && flags.full && /[a-z]{3}/i.test(q));
+    || (flags.any && flags.full && /[a-z]{3}/i.test(q))
+    || (explicitStudentCue && (flags.any || /[a-z]{3}/i.test(q)));
   const rememberedFollowup = rememberedRecord && flags.any && !directIntent && (
     /\b(?:his|her|their|that\s+student(?:'s)?|this\s+student(?:'s)?|uska|uski|unka|unki)\b/i.test(q)
     || /^(?:and\s+)?(?:what\s+(?:is|are)\s+|show\s+|tell\s+)?(?:mentor(?:\s+(?:phone|mobile|contact|venue|room|location))?|phone|mobile|contact|venue|room|location|section|subsection|branch|crn|registration|serial|academic\s+group|details?|profile)[\s?.,'s-]*$/i.test(q)
@@ -3749,10 +4281,10 @@ function studentLookupRequest(question = "", rememberedRecord = null) {
   let term = q
     .replace(/\b(?:who\s+is|tell\s+me\s+about|find|search|look\s*up|lookup|locate|verify|show|tell|give|check|please|dhundo|dhoondo|khojo|labho|labh|dasso|batao|dikhao)\b/g, " ")
     .replace(/\b(?:student|user|person|profile|record|details?|information|info|named|name|about|of|for|by|the|me|all|every|full|complete|current|new|old|previous|former|official|whose|what|is|are|and|aur|te|ka|ki|ke|da|di|de|his|her|their|purana|pichla|saari|sari|poori|puri|jankari|jaankari)\b/g, " ")
-    .replace(/\b(?:mentor|phone|mobile|contact|venue|room|location|place|branch|section|subsection|subgroup|academic|group|registration|reg|crn|serial|number|no)\b/g, " ")
+    .replace(/\b(?:mentor|phone|mobile|contact|venue|room|location|place|branch|section|subsection|subgroup|academic|group|registration|reg|crn|serial|number|no|roll|urn|roster)\b/g, " ")
     .replace(/[\u0900-\u097f\u0a00-\u0a7f]+/gu, " ")
     .replace(/[^a-z0-9-]+/gi, " ").replace(/\s+/g, " ").trim();
-  if (identifierOnly) term = q.replace(/\b(?:current|new|old|previous|crn|registration|reg(?:istration)?|serial|number|no|sr|s)\b/gi, " ").replace(/[^a-z0-9-]+/gi, " ").trim();
+  if (identifierOnly) term = q.replace(/\b(?:current|new|old|previous|crn|registration|reg(?:istration)?|serial|number|no|sr|s|roll|urn)\b/gi, " ").replace(/[^a-z0-9-]+/gi, " ").trim();
   return { term, flags, followup: false };
 }
 
@@ -3886,11 +4418,16 @@ function facultyDetailFlags(question = "") {
 
 function facultyLookupRequest(question = "") {
   const q = canonicalTimetableQuestion(question);
+  // Holiday words must always remain on the verified holiday-calendar route;
+  // otherwise short phrases such as “next holiday” look like a person's name.
+  if (/\b(?:holidays?|vacations?|chutti|chhutti|off\s+day)\b/.test(q)) return null;
   const department = FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(q))?.[0] || "";
   let knownTeacher = state.selectedGroup ? referencedTeacherName(q) : "";
-  const subjectTeacherCue = /\b(?:who|name|teacher|teachers|faculty|sir|mam|maam|madam|teach|teaches|teaching|taught)\b/.test(q);
-  const professionalDetailCue = /\b(?:email|mail|contact|experience|qualification|degree|education|research|interest|speciali[sz]ation|expertise|publications?|papers?|journal|conference|memberships?|vidwan|profile|details?|information|info|designation|position|post)\b/.test(q);
-  const explicitDepartmentCue = /\b(?:department|dept|applied science|computer science|information technology|electrical engineering|civil engineering|mechanical engineering|electronics(?:\s+and|\s*&)?\s+communication)\b/.test(q);
+  const subjectTeacherCue = /\b(?:who|name|teacher|teachers|faculty|sir|mam|maam|madam|prof|professor|dr|doctor|instructor|teach|teaches|teaching|taught)\b/i.test(q);
+  const professionalDetailCue = /\b(?:email|mail|contact|experience|qualification|degree|education|research|interest|speciali[sz]ation|expertise|publications?|papers?|journal|conference|memberships?|vidwan|profile|details?|information|info|designation|position|post)\b/i.test(q);
+  const explicitDepartmentCue = /\b(?:department|dept|applied science|computer science|information technology|electrical engineering|civil engineering|mechanical engineering|electronics(?:\s+and|\s*&)?\s+communication)\b/i.test(q);
+  const explicitStudentCue = /\b(?:student|roll|crn|urn|roster|registration|classmate|batchmate)\b/i.test(q);
+  if (explicitStudentCue && !subjectTeacherCue && !professionalDetailCue) return null;
   if (!knownTeacher && state.selectedGroup && subjectTeacherCue && !explicitDepartmentCue) {
     const subjectClasses = findReferencedClasses(q);
     const subjectTeachers = [...new Set(subjectClasses.flatMap((item) => teacherNames(item.teacher)))];
@@ -3903,12 +4440,13 @@ function facultyLookupRequest(question = "") {
     else if (subjectClasses.length) return null;
   }
   const listDepartment = Boolean(department && !knownTeacher && /\b(?:list|show|all|who|names?|faculty|staff|teachers?)\b/.test(q) && !professionalDetailCue);
-  const facultyCue = /\b(?:faculty|staff|teacher|professor|designation|official\s+email|research|qualification|experience|publications?|vidwan)\b|\bdr\.?\s+[a-z]/i.test(q);
-  if (!listDepartment && !knownTeacher && !facultyCue) return null;
+  const facultyCue = /\b(?:faculty|staff|teacher|professor|prof|doctor|sir|mam|maam|madam|hod|dean|instructor|designation|official\s+email|research|qualification|experience|publications?|vidwan)\b|\b(?:dr|prof)\.?\s+[a-z]/i.test(q);
+  const plainName = looksLikePlainStudentNameQuery(q);
+  if (!listDepartment && !knownTeacher && !facultyCue && !plainName) return null;
   if (/\b(?:faculty|teacher)\s+timetable\b/.test(q) && !knownTeacher) return null;
   let term = knownTeacher || q
     .replace(/\b(?:find|search|lookup|locate|verify|show|tell|give|please|who|what|which|is|are|about|of|for|the|me|and|ka|ki|ke|da|di|de|all|every|full|complete|official|details?|information|info|profile)\b/g, " ")
-    .replace(/\b(?:faculty|staff|teacher|professor|designation|position|post|email|mail|contact|experience|qualification|degree|education|research|interest|specialization|specialisation|expertise|publication|publications|paper|papers|journal|conference|membership|memberships|vidwan)\b/g, " ")
+    .replace(/\b(?:faculty|staff|teacher|professor|prof|doctor|sir|mam|maam|madam|hod|dean|instructor|designation|position|post|email|mail|contact|experience|qualification|degree|education|research|interest|specialization|specialisation|expertise|publication|publications|paper|papers|journal|conference|membership|memberships|vidwan)\b/g, " ")
     .replace(/\b(?:dr|er|prof|ar)\.?\b/g, " ")
     .replace(/[^a-z0-9@._+-]+/gi, " ").replace(/\s+/g, " ").trim();
   if (department) {
@@ -3919,7 +4457,10 @@ function facultyLookupRequest(question = "") {
 }
 
 async function loadFacultyDirectory() {
-  if (state.facultyCache?.records?.length) return state.facultyCache;
+  // The bundled file is only an offline starter set. It must never prevent a
+  // lookup from fetching GNDEC's complete current public directory.
+  if (state.facultyCache?.records?.length && !state.facultyCache.fallback) return state.facultyCache;
+  const bundledFallback = state.facultyCache?.fallback ? state.facultyCache : null;
   try {
     const stored = JSON.parse(localStorage.getItem(FACULTY_DIRECTORY_STORAGE_KEY) || "null");
     if (stored && Number.isFinite(stored.savedAt) && Date.now() - stored.savedAt <= FACULTY_DIRECTORY_MAX_AGE_MS && Array.isArray(stored.payload?.records) && stored.payload.records.length) {
@@ -3929,14 +4470,18 @@ async function loadFacultyDirectory() {
   } catch { /* a corrupt or blocked cache must never break faculty lookup */ }
   if (facultyDirectoryLoading) return facultyDirectoryLoading;
   facultyDirectoryLoading = (async () => {
-    const response = await fetch("/api/faculty", { cache: "default" });
+    const response = await fetch("/api/faculty", { cache: "no-cache" });
     const payload = await response.json();
-    if (!response.ok || !Array.isArray(payload.records)) throw new Error(payload.error || "Official GNDEC faculty directory could not be read.");
-    state.facultyCache = payload;
-    try { localStorage.setItem(FACULTY_DIRECTORY_STORAGE_KEY, JSON.stringify({ savedAt: Date.now(), payload })); } catch { /* caching is optional */ }
-    return payload;
+    if (!response.ok || !Array.isArray(payload.records) || !payload.records.length) throw new Error(payload.error || "Official GNDEC faculty directory could not be read.");
+    state.facultyCache = { ...payload, fallback: false };
+    try { localStorage.setItem(FACULTY_DIRECTORY_STORAGE_KEY, JSON.stringify({ savedAt: Date.now(), payload: state.facultyCache })); } catch { /* caching is optional */ }
+    return state.facultyCache;
   })();
   try { return await facultyDirectoryLoading; }
+  catch (error) {
+    if (bundledFallback?.records?.length) return bundledFallback;
+    throw error;
+  }
   finally { facultyDirectoryLoading = null; }
 }
 
@@ -4326,6 +4871,31 @@ function timetableSourceRevision(registry = state.sourceRegistry) {
   return ["groups", "subgroups"].map((id) => (registry?.sources || []).find((source) => source.id === id)?.contentHash || "").join("|");
 }
 
+function currentTimetableSourceFooter(registry = state.sourceRegistry) {
+  const source = (registry?.sources || []).find((item) => item.id === "groups");
+  return cleanText(source?.sourceFooter || "").slice(0, 100);
+}
+
+function isPreviousVerifiedTimetableResponse(response) {
+  return response?.headers?.get("X-GNDEC-Fallback") === "previous-verified";
+}
+
+function loadedTimetableSourceInfo(registry, groupsResponse) {
+  if (!isPreviousVerifiedTimetableResponse(groupsResponse)) return registry;
+  const version = cleanText(groupsResponse.headers.get("X-GNDEC-Version") || "Previous verified fallback").slice(0, 100);
+  const sourceFooter = cleanText(groupsResponse.headers.get("X-GNDEC-Source-Footer") || "").slice(0, 100);
+  const sourceUrl = cleanText(groupsResponse.headers.get("X-GNDEC-Resolved-Url") || "").slice(0, 1000);
+  return {
+    ...registry,
+    version,
+    // This intentionally differs from the live registry version so the next
+    // background sync retries the newer complete release instead of treating
+    // a temporary fallback as current.
+    sources: (registry.sources || []).map((source) => source.id === "groups" ? { ...source, url: sourceUrl || source.url, sourceFooter } : source),
+    fallback: { version, sourceFooter, sourceUrl }
+  };
+}
+
 function decodedReferenceText(link) {
   try { return `${link?.label || ""} ${decodeURIComponent(link?.url || "")}`; }
   catch { return `${link?.label || ""} ${link?.url || ""}`; }
@@ -4370,9 +4940,12 @@ function renderReferenceLinks() {
   const studentLists = [...(state.sourceRegistry.studentSectionSources || [])].sort((left, right) => branchOrder.indexOf(left.branch) - branchOrder.indexOf(right.branch)).map((source) => ({ label: `${source.branch} current student roster`, note: source.verified ? "Verified official PDF" : "Official PDF", url: source.url }));
   const profileBranch = branchCodeForProfile(activeStudentProfile());
   const personalList = profileBranch ? studentLists.find((source) => source.label.startsWith(`${profileBranch} `)) : null;
+  const currentAcademicCalendar = state.sourceRegistry.academicCalendarSource?.url
+    ? { label: state.sourceRegistry.academicCalendarSource.label || "Current academic calendar", note: state.sourceRegistry.academicCalendarSource.verified ? "Verified current official PDF" : "Official PDF", url: state.sourceRegistry.academicCalendarSource.url }
+    : { label: "Academic Calendar Jul-Dec 2026", note: "Last verified official PDF", url: "https://gndec.ac.in/sites/default/files/acjul-dec26.pdf" };
   const startHere = [
     { label: "Latest official timetable index", note: `Verified ${state.sourceRegistry.version || "source"}`, url: "https://appsc.gndec.ac.in/time_tables" },
-    { label: "Academic Calendar Jul-Dec 2026", note: "Academic span", url: "https://gndec.ac.in/sites/default/files/acjul-dec26.pdf" },
+    currentAcademicCalendar,
     { label: "GNDEC Official Holidays 2026", note: "Gazetted holidays", url: "https://gndec.ac.in/sites/default/files/LoH26.pdf" },
     { label: "Academic Calendar Jan-Jun 2026", note: "Academic span", url: "https://gndec.ac.in/sites/default/files/AC%20jan-jun26.pdf" },
     ...(personalList ? [{ ...personalList, label: `My ${profileBranch} current roster` }] : [])
@@ -4396,9 +4969,9 @@ function renderReferenceLinks() {
     { label: "Applied Sciences", note: "Department information and study resources", url: "https://appsc.gndec.ac.in/" }
   ];
   const calendarLinks = [
+    currentAcademicCalendar,
     { label: "GNDEC List of Holidays 2026 (PDF)", note: "Official Gazetted & Restricted holidays list", url: "https://gndec.ac.in/sites/default/files/LoH26.pdf" },
     { label: "GNDEC Holidays Official Portal", note: "Live statutory and college holiday notices", url: "https://gndec.ac.in/?q=holidays" },
-    { label: "Academic Calendar Jul-Dec 2026 (PDF)", note: "Session timeline, MSTs, and term-end exam dates", url: "https://gndec.ac.in/sites/default/files/acjul-dec26.pdf" },
     { label: "Academic Calendar Jan-Jun 2026 (PDF)", note: "Even semester timeline and academic schedule", url: "https://gndec.ac.in/sites/default/files/AC%20jan-jun26.pdf" },
     { label: "GNDEC Academic Calendars Archive", note: "All autonomous academic calendars and revisions", url: "https://gndec.ac.in/?q=node/23" },
     { label: "IKGPTU Academic Notifications", note: "Official university circulars and notices", url: "https://ptu.ac.in/" }
@@ -4477,12 +5050,26 @@ async function refreshOfficialData({ discover = true } = {}) {
   setSourceError();
   try {
     const registry = await loadSourceRegistry({ refresh: discover });
-    const [groupsResponse, subgroupsResponse] = await Promise.all([
+    let [groupsResponse, subgroupsResponse] = await Promise.all([
       fetch("/api/timetable?source=groups", { cache: "no-cache" }),
       fetch("/api/timetable?source=subgroups", { cache: "no-cache" })
     ]);
     if (!groupsResponse.ok || !subgroupsResponse.ok) throw new Error("Unable to contact the complete official timetable release.");
-    await importHtml(await groupsResponse.text(), "Official GNDEC group timetable", registry, await subgroupsResponse.text());
+    // A timetable release is only safe as a pair: never combine a newer group
+    // view with an older subgroup view. If either source reached its retained
+    // fallback, request both views from that same previous verified release.
+    if (isPreviousVerifiedTimetableResponse(groupsResponse) || isPreviousVerifiedTimetableResponse(subgroupsResponse)) {
+      [groupsResponse, subgroupsResponse] = await Promise.all([
+        fetch("/api/timetable?source=groups&fallback=1", { cache: "no-cache" }),
+        fetch("/api/timetable?source=subgroups&fallback=1", { cache: "no-cache" })
+      ]);
+      if (!groupsResponse.ok || !subgroupsResponse.ok || !isPreviousVerifiedTimetableResponse(groupsResponse) || !isPreviousVerifiedTimetableResponse(subgroupsResponse)) {
+        throw new Error("The latest official timetable is unavailable and its previous verified release could not be loaded safely.");
+      }
+    }
+    const sourceInfo = loadedTimetableSourceInfo(registry, groupsResponse);
+    await importHtml(await groupsResponse.text(), "Official GNDEC group timetable", sourceInfo, await subgroupsResponse.text());
+    if (sourceInfo.fallback) setSourceError("The newer official timetable could not be read. Compass is temporarily using the previous verified release and will retry automatically.");
     await synchronizeStudentProfile();
   } catch (error) {
     const message = error.message || "Official data refresh failed.";
@@ -4584,7 +5171,7 @@ function syncMobileViewport() {
 function registerOfflineShell() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js?v=20260829-4", { scope: "/" }).catch(() => {
+    navigator.serviceWorker.register("/sw.js?v=20260831-4", { scope: "/" }).catch(() => {
       // Service workers are an optional enhancement. The live app and its
       // deterministic fallback continue normally when registration is blocked.
     });
@@ -4603,6 +5190,13 @@ function initEvents() {
     });
   });
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); activatePage(button.dataset.go); }));
+  document.querySelectorAll("[data-focus]").forEach((button) => button.addEventListener("click", (event) => {
+    event.preventDefault();
+    const target = $(button.dataset.focus);
+    if (!target) return;
+    target.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => target.focus(), 220);
+  }));
   $("group-select").addEventListener("change", (event) => { resetBrainConversation(); state.selectedGroup = event.target.value; state.selectedSubgroup = ""; localStorage.setItem(GROUP_STORAGE_KEY, state.selectedGroup); recordGroupUsage(state.selectedGroup); hydrateGroupControls(); renderTimetableSearchSuggestions(); renderEverything(); showToast(`${state.selectedGroup} is now your timetable.`); });
   $("subgroup-select").addEventListener("change", (event) => { resetBrainConversation(); state.selectedSubgroup = event.target.value; localStorage.setItem(SUBGROUP_STORAGE_KEY, state.selectedSubgroup); renderEverything(); });
   $("timetable-group").addEventListener("change", (event) => { resetBrainConversation(); state.selectedGroup = event.target.value; state.selectedSubgroup = ""; localStorage.setItem(GROUP_STORAGE_KEY, state.selectedGroup); recordGroupUsage(state.selectedGroup); hydrateGroupControls(); renderTimetableSearchSuggestions(); renderEverything(); });
@@ -4654,6 +5248,11 @@ function initEvents() {
     image.src = fallbackUrl;
   }, true);
   $("refresh-button").addEventListener("click", refreshOfficialData);
+  $("review-timetable-update")?.addEventListener("click", () => {
+    activatePage("settings");
+    window.setTimeout(() => $("timetable-update-center")?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
+  });
+  $("mark-timetable-update-seen")?.addEventListener("click", markTimetableUpdateSeen);
   $("file-import").addEventListener("change", async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -4671,12 +5270,19 @@ function initEvents() {
   $("day-plan-toggle")?.addEventListener("click", (event) => { state.dayPlanOverride = event.currentTarget.dataset.planTarget || ""; renderDaySchedule(); });
   $("admin-ai-mode")?.addEventListener("change", (event) => { if (!hasAdminAiView()) return; localStorage.setItem(ADMIN_AI_MODE_STORAGE_KEY, event.target.value); renderAdminAiVisibility(); showToast(`Admin answer mode: ${event.target.options[event.target.selectedIndex].text}`); });
   $("question-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const question = $("question-input").value.trim();
-    if (!question) return;
-    $("question-input").value = "";
-    closeQuestionSuggestions();
-    const adminCommand = question.match(/^kkj$/i);
+  event.preventDefault();
+  const rawQuestion = $("question-input").value.trim();
+  if (!rawQuestion) return;
+  $("question-input").value = "";
+  closeQuestionSuggestions();
+
+  // Multi-Intent Splitter (Hinglish/English)
+  const queries = rawQuestion.split(/\s+(?:and|aur|te|also|plus)\s+(?=(?:what|when|where|who|is|are|tell|show|find|whose|how|kado|kadon|kab|kithe|kaha|kon|kaun|keda|whose)\b)|[?.,;]\s+/i).map(q => q.trim()).filter(Boolean);
+
+  for (const q of queries) {
+    await (async () => {
+      const question = q;
+      const adminCommand = question.match(/^kkj$/i);
     if (adminCommand) {
       ensureChatBubble("user", "<strong>KKJ admin request</strong>");
       await unlockAdminAi();
@@ -4690,6 +5296,20 @@ function initEvents() {
       ensureChatBubble("assistant", mentoringAnswer);
       persistChat();
       return;
+    }
+    // A name-only timetable request must never fall through to the active
+    // device profile. Resolve it from current official sources first, without
+    // applying a roster record or changing the user's timetable selection.
+    if (namedPersonTimetableRequest(question)) {
+      const lookupBubble = ensureChatBubble("assistant thinking", "<p><strong>Checking current official student and faculty timetables…</strong></p>");
+      const namedTimetableAnswer = await resolveNamedPersonTimetableAnswer(question);
+      if (namedTimetableAnswer) {
+        lookupBubble.className = "chat-bubble assistant";
+        lookupBubble.innerHTML = `${namedTimetableAnswer}${followupSuggestions(question)}`;
+        persistChat();
+        return;
+      }
+      lookupBubble.remove();
     }
     const requestedView = requestedOfficialTimetableView(question);
     if (requestedView) {
@@ -4718,18 +5338,32 @@ function initEvents() {
       persistChat();
       return;
     }
+    const workflowAnswer = approvedCompassWorkflowAnswer(question);
+    if (workflowAnswer) {
+      ensureChatBubble("assistant", `${workflowAnswer}${followupSuggestions(question)}`);
+      persistChat();
+      return;
+    }
     // Student roster questions are resolved locally before any external AI
     // route. This is a read-only query: it never calls applyStudentRecord(),
     // never changes the active timetable, and never sends identifiers away.
+    let unmatchedPlainStudentLookup = null;
     if (studentLookupRequest(question, state.rosterLookupConversation?.record || null)) {
       const lookupBubble = ensureChatBubble("assistant thinking", "<p><strong>Checking current verified student rosters…</strong></p>");
       const studentLookup = await resolveChatStudentLookup(question);
-      const lookupBrainResult = runCompassBrain(question, globalThis.CompassBrainV2, { studentLookup });
-      lookupBubble.className = "chat-bubble assistant";
-      const lookupAnswer = lookupBrainResult?.answer || legacyAnswerWithoutAi(question, studentLookup);
-      lookupBubble.innerHTML = `${lookupAnswer}${followupSuggestions(question, lookupBrainResult)}`;
-      persistChat();
-      return;
+      if (studentLookup?.status === "none" && looksLikePlainStudentNameQuery(question)) {
+        // A plain person name might be a faculty member. Keep the verified
+        // roster miss so the next directory lookup can give one clear result.
+        unmatchedPlainStudentLookup = studentLookup;
+        lookupBubble.remove();
+      } else {
+        const lookupBrainResult = runCompassBrain(question, globalThis.CompassBrainV2, { studentLookup });
+        lookupBubble.className = "chat-bubble assistant";
+        const lookupAnswer = lookupBrainResult?.answer || legacyAnswerWithoutAi(question, studentLookup);
+        lookupBubble.innerHTML = `${lookupAnswer}${followupSuggestions(question, lookupBrainResult)}`;
+        persistChat();
+        return;
+      }
     }
     // Public professional faculty facts come from GNDEC's own directory. This
     // runs after the private roster guard, so student identifiers can never be
@@ -4747,7 +5381,9 @@ function initEvents() {
         await askAi(question, isHeavyQuestion(question));
       } else {
         const lookupBrainResult = runCompassBrain(question, globalThis.CompassBrainV2, { facultyLookup });
-        const lookupAnswer = lookupBrainResult?.answer || legacyFacultyLookupAnswer(facultyLookup);
+        const lookupAnswer = unmatchedPlainStudentLookup && facultyLookup?.status === "none"
+          ? `<p><strong><u>No verified student or faculty match</u></strong></p><p>No current GNDEC student roster or faculty directory record matched <strong>${escapeHtml(unmatchedPlainStudentLookup.query)}</strong>. Check the spelling, or use a student CRN.</p>`
+          : lookupBrainResult?.answer || legacyFacultyLookupAnswer(facultyLookup);
         lookupBubble.className = "chat-bubble assistant";
         lookupBubble.innerHTML = `${lookupAnswer}${followupSuggestions(question, lookupBrainResult)}`;
         persistChat();
@@ -4763,6 +5399,11 @@ function initEvents() {
           }
         }
       }
+      persistChat();
+      return;
+    }
+    if (unmatchedPlainStudentLookup) {
+      ensureChatBubble("assistant", `<p><strong><u>No verified student or faculty match</u></strong></p><p>No current GNDEC student roster or faculty directory record matched <strong>${escapeHtml(unmatchedPlainStudentLookup.query)}</strong>. Check the spelling, or use a student CRN.</p>${followupSuggestions(question)}`);
       persistChat();
       return;
     }
@@ -4815,7 +5456,10 @@ function initEvents() {
       else ensureChatBubble("assistant", localClarificationAnswer());
     }
     persistChat();
-  });
+    })();
+  }
+});
+
   const clearChat = $("clear-chat");
   if (clearChat) clearChat.addEventListener("click", () => {
     const windowEl = $("chat-window");
@@ -4860,10 +5504,7 @@ function initEvents() {
   $("source-status-button")?.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const officialUrl = (state.sourceRegistry?.sources || []).find((source) => source.id === "groups")?.url
-      || state.sourceRegistry?.sources?.[0]?.url
-      || "https://appsc.gndec.ac.in/time_tables";
-    window.open(officialUrl, "_blank", "noopener,noreferrer");
+    window.open("https://appsc.gndec.ac.in/time_tables", "_blank", "noopener,noreferrer");
   });
   document.querySelector(".menu-button").addEventListener("click", (event) => {
     if (!mobileNavigationEnabled()) return;
@@ -4988,6 +5629,15 @@ if (!pageToActivate) {
 activatePage(pageToActivate, false);
 renderEverything();
 synchronizeOfficialData();
+
+// Eagerly fetch new data stores for the Brain
+fetch("/data/college-events.json").then(r => r.json()).then(d => { state.collegeEventsCache = d; }).catch(() => {});
+fetch("/data/notices.json").then(r => r.json()).then(d => { state.noticesCache = d; }).catch(() => {});
+fetch("/data/timetables.json").then(r => r.json()).then(d => { state.timetablesCache = d; }).catch(() => {});
+fetch("/data/faculty.json").then(r => r.json()).then(d => {
+  if (!state.facultyCache && Array.isArray(d) && d.length) state.facultyCache = { records: d, fallback: true, source: "Bundled offline faculty fallback" };
+}).catch(() => {});
+
 const warmSyllabusIndex = () => { if (!state.syllabus.length) loadOfficialSyllabus().catch(() => { /* PDF fallback remains available when asked */ }); };
 if ("requestIdleCallback" in window) window.requestIdleCallback(warmSyllabusIndex, { timeout: 1200 });
 else window.setTimeout(warmSyllabusIndex, 180);
@@ -5093,14 +5743,18 @@ function kbSyllabusUnitAnswer(question) {
 }
 
 const KB_OOB = [
-  {id:"admin-kkj",test:/kaushik\s*jain|\bkkj\b|who\s*(?:is|created|built)\s*(?:kaushik|kkj|compass)|creator|author|developer|admin\s*command/,reply:()=>`<p><strong><u>Kaushik Jain (Admin &amp; Creator)</u></strong></p><p>Kaushik Jain is the administrator and creator of GNDEC Compass, B.Tech Electronics &amp; Communication Engineering (ECE), Section <strong>ECB</strong>, Subsection <strong>ECB1</strong>, CRN <strong>2617070</strong>.</p><p>Typing <strong>kkj</strong> in the chat verifies the enrolled administrator profile on this device and unlocks full AI model selection (Meta Muse Glimmer 30B / OpenAI GPT-OSS 120B), custom timetable HTML imports, and administrative curation endpoints.</p><p class="answer-source">Verified Compass Administrator profile.</p>`},
+  {id:"admin-kkj",test:/kaushik\s*jain|\bkkj\b|who\s*(?:is|created|built)\s*(?:kaushik|kkj|compass)|creator|author|developer|admin\s*command/,reply:()=>`<p><strong><u>Kaushik Jain (Admin &amp; Creator)</u></strong></p><p>Kaushik Jain is the administrator and creator of GNDEC Compass.</p><p>Typing <strong>kkj</strong> in the chat verifies the configured administrator profile on this device and unlocks the admin AI modes and custom timetable HTML import. Server maintenance endpoints remain protected by the separate administrator API token.</p><p class="answer-source">Compass administrator rule.</p>`},
   {id:"college-timing",test:/college\s*(timing|time|opens?|closes?|hours)|college\s*kitne\s*baje|college\s*khulta|college\s*khulda|class\s*(timing|time)|what\s*time\s*(?:does\s*\w+|\w+\s*open|does\s*the\s*college)|kitne\s*baje\s*(college|class)/,reply:()=>{const classes=state.selectedGroup?DAY_NAMES.flatMap((day)=>classFor(state.selectedGroup,day)):[];if(!classes.length)return`<p><strong><u>College hours</u></strong></p><p>Office hours are not present in the currently loaded official timetable. Check the latest GNDEC notice or office page.</p>`;const first=Math.min(...classes.map((item)=>item.start)),last=Math.max(...classes.map((item)=>item.end));return`<p><strong><u>College hours · verified timetable span</u></strong></p><p>Your active official timetable runs from as early as <strong>${humanTime(first)}</strong> to as late as <strong>${humanTime(last)}</strong>, depending on the day.</p><p>This describes your classes, not administrative office hours.</p><p class="kb-tip">Ask “today ka timetable” for today’s exact span.</p>`;}},
   {id:"uniform",test:/uniform|dress\s*code|what\s*to\s*wear|wear\s*in\s*college|dress|ਵਰਦੀ|ड्रेस/,reply:()=>`<p><strong><u>Dress code</u></strong></p><p>The loaded timetable and syllabus do not contain a verified dress-code rule. Check the current student notice or ask your mentor before relying on informal advice.</p>`},
   {id:"attendance",test:/attend|attendance|75%?|75\s*percent|bunk|skip\s*class|miss\s*class|haziri|hazri|hajri|ਗੈਰ-ਹਾਜ਼ਰੀ|ऐटेंडेंस/,reply:()=>`<p><strong><u>GNDEC Attendance Rule</u></strong></p><p>A minimum of <strong>75% attendance</strong> is mandatory in all theory and practical courses under official autonomous regulations to sit in End-Semester Examinations (ESE). Compass provides a default target of <strong>76%</strong> (1% safety cushion) in Settings.</p><p class="answer-source">Official GNDEC Autonomous Academic Regulations.</p>`},
   {id:"cgpa",test:/cgpa|sgpa|gpa|percentage|marks\s*(calculation|formula)|grade\s*point|pointer|sgpi|cgpi/,reply:()=>`<p><strong><u>GNDEC CGPA &amp; Percentage Calculation</u></strong></p><p>• <strong>GNDEC Autonomous Rule:</strong> Percentage = CGPA × 9.5<br />• <strong>IKGPTU Standard Scale:</strong> Percentage = CGPA × 10.0</p><p>For example, a CGPA of <strong>8.4</strong> converts to <strong>79.8%</strong> under Autonomous regulations (or 84.0% standard).</p><p class="answer-source">Official GNDEC Examination Guidelines.</p>`},
   {id:"exam-pattern",test:/exam\s*(pattern|scheme|marks?|format)|internal\s*(exam|marks?)|sessional|mid\s*term|end\s*sem|external|how\s*many\s*marks|exam\s*kitne\s*marks|ਇमਤਿਹਾਨ|परीक्षा/,reply:()=>`<p><strong><u>Exam scheme</u></strong></p><p>Assessment varies by course. Ask for a subject—for example, <strong>“Physics assessment marks”</strong>—and Compass will read the exact continuous-assessment, end-semester, and total marks from the official syllabus.</p>`},
   {id:"holidays",test:/holiday|holidays|vacation|break\s*when|leave\s*when|when\s*is\s*(the\s*)?(next|any)\s*holiday|chutti|छुट्टी|ਛੁੱਟੀ/,reply:()=>`<p><strong><u>GNDEC Official Holidays 2026</u></strong></p><p>Compass includes the complete verified 2026 Gazetted and Restricted holiday calendar from the official GNDEC list (<code>LoH26.pdf</code>). Ask <strong>“How many holidays in August?”</strong>, <strong>“Is on 15 August holiday?”</strong>, or <strong>“When is the next holiday?”</strong> for exact dates.</p><p class="answer-source">Official GNDEC List of Holidays 2026.</p>`},
-  {id:"hostel",test:/hostel|mess|room\s*(in\s*)?(hostel|pg)|accommodation|stay\s*where|pg\s*near|हॉस्टल|ਹੋਸਟਲ/,reply:()=>`<p><strong><u>Hostel & stay</u></strong></p><p>GNDEC has hostel seats for boys and girls, allocated through admission. Many first-years also take PG rooms near campus. Ask the hostel office for current fees and availability.</p>`},
+  {id:"hostel",test:/hostel|mess|room\s*(in\s*)?(hostel|pg)|accommodation|stay\s*where|pg\s*near|हॉस्टल|ਹੋਸਟਲ/,reply:()=>`<p><strong><u>GNDEC Campus Facilities &amp; Hostel Guidelines</u></strong></p><p>GNDEC provides on-campus residential hostels for boys (Hostel 1, 2, 5) and girls (Hostel 4). Key guidelines under autonomous regulations:<br />• <strong>Study Hours:</strong> 9:00 PM – 11:00 PM (strict silence mandatory)<br />• <strong>Curfew Timings:</strong> 8:30 PM (Girls Hostel) / 10:00 PM (Boys Hostel)<br />• <strong>Mess &amp; Amenities:</strong> Cooperative student-managed mess, Wi-Fi, indoor recreation, 24×7 power backup.<br />• <strong>Compliance:</strong> Strict anti-ragging code and biometric attendance.</p><p class="answer-source"><a href="https://gndec.ac.in/?q=node/34" target="_blank" rel="noopener">GNDEC Facilities &amp; Hostels Portal</a> · <a href="https://gndec.ac.in/sites/default/files/information_brochure_2026.pdf" target="_blank" rel="noopener">Information Brochure 2026</a></p>`},
+  {id:"portal-timetables",test:/timetable\s*(index|link|portal|website|views?)|section\s*timetable|subsection\s*timetable|faculty\s*timetable|room\s*timetable|programme\s*timetable/,reply:()=>`<p><strong><u>Official GNDEC Timetable Index (Verified 24-08-2026)</u></strong></p><p>• <a href="https://gndec.ac.in/?q=node/34#section" target="_blank" rel="noopener">Section-wise Timetable</a> (Group &amp; semester lecture grids)<br />• <a href="https://gndec.ac.in/?q=node/34#subsection" target="_blank" rel="noopener">Subsection-wise Timetable</a> (Lab cohorts &amp; mentoring grids)<br />• <a href="https://gndec.ac.in/?q=node/34#subject" target="_blank" rel="noopener">Subject-wise Timetable</a> (Course-specific schedules)<br />• <a href="https://gndec.ac.in/?q=node/34#faculty" target="_blank" rel="noopener">Faculty Timetable</a> (Instructor slots)<br />• <a href="https://gndec.ac.in/?q=node/34#room" target="_blank" rel="noopener">Room Timetable</a> (Classroom &amp; lab occupancy)</p><p class="answer-source"><a href="https://gndec.ac.in/?q=node/34" target="_blank" rel="noopener">Official GNDEC Timetable Index</a></p>`},
+  {id:"portal-rosters",test:/(?:student\s*)?roster(?:s)?\s*(?:link|pdf|download|list)?|\b(?:ce|cs|ec|ee|it|me|rai)\s*(?:student\s*)?roster\b/,reply:()=>`<p><strong><u>Current Verified GNDEC Student Rosters</u></strong></p><p>• <a href="https://gndec.ac.in/sites/default/files/roster_ce_2026.pdf" target="_blank" rel="noopener">CE Roster</a> (Civil Engineering 1st Year)<br />• <a href="https://gndec.ac.in/sites/default/files/roster_cs_2026.pdf" target="_blank" rel="noopener">CS Roster</a> (Computer Science &amp; Engg)<br />• <a href="https://gndec.ac.in/sites/default/files/roster_ec_2026.pdf" target="_blank" rel="noopener">EC Roster</a> (Electronics &amp; Comm. Engg)<br />• <a href="https://gndec.ac.in/sites/default/files/roster_ee_2026.pdf" target="_blank" rel="noopener">EE Roster</a> (Electrical Engineering)<br />• <a href="https://gndec.ac.in/sites/default/files/roster_it_2026.pdf" target="_blank" rel="noopener">IT Roster</a> (Information Technology)<br />• <a href="https://gndec.ac.in/sites/default/files/roster_me_2026.pdf" target="_blank" rel="noopener">ME Roster</a> (Mechanical Engineering)<br />• <a href="https://gndec.ac.in/sites/default/files/roster_rai_2026.pdf" target="_blank" rel="noopener">RAI Roster</a> (Robotics &amp; AI)</p><p class="answer-source">Verified Official GNDEC Student Rosters.</p>`},
+  {id:"portal-appsc",test:/applied\s*sciences?\s*(?:notice|board|dept|department|link)?|appsc\s*(?:notice|board|link)?/,reply:()=>`<p><strong><u>Applied Sciences Department &amp; Live Notice Board</u></strong></p><p>The Department of Applied Sciences coordinates first-year academics, physics/chemistry/maths modules, internal evaluation, and student notices.</p><p>• <a href="https://appsc.gndec.ac.in/notice-board" target="_blank" rel="noopener">Applied Sciences Live Notice Board</a><br />• <a href="https://gndec.ac.in/sites/default/files/syllabus_first_year_2026.pdf" target="_blank" rel="noopener">First-Year Study Scheme &amp; Syllabus (PDF)</a></p><p class="answer-source">Official GNDEC Applied Sciences Portal.</p>`},
+  {id:"portal-calendar",test:/academic\s*calendar|session\s*timeline|mst\s*date|exam\s*date|semester\s*timeline/,reply:()=>`<p><strong><u>Official GNDEC Academic Calendar &amp; Session Timeline</u></strong></p><p>• <a href="https://gndec.ac.in/sites/default/files/academic_calendar_jul_dec_2026.pdf" target="_blank" rel="noopener">Academic Calendar Jul–Dec 2026 (PDF)</a> (MSTs, teaching days, and end-semester exams)<br />• <a href="https://gndec.ac.in/sites/default/files/academic_calendar_jan_jun_2026.pdf" target="_blank" rel="noopener">Academic Calendar Jan–Jun 2026 (PDF)</a> (Even semester schedule)<br />• <a href="https://gndec.ac.in/sites/default/files/LoH26.pdf" target="_blank" rel="noopener">GNDEC List of Holidays 2026 (PDF)</a></p><p class="answer-source">Official GNDEC Academic Section.</p>`},
   {id:"library",test:/library|books?|issue\s*(books?|a\s*book)|reading\s*room|library\s*timing|ਲਾਇਬ੍ਰੇਰੀ|लाइब्रेरी/,reply:()=>`<p><strong><u>Library</u></strong></p><p>Current library hours and borrowing rules are not included in the loaded timetable or syllabus. Check the official library notice or ask the library desk. For verified course books, ask “Physics textbooks” or another subject.</p>`},
   {id:"scholarship",test:/scholarship|financial\s*help|fee\s*concession|stipend|ਛਾਤਰਵ੍ਰਿਤੀ|छात्रवृत्ति/,reply:()=>`<p><strong><u>Scholarships</u></strong></p><p>Mostly state/central schemes (post-matric, merit-based). Apply online with bank details and registration number. The college office announces deadlines.</p>`},
   {id:"transport",test:/bus\s*(service|route|pass|timing)|transport|commute|how\s*(to\s*)?(reach|come)\s*(to\s*)?college|bicycle|parking|ਬੱਸ|बस/,reply:()=>`<p><strong><u>Getting to college</u></strong></p><p>City buses, private vans, cycles, and shared autos serve GNDEC from Ludhiana. Parking and a bicycle stand are on campus. Check the college notice for bus pass details.</p>`},

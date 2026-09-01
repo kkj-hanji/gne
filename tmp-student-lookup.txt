@@ -1,0 +1,12 @@
+    // Student roster questions are resolved locally before any external AI
+    // route. This is a read-only query: it never calls applyStudentRecord(),
+    // never changes the active timetable, and never sends identifiers away.
+    if (studentLookupRequest(question, state.rosterLookupConversation?.record || null)) {
+      const lookupBubble = ensureChatBubble("assistant thinking", "<p><strong>Checking current verified student rosters…</strong></p>");
+      const studentLookup = await resolveChatStudentLookup(question);
+      const lookupBrainResult = runCompassBrain(question, globalThis.CompassBrainV2, { studentLookup });
+      lookupBubble.className = "chat-bubble assistant";
+      const lookupAnswer = lookupBrainResult?.answer || legacyAnswerWithoutAi(question, studentLookup);
+      lookupBubble.innerHTML = `${lookupAnswer}${followupSuggestions(question, lookupBrainResult)}`;
+      persistChat();
+      return;

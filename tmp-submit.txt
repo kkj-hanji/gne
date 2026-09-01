@@ -1,0 +1,340 @@
+  $("question-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = $("question-input").value.trim();
+    if (!question) return;
+    $("question-input").value = "";
+    closeQuestionSuggestions();
+    const adminCommand = question.match(/^kkj$/i);
+    if (adminCommand) {
+      ensureChatBubble("user", "<strong>KKJ admin request</strong>");
+      await unlockAdminAi();
+      persistChat();
+      return;
+    }
+    ensureChatBubble("user", `<strong>${escapeHtml(question)}</strong>`);
+    state.activeFacultyAiContext = null;
+    const mentoringAnswer = mentoringClassAnswer(question);
+    if (mentoringAnswer) {
+      ensureChatBubble("assistant", mentoringAnswer);
+      persistChat();
+      return;
+    }
+    const requestedView = requestedOfficialTimetableView(question);
+    if (requestedView) {
+      const viewBubble = ensureChatBubble("assistant thinking", "<p><strong>Checking the verified official timetable…</strong></p>");
+      try {
+        await loadOfficialTimetableView(requestedView);
+        const officialViewAnswer = officialTimetableViewAnswer(question);
+        viewBubble.className = "chat-bubble assistant";
+        viewBubble.innerHTML = officialViewAnswer || "<p><strong><u>Choose a timetable entry.</u></strong></p><p>Name the faculty member, room, subject, programme, section, or subsection you want to check.</p>";
+      } catch (error) {
+        viewBubble.className = "chat-bubble assistant";
+        viewBubble.innerHTML = `<p><strong><u>Official timetable unavailable</u></strong></p><p>${escapeHtml(error.message || "Please try again.")}</p>`;
+      }
+      persistChat();
+      return;
+    }
+    const explicitSelectionAnswer = explicitTimetableSelectionAnswer(question);
+    if (explicitSelectionAnswer) {
+      ensureChatBubble("assistant", explicitSelectionAnswer);
+      persistChat();
+      return;
+    }
+    const contextualAnswer = contextualLocalFollowupAnswer(question);
+    if (contextualAnswer) {
+      ensureChatBubble("assistant", contextualAnswer);
+      persistChat();
+      return;
+    }
+    // Student roster questions are resolved locally before any external AI
+    // route. This is a read-only query: it never calls applyStudentRecord(),
+    // never changes the active timetable, and never sends identifiers away.
+    if (studentLookupRequest(question, state.rosterLookupConversation?.record || null)) {
+      const lookupBubble = ensureChatBubble("assistant thinking", "<p><strong>Checking current verified student rosters…</strong></p>");
+      const studentLookup = await resolveChatStudentLookup(question);
+      if (studentLookup?.status === "none" && looksLikePlainStudentNameQuery(question)) {
+        lookupBubble.remove();
+      } else {
+        const lookupBrainResult = runCompassBrain(question, globalThis.CompassBrainV2, { studentLookup });
+        lookupBubble.className = "chat-bubble assistant";
+        const lookupAnswer = lookupBrainResult?.answer || legacyAnswerWithoutAi(question, studentLookup);
+        lookupBubble.innerHTML = `${lookupAnswer}${followupSuggestions(question, lookupBrainResult)}`;
+        persistChat();
+        return;
+      }
+    }
+    // Public professional faculty facts come from GNDEC's own directory. This
+    // runs after the private roster guard, so student identifiers can never be
+    // diverted into an external answer path.
+    if (facultyLookupRequest(question)) {
+      const lookupBubble = ensureChatBubble("assistant thinking", "<p><strong>Checking the official GNDEC faculty directory…</strong></p>");
+      let facultyLookup = await resolveChatFacultyLookup(question, { includeProfile: false });
+      let facultyRecord = facultyLookup?.status === "single" ? facultyLookup.records[0] : null;
+      setActiveFacultyAiContext(facultyRecord, facultyLookup);
+      if (facultyRecord && adminAiMode() !== "local-only" && (adminForcesActualAi() || shouldUseActualAi(question))) {
+        facultyLookup = await enrichFacultyLookupProfile(facultyLookup);
+        facultyRecord = facultyLookup?.records?.[0] || facultyRecord;
+        setActiveFacultyAiContext(facultyRecord, facultyLookup);
+        lookupBubble.remove();
+        await askAi(question, isHeavyQuestion(question));
+      } else {
+        const lookupBrainResult = runCompassBrain(question, globalThis.CompassBrainV2, { facultyLookup });
+        const lookupAnswer = lookupBrainResult?.answer || legacyFacultyLookupAnswer(facultyLookup);
+        lookupBubble.className = "chat-bubble assistant";
+        lookupBubble.innerHTML = `${lookupAnswer}${followupSuggestions(question, lookupBrainResult)}`;
+        persistChat();
+        if (facultyRecord?.profileId && !(facultyRecord.photoUrl && (facultyRecord.qualifications || facultyRecord.experience || facultyRecord.researchInterests))) {
+          const enrichedLookup = await enrichFacultyLookupProfile(facultyLookup);
+          const enrichedRecord = enrichedLookup?.records?.[0];
+          if (enrichedRecord && enrichedRecord !== facultyRecord) {
+            facultyLookup = enrichedLookup;
+            facultyRecord = enrichedRecord;
+            setActiveFacultyAiContext(facultyRecord, facultyLookup);
+            const enrichedBrainResult = runCompassBrain(question, globalThis.CompassBrainV2, { facultyLookup });
+            lookupBubble.innerHTML = `${enrichedBrainResult?.answer || legacyFacultyLookupAnswer(facultyLookup)}${followupSuggestions(question, enrichedBrainResult)}`;
+          }
+        }
+      }
+      persistChat();
+      return;
+    }
+    // Choosing Muse or GPT-OSS is an explicit admin instruction to use that
+    // real model. Local-first and Local-only continue through Compass's
+    // deterministic routes below.
+    if (adminForcesActualAi()) {
+      await askAi(question, adminAiMode() === "gpt-oss" || isHeavyQuestion(question));
+      persistChat();
+      return;
+    }
+    // Brain 2.0 handles only verified deterministic results here. Unsupported,
+    // uncertain, malformed, or failed results continue into the legacy route.
+    const brainResult = runCompassBrain(question);
+    if (brainResult?.answer) {
+      ensureChatBubble("assistant", `${brainResult.answer}${followupSuggestions(question, brainResult)}`);
+      persistChat();
+      return;
+    }
+    // ── Knowledge base: answers instantly with zero AI ──
+    const kbResult = answerFromKnowledgeBase(question);
+    if (kbResult && kbResult.reply) {
+      // Show a brief "thinking" bubble for that AI feel, then show the answer
+      ensureChatBubble("assistant", kbResult.reply);
+      persistChat();
+      return;
+    }
+    // ── Fallback: existing flow (syllabus, structured, AI, etc.) ──
+    const popularAnswer = answerCompassQuestion(question);
+    const syllabusQuestion = isSyllabusQuestion(question);
+    if (popularAnswer) ensureChatBubble("assistant", `${popularAnswer}${followupSuggestions(question)}`);
+    else if (syllabusQuestion && !state.syllabus.length) {
+      let loading;
+      const loadingTimer = window.setTimeout(() => { loading = ensureChatBubble("assistant thinking", "<p><strong>Preparing the full official syllabus search…</strong></p>"); }, 450);
+      try { await loadOfficialSyllabus(); window.clearTimeout(loadingTimer); loading?.remove(); }
+      catch (error) {
+        window.clearTimeout(loadingTimer);
+        loading ||= ensureChatBubble("assistant", "");
+        loading.className = "chat-bubble assistant";
+        loading.innerHTML = `<p><strong><u>Syllabus unavailable</u></strong></p><p>${escapeHtml(error.message || "Please try again.")}</p>`;
+        persistChat(); return;
+      }
+    }
+    if (!popularAnswer) {
+      const structured = syllabusQuestion && !isOpenQuestion(question) ? answerSyllabusQuestion(question) : (isStructuredQuestion(question) ? answerStructuredQuestion(question) : "");
+      if (structured) ensureChatBubble("assistant", `${structured}${followupSuggestions(question)}`);
+      else if (syllabusQuestion && !isOpenQuestion(question)) ensureChatBubble("assistant", `<p><strong><u>Choose a subject.</u></strong></p><p>For example: “Physics syllabus”, “Math units”, or “PPS course outcomes”.</p>${followupSuggestions(question)}`);
+      else if (adminAiMode() === "local-only") ensureChatBubble("assistant", "<p><strong><u>Local-only mode is on.</u></strong></p><p>I can answer timetable, profile, syllabus, and built-in Compass questions without AI. Switch the admin mode to Fast or Deep AI for open-ended help.</p>");
+      else if (shouldUseActualAi(question)) await askAi(question, isHeavyQuestion(question));
+      else ensureChatBubble("assistant", localClarificationAnswer());
+    }
+    persistChat();
+  });
+  const clearChat = $("clear-chat");
+  if (clearChat) clearChat.addEventListener("click", () => {
+    const windowEl = $("chat-window");
+    const welcome = $("chat-welcome");
+    if (windowEl) windowEl.querySelectorAll(".chat-bubble").forEach((bubble) => bubble.remove());
+    if (welcome) welcome.hidden = false;
+    localStorage.removeItem(CHAT_STORAGE_KEY);
+    state.syllabusConversation = null;
+    state.rosterLookupConversation = null;
+    localStorage.removeItem(SYLLABUS_CONVERSATION_KEY);
+    resetBrainConversation();
+  });
+  document.querySelectorAll(".question-chips").forEach((container) => {
+    container.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      $("question-input").value = button.dataset.quick || button.textContent;
+      activatePage("chat");
+      window.setTimeout(submitQuestionForm, 60);
+    });
+  });
+  const holidayBanner = $("holiday-banner");
+  if (holidayBanner) {
+    const handleHolidayBannerAction = (event) => {
+      event.preventDefault();
+      const holidayName = holidayBanner.dataset.holidayName;
+      if (!holidayName) return;
+      const questionInput = $("question-input");
+      if (questionInput) {
+        questionInput.value = `when is ${holidayName.toLowerCase()}`;
+      }
+      activatePage("chat");
+      window.setTimeout(submitQuestionForm, 60);
+    };
+    holidayBanner.addEventListener("click", handleHolidayBannerAction);
+    holidayBanner.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        handleHolidayBannerAction(event);
+      }
+    });
+  }
+  $("source-status-button")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.open("https://appsc.gndec.ac.in/time_tables", "_blank", "noopener,noreferrer");
+  });
+  document.querySelector(".menu-button").addEventListener("click", (event) => {
+    if (!mobileNavigationEnabled()) return;
+    const sidebar = document.querySelector(".sidebar");
+    const opening = !sidebar.classList.contains("open");
+    sidebar.classList.toggle("open");
+    syncMobileNavigationAccessibility();
+    if (opening) window.requestAnimationFrame(() => sidebar.querySelector(".nav-link.active")?.focus());
+  });
+  $("sidebar-close-button")?.addEventListener("click", () => closeMobileNavigation(true));
+  // Settings event listeners
+  $("settings-brain-mode")?.addEventListener("change", (e) => {
+    saveSettings({ brainMode: e.target.value });
+    showToast(`Active Brain: ${e.target.options[e.target.selectedIndex].text}`);
+  });
+  $("settings-preferred-language")?.addEventListener("change", (e) => {
+    saveSettings({ preferredLanguage: e.target.value });
+    showToast(`Preferred language: ${e.target.options[e.target.selectedIndex].text}`);
+  });
+  $("settings-hinglish-chips")?.addEventListener("change", (e) => {
+    saveSettings({ showHinglishChips: e.target.checked });
+    showToast(`Hinglish chips: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("settings-dynamic-chips")?.addEventListener("change", (e) => {
+    saveSettings({ showDynamicChips: e.target.checked });
+    showToast(`Dynamic chips: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("settings-cgpa-formula")?.addEventListener("change", (e) => {
+    saveSettings({ cgpaFormula: e.target.value });
+    showToast(`CGPA formula: ${e.target.options[e.target.selectedIndex].text}`);
+  });
+  $("settings-attendance-target")?.addEventListener("change", (e) => {
+    saveSettings({ attendanceTarget: Number(e.target.value) || 76 });
+    showToast(`Attendance target: ${e.target.value}%`);
+  });
+  $("settings-attendance-alerts")?.addEventListener("change", (e) => {
+    saveSettings({ attendanceAlerts: e.target.checked });
+    showToast(`Attendance alerts: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("settings-restricted-holidays")?.addEventListener("change", (e) => {
+    saveSettings({ showRestrictedHolidays: e.target.checked });
+    showToast(`Restricted holidays: ${e.target.checked ? "Included" : "Excluded"}`);
+  });
+  $("settings-timetable-grid")?.addEventListener("change", (e) => {
+    saveSettings({ timetableGridView: e.target.checked });
+    const swapRow = $("settings-swap-axes-row");
+    if (swapRow) swapRow.hidden = !e.target.checked;
+    renderWeek();
+    showToast(`Timetable layout: ${e.target.checked ? "Week grid" : "Standard view"}`);
+  });
+  $("settings-timetable-swap-axes")?.addEventListener("change", (e) => {
+    saveSettings({ timetableSwapAxes: e.target.checked });
+    renderWeek();
+    showToast(e.target.checked
+      ? "Transposed Grid Enabled: Days as rows & Time as columns"
+      : "Transposed Grid Disabled: Standard vertical columns");
+  });
+  $("settings-freshness-tag")?.addEventListener("change", (e) => {
+    saveSettings({ showFreshnessTag: e.target.checked });
+    showToast(`Freshness badges: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("settings-ai-suggestions")?.addEventListener("change", (e) => {
+    saveSettings({ aiSuggestions: e.target.checked });
+    showToast(`AI study assistance: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("settings-compact-view")?.addEventListener("change", (e) => {
+    saveSettings({ compactTimetable: e.target.checked });
+    showToast(e.target.checked
+      ? "Compact Timetable: Enabled (dense layout)"
+      : "Compact Timetable: Disabled (standard spacing)");
+  });
+  $("settings-reduce-motion")?.addEventListener("change", (e) => {
+    saveSettings({ reduceMotion: e.target.checked });
+    showToast(`Reduce animations: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("settings-holiday-alerts")?.addEventListener("change", (e) => {
+    saveSettings({ holidayAlerts: e.target.checked });
+    showToast(`Long weekend alerts: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("settings-room-locations")?.addEventListener("change", (e) => {
+    saveSettings({ roomLocations: e.target.checked });
+    showToast(`Campus room hints: ${e.target.checked ? "Enabled" : "Disabled"}`);
+  });
+  $("theme-accent-picker")?.addEventListener("click", (e) => {
+    const dot = e.target.closest(".accent-dot");
+    if (!dot) return;
+    saveSettings({ themeAccent: dot.dataset.accent });
+    showToast(`Accent theme: ${dot.getAttribute("title") || dot.dataset.accent}`);
+  });
+  $("reset-conversation-btn")?.addEventListener("click", () => {
+    resetBrainConversation();
+    renderSettingsPage();
+    showToast("Conversation memory cleared.");
+  });
+  // Data & Storage panel removed — export/import/clear listeners removed
+  document.querySelector(".sidebar-scrim")?.addEventListener("click", () => closeMobileNavigation(true));
+  document.querySelector(".sidebar")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || !mobileNavigationEnabled() || !event.currentTarget.classList.contains("open")) return;
+    const controls = [...event.currentTarget.querySelectorAll("a, button")].filter((control) => control.getAttribute("tabindex") !== "-1");
+    if (!controls.length) return;
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+}
+
+restoreData();
+hydrateGroupControls();
+populateStudentLookupInput();
+initEvents();
+registerOfflineShell();
+restoreChat();
+renderStudentHistory();
+const initialHashPage = location.hash.slice(1);
+const savedPage = localStorage.getItem("gndec-compass-last-page") || "";
+const validPages = ["today", "chat", "timetable", "profile", "settings"];
+let pageToActivate = validPages.includes(initialHashPage) ? initialHashPage : null;
+if (!pageToActivate) {
+  pageToActivate = validPages.includes(savedPage) ? savedPage : (hasStudentProfile() ? "today" : "profile");
+}
+activatePage(pageToActivate, false);
+renderEverything();
+synchronizeOfficialData();
+
+// Eagerly fetch new data stores for the Brain
+fetch("/data/college-events.json").then(r => r.json()).then(d => { state.collegeEventsCache = d; }).catch(() => {});
+fetch("/data/notices.json").then(r => r.json()).then(d => { state.noticesCache = d; }).catch(() => {});
+fetch("/data/timetables.json").then(r => r.json()).then(d => { state.timetablesCache = d; }).catch(() => {});
+fetch("/data/faculty.json").then(r => r.json()).then(d => { if (!state.facultyCache) state.facultyCache = { records: d }; }).catch(() => {});
+
+const warmSyllabusIndex = () => { if (!state.syllabus.length) loadOfficialSyllabus().catch(() => { /* PDF fallback remains available when asked */ }); };
+if ("requestIdleCallback" in window) window.requestIdleCallback(warmSyllabusIndex, { timeout: 1200 });
+else window.setTimeout(warmSyllabusIndex, 180);
+syncMobileViewport();
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", syncMobileViewport);
+  window.visualViewport.addEventListener("scroll", syncMobileViewport);
+}
+window.addEventListener("resize", syncMobileViewport);
+window.addEventListener("resize", syncMobileNavigationAccessibility);
+window.addEventListener("hashchange", () => {
+  const page = location.hash.slice(1);
+  if (["today", "chat", "timetable", "profile", "settings"].includes(page)) activatePage(page, false);
+});

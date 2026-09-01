@@ -43,28 +43,30 @@
     [/\b(?:day\s+after\s+tomorrow|day-after-tomorrow|parso|parson)\b/g, " day after tomorrow "],
     [/\b(?:timetabel|timetble|timetabl|time tabel)\b/g, "timetable"],
     [/\b(?:loacation|locaton|locatoin|palce|plcae)\b/g, "location"],
-    [/\b(?:techer|techers|taecher|faculity)\b/g, "teacher"],
+    [/\b(?:techer|techers|taecher|faculity|sir|maam|mam|madam|prof|professor)\b/g, "teacher"],
     [/\b(?:syllbus|sylabus|syllubus)\b/g, "syllabus"],
     [/\b(?:subjet|subjets|subect)\b/g, "subjects"],
-    [/\b(?:tomor+ow|tomm?or+ow|kal)\b/g, "tomorrow"],
+    [/\b(?:tomor+ow|tomm?or+ow|kal|kalle)\b/g, "tomorrow"],
     [/\b(?:tod+ay|aaj|ajj)\b/g, "today"],
     [/\b(?:nxt|agle|agli|agla)\b/g, "next"],
-    [/\b(?:clas+|lectur+|lecture)\b/g, "class"],
-    [/\b(?:techers?|techer|sir|maam|madam)\b/g, "teacher"],
+    [/\b(?:clas+|lectur+|lecture|period|periods|ghanta|ghante)\b/g, "class"],
+    [/\b(?:techers?|techer|sir|maam|mam|madam|prof|professor)\b/g, "teacher"],
     [/\b(?:subjets?|subects?|sujects?)\b/g, "subjects"],
-    [/\b(?:kaha|kahaan|kidhar|kithe|kithhe)\b/g, "where"],
-    [/\b(?:kaun|kon)\b/g, "who"],
+    [/\b(?:kaha|kahaan|kidhar|kithe|kithhe|kamra|kamre)\b/g, "where"],
+    [/\b(?:kaun|kon|keda|kedi|kehra|kehri|kaunsa|kaunsi)\b/g, "who"],
     [/\b(?:baad|bad)\b/g, "after"],
     [/\b(?:pehla|pehli)\b/g, "first"],
     [/\b(?:akhri|aakhri)\b/g, "last"],
     [/\b(?:meri|mera|mere|my)\b/g, "my"],
-    [/\b(?:kab|kad|kado)\b/g, "when"],
-    [/\b(?:vishay|vishe)\b/g, "subjects"],
+    [/\b(?:kab|kad|kado|kadon|kis time|kinne vaje|kitne baje)\b/g, "when"],
+    [/\b(?:vishay|vishe|parhai|padhai)\b/g, "subjects"],
     [/\b(?:padhata|padhati|padhaunda|padhaundi|teachin)\b/g, "teaches"],
     [/\b(?:padhaata|padhaati|padhate|padhonda|padhondi)\b/g, "teaches"],
     [/\b(?:naam|nam)\b/g, "name"],
-    [/\b(?:aur|atte)\b/g, "and"],
-    [/\b(?:khali|khaali)\b/g, "free"],
+    [/\b(?:aur|atte|te|naale)\b/g, "and"],
+    [/\b(?:khali|khaali|vella|velle|vela|vele)\b/g, "free"],
+    [/\b(?:bunk|bunking|mass bunk|skip class)\b/g, "bunk"],
+    [/\b(?:haziri|hazri|hajri|att|attandance)\b/g, "attendance"],
     [/\b(?:sabse|sab ton)\s+(?:halka|halki|kam|ghatt)\b/g, "lightest"],
     [/\b(?:sabse|sab ton)\s+(?:zyada|jada|vadh|wadh)\b/g, "most"],
     [/\b(?:kitna|kinna)\s+(?:lamba|long)\b/g, "how long"],
@@ -430,6 +432,45 @@
     return null;
   }
 
+  function eventsAnswer(question, context) {
+    const q = normalize(question);
+    if (!/\b(?:mst|mid term|mid-term|holiday|exam|event|calendar|vacation|practical)\b/.test(q)) return null;
+    
+    if (Array.isArray(context.collegeEvents) && context.collegeEvents.length > 0) {
+      let matches = context.collegeEvents;
+      if (/\b(?:mst|mid term|mid-term)\b/.test(q)) matches = matches.filter(e => /mid semester/i.test(e.event) || /mst/i.test(e.event));
+      else if (/\b(?:practical)\b/.test(q)) matches = matches.filter(e => /practical/i.test(e.event));
+      else if (/\b(?:exam|examination)\b/.test(q)) matches = matches.filter(e => /exam/i.test(e.event));
+      else if (/\b(?:holiday|vacation)\b/.test(q)) matches = matches.filter(e => /holiday/i.test(e.event) || /vacation/i.test(e.event));
+
+      if (matches.length === 0) return null;
+      
+      const lines = matches.map(e => `<li><strong>${escapeHtml(e.event)}:</strong> ${escapeHtml(e.date)}</li>`).join("");
+      return result("ACADEMIC_EVENTS", 1, `<p>Here is what the latest Academic Calendar says:</p><ul>${lines}</ul><p class="answer-source">Auto-fetched from GNDEC Academic Calendar.</p>`, {}, ["check calendar events"]);
+    }
+    return null;
+  }
+
+  function noticesAnswer(question, context) {
+    const q = normalize(question);
+    if (!/\b(?:notice|notices|circular|fee|scholarship|update)\b/.test(q)) return null;
+    
+    if (Array.isArray(context.notices) && context.notices.length > 0) {
+      const isFee = /\b(?:fee|fees)\b/.test(q);
+      const isScholarship = /\b(?:scholarship|scholarships)\b/.test(q);
+      
+      let filtered = context.notices;
+      if (isFee) filtered = filtered.filter(n => /fee/i.test(n.title));
+      else if (isScholarship) filtered = filtered.filter(n => /scholarship/i.test(n.title));
+      
+      if (filtered.length === 0) filtered = context.notices.slice(0, 5); // Fallback to latest
+      
+      const lines = filtered.slice(0, 5).map(n => `<li><a href="${escapeHtml(n.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.title)}</a></li>`).join("");
+      return result("NOTICES", 1, `<p>Here are the relevant latest notices from GNDEC:</p><ul>${lines}</ul><p class="answer-source">Auto-fetched from GNDEC Notice Board.</p>`, {}, ["check official notices"]);
+    }
+    return null;
+  }
+
   function exactDateAnswer(question, context) {
     const q = normalize(question);
     const relative = q.match(/\b(?:what|which)\s+(?:is\s+)?(?:the\s+)?(?:day|date)(?:\s+is|\s+of)?\s+(day after tomorrow|today|tomorrow)\b|\bwhat\s+is\s+(day after tomorrow|today|tomorrow)(?:\s+s)?\s+(?:day|date)\b/);
@@ -783,6 +824,7 @@
     add(full || flags.email, "Official directory email", /@/.test(record.email || "") ? record.email : "", "Not published as a valid email");
     add(full || flags.experience, "Experience", record.experience);
     add(full || flags.qualifications, "Qualifications", record.qualifications);
+    add(full, "Office / Cabin", record.cabin || record.office || "");
     add(full || flags.publications, "Journal publications", record.journalPublications);
     add(full || flags.publications, "Conference publications", record.conferencePublications);
     add(full || flags.memberships, "Professional memberships", record.memberships);
@@ -1519,7 +1561,9 @@
       || (explicitSubject
         ? (subjectAnswer(original, context) || teacherAnswer(original, context))
         : (teacherAnswer(original, context) || subjectAnswer(original, context))));
-    const candidate = facultyLookupAnswer(context)
+    const candidate = eventsAnswer(original, context)
+      || noticesAnswer(original, context)
+      || facultyLookupAnswer(context)
       || studentLookupAnswer(context)
       || exactDateAnswer(original, context)
       || utilityAnswer(original)

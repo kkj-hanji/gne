@@ -4,6 +4,11 @@
 const TIMETABLE_INDEX_URL = "https://appsc.gndec.ac.in/time_tables";
 const SYLLABUS_INDEX_URL = "https://appsc.gndec.ac.in/node/27";
 const FALLBACK_SYLLABUS_URL = "https://appsc.gndec.ac.in/sites/default/files/2026-03/ss%20and%20Syllabus%20sem1%2C2%20Dec%202025%20unsigned.pdf";
+const ACADEMIC_CALENDAR_INDEX_URL = "https://www.gndec.ac.in/?q=node/23";
+const FALLBACK_ACADEMIC_CALENDAR_SOURCE = Object.freeze({
+  url: "https://www.gndec.ac.in/sites/default/files/acjul-dec26.pdf",
+  label: "Academic Calendar for Jul 2026 - Dec 2026"
+});
 const REGISTRY_KEY = "gndec-compass:active-source-registry:v1";
 const CACHE_SECONDS = 60 * 60 * 6;
 const SECTION_CACHE_SECONDS = 60 * 60 * 24;
@@ -25,10 +30,22 @@ const NVIDIA_CHAT_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const ADMIN_OWNER_CRN = "2617070";
 
 // These are a verified last-known-good bootstrap and fallback, not a normal
-// update mechanism.  The scheduled discovery task promotes newer sources from
-// /time_tables after validation.  Keeping this snapshot means a first visit
+// update mechanism. The scheduled discovery task promotes newer sources from
+// /time_tables after validation. Keeping this snapshot means a first visit
 // still works if GNDEC is temporarily unavailable.
 const FALLBACK_SOURCES = {
+  groups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_groups_days_horizontal.html",
+  teachers: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_teachers_days_horizontal.html",
+  rooms: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_rooms_days_horizontal.html",
+  subjects: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_subjects_days_horizontal.html",
+  years: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_years_days_horizontal.html",
+  subgroups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_subgroups_days_horizontal.html"
+};
+
+// Retain the preceding verified release for first-load recovery. Automatic
+// registries similarly retain their own previously verified release when
+// GNDEC changes links again.
+const LEGACY_FALLBACK_SOURCES = {
   groups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/09_08_2026%20FINAL_FILE%20R4_groups_days_horizontal.html",
   teachers: "https://appsc.gndec.ac.in/sites/default/files/2026-08/09_08_2026%20FINAL_FILE%20R4_teachers_days_horizontal.html",
   rooms: "https://appsc.gndec.ac.in/sites/default/files/2026-08/09_08_2026%20FINAL_FILE%20R4_rooms_days_horizontal.html",
@@ -36,15 +53,17 @@ const FALLBACK_SOURCES = {
   years: "https://appsc.gndec.ac.in/sites/default/files/2026-08/09_08_2026%20FINAL_FILE%20R4_years_days_horizontal.html",
   subgroups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/09_08_2026%20FINAL_FILE%20R4_subgroups_days_horizontal.html"
 };
+const FALLBACK_SOURCE_FOOTER = "FET 7.6.4 · 8/30/26 10:39 PM";
+const LEGACY_FALLBACK_SOURCE_FOOTER = "FET 7.6.4 · 8/13/26 9:12 AM";
 
 const FALLBACK_STUDENT_SECTION_SOURCES = {
-  CE: "https://appsc.gndec.ac.in/sites/default/files/2026-08/CE%20Permanent%20Sections%202026.pdf",
-  CS: "https://appsc.gndec.ac.in/sites/default/files/2026-08/CS%20Permanent%20Sections%202026.pdf",
-  EC: "https://appsc.gndec.ac.in/sites/default/files/2026-08/EC%20Permanent%20Sections%202026.pdf",
-  EE: "https://appsc.gndec.ac.in/sites/default/files/2026-08/EE%20Permanent%20Sections%202026.pdf",
-  IT: "https://appsc.gndec.ac.in/sites/default/files/2026-08/IT%20Permanent%20Sections%202026.pdf",
-  ME: "https://appsc.gndec.ac.in/sites/default/files/2026-08/ME%20Permanent%20Sections%202026.pdf",
-  RAI: "https://appsc.gndec.ac.in/sites/default/files/2026-08/RAI%20Permanent%20Sections%202026_0.pdf"
+  CE: "https://appsc.gndec.ac.in/sites/default/files/2026-08/CE%20Permanent%20Sections%202026_0.pdf",
+  CS: "https://appsc.gndec.ac.in/sites/default/files/2026-08/CS%20Permanent%20Sections%202026_0.pdf",
+  EC: "https://appsc.gndec.ac.in/sites/default/files/2026-08/EC%20Permanent%20Sections%202026_1.pdf",
+  EE: "https://appsc.gndec.ac.in/sites/default/files/2026-08/EE%20Permanent%20Sections%202026_0.pdf",
+  IT: "https://appsc.gndec.ac.in/sites/default/files/2026-08/IT%20Permanent%20Sections%202026_0.pdf",
+  ME: "https://appsc.gndec.ac.in/sites/default/files/2026-08/ME%20Permanent%20Sections%202026_0.pdf",
+  RAI: "https://appsc.gndec.ac.in/sites/default/files/2026-08/RAI%20Permanent%20Sections%202026_1.pdf"
 };
 const STUDENT_BRANCHES = Object.freeze(Object.keys(FALLBACK_STUDENT_SECTION_SOURCES));
 
@@ -79,15 +98,24 @@ const SYSTEM_PROMPT = "You are GNDEC Compass, a college assistant. Reply in the 
 
 function fallbackRegistry() {
   return {
-    version: "12-08-2026 (bootstrap fallback)",
+    version: "30-08-2026 (bootstrap fallback)",
     mode: "fallback",
     discoveredAt: null,
     checkedAt: null,
     updatedAt: null,
-    sources: Object.fromEntries(Object.entries(FALLBACK_SOURCES).map(([id, url]) => [id, { url, verified: true }])),
+    sources: Object.fromEntries(Object.entries(FALLBACK_SOURCES).map(([id, url]) => [id, {
+      url,
+      verified: true,
+      sourceGenerator: "FET 7.6.4",
+      sourceFooter: FALLBACK_SOURCE_FOOTER,
+      fallbackUrl: LEGACY_FALLBACK_SOURCES[id],
+      fallbackVersion: "09-08-2026 (previous verified fallback)",
+      fallbackSourceFooter: LEGACY_FALLBACK_SOURCE_FOOTER
+    }])),
     studentSectionSources: Object.fromEntries(Object.entries(FALLBACK_STUDENT_SECTION_SOURCES).map(([branch, url]) => [branch, { url, verified: true }])),
     studentHistorySources: Object.fromEntries(Object.entries(FALLBACK_STUDENT_HISTORY_SOURCES).map(([branch, records]) => [branch, records.map((record) => ({ ...record, verified: true }))])),
     syllabusSource: { url: FALLBACK_SYLLABUS_URL, verified: true, label: "First-year study scheme & syllabus" },
+    academicCalendarSource: { ...FALLBACK_ACADEMIC_CALENDAR_SOURCE, verified: true },
     extraLinks: []
   };
 }
@@ -108,6 +136,13 @@ function allowedCollegeUrl(value, extension) {
   } catch { return false; }
 }
 
+function allowedMainCollegePdfUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && (url.hostname === "gndec.ac.in" || url.hostname === "www.gndec.ac.in") && url.pathname.startsWith("/sites/default/files/") && url.pathname.toLowerCase().endsWith(".pdf");
+  } catch { return false; }
+}
+
 function decodeHtml(value = "") {
   return value.replace(/&amp;/gi, "&").replace(/&nbsp;/gi, " ").replace(/&#(?:x0*([0-9a-f]+)|([0-9]+));/gi, (_, hex, decimal) => String.fromCodePoint(parseInt(hex || decimal, hex ? 16 : 10))).replace(/&quot;/gi, "\"").replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">");
 }
@@ -116,13 +151,13 @@ function textOnly(value = "") {
   return decodeHtml(value).replace(/<[^>]*>/g, " ").replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "").replace(/\s+/g, " ").trim();
 }
 
-function anchorLinks(html) {
+function anchorLinks(html, baseUrl = TIMETABLE_INDEX_URL) {
   const links = [];
   const pattern = /<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
   for (let match; (match = pattern.exec(html));) {
     const href = decodeHtml(match[1] || match[2] || match[3] || "");
     const label = textOnly(match[4]);
-    try { links.push({ url: new URL(href, TIMETABLE_INDEX_URL).toString(), label }); } catch { /* ignore malformed link */ }
+    try { links.push({ url: new URL(href, baseUrl).toString(), label }); } catch { /* ignore malformed link */ }
   }
   return links;
 }
@@ -316,6 +351,18 @@ function effectiveVersion(html) {
   return match ? match[1].replaceAll("/", "-") : "Official GNDEC timetable";
 }
 
+function fetSourceFooter(html) {
+  // FET writes this in the published HTML itself. Keep the date/time exactly
+  // as GNDEC prints it: its numeric date format is not labelled, so converting
+  // it would risk displaying a wrong calendar date.
+  const match = textOnly(html).match(/\bTimetable\s+generated\s+with\s+(FET\s+[\d.]+)\s+on\s+(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\s+\d{1,2}:\d{2}\s*(?:AM|PM))\b/i);
+  if (!match) return { sourceGenerator: "", sourceFooter: "" };
+  return {
+    sourceGenerator: match[1].replace(/\s+/g, " ").trim(),
+    sourceFooter: `${match[1].replace(/\s+/g, " ").trim()} · ${match[2].replace(/\s+/g, " ").trim()}`
+  };
+}
+
 function decodedLinkText(link) {
   try { return `${link.label || ""} ${decodeURIComponent(link.url || "")}`; }
   catch { return `${link.label || ""} ${link.url || ""}`; }
@@ -409,13 +456,35 @@ async function discoverSyllabusSource() {
   return { url: match.url, label: "First-year study scheme & syllabus" };
 }
 
+function academicCalendarEndStamp(label = "") {
+  const months = { jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11 };
+  const match = textOnly(label).match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(20\d{2})\s*[-–—]\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(20\d{2})\b/i);
+  if (!match) return 0;
+  const month = months[match[3].toLowerCase()];
+  const year = Number(match[4]);
+  return Number.isInteger(month) && Number.isFinite(year) ? Date.UTC(year, month, 1) : 0;
+}
+
+async function discoverAcademicCalendarSource() {
+  const response = await fetch(ACADEMIC_CALENDAR_INDEX_URL, { headers: { Accept: "text/html,application/xhtml+xml" }, cf: { cacheTtl: 300, cacheEverything: true } });
+  if (!response.ok) throw new Error("The GNDEC academic calendar index could not be loaded.");
+  const links = anchorLinks(await response.text(), ACADEMIC_CALENDAR_INDEX_URL);
+  const candidates = links
+    .filter((link) => /\bacademic\s+calendar\b/i.test(link.label) && allowedMainCollegePdfUrl(link.url))
+    .map((link, index) => ({ ...link, index, stamp: academicCalendarEndStamp(link.label) }))
+    .filter((link) => link.stamp > 0)
+    .sort((left, right) => right.stamp - left.stamp || left.index - right.index);
+  if (!candidates.length) throw new Error("The GNDEC academic calendar index did not expose a dated PDF.");
+  return { url: candidates[0].url, label: candidates[0].label };
+}
+
 async function validateHtmlSource(record) {
   const response = await fetch(record.url, { headers: { Accept: "text/html,application/xhtml+xml" }, cf: { cacheTtl: 0, cacheEverything: true } });
   if (!response.ok) throw new Error(`Source returned HTTP ${response.status}`);
   const body = await response.text();
   const looksLikeFet = /<table[\s>]/i.test(body) && /(?:Monday|Tuesday|Wednesday|Thursday|Friday)/i.test(body) && /(?:studentsset|xAxis|yAxis|detailed)/i.test(body);
   if (!looksLikeFet) throw new Error("Source is not a recognizable FET timetable.");
-  return { ...record, hash: await sha256(body), verified: true, verifiedAt: new Date().toISOString() };
+  return { ...record, ...fetSourceFooter(body), hash: await sha256(body), verified: true, verifiedAt: new Date().toISOString() };
 }
 
 async function validatePdfSource(record) {
@@ -426,13 +495,29 @@ async function validatePdfSource(record) {
   return { ...record, hash: await sha256(new TextDecoder("latin1").decode(bytes.slice(0, 65536))), verified: true, verifiedAt: new Date().toISOString() };
 }
 
+function retainPreviousSource(current, previousRecord, previousVersion = "", fallbackUrl = "", fallbackVersion = "", fallbackSourceFooter = "") {
+  const candidates = [
+    [previousRecord?.url, previousVersion || fallbackVersion, previousRecord?.sourceFooter || ""],
+    [previousRecord?.fallbackUrl, previousRecord?.fallbackVersion || fallbackVersion, previousRecord?.fallbackSourceFooter || ""],
+    [fallbackUrl, fallbackVersion, fallbackSourceFooter]
+  ];
+  const retained = candidates.find(([url]) => typeof url === "string" && url && url !== current.url);
+  return retained ? {
+    ...current,
+    fallbackUrl: retained[0],
+    fallbackVersion: retained[1] || "Previous verified fallback",
+    fallbackSourceFooter: retained[2] || ""
+  } : current;
+}
+
 function sourceIdentity(registry) {
   return JSON.stringify({
     version: registry.version,
-    sources: Object.fromEntries(Object.entries(registry.sources).map(([id, record]) => [id, [record.url, record.hash]])),
+    sources: Object.fromEntries(Object.entries(registry.sources).map(([id, record]) => [id, [record.url, record.hash, record.fallbackUrl || "", record.fallbackVersion || ""]])),
     studentSectionSources: Object.fromEntries(Object.entries(registry.studentSectionSources).map(([id, record]) => [id, [record.url, record.hash]])),
     studentHistorySources: Object.fromEntries(Object.entries(registry.studentHistorySources || {}).map(([id, records]) => [id, records.map((record) => [record.id, record.url, record.hash])]))
     , syllabusSource: registry.syllabusSource ? [registry.syllabusSource.url, registry.syllabusSource.hash] : null
+    , academicCalendarSource: registry.academicCalendarSource ? [registry.academicCalendarSource.url, registry.academicCalendarSource.hash] : null
   });
 }
 
@@ -453,7 +538,10 @@ async function writeRegistry(env, registry) {
 async function refreshSourceRegistry(env) {
   const previous = await readRegistry(env);
   const discovered = await discoverSources();
-  const sources = Object.fromEntries(await Promise.all(REQUIRED_TIMETABLE_SOURCES.map(async (id) => [id, await validateHtmlSource(discovered.sources[id])] )));
+  const sources = Object.fromEntries(await Promise.all(REQUIRED_TIMETABLE_SOURCES.map(async (id) => {
+    const verified = await validateHtmlSource(discovered.sources[id]);
+    return [id, retainPreviousSource(verified, previous?.sources?.[id], previous?.version || "", LEGACY_FALLBACK_SOURCES[id], "09-08-2026 (previous verified fallback)", LEGACY_FALLBACK_SOURCE_FOOTER)];
+  })));
   // GNDEC occasionally republishes a branch PDF later than the timetable and
   // can temporarily omit another branch from the index. Retain the last
   // verified current PDF for any missing branch instead of making its roster
@@ -467,6 +555,8 @@ async function refreshSourceRegistry(env) {
   const studentHistorySources = Object.fromEntries(await Promise.all(Object.entries(FALLBACK_STUDENT_HISTORY_SOURCES).map(async ([branch, records]) => [branch, await Promise.all(records.map(validatePdfSource))])));
   let syllabusSource = previous?.syllabusSource || { url: FALLBACK_SYLLABUS_URL, verified: true, label: "First-year study scheme & syllabus" };
   try { syllabusSource = await validatePdfSource(await discoverSyllabusSource()); } catch { /* retain the last verified syllabus if the index is unavailable */ }
+  let academicCalendarSource = previous?.academicCalendarSource || { ...FALLBACK_ACADEMIC_CALENDAR_SOURCE, verified: true };
+  try { academicCalendarSource = await validatePdfSource(await discoverAcademicCalendarSource()); } catch { /* retain the last verified calendar if the index is unavailable */ }
   const candidate = {
     version: discovered.version,
     mode: "automatic",
@@ -477,6 +567,7 @@ async function refreshSourceRegistry(env) {
     studentSectionSources,
     studentHistorySources,
     syllabusSource,
+    academicCalendarSource,
     extraLinks: discovered.extraLinks,
     previous: previous ? { version: previous.version, updatedAt: previous.updatedAt } : null
   };
@@ -608,23 +699,45 @@ async function enforceAiLimit(request, env, profile) {
 }
 
 function adminAuthorized(request, env) {
-  const token = env.ADMIN_API_TOKEN || "kkj";
+  // Administrative API access is intentionally unavailable until a deployment
+  // secret is configured. The comparison is case-insensitive so the owner's
+  // chosen token can be entered as kkj, Kkj, or KKJ without creating three
+  // separate credentials.
+  const token = String(env.ADMIN_API_TOKEN || "").trim();
   const headerKey = request.headers.get("X-Compass-Admin-Key") || (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  return Boolean(token) && headerKey === token;
+  return Boolean(token && headerKey) && headerKey.toLowerCase() === token.toLowerCase();
 }
 
-async function proxySource(request, ctx, record, source, contentType, cacheSeconds) {
-  const cache = caches.default;
+async function proxySource(request, ctx, record, source, contentType, cacheSeconds, forceFallback = false) {
+  const cache = globalThis.caches?.default;
   // Include the verified content hash: GNDEC can replace a file without
   // changing its URL, and that must not keep serving the old cache entry.
-  const cacheKey = new Request(`${new URL(request.url).origin}/__gndec-cache/${source}/${encodeURIComponent(record.url)}?hash=${record.hash || "bootstrap"}`);
-  const cached = await cache.match(cacheKey);
+  const cacheKey = new Request(`${new URL(request.url).origin}/__gndec-cache/${source}/${encodeURIComponent(record.url)}?hash=${record.hash || "bootstrap"}&fallback=${forceFallback ? "1" : "0"}`);
+  const cached = cache ? await cache.match(cacheKey) : null;
   if (cached) return cached;
   try {
-    const upstream = await fetch(record.url, { headers: { Accept: contentType }, cf: { cacheTtl: cacheSeconds, cacheEverything: true } });
+    const hasFallback = typeof record.fallbackUrl === "string" && record.fallbackUrl;
+    let usingFallback = Boolean(forceFallback && hasFallback);
+    let upstream = usingFallback
+      ? await fetch(record.fallbackUrl, { headers: { Accept: contentType }, cf: { cacheTtl: 0, cacheEverything: true } })
+      : await fetch(record.url, { headers: { Accept: contentType }, cf: { cacheTtl: cacheSeconds, cacheEverything: true } });
+    if (!upstream.ok && !usingFallback && hasFallback) {
+      upstream = await fetch(record.fallbackUrl, { headers: { Accept: contentType }, cf: { cacheTtl: 0, cacheEverything: true } });
+      usingFallback = upstream.ok;
+    }
     if (!upstream.ok) return Response.json({ error: "Official GNDEC source could not be refreshed." }, { status: 502 });
-    const response = new Response(upstream.body, { headers: { "Content-Type": contentType, "Cache-Control": `public, max-age=${cacheSeconds}`, "X-GNDEC-Source": source, "X-GNDEC-Version": record.version || "current" } });
-    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    const response = new Response(upstream.body, { headers: {
+      "Content-Type": contentType,
+      "Cache-Control": `public, max-age=${usingFallback ? 0 : cacheSeconds}`,
+      "X-GNDEC-Source": source,
+      "X-GNDEC-Version": usingFallback ? (record.fallbackVersion || "previous verified fallback") : (record.version || "current"),
+      "X-GNDEC-Resolved-Url": usingFallback ? record.fallbackUrl : record.url,
+      "X-GNDEC-Source-Footer": usingFallback ? (record.fallbackSourceFooter || "") : (record.sourceFooter || ""),
+      ...(usingFallback ? { "X-GNDEC-Fallback": "previous-verified" } : {})
+    } });
+    // Do not cache a temporary fallback. The next request must retry the
+    // current official file so Compass returns to it as soon as GNDEC fixes it.
+    if (!usingFallback && cache) ctx.waitUntil(cache.put(cacheKey, response.clone()));
     return response;
   } catch { return Response.json({ error: "Network error while fetching the official GNDEC source." }, { status: 502 }); }
 }
@@ -672,7 +785,7 @@ export default {
       return Response.json({ ok: true, expiresAt });
     }
 
-    // ── Admin AI & Curation Endpoints (Behind Authorization: Bearer kkj) ──
+    // ── Admin AI & Curation Endpoints (require ADMIN_API_TOKEN) ──
     if (url.pathname === "/api/admin/ai/holidays-fetch") {
       if (!adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
       try {
@@ -777,10 +890,11 @@ export default {
         version: registry.version, mode: registry.mode, checkedAt: registry.checkedAt, updatedAt: registry.updatedAt,
         // Public content hashes let browsers distinguish a revised FET file
         // from an older file that has the same displayed date or URL.
-        sources: Object.entries(registry.sources).map(([id, record]) => ({ id, label: SOURCE_LABELS[id] || id, url: record.url, verified: record.verified === true, contentHash: record.hash || "" })),
+        sources: Object.entries(registry.sources).map(([id, record]) => ({ id, label: SOURCE_LABELS[id] || id, url: record.url, verified: record.verified === true, contentHash: record.hash || "", sourceGenerator: record.sourceGenerator || "", sourceFooter: record.sourceFooter || "" })),
         studentSectionSources: Object.entries(registry.studentSectionSources).map(([branch, record]) => ({ branch, url: record.url, verified: record.verified === true, contentHash: record.hash || "" })),
         studentHistorySources: Object.entries(Object.keys(registry.studentHistorySources || {}).length ? registry.studentHistorySources : FALLBACK_STUDENT_HISTORY_SOURCES).flatMap(([branch, records]) => records.map((record) => ({ branch, id: record.id, version: record.version, url: record.url, verified: record.verified !== false, contentHash: record.hash || "" }))),
         syllabusSource: registry.syllabusSource ? { label: registry.syllabusSource.label || "First-year study scheme & syllabus", url: registry.syllabusSource.url, verified: registry.syllabusSource.verified === true } : null,
+        academicCalendarSource: registry.academicCalendarSource ? { label: registry.academicCalendarSource.label || "Current academic calendar", url: registry.academicCalendarSource.url, verified: registry.academicCalendarSource.verified === true, contentHash: registry.academicCalendarSource.hash || "" } : null,
         extraLinks: registry.extraLinks || [], cacheSeconds: CACHE_SECONDS,
         dataHandling: "Saved student profiles and roster searches stay on the device. The shared registry stores only public GNDEC source metadata and anonymous AI-limit counters. Open-ended study prompts are stripped of student identifiers before external inference."
       }, { headers: { "Cache-Control": "public, max-age=300" } });
@@ -791,7 +905,7 @@ export default {
       const registry = await currentRegistry(env, ctx);
       const record = registry.sources[source];
       if (!record) return Response.json({ error: "Unknown timetable source." }, { status: 400 });
-      return proxySource(request, ctx, record, source, "text/html; charset=utf-8", CACHE_SECONDS);
+      return proxySource(request, ctx, record, source, "text/html; charset=utf-8", CACHE_SECONDS, url.searchParams.get("fallback") === "1");
     }
 
     if (url.pathname === "/api/section-list") {

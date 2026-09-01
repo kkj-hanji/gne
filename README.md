@@ -78,7 +78,7 @@ Local development works without KV, but it uses the checked-in verified bootstra
    npm run deploy
    ```
 
-`ADMIN_API_TOKEN` protects two owner-only emergency endpoints: `POST /api/admin/sources/refresh` (check GNDEC now) and `POST /api/admin/sources/override` (supply a complete validated six-file official set if GNDEC redesigns its index). Normal Cron discovery needs no manual link update and no deploy.
+`ADMIN_API_TOKEN` protects two owner-only emergency endpoints: `POST /api/admin/sources/refresh` (check GNDEC now) and `POST /api/admin/sources/override` (supply a complete validated six-file official set if GNDEC redesigns its index). It is required—there is no code fallback—and its comparison is case-insensitive, so its configured owner token can be entered with any letter casing. Normal Cron discovery needs no manual link update and no deploy.
 
 Normal students receive **8 AI questions per day** per hashed device-and-network pair by default. You may lower or raise this with the `AI_REQUESTS_PER_DAY` Worker variable (maximum 100). Timetable answers are not limited. For a larger public launch, also configure Cloudflare WAF/rate limiting or Turnstile in front of `/api/chat`.
 
@@ -92,13 +92,13 @@ KKJ
 
 After the profile check, KV stores only hashes of that browser's randomly generated device ID and current Cloudflare IP, expiring after 30 days. The browser separately binds the visible admin controls to the exact enrolled name, CRN, registration, branch, section, subsection, and timetable selection. Any identity/profile change immediately removes the local enrollment; changing the values back does not restore it, and `KKJ` must be sent again. Other users remain limited to 8 questions/day.
 
-This is a convenience rule requested for a personal deployment, not strong authentication: a person who can modify browser profile storage could imitate these public profile values. Use Cloudflare Access or a real sign-in provider before treating admin access as security-sensitive.
+This is a convenience rule requested for a personal deployment, not strong authentication: a person who can modify browser profile storage could imitate these public profile values. Use Cloudflare Access or a real sign-in provider before treating admin access as security-sensitive. The server maintenance endpoints remain separately protected by `ADMIN_API_TOKEN`.
 
 ## Privacy and roles
 
 `localStorage` holds the selected student profile, group/subgroup, chat history, recent name searches, and parsed timetable only on that browser. KV holds only public GNDEC source metadata plus hashed anonymous AI-limit counters. No student roster is copied into KV or D1.
 
-Do **not** implement “Kaushik/special student” access by checking a name or registration number in browser JavaScript. A visitor can edit browser storage, so that would only be cosmetic and is not secure. The current special access is the owner-only source-refresh API through `ADMIN_API_TOKEN`.
+The browser-side Kaushik profile check only controls the interface. The Worker repeats the configured profile check before recording the 30-day admin-AI enrollment, while maintenance APIs require `ADMIN_API_TOKEN`. A visitor can still imitate public profile fields in browser storage, so use Cloudflare Access or verified sign-in before treating the profile rule as security-sensitive.
 
 When special student features need real protection, add verified sign-in first (for example Cloudflare Access with an email allowlist/group). Then the Worker can trust a signed identity and grant roles such as `owner`, `special`, and `student`. Until that identity layer exists, all students receive the same safe public features.
 

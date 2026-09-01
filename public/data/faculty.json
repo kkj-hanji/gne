@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Dr. Parminder Singh",
+    "department": "CSE",
+    "role": "Professor & HOD",
+    "email": "parminder2u@gndec.ac.in",
+    "cabin": "G4"
+  },
+  {
+    "name": "Dr. Sumeet Kaur Sehra",
+    "department": "CSE",
+    "role": "Associate Professor",
+    "email": "sumeetkaur@gndec.ac.in",
+    "cabin": "F2"
+  },
+  {
+    "name": "Dr. Akshay Girdhar",
+    "department": "IT",
+    "role": "Professor & HOD",
+    "email": "akshaygirdhar@gndec.ac.in",
+    "cabin": "IT-1"
+  },
+  {
+    "name": "Prof. Kiran Jyoti",
+    "department": "IT",
+    "role": "Assistant Professor",
+    "email": "kiranjyoti@gndec.ac.in",
+    "cabin": "IT-3"
+  }
+]

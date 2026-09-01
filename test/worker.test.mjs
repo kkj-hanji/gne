@@ -9,7 +9,7 @@ const labels = {
 };
 const sourceUrl = (id) => `https://appsc.gndec.ac.in/sites/default/files/2099-01/current_${id}.html`;
 const bundledSourceUrl = (stamp, id) => `https://appsc.gndec.ac.in/sites/default/files/2099-01/${stamp}_FINAL_FILE_R4_${id}_days_horizontal.html`;
-const fet = (marker) => `<!doctype html><table><thead><tr><th class="xAxis">Monday</th><th class="xAxis">Tuesday</th><th class="xAxis">Wednesday</th><th class="xAxis">Thursday</th><th class="xAxis">Friday</th></tr></thead><tbody><tr class="studentsset"><td>${marker}</td></tr><tr><th class="yAxis">08:30</th><td>Class</td></tr></tbody></table>`;
+const fet = (marker) => `<!doctype html><table><thead><tr><th class="xAxis">Monday</th><th class="xAxis">Tuesday</th><th class="xAxis">Wednesday</th><th class="xAxis">Thursday</th><th class="xAxis">Friday</th></tr></thead><tbody><tr class="studentsset"><td>${marker}</td></tr><tr><th class="yAxis">08:30</th><td>Class</td></tr></tbody></table><p>Timetable generated with FET 7.6.4 on 8/12/26 6:47 AM</p>`;
 const bundledIndex = () => `<h3>Revised Time Table w.e.f. 24-08-2026</h3>${["09_08_2026", "23_08_2026"].flatMap((stamp) => ids.map((id) => `<a href="${bundledSourceUrl(stamp, id)}">${labels[id]}</a>`)).join("")}<a href="/sites/default/files/2026-08/EC%20Permanent%20Sections%202026.pdf">EC Branch Students</a>`;
 const index = () => `<h3>Time Table w.e.f. 01-01-2099</h3>${ids.map((id) => `<a href="${sourceUrl(id)}">${labels[id]}</a>`).join("")}<a href="/sites/default/files/2099-01/CS%20Students.pdf">👥 CS Branch Students</a><a href="/sites/default/files/2098-08/CS%20old%20students%20sections.pdf">CS Branch Students</a><a href="/sites/default/files/2099-01/one-day-activity-schedule.pdf">One-day activity schedule</a>`;
 
@@ -69,6 +69,33 @@ test("faculty photo proxy accepts Sanjam Kaur Sidhu's verified 13.3 MB image whi
   }
 });
 
+test("latest bootstrap release falls back to the previous verified timetable without caching it", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalCaches = globalThis.caches;
+  const requested = [];
+  globalThis.caches = { default: { match: async () => null, put: async () => { throw new Error("A fallback must not be cached"); } } };
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.includes("30_08_2026%20FINAL_FILE_subgroups")) return new Response("Unavailable", { status: 503 });
+    if (url.includes("09_08_2026%20FINAL_FILE%20R4_subgroups")) return new Response(fet("previous-verified"), { status: 200 });
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+  try {
+    const response = await worker.fetch(new Request("https://compass.test/api/timetable?source=subgroups"), {}, { waitUntil() {} });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("X-GNDEC-Fallback"), "previous-verified");
+    assert.equal(response.headers.get("X-GNDEC-Version"), "09-08-2026 (previous verified fallback)");
+    assert.equal(response.headers.get("X-GNDEC-Source-Footer"), "FET 7.6.4 · 8/13/26 9:12 AM");
+    assert.match(await response.text(), /previous-verified/);
+    assert.equal(requested.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalCaches === undefined) delete globalThis.caches;
+    else globalThis.caches = originalCaches;
+  }
+});
+
 test("scheduled discovery validates and promotes a complete new GNDEC source registry", async () => {
   const originalFetch = globalThis.fetch;
   const kv = new MemoryKv();
@@ -76,6 +103,8 @@ test("scheduled discovery validates and promotes a complete new GNDEC source reg
   globalThis.fetch = async (input) => {
     const url = String(input);
     if (url === "https://appsc.gndec.ac.in/time_tables") return new Response(index(), { status: 200 });
+    if (url === "https://www.gndec.ac.in/?q=node/23") return new Response('<a href="/sites/default/files/acjul-dec26.pdf">Academic Calendar for Jul 2026 - Dec 2026</a><a href="/sites/default/files/acjan-jun26.pdf">Academic Calendar Jan-Jun 2026</a>', { status: 200 });
+    if (url === "https://www.gndec.ac.in/sites/default/files/acjul-dec26.pdf") return new Response(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, ...Array(300).fill(0)]), { status: 200 });
     if (url.endsWith("CS%20Students.pdf") || url.includes("Permanent%20Sections%202026") || url.includes("Branch%20Temporary%20Sections%202026_0.pdf")) return new Response(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, ...Array(300).fill(0)]), { status: 200 });
     if (ids.some((id) => url === sourceUrl(id))) return new Response(fet(marker), { status: 200 });
     throw new Error(`Unexpected fetch ${url}`);
@@ -93,10 +122,13 @@ test("scheduled discovery validates and promotes a complete new GNDEC source reg
     assert.deepEqual(Object.keys(first.studentSectionSources).sort(), ["CE", "CS", "EC", "EE", "IT", "ME", "RAI"]);
     assert.equal(first.studentHistorySources.EC[0].verified, true);
     assert.equal(first.studentHistorySources.EC[0].version, "11-08-2026");
+    assert.equal(first.academicCalendarSource.url, "https://www.gndec.ac.in/sites/default/files/acjul-dec26.pdf");
+    assert.equal(first.academicCalendarSource.verified, true);
     assert.deepEqual(first.extraLinks, [{ label: "One-day activity schedule", url: "https://appsc.gndec.ac.in/sites/default/files/2099-01/one-day-activity-schedule.pdf" }]);
     const sourceResponse = await worker.fetch(new Request("https://compass.test/api/sources"), { SOURCE_REGISTRY: kv }, { waitUntil() {} });
     const publicSources = await sourceResponse.json();
     assert.equal(publicSources.sources.find((source) => source.id === "groups").contentHash, first.sources.groups.hash);
+    assert.equal(publicSources.sources.find((source) => source.id === "groups").sourceFooter, "FET 7.6.4 · 8/12/26 6:47 AM");
     assert.equal(publicSources.studentSectionSources.find((source) => source.branch === "CS").contentHash, first.studentSectionSources.CS.hash);
     assert.equal(publicSources.studentHistorySources.find((source) => source.branch === "EC").contentHash, first.studentHistorySources.EC[0].hash);
 
@@ -229,4 +261,19 @@ test("hard-coded Kaushik ECB1 KKJ enrollment saves only a hashed device/IP admin
   assert.ok(stored);
   assert.doesNotMatch(stored[0], /kaushik|203\.0\.113/);
   assert.doesNotMatch(stored[1], /kaushik|203\.0\.113/);
+});
+
+test("admin API token is required and accepts the owner's casing variants", async () => {
+  const endpoint = "https://compass.test/api/admin/ai/roster-qa";
+  for (const suppliedToken of ["kkj", "Kkj", "KKJ"]) {
+    const response = await worker.fetch(new Request(endpoint, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${suppliedToken}` }
+    }), { ADMIN_API_TOKEN: "kkj" }, { waitUntil() {} });
+    assert.equal(response.status, 200, suppliedToken);
+  }
+  const missingSecret = await worker.fetch(new Request(endpoint, { method: "POST", headers: { "Authorization": "Bearer kkj" } }), {}, { waitUntil() {} });
+  assert.equal(missingSecret.status, 401);
+  const wrongToken = await worker.fetch(new Request(endpoint, { method: "POST", headers: { "X-Compass-Admin-Key": "not-kkj" } }), { ADMIN_API_TOKEN: "kkj" }, { waitUntil() {} });
+  assert.equal(wrongToken.status, 401);
 });
