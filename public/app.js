@@ -3413,10 +3413,10 @@ function timetableVerificationAnswer(question = "") {
 // A named-person schedule is deliberately separate from the active device
 // profile. The name is first resolved against a current official roster or
 // official faculty timetable; only then may it select a section/subsection.
-function namedPersonTimetableRequest(question = "") {
+function namedPersonTimetableRequest(question = "", options = {}) {
   const q = canonicalTimetableQuestion(question);
   const asksTimetable = /\b(?:time\s*table|timetable|schedule|class(?:es)?|lectures?|periods?)\b/.test(q);
-  if (isTimetableComparisonQuestion(q)) return null;
+  if (!options?.allowComparison && isTimetableComparisonQuestion(q)) return null;
   if (!asksTimetable || requestedTimetableSelection(q)) return null;
   const teacherCue = /\b(?:teacher|faculty|prof(?:essor)?|dr\.?|doctor|instructor|sir|ma'?am|madam)\b/.test(q);
   const friendCue = /\b(?:friend|classmate|batchmate|peer|student)\b/.test(q);
@@ -3450,7 +3450,7 @@ function namedPersonTimetableRequest(question = "") {
   // fragments still stay on the timetable route.
   if (hasKnownTimetableReference && !teacherCue && words.length < 2) return null;
   const activeName = normalizeStudentName(activeStudentProfile()?.name || "");
-  if (activeName && (term === activeName || activeName.includes(term) || term.includes(activeName))) return null;
+  if (!options?.allowSelf && activeName && (term === activeName || activeName.includes(term) || term.includes(activeName))) return null;
   const dateRequest = requestedTimetableDate(q);
   const day = requestedWeekday(q) || dateRequest?.day || "";
   const requestedDays = [];
@@ -3541,45 +3541,62 @@ function readOnlyTeacherTimetableAnswer(request, match, schedule) {
 // active profile or timetable selection.
 function namedPersonComparisonRequest(question = "") {
   const q = canonicalTimetableQuestion(question);
-  if (!/\b(?:vs|versus|compare|comparison|farak|farq)\b/.test(q)) return null;
+  const hasComparisonCue = /\b(?:vs|versus|compare|comparison|farak|farq|both\s+free|common\s+free|free\s+periods?|free\s+slots?|free\s+classes|when\s+are\b.*\bboth\s+free)\b/.test(q);
+  if (!hasComparisonCue) return null;
+
   let parts = [];
   if (/\b(?:vs|versus)\b/.test(q)) {
     parts = q.split(/\b(?:vs|versus)\b/).map((part) => part.trim()).filter(Boolean);
   } else {
     const compMatch = q.match(/\b(?:compare|comparison|farak|farq)\s+(?:between\s+)?(.*?)\s+(?:and|with|to|se|te|nal|naal)\s+(.*)/i)
-      || q.match(/(.*?)\s+(?:and|with|se)\s+(.*?)\s+(?:ko\s+)?(?:compare|farak|farq)/i);
+      || q.match(/(.*?)\s+(?:and|with|se)\s+(.*?)\s+(?:ko\s+)?(?:compare|farak|farq)/i)
+      || q.match(/\b(?:when\s+are|are|find|show)?\s*(?:free\s+(?:periods?|slots?|time|classes)|common\s+free)?\s*(?:between\s+)?(.*?)\s+(?:and|with|se|nal|naal)\s+(.*?)\s*(?:both\s+free|free\s+(?:periods?|slots?|time|classes)|common\s+free|timetable|schedule)?$/i)
+      || q.match(/(.*?)\s+(?:and|aur|te)\s+(.*?)\s*(?:both\s+free|free\s+(?:periods?|slots?|time|classes)|common\s+free|timetable|schedule)/i);
     if (compMatch) {
       parts = [compMatch[1].trim(), compMatch[2].trim()];
     }
   }
   if (parts.length !== 2) return null;
+
+  const isFree = /\b(?:free|khali|break|break\s*time|common\s*free|both\s*free)\b/i.test(q);
+  const isWholeWeek = /\b(?:any\s*week|whole\s*week|all\s*week|full\s*week|pure\s*hafte|pure\s*week)\b/i.test(q);
+  const dateRequest = requestedTimetableDate(q);
+  const day = isWholeWeek ? "" : (requestedWeekday(q) || dateRequest?.day || "");
+  const dateIso = (!isWholeWeek && dateRequest?.iso) ? dateRequest.iso : "";
+
   const ownsPart = (part) => /\b(?:me|my|mine|mera|meri|mere|apna|apni|user\s*branch|my\s*branch)\b/.test(part);
   const leftOwn = ownsPart(parts[0]);
   const rightOwn = ownsPart(parts[1]);
-  const dateRequest = requestedTimetableDate(q);
-  const day = requestedWeekday(q) || dateRequest?.day || "";
+
+  const personOptions = { allowSelf: true, allowComparison: true };
 
   if (leftOwn !== rightOwn) {
     const personPart = leftOwn ? parts[1] : parts[0];
-    const person = namedPersonTimetableRequest(`${personPart} timetable`);
+    const person = namedPersonTimetableRequest(`${personPart} timetable`, personOptions);
     if (!person) return null;
     return {
       type: "student_vs_me",
-      person: { ...person, day: day || person.day, dateIso: dateRequest?.iso || person.dateIso },
-      personOnLeft: !leftOwn
+      person: { ...person, day: day || person.day, dateIso: dateIso || person.dateIso },
+      personOnLeft: !leftOwn,
+      day,
+      dateIso,
+      free: isFree,
+      wholeWeek: isWholeWeek
     };
   }
 
   // Check if both sides are named students
-  const leftPerson = namedPersonTimetableRequest(`${parts[0]} timetable`);
-  const rightPerson = namedPersonTimetableRequest(`${parts[1]} timetable`);
+  const leftPerson = namedPersonTimetableRequest(`${parts[0]} timetable`, personOptions);
+  const rightPerson = namedPersonTimetableRequest(`${parts[1]} timetable`, personOptions);
   if (leftPerson && rightPerson) {
     return {
       type: "two_students",
-      leftPerson: { ...leftPerson, day: day || leftPerson.day, dateIso: dateRequest?.iso || leftPerson.dateIso },
-      rightPerson: { ...rightPerson, day: day || rightPerson.day, dateIso: dateRequest?.iso || rightPerson.dateIso },
+      leftPerson: { ...leftPerson, day: day || leftPerson.day, dateIso: dateIso || leftPerson.dateIso },
+      rightPerson: { ...rightPerson, day: day || rightPerson.day, dateIso: dateIso || rightPerson.dateIso },
       day,
-      dateIso: dateRequest?.iso || ""
+      dateIso,
+      free: isFree,
+      wholeWeek: isWholeWeek
     };
   }
 
@@ -3588,17 +3605,25 @@ function namedPersonComparisonRequest(question = "") {
   if (leftPerson && isCode(parts[1])) {
     return {
       type: "student_vs_code",
-      person: { ...leftPerson, day: day || leftPerson.day, dateIso: dateRequest?.iso || leftPerson.dateIso },
+      person: { ...leftPerson, day: day || leftPerson.day, dateIso: dateIso || leftPerson.dateIso },
       code: cleanText(parts[1]).toUpperCase(),
-      personOnLeft: true
+      personOnLeft: true,
+      day,
+      dateIso,
+      free: isFree,
+      wholeWeek: isWholeWeek
     };
   }
   if (rightPerson && isCode(parts[0])) {
     return {
       type: "student_vs_code",
-      person: { ...rightPerson, day: day || rightPerson.day, dateIso: dateRequest?.iso || rightPerson.dateIso },
+      person: { ...rightPerson, day: day || rightPerson.day, dateIso: dateIso || rightPerson.dateIso },
       code: cleanText(parts[0]).toUpperCase(),
-      personOnLeft: false
+      personOnLeft: false,
+      day,
+      dateIso,
+      free: isFree,
+      wholeWeek: isWholeWeek
     };
   }
 
@@ -3608,6 +3633,16 @@ function namedPersonComparisonRequest(question = "") {
 async function resolveNamedPersonComparisonAnswer(question = "") {
   const request = namedPersonComparisonRequest(question);
   if (!request) return "";
+
+  const calendarKernel = globalThis.CompassBrainKernel;
+  const dateIso = request.dateIso || request.person?.dateIso || "";
+  if (dateIso) {
+    const calendarHoliday = calendarKernel?.checkDateHoliday?.(dateIso);
+    if (calendarHoliday?.closed) {
+      const dateLabel = calendarKernel?.formatIsoFull?.(dateIso) || dateIso;
+      return `<p><strong><u>${escapeHtml(dateLabel)} is an official holiday.</u></strong></p><p><strong>${escapeHtml(calendarHoliday.name)}</strong> (${escapeHtml(calendarHoliday.type)}). Compass will not show a normal weekly timetable comparison for that date.</p><p class="answer-source">Official GNDEC holiday calendar and current official roster; this did not change your profile.</p>`;
+    }
+  }
 
   if (request.type === "two_students") {
     let rosterData;
@@ -3630,12 +3665,15 @@ async function resolveNamedPersonComparisonAnswer(question = "") {
     if (!leftCode) return `<p><strong><u>${escapeHtml(leftRecord.name || request.leftPerson.label)} has no verified timetable subsection.</u></strong></p>`;
     if (!rightCode) return `<p><strong><u>${escapeHtml(rightRecord.name || request.rightPerson.label)} has no verified timetable subsection.</u></strong></p>`;
 
-    const comparisonQuestion = `${leftCode} vs ${rightCode}${request.day ? ` ${request.day}` : ""}`;
+    const comparisonQuestion = request.free
+      ? `compare free periods between ${leftCode} and ${rightCode}${request.day ? ` on ${request.day}` : ""}`
+      : `${leftCode} vs ${rightCode}${request.day ? ` ${request.day}` : ""}`;
     const brainResult = runCompassBrain(comparisonQuestion);
     if (!brainResult?.answer) return "<p><strong><u>Verified timetable comparison is unavailable.</u></strong></p><p>Please try again after the current official timetable finishes loading.</p>";
     const leftLabel = `${leftRecord.name || request.leftPerson.label} (${leftCode})`;
     const rightLabel = `${rightRecord.name || request.rightPerson.label} (${rightCode})`;
-    const dateNote = request.dateIso ? `<p class="kb-tip">For ${escapeHtml(request.dateIso)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
+    const dateLabel = dateIso ? (calendarKernel?.formatIsoFull?.(dateIso) || dateIso) : "";
+    const dateNote = dateLabel ? `<p class="kb-tip">For ${escapeHtml(dateLabel)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
     return `<p><strong>${escapeHtml(leftLabel)} vs ${escapeHtml(rightLabel)}</strong></p><p class="answer-source">Read-only comparison between verified official GNDEC roster records (${escapeHtml(leftLookup.version || "current")}). Your profile and selected timetable were not changed.</p>${brainResult.answer}${dateNote}`;
   }
 
@@ -3654,12 +3692,15 @@ async function resolveNamedPersonComparisonAnswer(question = "") {
     if (!personCode) return `<p><strong><u>${escapeHtml(record.name || request.person.label)} has no verified timetable subsection.</u></strong></p>`;
     const leftCode = request.personOnLeft ? personCode : request.code;
     const rightCode = request.personOnLeft ? request.code : personCode;
-    const comparisonQuestion = `${leftCode} vs ${rightCode}${request.person.day ? ` ${request.person.day}` : ""}`;
+    const comparisonQuestion = request.free
+      ? `compare free periods between ${leftCode} and ${rightCode}${request.day ? ` on ${request.day}` : ""}`
+      : `${leftCode} vs ${rightCode}${request.day ? ` ${request.day}` : ""}`;
     const brainResult = runCompassBrain(comparisonQuestion);
     if (!brainResult?.answer) return "<p><strong><u>Verified timetable comparison is unavailable.</u></strong></p><p>Please try again after the current official timetable finishes loading.</p>";
     const leftLabel = request.personOnLeft ? `${record.name || request.person.label} (${personCode})` : request.code;
     const rightLabel = request.personOnLeft ? request.code : `${record.name || request.person.label} (${personCode})`;
-    const dateNote = request.person.dateIso ? `<p class="kb-tip">For ${escapeHtml(request.person.dateIso)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
+    const dateLabel = dateIso ? (calendarKernel?.formatIsoFull?.(dateIso) || dateIso) : "";
+    const dateNote = dateLabel ? `<p class="kb-tip">For ${escapeHtml(dateLabel)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
     return `<p><strong>${escapeHtml(leftLabel)} vs ${escapeHtml(rightLabel)}</strong></p><p class="answer-source">Read-only comparison using official GNDEC roster and timetable data. Your profile and selected timetable were not changed.</p>${brainResult.answer}${dateNote}`;
   }
 
@@ -3685,12 +3726,15 @@ async function resolveNamedPersonComparisonAnswer(question = "") {
   if (!personCode) return `<p><strong><u>${escapeHtml(record.name || request.person.label)} has no verified timetable subsection.</u></strong></p><p>Compass will not infer one from a name.</p>`;
   const leftCode = request.personOnLeft ? personCode : ownCode;
   const rightCode = request.personOnLeft ? ownCode : personCode;
-  const comparisonQuestion = `${leftCode} vs ${rightCode}${request.person.day ? ` ${request.person.day}` : ""}`;
+  const comparisonQuestion = request.free
+    ? `compare free periods between ${leftCode} and ${rightCode}${request.day ? ` on ${request.day}` : ""}`
+    : `${leftCode} vs ${rightCode}${request.day ? ` ${request.day}` : ""}`;
   const brainResult = runCompassBrain(comparisonQuestion);
   if (!brainResult?.answer) return "<p><strong><u>Verified timetable comparison is unavailable.</u></strong></p><p>Please try again after the current official timetable finishes loading.</p>";
   const leftLabel = request.personOnLeft ? `${record.name || request.person.label} (${personCode})` : `Your ${ownCode}`;
   const rightLabel = request.personOnLeft ? `your ${ownCode}` : `${record.name || request.person.label} (${personCode})`;
-  const dateNote = request.person.dateIso ? `<p class="kb-tip">For ${escapeHtml(request.person.dateIso)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
+  const dateLabel = dateIso ? (calendarKernel?.formatIsoFull?.(dateIso) || dateIso) : "";
+  const dateNote = dateLabel ? `<p class="kb-tip">For ${escapeHtml(dateLabel)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
   return `<p><strong>${escapeHtml(leftLabel)} vs ${escapeHtml(rightLabel)}</strong></p><p class="answer-source">Read-only comparison: ${escapeHtml(personCode)} came from the current official GNDEC roster (${escapeHtml(lookup.version || "current")}). Your profile and selected timetable were not changed.</p>${brainResult.answer}${dateNote}`;
 }
 

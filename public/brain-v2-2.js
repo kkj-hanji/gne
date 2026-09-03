@@ -61,17 +61,48 @@
   }
 
   function resolveSelection(token, context) {
-    const wanted = String(token || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (!wanted) return { match: null };
+    const raw = String(token || "").trim();
+    const wanted = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!wanted && !raw) return { match: null };
     const catalog = selectionCatalog(context);
-    const exact = catalog.filter((entry) => entry.code === wanted);
-    if (exact.length === 1) return { match: { ...exact[0] } };
-    // A unique prefix still resolves ("ecba" → ECBA1); an ambiguous prefix
-    // ("cs" → CSA/CSB/CSD2…) must be reported, never guessed.
-    if (!exact.length && wanted.length >= 2) {
-      const starts = catalog.filter((entry) => entry.code.startsWith(wanted));
-      if (starts.length === 1) return { match: { ...starts[0] } };
-      if (starts.length > 1) return { match: null, ambiguous: starts.map((entry) => entry.code) };
+    if (wanted) {
+      const exact = catalog.filter((entry) => entry.code === wanted);
+      if (exact.length === 1) return { match: { ...exact[0] } };
+      // A unique prefix still resolves ("ecba" → ECBA1); an ambiguous prefix
+      // ("cs" → CSA/CSB/CSD2…) must be reported, never guessed.
+      if (!exact.length && wanted.length >= 2) {
+        const starts = catalog.filter((entry) => entry.code.startsWith(wanted));
+        if (starts.length === 1) return { match: { ...starts[0] } };
+        if (starts.length > 1) return { match: null, ambiguous: starts.map((entry) => entry.code) };
+      }
+    }
+    // Check student roster if available in context
+    if (Array.isArray(context?.studentRoster) && context.studentRoster.length && raw.length >= 3) {
+      const norm = raw.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
+      const normWords = norm.split(/\s+/).filter(Boolean);
+      const studentMatches = context.studentRoster.filter((st) => {
+        const name = String(st.name || "").trim().toLowerCase();
+        const crn = String(st.crn || "").trim().toLowerCase();
+        if (crn && crn === norm) return true;
+        if (name === norm) return true;
+        if (normWords.length >= 2 && normWords.every((w) => name.includes(w))) return true;
+        if (norm.length >= 4 && (name.includes(norm) || norm.includes(name))) return true;
+        return false;
+      });
+      if (studentMatches.length === 1) {
+        const student = studentMatches[0];
+        const code = String(student.subsection || student.section || "").trim().toUpperCase();
+        const catMatch = catalog.find((entry) => entry.code === code);
+        if (catMatch) {
+          return {
+            match: {
+              ...catMatch,
+              studentName: student.name,
+              label: `${student.name} (${catMatch.code})`
+            }
+          };
+        }
+      }
     }
     return { match: null };
   }
@@ -86,6 +117,22 @@
 
   function mentionsOwnTimetable(text) {
     return /\bmy\b|\bmine\b|\bme\b|\bapna\b|\bapni\b|\bmera\b|\bmeri\b|\bmere\b|\buser\s*branch\b|\bmy\s*branch\b|\bour\b|\bhamara\b/.test(String(text || ""));
+  }
+
+  function cleanCandidateName(text) {
+    const ignored = new Set([
+      "TIMETABLE", "SCHEDULE", "CLASSES", "CLASS", "LECTURES", "LECTURE", "PERIODS", "PERIOD",
+      "TODAY", "TOMORROW", "TOMMOROW", "TOMMORROW", "YESTERDAY", "FREE", "SLOTS", "SLOT", "BREAK", "TIME",
+      "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY",
+      "SIR", "MAAM", "MADAM", "PROF", "PROFESSOR", "DR", "DOCTOR", "STUDENT", "ME", "MY",
+      "VS", "VERSUS", "AND", "WITH", "BETWEEN", "ON", "AT", "IN", "KA", "KI", "KE", "KO",
+      "SE", "TE", "NAL", "NAAL", "AUR", "DA", "DE", "DI", "HAI", "HAN", "COMPARE", "COMPARISON"
+    ]);
+    const words = String(text || "").trim().split(/\s+/).filter((w) => {
+      const upper = w.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      return upper && !ignored.has(upper);
+    });
+    return words.join(" ");
   }
 
   function comparisonRequest(question, context) {
@@ -139,8 +186,8 @@
     // "my timetable vs ECB2" resolves the own side from the device profile.
     const leftOwn = mentionsOwnTimetable(parts[0]);
     const rightOwn = mentionsOwnTimetable(parts[1]);
-    const leftToken = leftOwn ? "" : lastCode(parts[0]);
-    const rightToken = rightOwn ? "" : firstCode(parts[1]);
+    const leftToken = leftOwn ? "" : (lastCode(parts[0]) || cleanCandidateName(parts[0]));
+    const rightToken = rightOwn ? "" : (firstCode(parts[1]) || cleanCandidateName(parts[1]));
     if ((!leftToken && !leftOwn) || (!rightToken && !rightOwn)) return null;
     return {
       left: leftOwn ? activeProfileSelection(context) : resolveSelection(leftToken, context),
@@ -322,9 +369,11 @@
     }
     const leftSel = request.left.match;
     const rightSel = request.right.match;
+    const leftLabel = leftSel.studentName ? `${leftSel.studentName} (${leftSel.code})` : leftSel.code;
+    const rightLabel = rightSel.studentName ? `${rightSel.studentName} (${rightSel.code})` : rightSel.code;
     if (leftSel.code === rightSel.code) {
       return kernel.result("COMPARE_SAME", 0.95,
-        `<p><strong>${kernel.escapeHtml(leftSel.code)}</strong> and <strong>${kernel.escapeHtml(rightSel.code)}</strong> are the same timetable, so every scheduled class matches exactly.</p>`,
+        `<p><strong>${kernel.escapeHtml(leftLabel)}</strong> and <strong>${kernel.escapeHtml(rightLabel)}</strong> are the same timetable, so every scheduled class matches exactly.</p>`,
         [], ["detect identical selections"], {});
     }
 
@@ -333,18 +382,18 @@
     const scopeLabel = request.scopeDay ? ` · ${kernel.escapeHtml(request.scopeDay)} only` : " · whole week";
 
     if (/\b(?:common|shared|same)\s+(?:teacher|teachers|faculty)\b/i.test(question)) {
-      const teacherHeader = `<p><strong><u>Common Faculty: ${kernel.escapeHtml(leftSel.code)} &amp; ${kernel.escapeHtml(rightSel.code)}</u></strong>${scopeLabel}</p>`
+      const teacherHeader = `<p><strong><u>Common Faculty: ${kernel.escapeHtml(leftLabel)} &amp; ${kernel.escapeHtml(rightLabel)}</u></strong>${scopeLabel}</p>`
         + `<p>Source: official GNDEC timetable, ${kernel.escapeHtml(revision)}</p>`;
       const teacherContent = report.commonTeachers.length
         ? `<p>Found <strong>${report.commonTeachers.length}</strong> shared faculty member${report.commonTeachers.length > 1 ? "s" : ""}:</p><ul>${report.commonTeachers.map((t) => `<li><strong>${kernel.escapeHtml(t)}</strong></li>`).join("")}</ul>`
-        : `<p>No shared faculty members are scheduled between <strong>${kernel.escapeHtml(leftSel.code)}</strong> and <strong>${kernel.escapeHtml(rightSel.code)}</strong>${request.scopeDay ? ` on ${kernel.escapeHtml(request.scopeDay)}` : ""}.</p>`;
+        : `<p>No shared faculty members are scheduled between <strong>${kernel.escapeHtml(leftLabel)}</strong> and <strong>${kernel.escapeHtml(rightLabel)}</strong>${request.scopeDay ? ` on ${kernel.escapeHtml(request.scopeDay)}` : ""}.</p>`;
       return kernel.result("TIMETABLE_COMMON_TEACHERS", 0.98,
         teacherHeader + teacherContent + `<p class="answer-source">Computed from verified faculty timetable assignments.</p>`,
         { left: leftSel.code, right: rightSel.code, commonTeachers: report.commonTeachers, count: report.commonTeachers.length },
         ["extract teachers from both timetables", "compute intersection", "render common faculty"]);
     }
 
-    const header = `<p><strong>Compared: ${kernel.escapeHtml(leftSel.code)} and ${kernel.escapeHtml(rightSel.code)}</strong>${scopeLabel}</p>`
+    const header = `<p><strong>Compared: ${kernel.escapeHtml(leftLabel)} and ${kernel.escapeHtml(rightLabel)}</strong>${scopeLabel}</p>`
       + `<p>Source: official GNDEC timetable, ${kernel.escapeHtml(revision)} · Profile unchanged; your active timetable stays selected.</p>`;
 
     const sections = [];
@@ -511,9 +560,11 @@
     }
 
     const scopeText = scopeDay ? ` on ${scopeDay}` : " (Whole Week)";
+    const leftLabel = leftSel.match?.studentName ? `${leftSel.match.studentName} (${leftCode})` : leftCode;
+    const rightLabel = rightSel.match?.studentName ? `${rightSel.match.studentName} (${rightCode})` : rightCode;
     if (!commonFreePerDay.length) {
       return kernel.result("TIMETABLE_COMMON_FREE", 0.96,
-        `<p><strong>No common free periods found between ${kernel.escapeHtml(leftCode)} and ${kernel.escapeHtml(rightCode)}${kernel.escapeHtml(scopeText)}.</strong></p><p>Scheduled lectures overlap throughout the day.</p><p class="answer-source">Computed from verified official timetables.</p>`,
+        `<p><strong>No common free periods found between ${kernel.escapeHtml(leftLabel)} and ${kernel.escapeHtml(rightLabel)}${kernel.escapeHtml(scopeText)}.</strong></p><p>Scheduled lectures overlap throughout the day.</p><p class="answer-source">Computed from verified official timetables.</p>`,
         { left: leftCode, right: rightCode, day: scopeDay, commonSlots: [] },
         ["compute free intervals for both groups", "intersect free slots", "report no overlap"]);
     }
@@ -524,7 +575,7 @@
     }).join("");
 
     return kernel.result("TIMETABLE_COMMON_FREE", 0.98,
-      `<p><strong><u>🎉 Common Free Slots Between ${kernel.escapeHtml(leftCode)} & ${kernel.escapeHtml(rightCode)}${kernel.escapeHtml(scopeText)}</u></strong></p><ul>${dayRows}</ul><p class="kb-tip">Great for common group study sessions, library visits, or lunch breaks together.</p><p class="answer-source">Computed from verified official timetables.</p>`,
+      `<p><strong><u>🎉 Common Free Slots Between ${kernel.escapeHtml(leftLabel)} & ${kernel.escapeHtml(rightLabel)}${kernel.escapeHtml(scopeText)}</u></strong></p><ul>${dayRows}</ul><p class="kb-tip">Great for common group study sessions, library visits, or lunch breaks together.</p><p class="answer-source">Computed from verified official timetables.</p>`,
       { left: leftCode, right: rightCode, day: scopeDay, daysWithCommonFree: commonFreePerDay.length },
       ["compute free timetable intervals for both groups", "intersect overlapping free slots", "render clear schedule breakdown"],
       {

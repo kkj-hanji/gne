@@ -458,6 +458,41 @@ test("resolves a named student or faculty timetable from verified source data wi
   assert.equal(casualComparison.type, "student_vs_me");
   assert.equal(casualComparison.person.term, "mohitveer singh");
 
+  const personVsPersonTt = namedPersonComparisonRequest("Kaushik Jain vs Mohitveer Singh timetable");
+  assert.equal(personVsPersonTt.type, "two_students");
+  assert.equal(personVsPersonTt.leftPerson.term, "kaushik jain");
+  assert.equal(personVsPersonTt.rightPerson.term, "mohitveer singh");
+
+  const personVsPersonWed = namedPersonComparisonRequest("Kaushik Jain vs Mohitveer Singh wednesday");
+  assert.equal(personVsPersonWed.type, "two_students");
+  assert.equal(personVsPersonWed.day, "Wednesday");
+
+  const personVsPersonToday = namedPersonComparisonRequest("Kaushik Jain vs Mohitveer Singh today timetable");
+  assert.equal(personVsPersonToday.type, "two_students");
+  assert.ok(personVsPersonToday.day);
+  assert.ok(personVsPersonToday.dateIso);
+
+  const personVsPersonTomorrow = namedPersonComparisonRequest("Kaushik Jain vs Mohitveer Singh tommorow");
+  assert.equal(personVsPersonTomorrow.type, "two_students");
+  assert.ok(personVsPersonTomorrow.day);
+  assert.ok(personVsPersonTomorrow.dateIso);
+
+  const personVsPersonWeek = namedPersonComparisonRequest("Kaushik Jain vs Mohitveer Singh any week");
+  assert.equal(personVsPersonWeek.type, "two_students");
+  assert.equal(personVsPersonWeek.wholeWeek, true);
+  assert.equal(personVsPersonWeek.day, "");
+
+  const personVsPersonFree = namedPersonComparisonRequest("Kaushik Jain vs Mohitveer Singh free periods");
+  assert.equal(personVsPersonFree.type, "two_students");
+  assert.equal(personVsPersonFree.free, true);
+
+  const personBothFreeWed = namedPersonComparisonRequest("when are Kaushik Jain and Mohitveer Singh both free on wednesday");
+  assert.equal(personBothFreeWed.type, "two_students");
+  assert.equal(personBothFreeWed.leftPerson.term, "kaushik jain");
+  assert.equal(personBothFreeWed.rightPerson.term, "mohitveer singh");
+  assert.equal(personBothFreeWed.day, "Wednesday");
+  assert.equal(personBothFreeWed.free, true);
+
   assert.equal(namedPersonTimetableRequest("which classes are in the same lab today"), null);
   assert.equal(namedPersonTimetableRequest("what class is going on right now"), null);
 
