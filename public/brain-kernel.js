@@ -39,7 +39,7 @@
     // Day-after-tomorrow aliases must be rewritten BEFORE plain tomorrow/today
     // words, otherwise "ਕਲ੍ਹ ਪਿੱਛੋਂ" collapses to "tomorrow".
     [/\b(?:day\s+after\s+tomorrow|day-after-tomorrow|parso|parson)\b|\u092a\u0930\u0938\u094b\u0902|\u0a15(?:\u0a71)?\u0a32\u0a4d\u0a39\s*\u0a2a\u0a3f\u0a71?\u0a1b\u0a4b\u0a02/g, " day after tomorrow "],
-    [/\b(?:holidays?|vacations?|chutti|chhutti|chuttiyan|chutiyan|chuttiya|chuttiyaan|off)\b|\u091b\u0941\u091f\u094d\u091f\u0940|\u091b\u0941\u091f\u094d\u091f\u093f\u092f\u093e\u0901|\u0905\u0935\u0915\u093e\u0936|\u0a1b\u0a41\u0a71\u0a1f\u0a40|\u0a1b\u0a41\u0a71\u0a1f\u0a40\u0a06\u0a02/gu, " holiday "],
+    [/\b(?:holidays?|vacations?|chutti|chhutti|chuttiyan|chutiyan|chuttiya|chuttiyaan|chuti|chhoti|choti|chutty|off)\b|\u091b\u0941\u091f\u094d\u091f\u0940|\u091b\u0941\u091f\u094d\u091f\u093f\u092f\u093e\u0901|\u0905\u0935\u0915\u093e\u0936|\u0a1b\u0a41\u0a71\u0a1f\u0a40|\u0a1b\u0a41\u0a71\u0a1f\u0a40\u0a06\u0a02/gu, " holiday "],
     // Month normalizations in English, Hinglish, Punjabi (Gurmukhi), and Hindi (Devanagari)
     [/\b(?:january|janvari|janwary)\b|\u0a1c\u0a28\u0a35\u0a30\u0a40|\u091c\u0928\u0935\u0930\u0940/gu, " january "],
     [/\b(?:february|farwari|farvari|farwary)\b|\u0a2b\u0a3c\u0a30\u0a35\u0a30\u0a40|\u0a2b\u0a30\u0a35\u0a30\u0a40|\u092b\u093c\u0930\u0935\u0930\u0940|\u092b\u0930\u0935\u0930\u0940/gu, " february "],
@@ -57,12 +57,18 @@
     [/\b(?:tt|tm-table|tmtable)\b/g, "timetable"],
     [/\u091f\u093e\u0907\u092e\u091f\u0947\u092c\u0932|\u0938\u092e\u092f\s*\u0938\u093e\u0930\u0923\u0940|\u0a1f\u0a3e(?:\u0a07|\u0a08)\u0a2e\u0a1f\u0a47\u0a2c\u0a32|\u0a38\u0a2e\u0a3e\u0a02\s*\u0a38\u0a3e\u0a30\u0a23\u0a40/gu, " timetable "],
     [/\b(?:loacation|locaton|locatoin|palce|plcae)\b/g, "location"],
-    [/\b(?:techer|techers|taecher|faculity|sir|maam|mam|madam|prof|professor)\b/g, "teacher"],
+    [/\b(?:techer|techers|taecher|faculity|profesor|sir|maam|mam|madam|prof|professor|faculty|instructor)\b/g, "teacher"],
     [/\b(?:syllbus|sylabus|syllubus)\b/g, "syllabus"],
     [/\b(?:subjet|subjets|subect)\b/g, "subjects"],
-    [/\b(?:tomor+ow|tomm?or+ow|tmr+w?|tmro|kl|kal|kalle)\b/g, "tomorrow"],
+    [/\b(?:tomor+ow|tomm?or+ow|tmr+w?|tmro|tmrw|tom|tomoro|tomrw|kl|kal|kalle)\b/g, "tomorrow"],
     [/\b(?:tod+ay|aaj|ajj)\b/g, "today"],
     [/\b(?:nxt|agle|agli|agla)\b/g, "next"],
+    [/\b(?:campass|compas|compss)\b/g, "compass"],
+    [/\b(?:phy|phys)\b/g, "physics"],
+    [/\b(?:chem|chemi)\b/g, "chemistry"],
+    [/\b(?:m1|m2|math|mathe)\b/g, "maths"],
+    [/\b(?:eco|econ)\b/g, "economics"],
+    [/\b([a-z]{2,4})[- ]([a-z]?\d)\b/gi, "$1$2"],
     [/\b(?:clas+|cls|lectur+|lecture|lec|lect|period|periods|ghanta|ghante)\b/g, "class"],
     [/\b(?:batao|btado|dikhao|dikha|dasso|daso)\b/g, "show"],
     [/\b(?:kinne\s+vaje|kitne\s+baje|kis\s+time)\b/g, "when"],
@@ -104,7 +110,7 @@
     [/\b(?:ravivar|ravivaar|aitvar|aitvaar|etwar)\b/g, "sunday"],
     [/\b(?:imarat|building|block)\b/g, "building"],
     [/\b(?:marks?|number|ank|aank|nomber)\b|\u0905\u0902\u0915|\u0a05\u0a70\u0a15/gu, " marks "],
-    [/\b(?:credits?|kredit)\b/gi, " credits "],
+    [/\b(?:credits?|cred|creds|kredit|kredits)\b/gi, " credits "],
     [/\u0917\u0923\u093f\u0924|\u0a17\u0a23\u0a3f\u0a24/gu, " maths "],
     [/(?:\u092d\u094c\u0924\u093f\u0915|\u092b\u093f\u091c\u093f\u0915\u094d\u0938|\u0a2d\u0a4c\u0a24\u093f\u0915|\u0a2b\u0a3f\u0a1c\u0a3c\u093f\u0a15\u0a38|\u0a2b\u0a3f\u0a1c\u0a3c\u0a3f\u0a15\u0a38)/gu, " physics "],
     [/\u0936\u093f\u0915\u094d\u0937\u0915|\u091f\u0940\u091a\u0930|\u0905\u0927\u094d\u092f\u093e\u092a\u0915|\u0a05\u0a27\u093f\u0a06\u0a2a\u0915|\u0a1f\u0940\u091a\u0930/gu, " teacher "],
@@ -165,12 +171,14 @@
     if (/\b(?:syllabus|units?|chapters?|course outcomes?|credits?|assessment|textbooks?|reference books?)\b/.test(normalized)) add("syllabus", 96);
     if (/\b(?:timetable|schedule|class|classes|periods?|free|first|last|morning|afternoon|current|next)\b/.test(normalized)
       || CALENDAR_DAYS.some((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(normalized))) add("timetable", 80);
-    if (/\b(?:compare|comparison|versus|vs|difference|farak|farq)\b/.test(normalized)) add("comparison", 98);
+    if (/\b(?:compare|comparison|versus|vs|difference|farak|farq)\b/.test(normalized)
+      || /\b(?:common|shared|same|both)\s+free\b|\bwhen are\b.*\bfree\b/.test(normalized)) add("comparison", 98);
     if (/\b(?:students?|crn|registration|serial|roster|mentor)\b/.test(normalized)) add("student", 75);
     if (/\b(?:faculty|teacher|professor|designation|qualification|research|publication|official email)\b/.test(normalized)) add("faculty", 75);
     if (/\b(?:where|location|directions?|campus|hostel|library|canteen|dispensary|workshop)\b/.test(normalized)) add("campus", 65);
     if (/\b(?:calculate|calculation|percentage|cgpa|sgpa|attendance|bunk|solve)\b|\d\s*[%+*/^=-]/.test(normalized)) add("calculation", 72);
-    if (/\b(?:who (?:built|made|created|developed|coded)|creator|developer|author)\b.*\b(?:compass|app|website|site|this)\b|\bwho built this\b/.test(normalized)) add("creator", 100);
+    if (/\b(?:who (?:built|made|created|developed|coded)|creator|developer|author)\b.*\b(?:compass|app|website|site|this|web|system)\b|\bwho built this\b|\bwho is kaushik(?:\s+jain)?\b|\babout (?:compass|developer|creator)\b/.test(normalized)) add("creator", 100);
+    if (/\b(?:what (?:can|does)|how to use|features?|capabilities?|help me)\b.*\b(?:compass|app|you|it|this)\b|\bwhat can (?:you|compass) do\b|\bhelp me\b/.test(normalized)) add("capabilities", 95);
 
     const intents = [...scores.entries()].sort((left, right) => right[1] - left[1]).map(([intent, score]) => ({ intent, score }));
     return {
@@ -209,7 +217,7 @@
         const left = text.slice(cursor, match.index).trim();
         const right = text.slice(matcher.lastIndex).trim();
         const leftIsComparison = /\b(?:compare|comparison|vs|versus|farak|farq)\b/i.test(left);
-        const preserveComparison = leftIsComparison && comparisonQualifier.test(right);
+        const preserveComparison = leftIsComparison && (comparisonQualifier.test(right) || !startsIndependentQuestion.test(right));
         const independent = startsIndependentQuestion.test(right) || startsIndependentContext.test(right);
         if (left && independent && !preserveComparison) {
           pieces.push(left);

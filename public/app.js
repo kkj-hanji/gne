@@ -4291,7 +4291,26 @@ function compassBrainContext(overrides = {}) {
     },
     nextStudyDay: nextStudyDay ? { day: nextStudyDay.day, label: nextStudyDay.compactLabel } : null,
     datasetVersion: state.metadata?.version || "",
-    allClasses: state.schedule,
+    allClasses: (() => {
+      const combined = [
+        ...(Array.isArray(state.allClasses) ? state.allClasses : []),
+        ...(Array.isArray(state.schedule) ? state.schedule : []),
+        ...(state.timetablesCache && typeof state.timetablesCache === "object"
+          ? Object.values(state.timetablesCache).flatMap((t) => Array.isArray(t?.classes || t?.schedule) ? (t.classes || t.schedule) : [])
+          : [])
+      ];
+      const seen = new Set();
+      const list = [];
+      for (const c of combined) {
+        if (!c) continue;
+        const key = c.id || `${c.group}|${c.day}|${c.start}|${c.end}|${c.subject}|${c.cohorts || ""}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          list.push(c);
+        }
+      }
+      return list.length ? list : (Array.isArray(state.schedule) ? state.schedule : []);
+    })(),
     studentRoster: Array.isArray(state.rosterCache?.records) ? state.rosterCache.records : [],
     facultyDirectory: Array.isArray(state.facultyCache?.records) ? state.facultyCache.records : [],
     collegeEvents: Array.isArray(state.collegeEventsCache) ? state.collegeEventsCache : [],

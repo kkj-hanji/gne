@@ -32,7 +32,10 @@
 
   function selectionCatalog(context, limit = Infinity) {
     const groups = new Map(); // code -> {code, kind, count}
-    (Array.isArray(context.allClasses) ? context.allClasses : []).forEach((item) => {
+    const pool = (Array.isArray(context.allClasses) && context.allClasses.length)
+      ? context.allClasses
+      : (Array.isArray(context.classes) ? context.classes : []);
+    pool.forEach((item) => {
       const code = String(item.group || "").trim().toUpperCase();
       if (!code || code.length > 12) return;
       const entry = groups.get(code) || { code, kind: "group", count: 0 };
@@ -46,6 +49,12 @@
         sub.count += 1;
         groups.set(token, sub);
       });
+    });
+    // Also include any explicit group codes from context
+    (Array.isArray(context.groups) ? context.groups : []).forEach((groupName) => {
+      const code = String(groupName || "").trim().toUpperCase();
+      if (!code || code.length > 12) return;
+      if (!groups.has(code)) groups.set(code, { code, kind: "group", count: 0 });
     });
     const sorted = [...groups.values()].sort((left, right) => left.code.localeCompare(right.code, undefined, { numeric: true }));
     return Number.isFinite(limit) ? sorted.slice(0, limit) : sorted;
@@ -69,8 +78,8 @@
 
   function activeProfileSelection(context) {
     const profile = context?.profile && typeof context.profile === "object" ? context.profile : {};
-    const subsection = String(profile.subsection || profile.subgroup || "").trim().toUpperCase();
-    const section = String(profile.section || "").trim().toUpperCase();
+    const subsection = String(profile.subsection || profile.subgroup || context?.selectedSubgroup || "").trim().toUpperCase();
+    const section = String(profile.section || context?.selectedGroup || context?.profileLabel || "").trim().toUpperCase();
     if (!subsection && !section) return { match: null, missingProfile: true };
     return resolveSelection(subsection || section, context);
   }
@@ -81,7 +90,13 @@
 
   function comparisonRequest(question, context) {
     const q = kernel.normalize(question);
-    if (!/\bcompare\b|\bcomparison\b|\bvs\b|\bversus\b|\bdifference\b|\bdifferent\b|\bfarak\b|\bfarq\b|\b(?:common|shared|same)\s+(?:teacher|teachers|faculty|subject|subjects|slot|slots|free)\b/.test(q)) return null;
+    const hasExplicitCue = /\bcompare\b|\bcomparison\b|\bvs\b|\bversus\b|\bdifference\b|\bdifferent\b|\bfarak\b|\bfarq\b|\b(?:common|shared|same|both)\s+(?:teacher|teachers|faculty|subject|subjects|slot|slots|free)\b|\bwhen are\b.*\bboth free\b|\bboth free\b/.test(q);
+    if (!hasExplicitCue) {
+      const extracted = [...new Set(codesIn(q))];
+      const hasDay = Boolean(kernel.extractDaySymbol(q) || kernel.CALENDAR_DAYS.some((d) => new RegExp(`\\b${d.toLowerCase()}\\b`).test(q)));
+      const hasFree = /\b(?:free|khali|break|periods?|slots?)\b/.test(q);
+      if (!(extracted.length === 2 && (hasDay || hasFree))) return null;
+    }
     const parts = q.split(/\bvs\b|\bversus\b/).map((part) => part.trim()).filter(Boolean);
     const symbol = kernel.extractDaySymbol(q);
     const day = symbol ? kernel.resolveDaySymbol(symbol, String(context?.calendarDate ? kernel.weekdayOfIso(context.calendarDate) : "")) : "";
@@ -142,7 +157,8 @@
   // Words that appear around comparisons but are never timetable codes.
   const CODE_STOPWORDS = new Set([
     "A", "AN", "THE", "AND", "OR", "OF", "FOR", "TO", "IN", "ON", "AT", "IS", "ARE",
-    "MY", "ME", "OUR", "WHAT", "WHICH", "WHO", "HOW", "DIFFERS", "DIFFERENT",
+    "MY", "ME", "OUR", "WHAT", "WHICH", "WHO", "HOW", "WHEN", "WHERE", "WHY", "CAN", "WILL",
+    "DIFFERS", "DIFFERENT",
     "DIFFERENCE", "COMPARE", "COMPARISON", "COMMON", "SHARED", "ONLY", "FREE",
     "TIMETABLE", "TIME", "TABLE", "SCHEDULE", "CLASSES", "CLASS", "LECTURES",
     "LECTURE", "PERIODS", "PERIOD", "TODAY", "TOMORROW", "YESTERDAY", "PLEASE",
@@ -153,6 +169,7 @@
     "KA", "KI", "KE", "KO", "SE", "TE", "VICH", "MEIN", "AUR", "NAL", "NAAL",
     "FARAK", "FARQ", "KARO", "BATAO", "DIKHAO", "DASSO", "DA", "DE", "DI",
     "HAI", "HAN", "HE", "SI", "SAN", "CH", "NU", "HAFTE", "HAFTA", "GROUPS", "GROUP",
+    "KAB", "KADON", "KADO", "KITHE", "KAHAN", "KIDHAR", "KYA", "KYUN", "KON", "KAUN",
     "ALL", "ANY", "TEACHER", "FACULTY", "ROOM", "ROOMS", "BRANCHES", "ETC", "SO", "ON"
   ]);
 
@@ -177,7 +194,7 @@
 
   function classesFor(selection, context) {
     const wanted = String(selection.code || "").toUpperCase();
-    const all = kernel.chronological((Array.isArray(context.allClasses) ? context.allClasses : []));
+    const all = kernel.chronological((Array.isArray(context.allClasses) && context.allClasses.length ? context.allClasses : (Array.isArray(context.classes) ? context.classes : [])));
     if (selection.kind !== "subgroup") {
       return all.filter((item) => String(item.group || "").toUpperCase() === wanted);
     }
@@ -736,10 +753,24 @@
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
     if (/\b(?:who\s+(?:built|made|created|developed|coded)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|tool|site|system)?|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|creator\s+of\s+(?:this|compass))\b/i.test(q)
-      || /built\s+this\s+web/i.test(q)) {
+      || /built\s+this\s+web/i.test(q)
+      || /\bwho\s+is\s+kaushik(?:\s+jain)?\b/i.test(q)
+      || /\babout\s+(?:compass|developer|creator)\b/i.test(q)) {
       return kernel.result("CREATOR", 1,
         `<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p>Typing <strong>kkj</strong> in the chat verifies the configured administrator profile on this device and unlocks the admin AI modes and custom timetable HTML import. Server maintenance endpoints remain protected by the separate administrator API token.</p><p class="answer-source">Official GNDEC Compass creator info.</p>`,
         {}, ["creator query", "respond with verified author details"]);
+    }
+    return null;
+  }
+
+  // Capabilities & Help Handler
+  function capabilitiesAnswer(question) {
+    const raw = String(question || "").trim();
+    const q = kernel.normalize(raw);
+    if (/\b(?:what (?:can|does)|how to use|features?|capabilities?|help me)\b.*\b(?:compass|app|you|it|this)\b|\bwhat can (?:you|compass) do\b|\bhelp me\b/i.test(q)) {
+      return kernel.result("CAPABILITIES", 1,
+        `<p><strong><u>Ask Compass — Intelligent GNDEC Assistant</u></strong></p><p>Compass is an autonomous offline-first assistant built specifically for Guru Nanak Dev Engineering College. Here is what you can ask:</p><ul><li><strong>Timetables:</strong> “today schedule”, “ECB1 Friday timetable”, “next class”, “when is free period”, “room A9 Monday”</li><li><strong>Timetable Comparisons:</strong> “ECB1 vs CSD2”, “compare my timetable with CSD2”, “when are ECB1 and CSD2 both free”</li><li><strong>Faculty &amp; Rooms:</strong> “who is Dr Jasmeet Kaur”, “Sukhminder sir cabin”, “is A9 free at 2 PM”</li><li><strong>Student Rosters:</strong> “how many students in CSD2”, “student roll 2315001 roster”, “my mentor”</li><li><strong>Academic Schemes &amp; Credits:</strong> “Physics credits”, “Economics credits”, “how many total credits in first year”, “marking scheme”</li><li><strong>Calculations:</strong> “8.4 CGPA in percentage”, “79.8 percentage to CGPA”, “attendance rule”, “bunk calculator”</li><li><strong>Holidays &amp; Portals:</strong> “next holiday”, “holidays in November”, “academic calendar link”, “timetable index”</li></ul><p class="answer-source">Official GNDEC autonomous databases and verified catalogues.</p>`,
+        {}, ["capabilities inquiry", "provide comprehensive feature overview"]);
     }
     return null;
   }
@@ -856,6 +887,7 @@
       const mergedContext = { ...context, conversation: kernel.createMemory(context.conversation) };
       const candidate = holidayTimetableAnswer(original, mergedContext)
         || creatorAnswer(original, mergedContext)
+        || capabilitiesAnswer(original, mergedContext)
         || commonFreeSlotsAnswer(original, mergedContext)
         || comparisonAnswer(original, mergedContext)
         || comparisonFollowUp(original, mergedContext)

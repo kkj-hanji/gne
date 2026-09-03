@@ -375,8 +375,16 @@
       }
     }
 
-    // 4. Subject Credits Lookup: e.g. "Physics credits", "PPS credits", "Maths credits"
-    const asksSubjectCredits = /\bcredits?\b/.test(q) && /\b(?:physics|math|maths|mathematics|chemistry|pps|programming|english|drawing|electrical|workshop|manufacturing|economics|hvpe)\b/.test(q);
+    // 4. Subject Credits Lookup: e.g. "Physics credits", "PPS credits", "Maths credits", "Economics credits"
+    const asksTotalCredits = /\b(?:total|my|overall|how many)\s+credits?\b|\bcredits?\s+(?:in|of)\s+(?:first|1st|sem|semester|year|b\.?tech)\b/.test(q);
+    if (asksTotalCredits) {
+      return kernel.result("ACADEMIC_TOTAL_CREDITS", 0.99,
+        `<p><strong><u>Official GNDEC B.Tech First-Year Credit Scheme</u></strong></p><p>• <strong>Physics Group (Semester 1/2):</strong> ~20.5 Credits<br />• <strong>Chemistry Group (Semester 1/2):</strong> ~19.5 Credits<br />• <strong>Total First-Year Credits:</strong> ~40 Credits (out of 160 total B.Tech credits under autonomous regulations)</p><p class="answer-source">Official GNDEC Autonomous Study Scheme (AICTE Model Curriculum).</p>`,
+        { firstYearCredits: 40, totalBTechCredits: 160 },
+        ["retrieve autonomous study scheme", "summarize first year credit allocation"]);
+    }
+
+    const asksSubjectCredits = /\bcredits?\b/.test(q) && /\b(?:physics|math|maths|mathematics|chemistry|pps|programming|english|drawing|electrical|workshop|manufacturing|economics|eco|hvpe|ethics|values|evs|environmental)\b/.test(q);
     if (asksSubjectCredits) {
       const subjectCreditsMap = {
         physics: { name: "Applied Physics (BTPH-101-18 / BTPH-102-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
@@ -390,7 +398,14 @@
         electrical: { name: "Basic Electrical Engineering (BTEE-101-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
         drawing: { name: "Engineering Graphics & Design (BTME-101-18)", credits: 3, breakdown: "1 Lecture + 4 Practical/Drawing hrs = 3 Credits" },
         workshop: { name: "Workshop/Manufacturing Practices (BTMP-101-18)", credits: 3, breakdown: "1 Lecture + 4 Practical hrs = 3 Credits" },
-        manufacturing: { name: "Manufacturing Practices (BTMP-101-18)", credits: 3, breakdown: "1 Lecture + 4 Practical hrs = 3 Credits" }
+        manufacturing: { name: "Manufacturing Practices (BTMP-101-18)", credits: 3, breakdown: "1 Lecture + 4 Practical hrs = 3 Credits" },
+        economics: { name: "Economics for Engineers (HSMC-101-18 / HSMC-102-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
+        eco: { name: "Economics for Engineers (HSMC-101-18 / HSMC-102-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
+        hvpe: { name: "Human Values & Professional Ethics (HVPE-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
+        ethics: { name: "Human Values & Professional Ethics (HVPE-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
+        values: { name: "Human Values & Professional Ethics (HVPE-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
+        evs: { name: "Environmental Sciences (EVS-101-18)", credits: 0, breakdown: "Non-credit mandatory audit course (Satisfactory / Non-Satisfactory)" },
+        environmental: { name: "Environmental Sciences (EVS-101-18)", credits: 0, breakdown: "Non-credit mandatory audit course (Satisfactory / Non-Satisfactory)" }
       };
       const foundKey = Object.keys(subjectCreditsMap).find((key) => new RegExp(`\\b${key}\\b`, "i").test(q));
       if (foundKey) {
