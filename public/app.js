@@ -932,23 +932,21 @@ function renderLive() {
 
     if (state.settings?.holidayAlerts !== false && nextHoli && diffDays >= 0 && diffDays <= 5) {
       holidayBanner.hidden = false;
-      holidayBanner.setAttribute("role", "button");
-      holidayBanner.setAttribute("tabindex", "0");
+      holidayBanner.removeAttribute("role");
+      holidayBanner.removeAttribute("tabindex");
+      holidayBanner.removeAttribute("aria-label");
       holidayBanner.dataset.holidayName = nextHoli.name;
       holidayBanner.dataset.holidayDate = nextHoli.date;
 
       if (diffDays === 0) {
         holidayBanner.className = "holiday-banner active-holiday";
-        holidayBanner.setAttribute("aria-label", `Today is a holiday: ${nextHoli.name}. Tap to ask Compass details.`);
-        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">🎉</span><div class="holiday-text"><strong>Today is a Holiday: ${escapeHtml(nextHoli.name)}</strong><p>${escapeHtml(nextHoli.description || "College teaching is suspended.")} · Full-day Gazetted Holiday</p></div><div class="holiday-action"><span>Ask Compass</span> <span aria-hidden="true">→</span></div>`;
+        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">🎉</span><div class="holiday-text"><strong>Today is a Holiday: ${escapeHtml(nextHoli.name)}</strong><p>${escapeHtml(nextHoli.description || "College teaching is suspended.")} · Full-day Gazetted Holiday</p></div><button type="button" class="holiday-action" aria-label="Ask Compass about ${escapeHtml(nextHoli.name)}"><span>Ask Compass</span> <span aria-hidden="true">→</span></button>`;
       } else if (diffDays === 1) {
         holidayBanner.className = "holiday-banner upcoming-holiday";
-        holidayBanner.setAttribute("aria-label", `Tomorrow is a holiday: ${nextHoli.name}. Tap to ask Compass details.`);
-        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">📅</span><div class="holiday-text"><strong>Tomorrow is a Holiday: ${escapeHtml(nextHoli.name)}</strong><p>${escapeHtml(nextHoli.date)} (${escapeHtml(nextHoli.day)}) · Full-day Gazetted Holiday</p></div><div class="holiday-action"><span>Ask Compass</span> <span aria-hidden="true">→</span></div>`;
+        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">📅</span><div class="holiday-text"><strong>Tomorrow is a Holiday: ${escapeHtml(nextHoli.name)}</strong><p>${escapeHtml(nextHoli.date)} (${escapeHtml(nextHoli.day)}) · Full-day Gazetted Holiday</p></div><button type="button" class="holiday-action" aria-label="Ask Compass about ${escapeHtml(nextHoli.name)}"><span>Ask Compass</span> <span aria-hidden="true">→</span></button>`;
       } else {
         holidayBanner.className = "holiday-banner info-holiday";
-        holidayBanner.setAttribute("aria-label", `Upcoming holiday in ${diffDays} days: ${nextHoli.name}. Tap to ask Compass details.`);
-        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">🏖️</span><div class="holiday-text"><strong>Upcoming Holiday: ${escapeHtml(nextHoli.name)} (in ${diffDays} days)</strong><p>${escapeHtml(nextHoli.date)} (${escapeHtml(nextHoli.day)}) · Full-day Gazetted Holiday</p></div><div class="holiday-action"><span>Ask Compass</span> <span aria-hidden="true">→</span></div>`;
+        holidayBanner.innerHTML = `<span class="holiday-icon" aria-hidden="true">🏖️</span><div class="holiday-text"><strong>Upcoming Holiday: ${escapeHtml(nextHoli.name)} (in ${diffDays} days)</strong><p>${escapeHtml(nextHoli.date)} (${escapeHtml(nextHoli.day)}) · Full-day Gazetted Holiday</p></div><button type="button" class="holiday-action" aria-label="Ask Compass about ${escapeHtml(nextHoli.name)}"><span>Ask Compass</span> <span aria-hidden="true">→</span></button>`;
       }
     } else {
       holidayBanner.hidden = true;
@@ -5431,7 +5429,7 @@ function syncMobileViewport() {
 function registerOfflineShell() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js?v=20260901-3", { scope: "/" }).catch(() => {
+    navigator.serviceWorker.register("/sw.js?v=20260901-4", { scope: "/" }).catch(() => {
       // Service workers are an optional enhancement. The live app and its
       // deterministic fallback continue normally when registration is blocked.
     });
@@ -5782,11 +5780,10 @@ function initEvents() {
       activatePage("chat");
       window.setTimeout(submitQuestionForm, 60);
     };
-    holidayBanner.addEventListener("click", handleHolidayBannerAction);
-    holidayBanner.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        handleHolidayBannerAction(event);
-      }
+    holidayBanner.addEventListener("click", (event) => {
+      const action = event.target.closest?.(".holiday-action");
+      if (!action || !holidayBanner.contains(action)) return;
+      handleHolidayBannerAction(event);
     });
   }
   $("source-status-button")?.addEventListener("click", (event) => {

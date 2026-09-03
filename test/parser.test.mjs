@@ -852,12 +852,23 @@ test("uses DOM selectors that exist in the application shell", () => {
   assert.doesNotMatch(appSource, /\$\("class-state"\)/);
 });
 
+test("only the Ask Compass control is interactive inside a holiday banner", () => {
+  assert.equal([...appSource.matchAll(/<button type="button" class="holiday-action"/g)].length, 3);
+  assert.doesNotMatch(appSource, /holidayBanner\.setAttribute\("role", "button"\)/);
+  assert.doesNotMatch(appSource, /holidayBanner\.addEventListener\("keydown"/);
+  assert.match(appSource, /event\.target\.closest\?\.\("\.holiday-action"\)/);
+  assert.match(appSource, /if \(!action \|\| !holidayBanner\.contains\(action\)\) return/);
+  assert.match(appSource, /holidayBanner\.hidden = true/);
+  assert.doesNotMatch(stylesSource, /\.holiday-banner\{[^}]*cursor:pointer/);
+  assert.match(stylesSource, /\.holiday-banner \.holiday-action\{[^}]*cursor:pointer/);
+});
+
 test("service worker caches only an unused response copy and absorbs cache-write failures", () => {
   assert.match(serviceWorkerSource, /function cacheResponse\(event, request, response\)/);
   assert.match(serviceWorkerSource, /response\.bodyUsed/);
   assert.match(serviceWorkerSource, /copy = response\.clone\(\)/);
   assert.match(serviceWorkerSource, /cache\.put\(request, copy\)\)\.catch\(\(\) => \{\}\)/);
-  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260901-3"/);
+  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260901-4"/);
 });
 
 test("keeps actual Hindi and Punjabi timetable questions on the fast local path", () => {

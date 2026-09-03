@@ -540,9 +540,7 @@ body.reduce-motion .pulse,body.reduce-motion .live-dot{animation:none!important}
 body.hide-answer-freshness .chat-bubble.assistant .answer-source:not(.answer-source-stream){display:none}
 
 /* Holiday Alert Banner */
-.holiday-banner{display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:18px;border-radius:var(--radius-md);background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(11,16,25,.85));border:1px solid rgba(16,185,129,.35);box-shadow:0 6px 20px rgba(0,0,0,.28);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);cursor:pointer;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background .2s ease;user-select:none}
-.holiday-banner:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.38);border-color:rgba(56,189,248,.5)}
-.holiday-banner:focus-visible{outline:2px solid var(--accent,#38bdf8);outline-offset:2px}
+.holiday-banner{display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:18px;border-radius:var(--radius-md);background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(11,16,25,.85));border:1px solid rgba(16,185,129,.35);box-shadow:0 6px 20px rgba(0,0,0,.28);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:border-color .2s ease,background .2s ease}
 .holiday-banner.active-holiday{background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(11,16,25,.85));border-color:rgba(245,158,11,.45)}
 .holiday-banner.upcoming-holiday{background:linear-gradient(135deg,rgba(56,189,248,.16),rgba(11,16,25,.85));border-color:rgba(56,189,248,.4)}
 .holiday-banner.info-holiday{background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(11,16,25,.85));border-color:rgba(16,185,129,.35)}
@@ -550,8 +548,9 @@ body.hide-answer-freshness .chat-bubble.assistant .answer-source:not(.answer-sou
 .holiday-banner .holiday-text{flex:1;min-width:0}
 .holiday-banner .holiday-text strong{display:block;color:var(--text);font-size:14px;margin-bottom:2px}
 .holiday-banner .holiday-text p{margin:0;color:var(--muted);font-size:12px;line-height:1.4}
-.holiday-banner .holiday-action{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--accent,#38bdf8);white-space:nowrap;flex-shrink:0;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:9999px;padding:4px 10px;transition:background .2s ease,border-color .2s ease}
-.holiday-banner:hover .holiday-action{background:rgba(56,189,248,.2);border-color:rgba(56,189,248,.5)}
+.holiday-banner .holiday-action{display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11.5px;font-weight:600;color:var(--accent,#38bdf8);white-space:nowrap;flex-shrink:0;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:9999px;padding:4px 10px;cursor:pointer;transition:background .2s ease,border-color .2s ease,transform .2s ease}
+.holiday-banner .holiday-action:hover{background:rgba(56,189,248,.2);border-color:rgba(56,189,248,.5);transform:translateY(-1px)}
+.holiday-banner .holiday-action:focus-visible{outline:2px solid var(--accent,#38bdf8);outline-offset:2px}
 
 /* --- Time of Day Glassmorphism Themes --- */
 :root { --glass-tint: rgba(17, 24, 39, 0.7); }
