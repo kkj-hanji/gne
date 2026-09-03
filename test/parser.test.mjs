@@ -1387,7 +1387,6 @@ test("exposes the student lookup control and uses only the Worker section-list r
   assert.match(appSource, /MAX_CHAT_MESSAGES = 60/);
   assert.match(appSource, /safeStoredChatHtml/);
   assert.match(appSource, /history\.pushState/);
-  assert.match(pageSource, /id="day-plan-toggle"/);
   assert.match(appSource, /adminAiMode\(\) === "local-only"/);
   assert.match(appSource, /if \(htmlImport\) htmlImport\.hidden = !visible/);
   assert.match(appSource, /if \(!hasAdminAiView\(\)\)[\s\S]{0,300}Admin authorization required/);

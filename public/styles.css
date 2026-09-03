@@ -121,7 +121,11 @@ button:disabled,input:disabled,select:disabled{opacity:.62;cursor:not-allowed}
 .question-chips button:hover{border-color:var(--green);color:var(--green);background:rgba(52,211,153,.08)}
 
 /* ---------- Day schedule list ---------- */
-.day-section{margin-top:38px}
+.day-section{margin-top:28px}
+.text-button:disabled{opacity:.4;cursor:not-allowed;color:var(--faint);text-decoration:none;pointer-events:none}
+.day-holiday-badge{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:12px;border:1px solid rgba(245,158,11,.3);border-radius:10px;background:rgba(245,158,11,.08);color:var(--amber);font-size:13px}
+.day-holiday-badge strong{color:#fde68a;font-weight:800}
+.day-empty-weekend strong{display:block;margin-bottom:4px;color:var(--text);font-size:15px}
 .section-header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:16px}.day-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end}
 .schedule-list{border-top:1px solid var(--line)}
 .schedule-item{display:grid;grid-template-columns:118px minmax(0,1fr) 180px 132px;gap:16px;align-items:center;padding:15px 14px;border-bottom:1px solid var(--line-soft);border-radius:10px;transition:background .15s}

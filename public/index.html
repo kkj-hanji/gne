@@ -84,24 +84,18 @@
             </div>
           </section>
 
-          <section class="quick-ask" aria-label="Quick questions">
-            <div class="quick-ask-head"><p class="eyebrow">ASK COMPASS</p><button class="text-button" type="button" data-go="chat">Open chat <span aria-hidden="true">&#8594;</span></button></div>
-            <div class="question-chips">
-              <button type="button" data-quick="What is my next class?">Next class?</button>
-              <button type="button" data-quick="Aaj ka timetable batao">Aaj ka timetable</button>
-              <button type="button" data-quick="Physics kahan hai?">Physics kahan hai?</button>
-              <button type="button" data-quick="ਅਗਲੀ ਕਲਾਸ ਕਿੱਥੇ ਹੈ?">ਅਗਲੀ ਕਲਾਸ?</button>
-              <button type="button" data-quick="Who is my mentor?">My mentor</button>
-              <button type="button" data-quick="Kal ka timetable batao">Kal ka timetable</button>
-              <button type="button" data-quick="Give me some study tips for physics">Study tips</button>
-            </div>
-          </section>
-
           <section class="day-section">
             <div class="section-header">
               <div><p class="eyebrow" id="day-eyebrow">TODAY'S PLAN</p><h2 id="day-heading">Your schedule</h2></div>
-              <div class="day-actions"><button class="text-button" type="button" id="day-plan-toggle" hidden></button><button class="text-button" type="button" data-go="timetable">View timetable <span aria-hidden="true">&#8594;</span></button></div>
+              <div class="day-actions" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+                <button class="text-button" type="button" data-go="timetable">View timetable <span aria-hidden="true">&#8594;</span></button>
+                <div style="display:flex;gap:16px;align-items:center;">
+                  <button type="button" class="text-button" id="day-nav-prev" disabled><span aria-hidden="true">&#8592;</span> <span id="day-nav-prev-text">Back</span></button>
+                  <button type="button" class="text-button" id="day-nav-next"><span id="day-nav-next-text">Tomorrow</span> <span aria-hidden="true">&#8594;</span></button>
+                </div>
+              </div>
             </div>
+
             <div id="day-schedule" class="schedule-list"><div class="empty-list">Load the official group timetable to see your day here.</div></div>
           </section>
         </section>
@@ -385,10 +379,10 @@
     </nav>
 
     <div class="toast" id="toast" role="status"></div>
-    <script src="brain-kernel.js?v=20260903-1"></script>
-    <script src="brain-v1-2.js?v=20260903-1"></script>
-    <script src="brain-v2-2.js?v=20260903-1"></script>
+    <script src="brain-kernel.js?v=20260903-2"></script>
+    <script src="brain-v1-2.js?v=20260903-2"></script>
+    <script src="brain-v2-2.js?v=20260903-2"></script>
     <script src="brain-v2.js?v=20260831-2"></script>
-    <script src="app.js?v=20260903-1"></script>
+    <script src="app.js?v=20260903-2"></script>
   </body>
 </html>

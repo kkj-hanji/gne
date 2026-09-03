@@ -108,7 +108,7 @@ const state = {
   timetablesCache: null,
   activeFacultyAiContext: null,
   nowOverride: null,
-  dayPlanOverride: "",
+  userDayOffset: null,
   questionSuggestionIndex: -1
 };
 let facultyDirectoryLoading = null;
@@ -1040,25 +1040,47 @@ function renderDaySchedule() {
   const afterCollegeHours = now.minutes >= COLLEGE_DAY_END_MINUTES;
   const todayClasses = classFor(state.selectedGroup, now.day);
   const nextStudyDay = nextStudyDayInfo(false);
-  // Outside teaching days (Saturday/Sunday) the useful plan is always the
-  // next real study day. After a weekday ends, it does the same.
+
+  // Determine baseline auto offset
   const shouldLookAhead = afterCollegeHours || !todayClasses.length;
-  const showNextDay = shouldLookAhead && state.dayPlanOverride !== "today" && Boolean(nextStudyDay);
-  const day = showNextDay ? nextStudyDay.day : now.day;
-  const classes = classFor(state.selectedGroup, day);
+  let autoOffset = 0;
+  if (shouldLookAhead && nextStudyDay) {
+    autoOffset = nextStudyDay.offset;
+  }
+
+  // Use user selected offset if available, otherwise fallback to autoOffset
+  const currentOffset = state.userDayOffset !== null ? state.userDayOffset : autoOffset;
+  const isToday = currentOffset === 0;
+  const isTomorrow = currentOffset === 1;
+
+  const targetDate = indiaCalendarDate(currentOffset);
+  const classes = classFor(state.selectedGroup, targetDate.day);
   const plan = dayPlanEntries(classes);
   const profile = activeTimetableLabel();
-  $("day-eyebrow").textContent = showNextDay ? (nextStudyDay.offset === 1 ? "TOMORROW'S PLAN" : "NEXT STUDY DAY PLAN") : "TODAY'S PLAN";
-  $("day-heading").textContent = state.selectedGroup ? (showNextDay ? `${profile} · ${nextStudyDay.compactLabel}` : `${profile} schedule`) : "Your schedule";
+
+  let eyebrowText = "TODAY'S PLAN";
+  if (!isToday) {
+    eyebrowText = isTomorrow ? "TOMORROW'S PLAN" : "UPCOMING SCHEDULE";
+  }
+  $("day-eyebrow").textContent = eyebrowText;
+  $("day-heading").textContent = state.selectedGroup ? (isToday ? `${profile} schedule` : `${profile} · ${targetDate.compactLabel}`) : "Your schedule";
+
+  const prevBtn = $("day-nav-prev");
+  const nextBtn = $("day-nav-next");
+  
+  if (prevBtn && nextBtn) {
+    prevBtn.disabled = currentOffset <= 0;
+    
+    if (currentOffset === 0) {
+      $("day-nav-next-text").textContent = "Tomorrow";
+    } else {
+      $("day-nav-next-text").textContent = "Next Day";
+    }
+  }
+
   $("day-schedule").innerHTML = classes.length ? plan.map((item) => item.free
     ? `<article class="schedule-item free-slot"><div class="schedule-time">${humanTime(item.start)}<br /><span>${humanTime(item.end)}</span></div><div><div class="schedule-name">Free lecture</div><div class="schedule-sub">No class listed in the official timetable</div></div><div class="schedule-teacher">Open study time</div><div class="schedule-room">Available</div></article>`
-    : `<article class="schedule-item ${!showNextDay && item.start <= now.minutes && item.end > now.minutes ? "current" : ""}"><div class="schedule-time">${humanTime(item.start)}<br /><span>${humanTime(item.end)}</span></div><div><div class="schedule-name">${escapeHtml(item.subject)}</div><div class="schedule-sub">${escapeHtml(classTypeLabel(item.type))}</div></div><div class="schedule-teacher">${escapeHtml(item.teacher)}</div><div class="schedule-room">${escapeHtml(expandRoomLocation(item.room))}</div></article>`).join("") : "<div class=\"empty-list\">No classes are listed for this day.</div>";
-  const toggle = $("day-plan-toggle");
-  if (toggle) {
-    toggle.hidden = !afterCollegeHours || !todayClasses.length || !nextStudyDay;
-    toggle.dataset.planTarget = showNextDay ? "today" : "next";
-    toggle.textContent = showNextDay ? "Show today's completed plan" : `Show ${nextStudyDay?.compactLabel || "next study day"}`;
-  }
+    : `<article class="schedule-item ${isToday && item.start <= now.minutes && item.end > now.minutes ? "current" : ""}"><div class="schedule-time">${humanTime(item.start)}<br /><span>${humanTime(item.end)}</span></div><div><div class="schedule-name">${escapeHtml(item.subject)}</div><div class="schedule-sub">${escapeHtml(classTypeLabel(item.type))}</div></div><div class="schedule-teacher">${escapeHtml(item.teacher)}</div><div class="schedule-room">${escapeHtml(expandRoomLocation(item.room))}</div></article>`).join("") : "<div class=\"empty-list\">No classes are listed for this day.</div>";
 }
 
 function renderWeek() {
@@ -5766,7 +5788,30 @@ function initEvents() {
   });
   $("student-lookup-form").addEventListener("submit", async (event) => { event.preventDefault(); const name = $("student-name-input").value; recordStudentSearch(name); try { await lookupStudent(name); } catch (error) { $("student-lookup-result").textContent = error.message || "Student lookup could not be completed."; } });
   $("save-manual-profile")?.addEventListener("click", saveManualProfile);
-  $("day-plan-toggle")?.addEventListener("click", (event) => { state.dayPlanOverride = event.currentTarget.dataset.planTarget || ""; renderDaySchedule(); });
+  $("day-nav-prev")?.addEventListener("click", () => {
+    if (state.userDayOffset === null) {
+      const now = getIndiaNow();
+      const afterCollegeHours = now.minutes >= COLLEGE_DAY_END_MINUTES;
+      const todayClasses = classFor(state.selectedGroup, now.day);
+      const nextStudyDay = nextStudyDayInfo(false);
+      state.userDayOffset = (afterCollegeHours || !todayClasses.length) && nextStudyDay ? nextStudyDay.offset : 0;
+    }
+    if (state.userDayOffset > 0) {
+      state.userDayOffset--;
+      renderDaySchedule();
+    }
+  });
+  $("day-nav-next")?.addEventListener("click", () => {
+    if (state.userDayOffset === null) {
+      const now = getIndiaNow();
+      const afterCollegeHours = now.minutes >= COLLEGE_DAY_END_MINUTES;
+      const todayClasses = classFor(state.selectedGroup, now.day);
+      const nextStudyDay = nextStudyDayInfo(false);
+      state.userDayOffset = (afterCollegeHours || !todayClasses.length) && nextStudyDay ? nextStudyDay.offset : 0;
+    }
+    state.userDayOffset++;
+    renderDaySchedule();
+  });
   $("admin-ai-mode")?.addEventListener("change", (event) => { if (!hasAdminAiView()) return; localStorage.setItem(ADMIN_AI_MODE_STORAGE_KEY, event.target.value); renderAdminAiVisibility(); showToast(`Admin answer mode: ${event.target.options[event.target.selectedIndex].text}`); });
   $("question-form").addEventListener("submit", async (event) => {
   event.preventDefault();

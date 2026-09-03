@@ -15,6 +15,7 @@
     "build:syllabus-index": "node scripts/build-syllabus-index.mjs"
   },
   "devDependencies": {
+    "jsdom": "^30.0.1",
     "linkedom": "^0.18.13"
   },
   "dependencies": {
