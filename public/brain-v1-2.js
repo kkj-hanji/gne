@@ -428,9 +428,10 @@
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
 
+    const hasTwoCounts = (raw.match(/\b\d+\b/g) || []).length >= 2;
     const asksAttendance = /\b(?:attendance|bunk|bunks|bunking|shortage|safe\s*bunk)\b/i.test(raw)
-      || (/\b(?:class(?:es)?|lectures?)\b/i.test(raw) && /\b(?:miss|skip|bunk|attend|percentage|75|kitni|chutti|how\s+many|lage)\b/i.test(raw))
-      || (/\bchutti\b/i.test(raw) && /\b(?:lecture|class|me\s*se|lage|lagi|kitni)\b/i.test(raw))
+      || (/\b(?:class(?:es)?|lectures?)\b/i.test(raw) && /\b(?:miss|skip|bunk|attend|attendance|percentage|75)\b/i.test(raw))
+      || (hasTwoCounts && /\bchutti\b/i.test(raw) && /\b(?:lecture|class|me\s*se|lage|lagi|kitni)\b/i.test(raw))
       || /\b(?:attendance|bunk)\b/.test(q);
     if (!asksAttendance) return null;
 
@@ -505,13 +506,23 @@
     const asksLocation = /\b(?:room|kamra|kamre|hall|block|wing|floor|building|lab|laboratory|kahan|kidhar|where|location|situated|located)\b/.test(q);
     if (!asksLocation) return null;
 
-    const info = kernel.lookupCampusRoom(raw);
-    if (!info) return null;
+    // Subject/class locations belong to the verified timetable engine. This
+    // route is only for campus-navigation questions and must not replace a
+    // published room answer with a generic directions disclaimer.
+    const scheduledSubjects = kernel.unique((Array.isArray(context?.classes) ? context.classes : [])
+      .map((item) => String(item.subject || "").trim()).filter(Boolean));
+    const referencesScheduledSubject = scheduledSubjects.some((subject) => kernel.normalize(subject)
+      .split(/\s+/).filter((word) => word.length >= 4)
+      .some((word) => q.split(/\s+/).includes(word)));
+    if (/\b(?:class(?:es)?|lectures?|periods?|schedule|timetable|teaches?)\b/.test(q) || referencesScheduledSubject) return null;
 
+    const publishedRooms = kernel.unique((Array.isArray(context?.classes) ? context.classes : []).map((item) => item.room).filter(Boolean));
+    const matchedRoom = publishedRooms.find((room) => q.includes(String(room).toLowerCase())) || "";
+    const label = matchedRoom || raw.replace(/\b(?:where|is|the|located|location|of|room|please|tell|show|kahan|kidhar|hai)\b/gi, " ").replace(/\s+/g, " ").trim();
     return kernel.result("CAMPUS_ROOM_LOCATION", 0.98,
-      `<p><strong><u>📍 Campus Location: ${kernel.escapeHtml(info.name)}</u></strong></p><p>• <strong>Building / Block:</strong> ${kernel.escapeHtml(info.block)}<br />• <strong>Floor:</strong> ${kernel.escapeHtml(info.floor)}<br />• <strong>Landmark / Navigation:</strong> ${kernel.escapeHtml(info.landmark)}</p><p class="answer-source">Official GNDEC Campus Directory & Room Plan.</p>`,
-      { room: info.name, block: info.block, floor: info.floor },
-      ["identify requested campus room/facility", "lookup official block and floor", "render navigation landmarks"]);
+      `<p><strong><u>${kernel.escapeHtml(label || "Campus location")}</u></strong></p><p>${matchedRoom ? `The current official timetable publishes <strong>${kernel.escapeHtml(matchedRoom)}</strong> as the venue label.` : "An exact internal route is not present in the loaded official timetable data."} Compass will not guess a block, floor, or landmark.</p><p class="answer-source"><a href="https://gndec.ac.in/?q=node/58" target="_blank" rel="noopener noreferrer">Official GNDEC campus information ↗</a></p>`,
+      { room: matchedRoom, exactDirectionsAvailable: false },
+      ["identify location intent", "preserve the official timetable venue label", "avoid unverified directions"]);
   }
 
   // ---- Campus Administration & Leadership Engine ----
@@ -522,26 +533,10 @@
     const asksAdmin = /\b(?:principal|director|sehijpal|dean|deans|dsw|tpo|tcc|coe|controller\s*of\s*exam|hod|hods|head\s*of\s*department|head\s*of\s*the\s*department|administration|leadership|authorities|officials)\b/.test(q);
     if (!asksAdmin) return null;
 
-    // Overview list of administration / deans / hods
-    if (/\b(?:all\s+hods?|list\s+hods?|list\s+deans?|who\s+are\s+the\s+deans?|leadership|administration\s*list|college\s*officials?)\b/.test(q)
-      || (/\b(?:deans?|hods?)\b/.test(q) && /\b(?:list|all|names?|batao|dasso|show)\b/.test(q))) {
-      return kernel.result("CAMPUS_ADMINISTRATION_INFO", 0.99,
-        `<p><strong><u>🏛️ Key Administrative Leadership — GNDEC Ludhiana</u></strong></p><p>• <strong>Principal:</strong> Dr. Sehijpal Singh (<em>principal@gndec.ac.in</em>)<br />• <strong>Dean (Academic):</strong> Dr. Parminder Singh<br />• <strong>Dean (Student Welfare / DSW):</strong> Dr. Jatinder Kapoor<br />• <strong>Dean (Training & Placement / TPO):</strong> Dr. K.S. Mann<br />• <strong>Dean (Testing & Consultancy / TCC):</strong> Dr. Harwinder Singh<br />• <strong>Dean (Research & Development):</strong> Dr. Hardeep Singh Rai<br />• <strong>Controller of Examinations (COE):</strong> Dr. Arvind Dhingra</p><p><strong><u>Department Heads (HODs):</u></strong><br />• <strong>CSE:</strong> Dr. Parminder Singh | <strong>IT:</strong> Dr. Kiran Jyoti<br />• <strong>ECE:</strong> Dr. Narwant Singh Grewal | <strong>EE:</strong> Dr. Kanwardeep Singh<br />• <strong>ME:</strong> Dr. Harwinder Singh | <strong>CE:</strong> Dr. Puneet Pal Singh Cheema<br />• <strong>Applied Sciences:</strong> Dr. Harpreet Kaur | <strong>MBA:</strong> Dr. Parampal Singh | <strong>MCA:</strong> Dr. Jasbir Singh Saini</p><p class="answer-source">Official GNDEC Institutional Administration Directory.</p>`,
-        { type: "overview" },
-        ["query institutional administration directory", "format executive leadership hierarchy", "list department heads"]);
-    }
-
-    if (typeof kernel.lookupCampusAdministration === "function") {
-      const info = kernel.lookupCampusAdministration(raw);
-      if (info) {
-        return kernel.result("CAMPUS_ADMINISTRATION_INFO", 0.99,
-          `<p><strong><u>🏛️ ${kernel.escapeHtml(info.title)}: ${kernel.escapeHtml(info.name)}</u></strong></p><p>• <strong>Role & Department:</strong> ${kernel.escapeHtml(info.description)}<br />• <strong>Office Location:</strong> ${kernel.escapeHtml(info.office)}<br />• <strong>Official Email:</strong> <code>${kernel.escapeHtml(info.email)}</code>${info.phone ? `<br />• <strong>Contact:</strong> ${kernel.escapeHtml(info.phone)}` : ""}</p><p class="answer-source">Official GNDEC Institutional Administration Directory.</p>`,
-          info,
-          ["match administrative role/designation", "retrieve verified office location and contact", "render official profile card"]);
-      }
-    }
-
-    return null;
+    return kernel.result("CAMPUS_ADMINISTRATION_INFO", 0.99,
+      `<p><strong><u>Current GNDEC administration</u></strong></p><p>Administrative appointments can change and are not part of the loaded verified dataset. Compass will not guess a name, office, phone number, or email.</p><p class="answer-source"><a href="https://gndec.ac.in/faculty/" target="_blank" rel="noopener noreferrer">Official GNDEC faculty and staff directory ↗</a></p>`,
+      { currentAppointmentLoaded: false },
+      ["identify administration query", "avoid stale appointment data", "link the current official directory"]);
   }
 
   // ---- Identity resolution (students & faculty) ----
@@ -618,6 +613,11 @@
   function personSearchAnswer(question, context) {
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
+    const semantic = kernel.analyzeQuery(raw);
+    // A timetable/holiday/syllabus/calculation sentence must never become a
+    // guessed person lookup merely because its non-Latin words resemble a
+    // name. Dedicated app routes own those strong factual intents.
+    if (["holiday", "syllabus", "timetable", "comparison", "calculation"].includes(semantic.primaryIntent)) return null;
     const students = Array.isArray(context.studentRoster) ? context.studentRoster.filter((record) => record && typeof record === "object") : [];
     const faculty = Array.isArray(context.facultyDirectory) ? context.facultyDirectory.filter((record) => record && typeof record === "object") : [];
     const conversation = context.conversation || {};
@@ -643,15 +643,63 @@
         [], ["keep pending clarification open"], {});
     }
 
-    const wantsStudent = /\bstudent\b/.test(q);
-    const wantsFaculty = /\b(?:faculty|teacher|professor|lecturer)\b/.test(q);
-    const explicitSearch = /\b(?:find|search|lookup|details|info|information|about|who is|dhundo|khojo)\b/.test(q);
+    const wantsStudent = /\bstudents?\b/.test(q);
+    const wantsFaculty = /\b(?:faculty|teacher|professor|lecturer)\b/.test(q)
+      || (/\b(?:email|designation|qualification|profile|research|publication)\b/.test(q)
+        && /\b(?:dr|doctor|prof|professor|er)\b/.test(q));
+    const asksRosterCount = wantsStudent && /\b(?:how\s+many|count|total)\b/.test(q);
+    const explicitSearch = /\b(?:find|search|lookup|show|details|info|information|about|who is|dhundo|khojo)\b/.test(q);
+    const rosterEnumeration = wantsStudent && /\b(?:all|every|entire|whole|list|show)\b/.test(q);
     // A bare name is only 2–3 personal-name tokens with no question words.
     const bareName = !wantsStudent && !wantsFaculty && !explicitSearch
       && !/\b(?:what|which|when|where|who|why|how|is|are|do|does|did)\b/.test(q)
       && kernel.looksLikeBarePersonName(raw);
 
-    if (!explicitSearch && !bareName && !wantsFaculty) return null;
+    if (!explicitSearch && !bareName && !wantsFaculty && !wantsStudent) return null;
+
+    if (rosterEnumeration) {
+      return kernel.result("ROSTER_ENUMERATION_BLOCKED", 0.98,
+        "<p><strong><u>Roster list is not shown in chat.</u></strong></p><p>Compass protects student data and will not reveal a whole roster. Ask for one named student using their full name or CRN, or ask how many students are in one verified branch, section, or subsection.</p>",
+        { protected: true },
+        ["recognize roster enumeration", "protect student records", "offer safe aggregate or individual lookup"]);
+    }
+
+    // A count is an aggregate question, not a person lookup. The live chat
+    // fetches the current roster before this Brain runs; this branch also
+    // keeps cached/offline contexts from misreading the target as a name.
+    if (asksRosterCount) {
+      if (!students.length) {
+        return kernel.result("ROSTER_COUNT_SOURCE_REQUIRED", 0.98,
+          "<p><strong><u>Current official roster needed</u></strong></p><p>Compass needs the current verified roster before it can count students. It will not guess a count or treat the section code as a student's name.</p>",
+          { sourceRequired: true }, ["identify aggregate roster request", "require current official roster"]);
+      }
+      const targets = new Map();
+      const addTarget = (code, type, predicate) => {
+        const cleanCode = String(code || "").trim();
+        const escapedCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (!cleanCode || !new RegExp(`(?:^|[^a-z0-9])${escapedCode}(?=$|[^a-z0-9])`, "i").test(q)) return;
+        const count = students.filter(predicate).length;
+        if (count) targets.set(`${type}:${cleanCode}`, { code: cleanCode, type, count });
+      };
+      [...new Set(students.map((record) => record.subsection).filter(Boolean))].forEach((code) => addTarget(code, "subsection", (record) => record.subsection === code));
+      [...new Set(students.map((record) => record.section).filter(Boolean))].forEach((code) => addTarget(code, "section", (record) => record.section === code));
+      [...new Set(students.map((record) => record.branch).filter(Boolean))].forEach((code) => addTarget(code, "branch", (record) => record.branch === code));
+      const matches = [...targets.values()];
+      if (matches.length === 1) {
+        const match = matches[0];
+        return kernel.result("ROSTER_COUNT", 0.99,
+          `<p><strong><u>${kernel.escapeHtml(match.code)}: ${match.count} verified student${match.count === 1 ? "" : "s"}</u></strong></p><p>${kernel.escapeHtml(match.type[0].toUpperCase() + match.type.slice(1))} count from the current official GNDEC roster.</p>`,
+          { target: match.code, count: match.count, type: match.type }, ["match one verified roster target", "return aggregate count only"]);
+      }
+      if (matches.length > 1) {
+        return kernel.result("ROSTER_COUNT_CLARIFY", 0.98,
+          `<p><strong><u>More than one roster target matches.</u></strong></p><p>Please specify one branch, section, or subsection: ${kernel.escapeHtml(matches.map((match) => `${match.code} (${match.type})`).join(", "))}.</p>`,
+          { candidates: matches.map(({ code, type }) => ({ code, type })) }, ["avoid combining roster counts", "ask for one verified target"]);
+      }
+      return kernel.result("ROSTER_COUNT_TARGET_REQUIRED", 0.98,
+        "<p><strong><u>Which branch, section, or subsection should I count?</u></strong></p><p>For example: “How many students are in CSD2?”</p>",
+        { targetRequired: true }, ["request one verified roster target"]);
+    }
 
     const identifier = identifierInQuestion(question);
     const name = kernel.extractPersonName(raw);
@@ -853,56 +901,33 @@
     // Library
     if (/\blibrary\b/i.test(q)) {
        return kernel.result("LIBRARY_INFO", 0.95,
-         `<p><strong>Library Information 📚</strong></p>
-          <p><strong>Weekdays:</strong> ${kernel.LIBRARY_HOURS?.weekday.open} to ${kernel.LIBRARY_HOURS?.weekday.close}</p>
-          <p><strong>Weekends:</strong> ${kernel.LIBRARY_HOURS?.weekend.open} to ${kernel.LIBRARY_HOURS?.weekend.close}</p>
-          <p class="kb-tip">${kernel.LIBRARY_HOURS?.notice}</p>
-          <p class="answer-source">Campus Information Catalog</p>`,
-         { hours: kernel.LIBRARY_HOURS },
-         ["query library hours and rules"]);
+         `<p><strong>GNDEC Library</strong></p><p>Library timings and borrowing rules can change. Check the current official library page for today’s hours and notices.</p><p class="answer-source"><a href="https://gndec.ac.in/library/" target="_blank" rel="noopener noreferrer">Official GNDEC Library ↗</a></p>`,
+         { officialUrl: "https://gndec.ac.in/library/" },
+         ["identify library intent", "link the current official source instead of caching mutable hours"]);
     }
 
     // Transport
     if (/\b(?:bus|transport|routes?)\b/i.test(q)) {
-       const routes = kernel.TRANSPORT_ROUTES || [];
-       const routeHtml = routes.map(r => `<li><strong>${kernel.escapeHtml(r.name)}</strong>: Departs ${kernel.humanTime(r.departure)}, Returns ${kernel.humanTime(r.return)}</li>`).join("");
        return kernel.result("TRANSPORT_INFO", 0.95,
-         `<p><strong>College Transport & Buses 🚌</strong></p>
-          <ul>${routeHtml}</ul>
-          <p class="answer-source">Campus Transport Office</p>`,
-         { routes },
-         ["query transport routes"]);
+         `<p><strong>GNDEC Transport</strong></p><p>No current official bus route or timing dataset is loaded, so Compass will not guess a route. Check the latest GNDEC notice or contact the college office.</p><p class="answer-source"><a href="https://gndec.ac.in/" target="_blank" rel="noopener noreferrer">Official GNDEC website ↗</a></p>`,
+         { verifiedRoutes: [] },
+         ["identify transport intent", "avoid unverified routes and times"]);
     }
 
     // Clubs
     if (/\b(?:club|scie|lug|society|cultural)\b/i.test(q)) {
-       const clubs = kernel.CLUBS || [];
-       const match = clubs.find(c => new RegExp(`\\b${c.name}\\b`, "i").test(q)) || clubs[0];
-       if (match) {
-         return kernel.result("CLUB_INFO", 0.95,
-           `<p><strong>${kernel.escapeHtml(match.name)} (${kernel.escapeHtml(match.full)})</strong></p>
-            <p>Type: ${kernel.escapeHtml(match.type)}</p>
-            <p>Next Event: <strong>${kernel.escapeHtml(match.nextEvent)}</strong></p>
-            <p class="answer-source">Clubs & Societies Event Calendar</p>`,
-           { club: match },
-           ["query club information"]);
-       }
+       return kernel.result("CLUB_INFO", 0.95,
+         `<p><strong>GNDEC clubs and societies</strong></p><p>No current official club-event feed is loaded. Check GNDEC’s latest notices for verified societies, contacts, and event dates.</p><p class="answer-source"><a href="https://gndec.ac.in/" target="_blank" rel="noopener noreferrer">Official GNDEC website ↗</a></p>`,
+         { verifiedEvents: [] },
+         ["identify club intent", "avoid unverified event details"]);
     }
 
     // Placement
     if (/\b(?:placement|internship|tpo)\b/i.test(q)) {
-       const p = kernel.PLACEMENT_INFO;
-       if (p) {
-         const upcHtml = p.upcoming.map(u => `<li><strong>${kernel.escapeHtml(u.company)}</strong> (${kernel.escapeHtml(u.role)}) - ${kernel.escapeHtml(u.date)}</li>`).join("");
-         return kernel.result("PLACEMENT_INFO", 0.95,
-           `<p><strong>Training & Placement Cell 💼</strong></p>
-            <p><strong>Eligibility:</strong> ${kernel.escapeHtml(p.eligibility)}</p>
-            <p><strong>Upcoming Drives:</strong></p>
-            <ul>${upcHtml}</ul>
-            <p class="answer-source">TPO Office Calendar</p>`,
-           { placements: p },
-           ["query placement eligibility and drives"]);
-       }
+       return kernel.result("PLACEMENT_INFO", 0.95,
+         `<p><strong>GNDEC placements and internships</strong></p><p>No current official placement-drive feed is loaded. Compass will not invent company dates or eligibility rules; check the latest Training and Placement Cell notice.</p><p class="answer-source"><a href="https://gndec.ac.in/" target="_blank" rel="noopener noreferrer">Official GNDEC website ↗</a></p>`,
+         { verifiedDrives: [] },
+         ["identify placement intent", "avoid unverified eligibility and drive dates"]);
     }
 
     return null;

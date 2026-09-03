@@ -36,6 +36,39 @@ test("kernel normalization unifies relative-day aliases across four languages", 
   assert.match(kernel.normalize("parso timetable"), /day after tomorrow/);
   assert.match(kernel.normalize("आज का टाइमटेबल"), /today/);
   assert.match(kernel.normalize("ਕੱਲ੍ਹ ਦਾ ਟਾਇਮਟੇਬਲ"), /tomorrow/);
+  assert.match(kernel.normalize("आज का टाइमटेबल बताओ"), /today.*timetable/);
+  assert.match(kernel.normalize("ਅੱਜ ਦਾ ਟਾਇਮਟੇਬਲ ਦੱਸੋ"), /today.*timetable/);
+});
+
+test("kernel semantic pass protects strong intents from name-search collisions", () => {
+  const kernel = createKernelHarness().CompassBrainKernel;
+  assert.equal(kernel.analyzeQuery("all holidays").primaryIntent, "holiday");
+  assert.equal(kernel.analyzeQuery("when is janam ashtami").primaryIntent, "holiday");
+  assert.equal(kernel.analyzeQuery("physics syllabus unit 2").primaryIntent, "syllabus");
+  assert.equal(kernel.analyzeQuery("find student Kaushik Jain").primaryIntent, "student");
+  assert.equal(kernel.analyzeQuery("mohitveer vs me tomorrow").primaryIntent, "comparison");
+  assert.match(kernel.normalize("somvar tmrw tt"), /monday tomorrow timetable/);
+});
+
+test("native-script timetable requests never become a faculty or student search", () => {
+  const brain = createBrainHarness().CompassBrainV1_2;
+  ["आज का टाइमटेबल बताओ", "ਅੱਜ ਦਾ ਟਾਇਮਟੇਬਲ ਦੱਸੋ"].forEach((question) => {
+    const outcome = brain.process(question, personContext());
+    assert.equal(outcome.handled, false, question);
+  });
+});
+
+test("kernel decomposes only clearly independent questions", () => {
+  const kernel = createKernelHarness().CompassBrainKernel;
+  assert.deepEqual(
+    [...kernel.decomposeQuery("What is my next class and is tomorrow a holiday?")],
+    ["what is my next class", "is tomorrow a holiday"]
+  );
+  const mixed = [...kernel.decomposeQuery("mohitveer sir ka kl ka tt, holiday bhi hai kya")];
+  assert.equal(mixed.length, 2);
+  assert.match(mixed[0], /mohitveer.*tomorrow.*timetable/);
+  assert.match(mixed[1], /holiday/);
+  assert.equal(kernel.decomposeQuery("Math, Physics and Chemistry subjects").length, 1);
 });
 
 test("kernel arithmetic rejects executable input and non-finite results", () => {
@@ -555,6 +588,12 @@ test("regression: roster enumeration attempts fail closed without leaking record
     assert.doesNotMatch(text, /2610001|2610002|2617070/, `roster leaked for "${question}"`);
     if (outcome.handled) assert.notEqual(outcome.intent, "STUDENT_DETAILS");
   });
+  const list = brain.process("show all students of ECB", personContext());
+  assert.equal(list.intent, "ROSTER_ENUMERATION_BLOCKED");
+  assert.match(list.answer, /will not reveal a whole roster/i);
+  const count = brain.process("how many students are in ECB?", personContext());
+  assert.equal(count.intent, "ROSTER_COUNT");
+  assert.match(count.answer, /verified students?/i);
 });
 
 // ---- Hierarchy hardening regressions (sections, subgroups, comparisons) ----
@@ -892,6 +931,11 @@ test("legacyAnswerWithoutAi answers holiday and marking scheme questions reliabl
 
   const cgpa = api.answerWithoutAi("8.5 cgpa to percentage");
   assert.match(cgpa, /8.5 CGPA = 80.75%/);
+
+  const hostel = api.answerWithoutAi("hostel timings");
+  assert.match(hostel, /does not have a current verified hostel-rule dataset/i);
+  assert.match(hostel, /gndec\.ac\.in\/\?q=node\/58/);
+  assert.doesNotMatch(hostel, /Curfew Timings|9:00 PM|Hostel 1, 2, 5/);
 });
 
 test("attendance calculation in brain-kernel and brain 1.2", () => {
@@ -924,30 +968,33 @@ test("attendance calculation in brain-kernel and brain 1.2", () => {
   assert.equal(ansHing.intent, "ACADEMIC_ATTENDANCE_CALCULATION");
   assert.match(ansHing.answer, /Attendance Shortage/);
   assert.match(ansHing.answer, /7 consecutive classes/);  // default target is now 76%
+
+  const timetableCount = brain.process("kitni math classes this week?");
+  assert.equal(timetableCount.handled, false);
+  assert.notEqual(timetableCount.intent, "ACADEMIC_ATTENDANCE_RULE");
 });
 
-test("campus room directory and navigation in brain-kernel and brain 1.2", () => {
+test("campus location questions never invent blocks, floors, or landmarks", () => {
   const { CompassBrainKernel } = createBrainHarness();
   const kernel = CompassBrainKernel;
 
   const roomG6 = kernel.lookupCampusRoom("G6");
-  assert.equal(roomG6.name, "Room G6");
-  assert.equal(roomG6.block, "Civil & Applied Sciences Block");
+  assert.equal(roomG6, null);
 
   const lab = kernel.lookupCampusRoom("Physics lab");
-  assert.equal(lab.name, "Physics Laboratory");
+  assert.equal(lab, null);
 
   const brain = createBrainHarness().CompassBrainV1_2;
   const g6Ans = brain.process("where is G6 room located?");
   assert.equal(g6Ans.handled, true);
   assert.equal(g6Ans.intent, "CAMPUS_ROOM_LOCATION");
-  assert.match(g6Ans.answer, /Civil &amp; Applied Sciences Block/);
-  assert.match(g6Ans.answer, /Ground Floor/);
+  assert.match(g6Ans.answer, /will not guess a block, floor, or landmark/i);
+  assert.doesNotMatch(g6Ans.answer, /Civil &amp; Applied Sciences Block|Ground Floor/);
 
   const physAns = brain.process("physics lab kahan hai?");
   assert.equal(physAns.handled, true);
   assert.equal(physAns.intent, "CAMPUS_ROOM_LOCATION");
-  assert.match(physAns.answer, /Physics Laboratory/);
+  assert.match(physAns.answer, /exact internal route is not present/i);
 });
 
 test("common free slots comparison in brain 2.2", () => {
@@ -975,48 +1022,30 @@ test("common free slots comparison in brain 2.2", () => {
   assert.match(res.answer, /Common Free Slots Between ECB1 & CSA1/);
 });
 
-test("campus administration and leadership in brain-kernel and brain 1.2", () => {
+test("mutable campus appointments require a current official directory", () => {
   const { CompassBrainKernel, CompassBrainV1_2 } = createBrainHarness();
   const kernel = CompassBrainKernel;
   const brain = CompassBrainV1_2;
 
-  // Principal lookup
-  const principal = kernel.lookupCampusAdministration("who is the principal of gndec");
-  assert.equal(principal.name, "Dr. Sehijpal Singh");
-  assert.equal(principal.title, "Principal, GNDEC");
-
-  // HOD CSE lookup
-  const hodCse = kernel.lookupCampusAdministration("who is hod cse");
-  assert.equal(hodCse.name, "Dr. Parminder Singh");
-  assert.equal(hodCse.key, "hod_cse");
-
-  // HOD IT lookup
-  const hodIt = kernel.lookupCampusAdministration("hod of it department");
-  assert.equal(hodIt.name, "Dr. Kiran Jyoti");
-
-  // Dean Student Welfare lookup
-  const dsw = kernel.lookupCampusAdministration("who is dsw / dean student welfare");
-  assert.equal(dsw.name, "Dr. Jatinder Kapoor");
-
-  // Controller of Examinations lookup
-  const coe = kernel.lookupCampusAdministration("controller of examination / coe");
-  assert.equal(coe.name, "Dr. Arvind Dhingra");
+  assert.equal(kernel.lookupCampusAdministration("who is the principal of gndec"), null);
+  assert.equal(kernel.lookupCampusAdministration("who is hod cse"), null);
 
   // Brain 1.2 answering
   const ansPrincipal = brain.process("Who is the principal of GNDEC?");
   assert.equal(ansPrincipal.handled, true);
   assert.equal(ansPrincipal.intent, "CAMPUS_ADMINISTRATION_INFO");
-  assert.match(ansPrincipal.answer, /Dr\. Sehijpal Singh/);
-  assert.match(ansPrincipal.answer, /principal@gndec\.ac\.in/);
+  assert.match(ansPrincipal.answer, /appointments can change/i);
+  assert.match(ansPrincipal.answer, /gndec\.ac\.in\/faculty/i);
+  assert.doesNotMatch(ansPrincipal.answer, /Dr\. Sehijpal Singh|principal@gndec\.ac\.in/);
 
   const ansHodCse = brain.process("who is HOD CSE?");
   assert.equal(ansHodCse.handled, true);
   assert.equal(ansHodCse.intent, "CAMPUS_ADMINISTRATION_INFO");
-  assert.match(ansHodCse.answer, /Dr\. Parminder Singh/);
+  assert.match(ansHodCse.answer, /will not guess/i);
 
   const ansAdminList = brain.process("list college administration and deans");
   assert.equal(ansAdminList.handled, true);
   assert.equal(ansAdminList.intent, "CAMPUS_ADMINISTRATION_INFO");
-  assert.match(ansAdminList.answer, /Key Administrative Leadership/);
-  assert.match(ansAdminList.answer, /Dean \(Academic\)/);
+  assert.match(ansAdminList.answer, /Current GNDEC administration/);
+  assert.doesNotMatch(ansAdminList.answer, /Dean \(Academic\):/);
 });

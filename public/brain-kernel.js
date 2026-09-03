@@ -54,14 +54,24 @@
     [/\b(?:november|navambar|navamber)\b|\u0a28\u0a35\u0a70\u0a2c\u0a30|\u0928\u0935\u0902\u092c\u0930/gu, " november "],
     [/\b(?:december|disambar|disamber)\b|\u0a26\u0a38\u0a70\u0a2c\u0a30|\u0926\u093f\u0938\u0902\u092c\u0930/gu, " december "],
     [/\b(?:timetabel|timetble|timetabl|time tabel)\b/g, "timetable"],
+    [/\b(?:tt|tm-table|tmtable)\b/g, "timetable"],
+    [/\u091f\u093e\u0907\u092e\u091f\u0947\u092c\u0932|\u0938\u092e\u092f\s*\u0938\u093e\u0930\u0923\u0940|\u0a1f\u0a3e(?:\u0a07|\u0a08)\u0a2e\u0a1f\u0a47\u0a2c\u0a32|\u0a38\u0a2e\u0a3e\u0a02\s*\u0a38\u0a3e\u0a30\u0a23\u0a40/gu, " timetable "],
     [/\b(?:loacation|locaton|locatoin|palce|plcae)\b/g, "location"],
     [/\b(?:techer|techers|taecher|faculity|sir|maam|mam|madam|prof|professor)\b/g, "teacher"],
     [/\b(?:syllbus|sylabus|syllubus)\b/g, "syllabus"],
     [/\b(?:subjet|subjets|subect)\b/g, "subjects"],
-    [/\b(?:tomor+ow|tomm?or+ow|kal|kalle)\b/g, "tomorrow"],
+    [/\b(?:tomor+ow|tomm?or+ow|tmr+w?|tmro|kl|kal|kalle)\b/g, "tomorrow"],
     [/\b(?:tod+ay|aaj|ajj)\b/g, "today"],
     [/\b(?:nxt|agle|agli|agla)\b/g, "next"],
-    [/\b(?:clas+|lectur+|lecture|period|periods|ghanta|ghante)\b/g, "class"],
+    [/\b(?:clas+|cls|lectur+|lecture|lec|lect|period|periods|ghanta|ghante)\b/g, "class"],
+    [/\b(?:batao|btado|dikhao|dikha|dasso|daso)\b/g, "show"],
+    [/\b(?:kinne\s+vaje|kitne\s+baje|kis\s+time)\b/g, "when"],
+    [/\b(?:kitne|kitni|kinne|kinni)\b/g, "how many"],
+    [/\u092c\u0924\u093e\u0913|\u0926\u093f\u0916\u093e\u0913|\u0a26\u0a71\u0a38\u0a4b/gu, " show "],
+    [/\u0915\u094d\u092f\u093e|\u0a15\u0a40/gu, " what "],
+    [/\u0924\u093e\u0930\u0940\u0916\u093c?|\u0a24\u0a3e\u0a30\u0a40\u0a16/gu, " date "],
+    [/\u0926\u093f\u0928|\u0a26\u0a3f\u0a28/gu, " day "],
+    [/\u0915\u092c|\u0a15\u0a26\u0a4b\u0a02/gu, " when "],
     [/\b(?:kaha|kahaan|kidhar|kithe|kithhe|kamra|kamre)\b/g, "where"],
     [/\b(?:kaun|kon|keda|kedi|kehra|kehri|kaunsa|kaunsi)\b/g, "who"],
     [/\b(?:baad|bad)\b/g, "after"],
@@ -85,11 +95,18 @@
     [/\b(?:times|multiply|multiplied by|guna)\b/g, " * "],
     [/\b(?:divided by|divide|bhaag)\b/g, " / "],
     [/\b(?:hafte|hafta|haftey)\b/g, "week"],
+    [/\b(?:somvar|somvaar|sombar)\b/g, "monday"],
+    [/\b(?:mangalvar|mangalvaar)\b/g, "tuesday"],
+    [/\b(?:budhvar|budhvaar|budhwar)\b/g, "wednesday"],
+    [/\b(?:guruvar|guruvaar|guruwar|veerwar|virvar)\b/g, "thursday"],
+    [/\b(?:shukravar|shukravaar|shukarvar|shukarvaar)\b/g, "friday"],
+    [/\b(?:shanivar|shanivaar)\b/g, "saturday"],
+    [/\b(?:ravivar|ravivaar|aitvar|aitvaar|etwar)\b/g, "sunday"],
     [/\b(?:imarat|building|block)\b/g, "building"],
     [/\b(?:marks?|number|ank|aank|nomber)\b|\u0905\u0902\u0915|\u0a05\u0a70\u0a15/gu, " marks "],
     [/\b(?:credits?|kredit)\b/gi, " credits "],
     [/\u0917\u0923\u093f\u0924|\u0a17\u0a23\u0a3f\u0a24/gu, " maths "],
-    [/(?:\u092d\u094c\u0924\u093f\u0915|\u092b\u093f\u091c\u093f\u0915\u094d\u0938|\u0a2d\u0a4c\u0a24\u093f\u0915|\u0a2b\u0a3f\u0a1c\u0a3c\u093f\u0a15\u0a38)/gu, " physics "],
+    [/(?:\u092d\u094c\u0924\u093f\u0915|\u092b\u093f\u091c\u093f\u0915\u094d\u0938|\u0a2d\u0a4c\u0a24\u093f\u0915|\u0a2b\u0a3f\u0a1c\u0a3c\u093f\u0a15\u0a38|\u0a2b\u0a3f\u0a1c\u0a3c\u0a3f\u0a15\u0a38)/gu, " physics "],
     [/\u0936\u093f\u0915\u094d\u0937\u0915|\u091f\u0940\u091a\u0930|\u0905\u0927\u094d\u092f\u093e\u092a\u0915|\u0a05\u0a27\u093f\u0a06\u0a2a\u0915|\u0a1f\u0940\u091a\u0930/gu, " teacher "],
     [/\u0928\u093e\u092e|\u0a28\u093e\u092e/gu, " name "],
     [/\u0914\u0930|\u0a05\u0a24\u0a47/gu, " and "],
@@ -133,6 +150,59 @@
     let normalized = clean(input);
     PHRASES.forEach(([pattern, replacement]) => { normalized = normalized.replace(pattern, replacement); });
     return normalized.replace(/\btime\s*table\b/g, "timetable").replace(/\s+/g, " ").trim();
+  }
+
+  // One bounded semantic pass shared by the UI and every deterministic brain.
+  // It does not choose a factual answer; it only identifies broad intent so an
+  // unrelated name lookup cannot steal a holiday, syllabus, or timetable query.
+  function analyzeQuery(input) {
+    const normalized = normalize(String(input || "").slice(0, LIMITS.input));
+    const scores = new Map();
+    const add = (intent, score) => scores.set(intent, Math.max(score, scores.get(intent) || 0));
+    const holidayMatches = typeof searchHolidays === "function" ? searchHolidays(normalized) : [];
+
+    if (/\b(?:holiday|holidays|vacation|gazetted|restricted|half day)\b/.test(normalized) || holidayMatches.length) add("holiday", 100);
+    if (/\b(?:syllabus|units?|chapters?|course outcomes?|credits?|assessment|textbooks?|reference books?)\b/.test(normalized)) add("syllabus", 96);
+    if (/\b(?:timetable|schedule|class|classes|periods?|free|first|last|morning|afternoon|current|next)\b/.test(normalized)
+      || CALENDAR_DAYS.some((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(normalized))) add("timetable", 80);
+    if (/\b(?:compare|comparison|versus|vs|difference|farak|farq)\b/.test(normalized)) add("comparison", 98);
+    if (/\b(?:student|crn|registration|serial|roster|mentor)\b/.test(normalized)) add("student", 75);
+    if (/\b(?:faculty|teacher|professor|designation|qualification|research|publication|official email)\b/.test(normalized)) add("faculty", 75);
+    if (/\b(?:where|location|directions?|campus|hostel|library|canteen|dispensary|workshop)\b/.test(normalized)) add("campus", 65);
+    if (/\b(?:calculate|calculation|percentage|cgpa|sgpa|attendance|bunk|solve)\b|\d\s*[%+*/^=-]/.test(normalized)) add("calculation", 72);
+    if (/\b(?:who (?:built|made|created|developed|coded)|creator|developer|author)\b.*\b(?:compass|app|website|site|this)\b|\bwho built this\b/.test(normalized)) add("creator", 100);
+
+    const intents = [...scores.entries()].sort((left, right) => right[1] - left[1]).map(([intent, score]) => ({ intent, score }));
+    return {
+      normalized,
+      primaryIntent: intents[0]?.intent || "unknown",
+      intents,
+      days: CALENDAR_DAYS.filter((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(normalized)),
+      relativeDay: extractDaySymbol(normalized) || "",
+      holidayMatches: holidayMatches.slice(0, LIMITS.candidates).map((holiday) => holiday.name),
+      hasComparison: scores.has("comparison")
+    };
+  }
+
+  // Split only at a clear boundary between independently answerable intents.
+  // Conjunctions inside names, subjects, or comparisons stay intact.
+  function decomposeQuery(input) {
+    // Preserve punctuation boundaries through normalize(), whose safety clean-up
+    // intentionally removes punctuation before intent matching.
+    const marked = String(input || "").slice(0, LIMITS.input)
+      .replace(/[;?\n]+(?=\s*\S)/g, " askcompassquestionboundary ")
+      .replace(/,/g, " askcompasscommaboundary ");
+    const normalized = normalize(marked);
+    if (!normalized) return [];
+    const explicitBoundary = /\s+askcompassquestionboundary\s+|\s+askcompasscommaboundary\s+(?=(?:is|are|what|when|where|who|how|show|tell|find|check|and)?\s*(?:today|tomorrow|day after tomorrow|holiday|date|timetable|schedule|syllabus|student|faculty|teacher|calculate)\b)/gi;
+    let parts = normalized.split(explicitBoundary).map((part) => part.trim()).filter(Boolean);
+    if (parts.length === 1) {
+      parts = normalized.split(/\s+(?:and|also|plus)\s+(?=(?:what|when|where|who|is|are|tell|show|find|check|calculate|today|tomorrow|holiday|date|timetable|schedule|syllabus|student|faculty|teacher)\b)/i)
+        .map((part) => part.trim()).filter(Boolean);
+    }
+    if (parts.length < 2) return [normalized];
+    const useful = parts.filter((part) => analyzeQuery(part).primaryIntent !== "unknown");
+    return useful.length >= 2 ? useful.slice(0, 4) : [normalized];
   }
 
   function escapeHtml(value) {
@@ -888,7 +958,7 @@
     "about", "for", "of", "the", "and", "from", "with", "into", "this", "that", "there", "here",
     "me", "my", "please", "compass", "student", "students", "faculty", "teacher", "teachers", "professor", "lecturer",
     "who", "is", "was", "are", "kaun", "hai", "hain", "ka", "ki", "ke", "ko", "ka", "da", "di", "de",
-    "dhundo", "khojo", "labho", "name", "record", "records", "roster", "directory", "branch", "section", "subsection",
+    "dhundo", "khojo", "labho", "batao", "btado", "dikhao", "dikha", "dasso", "daso", "name", "record", "records", "roster", "directory", "branch", "section", "subsection",
     "all", "list", "his", "her", "their", "him", "them",
     // Conversational words must never be mistaken for personal names.
     "how", "what", "when", "where", "why", "which", "you", "your", "yours", "am", "were", "be", "been",
@@ -1310,6 +1380,8 @@
     MONTH_NAMES,
     clean,
     normalize,
+    analyzeQuery,
+    decomposeQuery,
     escapeHtml,
     humanTime,
     durationLabel,
@@ -1325,8 +1397,8 @@
     freeTimetableIntervals,
     internalBreakIntervals,
     buildingForRoom,
-    ROOM_LOCATIONS,
-    getWalkingTime,
+    ROOM_LOCATIONS: Object.freeze({}),
+    getWalkingTime: () => null,
     editDistance,
     phoneticKey,
     detectLanguage,
@@ -1378,14 +1450,17 @@
     cgpaToPercentage,
     percentageToCgpa,
     evaluateAttendance,
-    CAMPUS_ROOM_DIRECTORY,
-    lookupCampusRoom,
-    CAMPUS_ADMINISTRATION_DIRECTORY,
-    lookupCampusAdministration,
-    TRANSPORT_ROUTES,
-    LIBRARY_HOURS,
-    CLUBS,
-    PLACEMENT_INFO,
+    // Mutable campus appointments, routes, room directions, events, and
+    // placement dates are intentionally not exposed as verified facts. They
+    // must come from a current official source at answer time.
+    CAMPUS_ROOM_DIRECTORY: Object.freeze({}),
+    lookupCampusRoom: () => null,
+    CAMPUS_ADMINISTRATION_DIRECTORY: Object.freeze({}),
+    lookupCampusAdministration: () => null,
+    TRANSPORT_ROUTES: Object.freeze([]),
+    LIBRARY_HOURS: null,
+    CLUBS: Object.freeze([]),
+    PLACEMENT_INFO: null,
     isExamSeason
   });
 })(typeof globalThis !== "undefined" ? globalThis : window);

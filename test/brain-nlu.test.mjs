@@ -133,13 +133,13 @@ test("NLU: Knowledge Base answers for hostel rules, links, and portals", () => {
   assert.ok(hostelAns, "Hostel rules query must be answered");
   const hostelText = typeof hostelAns === "string" ? hostelAns : hostelAns.reply;
   assert.match(hostelText, /hostel/i);
-  assert.match(hostelText, /study hours|curfew/i);
+  assert.match(hostelText, /can change|latest official/i);
 
   const timetableLinksAns = api.answerFromKnowledgeBase("official timetable index link");
   assert.ok(timetableLinksAns, "Timetable links query must be answered");
   const timetableText = typeof timetableLinksAns === "string" ? timetableLinksAns : timetableLinksAns.reply;
-  assert.match(timetableText, /Section-wise Timetable/i);
-  assert.match(timetableText, /Subsection-wise Timetable/i);
+  assert.match(timetableText, /section, subsection, faculty, room, subject, and programme/i);
+  assert.match(timetableText, /appsc\.gndec\.ac\.in\/time_tables/i);
 
   const appscAns = api.answerFromKnowledgeBase("applied sciences notice board link");
   assert.ok(appscAns, "Applied sciences query must be answered");
@@ -149,20 +149,21 @@ test("NLU: Knowledge Base answers for hostel rules, links, and portals", () => {
   const rosterAns = api.answerFromKnowledgeBase("CE student roster PDF download");
   assert.ok(rosterAns, "Rosters query must be answered");
   const rosterText = typeof rosterAns === "string" ? rosterAns : rosterAns.reply;
-  assert.match(rosterText, /roster_ce_2026\.pdf/i);
+  assert.match(rosterText, /will not guess a PDF filename/i);
+  assert.match(rosterText, /appsc\.gndec\.ac\.in\/time_tables/i);
 
   const calendarAns = api.answerFromKnowledgeBase("academic calendar semester timeline");
   assert.ok(calendarAns, "Academic calendar query must be answered");
   const calendarText = typeof calendarAns === "string" ? calendarAns : calendarAns.reply;
-  assert.match(calendarText, /academic_calendar_jul_dec_2026\.pdf/i);
+  assert.match(calendarText, /gndec\.ac\.in\/\?q=node\/23/i);
 });
 
 test("NLU: Knowledge graph JSON data validity", () => {
   assert.ok(knowledgeGraph.portalLinks && Array.isArray(knowledgeGraph.portalLinks));
   assert.ok(knowledgeGraph.portalLinks.length >= 4);
   assert.ok(knowledgeGraph.hostelRules.summary);
-  assert.ok(knowledgeGraph.autonomousRegulations.attendance.mandatoryPercent === 75);
-  assert.ok(knowledgeGraph.autonomousRegulations.cgpaScale.gndecFormula);
+  assert.equal(knowledgeGraph.autonomousRegulations.sourceRequired, true);
+  assert.match(knowledgeGraph.policy, /current official source/i);
 });
 
 test("NLU: Attendance and CGPA math calculation questions", () => {
@@ -191,11 +192,12 @@ test("NLU: Creator, campus places, and holiday assistant intelligence", () => {
 
   const libraryAns = api.answerWithoutAi("where is the library");
   assert.ok(libraryAns, "Library location query must be answered");
-  assert.match(libraryAns, /Central Library/i);
+  assert.match(libraryAns, /Official GNDEC Library/i);
+  assert.doesNotMatch(libraryAns, /between the Main Block|Workshop complex/i);
 
   const mechAns = api.answerWithoutAi("where is mechanical block");
   assert.ok(mechAns, "Mechanical block location query must be answered");
-  assert.match(mechAns, /Mechanical Engineering Block/i);
+  assert.match(mechAns, /will not guess a block, floor, or landmark/i);
 
   const holidayMonthAns = api.answerWithoutAi("holidays in November 2026");
   assert.ok(holidayMonthAns, "Holiday month query must be answered");

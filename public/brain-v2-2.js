@@ -735,7 +735,7 @@
   function creatorAnswer(question) {
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
-    if (/\b(?:who\s+(?:built|made|created|developed|coded)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|tool|site|system)?|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|creator\s+of\s+(?:this|compass)|kaushik\s*jain|\bkkj\b)\b/i.test(q)
+    if (/\b(?:who\s+(?:built|made|created|developed|coded)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|tool|site|system)?|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|creator\s+of\s+(?:this|compass))\b/i.test(q)
       || /built\s+this\s+web/i.test(q)) {
       return kernel.result("CREATOR", 1,
         `<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p>Typing <strong>kkj</strong> in the chat verifies the configured administrator profile on this device and unlocks the admin AI modes and custom timetable HTML import. Server maintenance endpoints remain protected by the separate administrator API token.</p><p class="answer-source">Official GNDEC Compass creator info.</p>`,
@@ -856,9 +856,6 @@
       const mergedContext = { ...context, conversation: kernel.createMemory(context.conversation) };
       const candidate = holidayTimetableAnswer(original, mergedContext)
         || creatorAnswer(original, mergedContext)
-        || campusLocationAnswer(original, mergedContext)
-        || routeAndRushAnswer(original, mergedContext)
-        || examScenarioAnswer(original, mergedContext)
         || commonFreeSlotsAnswer(original, mergedContext)
         || comparisonAnswer(original, mergedContext)
         || comparisonFollowUp(original, mergedContext)

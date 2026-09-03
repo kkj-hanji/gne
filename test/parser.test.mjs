@@ -16,7 +16,7 @@ const sourceUnderTest = appSource.replace(
   ""
 ).replace(
   /function kbClean/,
-  "globalThis.__parserTest = { parseFetTimetable, state, classFor, subgroupsFor, preferredGroup, groupLabel, activeTimetableLabel, buildScheduleIndex, renderWeek, renderReferenceLinks, safeStoredChatHtml, answerQuestion, isStructuredQuestion, isHeavyQuestion, shouldUseActualAi, requestedTime, requestedTimetableDate, requestedTimetableWindow, timetableWindowAnswer, formatAiAnswer, assistantContext, redactSensitiveAiText, normalizeStudentName, normalizeStudentIdentifier, normalizeStudentRecord, studentIdentifierValues, studentIdentifierMatch, resolveStudentIdentifierMatches, mergeStudentRecord, mergeStudentRosterHistory, studentMatchScore, parseStudentSectionText, answerSyllabusQuestion, answerSyllabusFollowup, contextualLocalFollowupAnswer, parseSyllabusText, answerSyllabusPageSearch, syllabusQuestionSuggestions, localQuestionSuggestions, rankQuestionSuggestions, normalizeQuestionSuggestion, chooseQuestionSuggestion, activateQuestionSuggestion, followupSuggestions, answerCompassQuestion, answerFromKnowledgeBase, answerWithoutAi, legacyAnswerWithoutAi, isSyllabusQuestion, getIndiaNow, indiaCalendarDate, nextStudyDayInfo, nextScheduledDay, officialFreeLectureSlots, dayPlanEntries, dayScheduleAnswer, engineeringBranchesAnswer, verifiedAiAnswerOverride, localClarificationAnswer, isKaushikAdminProfile, adminProfileFingerprint, revokeAdminAiView, hasAdminAiView, adminAiMode, adminRequestedModel, adminForcesActualAi, isStudentRosterReference, currentTimetableNoticeLinks, studentDetailFlags, looksLikePlainStudentNameQuery, isHolidayCalendarQuestion, studentLookupRequest, safeRosterLookupRecord, studentLookupContextFromRecords, rosterCountRequest, rosterCountAnswer, legacyStudentLookupAnswer, facultyLookupRequest, legacyFacultyLookupAnswer, saveManualProfile, profileMatchesTimetableSelection, populateStudentLookupInput, mentoringClassAnswer, officialTimetableViewAnswer, requestedOfficialTimetableView, explicitTimetableSelectionAnswer, isTimetableComparisonQuestion, compareTimetableReleases, detectedTimetableUpdate, timetableUpdateAnswer, namedPersonTimetableRequest, namedPersonComparisonRequest, timetablePersonCaption, readOnlyStudentTimetableAnswer, readOnlyTeacherTimetableAnswer, scheduleAnswer };\nfunction kbClean"
+  "globalThis.__parserTest = { parseFetTimetable, state, classFor, subgroupsFor, preferredGroup, groupLabel, activeTimetableLabel, buildScheduleIndex, renderWeek, renderReferenceLinks, safeStoredChatHtml, answerQuestion, isStructuredQuestion, isHeavyQuestion, shouldUseActualAi, canonicalTimetableQuestion, requestedTime, requestedTimetableDate, requestedTimetableWindow, timetableWindowAnswer, formatAiAnswer, assistantContext, redactSensitiveAiText, normalizeStudentName, normalizeStudentIdentifier, normalizeStudentRecord, studentIdentifierValues, studentIdentifierMatch, resolveStudentIdentifierMatches, mergeStudentRecord, mergeStudentRosterHistory, studentMatchScore, parseStudentSectionText, answerSyllabusQuestion, answerSyllabusFollowup, contextualLocalFollowupAnswer, parseSyllabusText, answerSyllabusPageSearch, syllabusQuestionSuggestions, localQuestionSuggestions, rankQuestionSuggestions, normalizeQuestionSuggestion, chooseQuestionSuggestion, activateQuestionSuggestion, followupSuggestions, answerCompassQuestion, answerFromKnowledgeBase, answerWithoutAi, legacyAnswerWithoutAi, isSyllabusQuestion, getIndiaNow, indiaCalendarDate, nextStudyDayInfo, nextScheduledDay, officialFreeLectureSlots, dayPlanEntries, dayScheduleAnswer, engineeringBranchesAnswer, verifiedAiAnswerOverride, localClarificationAnswer, isKaushikAdminProfile, adminProfileFingerprint, revokeAdminAiView, hasAdminAiView, adminAiMode, adminRequestedModel, adminForcesActualAi, isStudentRosterReference, currentTimetableNoticeLinks, studentDetailFlags, looksLikePlainStudentNameQuery, isHolidayCalendarQuestion, studentLookupRequest, safeRosterLookupRecord, studentLookupContextFromRecords, rosterCountRequest, rosterCountAnswer, legacyStudentLookupAnswer, facultyLookupRequest, legacyFacultyLookupAnswer, saveManualProfile, profileMatchesTimetableSelection, populateStudentLookupInput, mentoringClassAnswer, officialTimetableViewAnswer, requestedOfficialTimetableView, explicitTimetableSelectionAnswer, isTimetableComparisonQuestion, compareTimetableReleases, detectedTimetableUpdate, timetableUpdateAnswer, namedPersonTimetableRequest, namedPersonComparisonRequest, timetablePersonCaption, readOnlyStudentTimetableAnswer, readOnlyTeacherTimetableAnswer, scheduleAnswer };\nfunction kbClean"
 );
 const { document } = parseHTML("<!doctype html><html><body></body></html>");
 const storage = new Map();
@@ -400,9 +400,10 @@ test("answers timetable verification directly and never substitutes the active t
 });
 
 test("resolves a named student or faculty timetable from verified source data without changing the active profile", () => {
-  const { state, buildScheduleIndex, explicitTimetableSelectionAnswer, namedPersonTimetableRequest, namedPersonComparisonRequest, studentLookupContextFromRecords, readOnlyStudentTimetableAnswer, timetablePersonCaption, readOnlyTeacherTimetableAnswer } = context.__parserTest;
+  const { state, buildScheduleIndex, canonicalTimetableQuestion, requestedTimetableDate, explicitTimetableSelectionAnswer, namedPersonTimetableRequest, namedPersonComparisonRequest, studentLookupContextFromRecords, readOnlyStudentTimetableAnswer, timetablePersonCaption, readOnlyTeacherTimetableAnswer } = context.__parserTest;
   state.schedule = [
     { id: "active-tuesday", group: "ECB", day: "Tuesday", start: 510, end: 570, subject: "ACTIVE TUESDAY COURSE", teacher: "Teacher One", room: "A1", type: "L", cohorts: "ECB1" },
+    { id: "mohitveer-monday", group: "CSD", day: "Monday", start: 510, end: 570, subject: "MOHITVEER MONDAY COURSE", teacher: "Teacher Two", room: "C1", type: "L", cohorts: "CSD2" },
     { id: "mohitveer-tuesday-first", group: "CSD", day: "Tuesday", start: 510, end: 570, subject: "MOHITVEER FIRST COURSE", teacher: "Teacher Two", room: "C1", type: "L", cohorts: "CSD2" },
     { id: "mohitveer-tuesday", group: "CSD", day: "Tuesday", start: 570, end: 630, subject: "MOHITVEER TUESDAY COURSE", teacher: "Teacher Two", room: "C2", type: "L", cohorts: "CSD2" },
     { id: "mohitveer-tuesday-last", group: "CSD", day: "Tuesday", start: 750, end: 810, subject: "MOHITVEER LAST COURSE", teacher: "Teacher Four", room: "C4", type: "L", cohorts: "CSD2" },
@@ -411,6 +412,7 @@ test("resolves a named student or faculty timetable from verified source data wi
   state.selectedGroup = "ECB";
   state.selectedSubgroup = "ECB1";
   state.student = { name: "Active Student", section: "ECB", subsection: "ECB1" };
+  state.nowOverride = "2026-09-01T04:30:00.000Z";
   buildScheduleIndex();
 
   const studentRequest = namedPersonTimetableRequest("Mohitveer or Mohitveer Singh Tuesday or tomorrow timetable");
@@ -445,6 +447,29 @@ test("resolves a named student or faculty timetable from verified source data wi
   assert.equal(versusMe.personOnLeft, true);
   assert.ok(versusMe.person.day);
 
+  const casualSir = namedPersonTimetableRequest("Mohitveer Singh sir ka kl morning tt");
+  assert.equal(canonicalTimetableQuestion("Mohitveer Singh sir ka kl morning tt"), "mohitveer singh teacher ka tomorrow morning timetable");
+  assert.equal(casualSir.term, "mohitveer singh");
+  assert.equal(casualSir.teacherCue, true);
+  assert.equal(casualSir.window, "morning");
+  assert.ok(casualSir.day);
+
+  const casualComparison = namedPersonComparisonRequest("Mohitveer Singh sir ka kl ka tt and my compare krdo");
+  assert.equal(casualComparison.type, "student_vs_me");
+  assert.equal(casualComparison.person.term, "mohitveer singh");
+
+  assert.equal(namedPersonTimetableRequest("which classes are in the same lab today"), null);
+  assert.equal(namedPersonTimetableRequest("what class is going on right now"), null);
+
+  const dayAfterTomorrow = requestedTimetableDate("day after tomorrow timetable");
+  assert.deepEqual({ iso: dayAfterTomorrow.iso, day: dayAfterTomorrow.day }, { iso: "2026-09-03", day: "Thursday" });
+
+  const multiDayRequest = namedPersonTimetableRequest("Mohitveer Singh Monday and Tuesday timetable");
+  const multiDayAnswer = readOnlyStudentTimetableAnswer(multiDayRequest, studentLookup);
+  assert.deepEqual([...multiDayRequest.days], ["Monday", "Tuesday"]);
+  assert.match(multiDayAnswer, /MOHITVEER MONDAY COURSE/);
+  assert.match(multiDayAnswer, /MOHITVEER TUESDAY COURSE/);
+
   assert.match(explicitTimetableSelectionAnswer("CSD2 Tuesday first class"), /MOHITVEER FIRST COURSE/);
   assert.match(explicitTimetableSelectionAnswer("CSD2 Tuesday last class"), /MOHITVEER LAST COURSE/);
   assert.match(explicitTimetableSelectionAnswer("CSD2 Tuesday morning classes"), /MOHITVEER TUESDAY COURSE/);
@@ -474,6 +499,7 @@ test("resolves a named student or faculty timetable from verified source data wi
   assert.doesNotMatch(facultyAnswer, /ACTIVE TUESDAY COURSE/);
   assert.equal(state.selectedGroup, "ECB");
   assert.equal(state.selectedSubgroup, "ECB1");
+  state.nowOverride = null;
   state.student = null;
 });
 
@@ -868,7 +894,7 @@ test("service worker caches only an unused response copy and absorbs cache-write
   assert.match(serviceWorkerSource, /response\.bodyUsed/);
   assert.match(serviceWorkerSource, /copy = response\.clone\(\)/);
   assert.match(serviceWorkerSource, /cache\.put\(request, copy\)\)\.catch\(\(\) => \{\}\)/);
-  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260901-4"/);
+  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260903-1"/);
 });
 
 test("keeps actual Hindi and Punjabi timetable questions on the fast local path", () => {
