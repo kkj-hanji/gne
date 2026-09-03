@@ -166,7 +166,7 @@
     if (/\b(?:timetable|schedule|class|classes|periods?|free|first|last|morning|afternoon|current|next)\b/.test(normalized)
       || CALENDAR_DAYS.some((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(normalized))) add("timetable", 80);
     if (/\b(?:compare|comparison|versus|vs|difference|farak|farq)\b/.test(normalized)) add("comparison", 98);
-    if (/\b(?:student|crn|registration|serial|roster|mentor)\b/.test(normalized)) add("student", 75);
+    if (/\b(?:students?|crn|registration|serial|roster|mentor)\b/.test(normalized)) add("student", 75);
     if (/\b(?:faculty|teacher|professor|designation|qualification|research|publication|official email)\b/.test(normalized)) add("faculty", 75);
     if (/\b(?:where|location|directions?|campus|hostel|library|canteen|dispensary|workshop)\b/.test(normalized)) add("campus", 65);
     if (/\b(?:calculate|calculation|percentage|cgpa|sgpa|attendance|bunk|solve)\b|\d\s*[%+*/^=-]/.test(normalized)) add("calculation", 72);
@@ -195,14 +195,38 @@
     const normalized = normalize(marked);
     if (!normalized) return [];
     const explicitBoundary = /\s+askcompassquestionboundary\s+|\s+askcompasscommaboundary\s+(?=(?:is|are|what|when|where|who|how|show|tell|find|check|and)?\s*(?:today|tomorrow|day after tomorrow|holiday|date|timetable|schedule|syllabus|student|faculty|teacher|calculate)\b)/gi;
-    let parts = normalized.split(explicitBoundary).map((part) => part.trim()).filter(Boolean);
-    if (parts.length === 1) {
-      parts = normalized.split(/\s+(?:and|also|plus)\s+(?=(?:what|when|where|who|is|are|tell|show|find|check|calculate|today|tomorrow|holiday|date|timetable|schedule|syllabus|student|faculty|teacher)\b)/i)
-        .map((part) => part.trim()).filter(Boolean);
-    }
-    if (parts.length < 2) return [normalized];
+    const normalizedWithoutMarkers = normalized.replace(/\baskcompass(?:question|comma)boundary\b/gi, " ").replace(/\s+/g, " ").trim();
+    const comparisonQualifier = /^(?:show|tell|give|what(?:\s+are)?|which|who|and)?\s*(?:the\s+)?(?:common|shared|same|different|difference|free|overlap(?:ping)?|teacher|teachers|faculty|room|rooms|subject|subjects|class|classes|slot|slots)\b/i;
+    const startsIndependentQuestion = /^(?:what|when|where|who|why|how|is|are|do|does|did|show|tell|find|search|check|calculate)\b/i;
+    const startsIndependentContext = /^(?:my|mine|today|tomorrow|day\s+after\s+tomorrow|yesterday|holiday|date|syllabus|student|faculty|teacher|room|timetable|schedule|free|next|current)\b/i;
+    const splitConjunctions = (segment) => {
+      const text = String(segment || "").trim();
+      const matcher = /\s+(?:and|aur|te|also|plus)\s+/gi;
+      const pieces = [];
+      let cursor = 0;
+      let match;
+      while ((match = matcher.exec(text))) {
+        const left = text.slice(cursor, match.index).trim();
+        const right = text.slice(matcher.lastIndex).trim();
+        const leftIsComparison = /\b(?:compare|comparison|vs|versus|farak|farq)\b/i.test(left);
+        const preserveComparison = leftIsComparison && comparisonQualifier.test(right);
+        const independent = startsIndependentQuestion.test(right) || startsIndependentContext.test(right);
+        if (left && independent && !preserveComparison) {
+          pieces.push(left);
+          cursor = matcher.lastIndex;
+        }
+      }
+      const tail = text.slice(cursor).trim();
+      if (tail) pieces.push(tail);
+      return pieces.length ? pieces : [text];
+    };
+    let parts = normalized.split(explicitBoundary)
+      .map((part) => part.replace(/\baskcompass(?:question|comma)boundary\b/gi, " ").replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .flatMap(splitConjunctions);
+    if (parts.length < 2) return [normalizedWithoutMarkers];
     const useful = parts.filter((part) => analyzeQuery(part).primaryIntent !== "unknown");
-    return useful.length >= 2 ? useful.slice(0, 4) : [normalized];
+    return useful.length >= 2 ? useful.slice(0, 4) : [normalizedWithoutMarkers];
   }
 
   function escapeHtml(value) {

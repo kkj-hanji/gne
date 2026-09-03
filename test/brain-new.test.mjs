@@ -68,7 +68,16 @@ test("kernel decomposes only clearly independent questions", () => {
   assert.equal(mixed.length, 2);
   assert.match(mixed[0], /mohitveer.*tomorrow.*timetable/);
   assert.match(mixed[1], /holiday/);
+  assert.deepEqual(
+    [...kernel.decomposeQuery("Mohitveer Singh ka kal timetable batao aur mera next class kya hai?")],
+    ["mohitveer singh ka tomorrow timetable show", "my next class kya hai"]
+  );
+  assert.deepEqual(
+    [...kernel.decomposeQuery("CSD2 aur RAI ka Tuesday timetable compare karo aur batao common teacher kaun hai")],
+    ["csd2 and rai ka tuesday timetable compare karo and show common teacher who hai"]
+  );
   assert.equal(kernel.decomposeQuery("Math, Physics and Chemistry subjects").length, 1);
+  assert.doesNotMatch(kernel.decomposeQuery("Math, Physics and Chemistry subjects")[0], /askcompass/i);
 });
 
 test("kernel arithmetic rejects executable input and non-finite results", () => {
@@ -411,6 +420,11 @@ test("default chain answers through brain 2.2 then falls back to brain 2 facts",
   assert.ok(compared, "comparison should be handled by the new chain");
   assert.equal(compared.version, "2.2.0");
   assert.match(compared.answer, /Profile unchanged/);
+
+  const commonTeacher = api.runCompassBrain("Compare ECB and ECB2 on Wednesday and show the common teacher");
+  assert.ok(commonTeacher, "a comparison qualifier should remain attached to its two timetable codes");
+  assert.equal(commonTeacher.intent, "TIMETABLE_COMMON_TEACHERS");
+  assert.match(commonTeacher.answer, /SANJAM KAUR SIDHU/);
 
   const calculated = api.runCompassBrain("25% of 240");
   assert.ok(calculated, "calculation should resolve inside the new chain");
