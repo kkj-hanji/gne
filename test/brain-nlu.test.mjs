@@ -5,6 +5,8 @@ import vm from "node:vm";
 import { parseHTML } from "linkedom";
 
 const kernelSource = await readFile(new URL("../public/brain-kernel.js", import.meta.url), "utf8");
+const brainV12Source = await readFile(new URL("../public/brain-v1-2.js", import.meta.url), "utf8");
+const brainV22Source = await readFile(new URL("../public/brain-v2-2.js", import.meta.url), "utf8");
 const brainSource = await readFile(new URL("../public/brain-v2.js", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 const knowledgeGraph = JSON.parse(await readFile(new URL("../public/data/knowledge-graph.json", import.meta.url), "utf8"));
@@ -38,6 +40,8 @@ function createHarness() {
     fetch: async () => ({ ok: true, json: async () => ({}) })
   });
   vm.runInContext(kernelSource, context);
+  vm.runInContext(brainV12Source, context);
+  vm.runInContext(brainV22Source, context);
   vm.runInContext(brainSource, context);
   vm.runInContext(sourceUnderTest, context);
   const api = context.__brainNluTest;
@@ -176,4 +180,24 @@ test("NLU: Attendance and CGPA math calculation questions", () => {
   assert.ok(attRuleAns, "Attendance rule should return 75%");
   const attText = typeof attRuleAns === "string" ? attRuleAns : attRuleAns.reply;
   assert.match(attText, /75%/);
+});
+
+test("NLU: Creator, campus places, and holiday assistant intelligence", () => {
+  const { api } = createHarness();
+
+  const creatorAns = api.answerWithoutAi("who built this web (i am kaushik jain from ece - b1 )");
+  assert.ok(creatorAns, "Creator query must be answered");
+  assert.match(creatorAns, /Kaushik Jain from ECE - B1/i);
+
+  const libraryAns = api.answerWithoutAi("where is the library");
+  assert.ok(libraryAns, "Library location query must be answered");
+  assert.match(libraryAns, /Central Library/i);
+
+  const mechAns = api.answerWithoutAi("where is mechanical block");
+  assert.ok(mechAns, "Mechanical block location query must be answered");
+  assert.match(mechAns, /Mechanical Engineering Block/i);
+
+  const holidayMonthAns = api.answerWithoutAi("holidays in November 2026");
+  assert.ok(holidayMonthAns, "Holiday month query must be answered");
+  assert.match(holidayMonthAns, /November 2026/i);
 });

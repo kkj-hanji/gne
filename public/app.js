@@ -2193,7 +2193,7 @@ function requestedTimetableDate(question = "") {
   const q = canonicalTimetableQuestion(question);
   const kernel = globalThis.CompassBrainKernel;
   const months = kernel?.MONTHS || { january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6, august: 7, september: 8, october: 9, november: 10, december: 11 };
-  const relativeOffset = /\byesterday\b/.test(q) ? -1 : /\b(?:tomorrow|kal)\b/.test(q) ? 1 : /\b(?:today|aaj|ajj)\b/.test(q) ? 0 : null;
+  const relativeOffset = /\byesterday\b/.test(q) ? -1 : /\b(?:tomorrow|tomm?or+ow|kal|kalle)\b/.test(q) ? 1 : /\b(?:day\s+after\s+tomorrow|parso|parson)\b/.test(q) ? 2 : /\b(?:today|aaj|ajj)\b/.test(q) ? 0 : null;
   if (relativeOffset !== null) {
     const date = indiaCalendarDate(relativeOffset).date;
     return { iso: date.toISOString().slice(0, 10), day: indiaCalendarDate(relativeOffset).day };
@@ -2331,6 +2331,16 @@ function answerQuestion(question) {
       const matchedStart = exact.length ? exact[0].start : overlapping[0].start;
       return `<p><strong><u>${escapeHtml(state.selectedGroup)} · ${escapeHtml(timeDay)} · ${humanTime(matchedStart)}</u></strong></p>${timeMatches.map((item) => `<p><strong>${escapeHtml(item.subject)}</strong> <span>(${escapeHtml(classTypeLabel(item.type))})</span><br />${escapeHtml(item.teacher)} · ${escapeHtml(item.room)}</p>`).join("")}<p class="answer-source">Official GNDEC weekly timetable.</p>`;
     }
+  }
+  if (asksToday && asksTomorrow && (isScheduleQuestion || /timetable|schedule|classes/.test(q)) && !asksNext && !asksCurrent && !asksWhere && !asksTeacher) {
+    const todayDay = getIndiaNow().day;
+    const futureStudyDay = nextStudyDayInfo(false);
+    const tomorrowDay = futureStudyDay?.day || currentAndNext(1).day;
+    const todayClasses = classFor(state.selectedGroup, todayDay);
+    const tomorrowClasses = classFor(state.selectedGroup, tomorrowDay);
+    const todayBlock = dayScheduleAnswer(todayClasses, todayDay);
+    const tomorrowBlock = dayScheduleAnswer(tomorrowClasses, tomorrowDay, futureStudyDay?.compactLabel || "");
+    return `${todayBlock}${tomorrowBlock}`;
   }
   if ((asksToday || explicitDay || isScheduleQuestion) && !asksNext && !asksCurrent && !asksWhere && !asksTeacher) {
     // A whole-week question must never collapse to today's (possibly empty)
@@ -3385,7 +3395,7 @@ function namedPersonTimetableRequest(question = "") {
   const friendCue = /\b(?:friend|classmate|batchmate|peer|student)\b/.test(q);
   const refersToOwnTimetable = /\b(?:my|mine|mera|meri|mere)\b/.test(q) && !friendCue;
   if (refersToOwnTimetable) return null;
-  const ignored = new Set(["a", "after", "afternoon", "am", "an", "and", "are", "around", "as", "at", "before", "between", "can", "check", "class", "classes", "current", "day", "does", "do", "doctor", "dr", "duration", "earlier", "evening", "faculty", "first", "for", "free", "friend", "from", "give", "had", "has", "have", "her", "his", "how", "i", "instructor", "is", "its", "last", "later", "latest", "lecture", "lectures", "many", "me", "mine", "morning", "most", "my", "new", "next", "night", "of", "official", "on", "or", "parso", "parson", "period", "periods", "please", "pm", "prof", "professor", "schedule", "shanivar", "show", "student", "table", "teacher", "tell", "that", "the", "their", "this", "time", "timetabel", "timetble", "timetabl", "timetable", "to", "today", "tomorrow", "total", "until", "update", "updated", "verified", "week", "what", "when", "which", "who", "with", "your", "aaj", "ajj", "batao", "kal", "kalle", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+  const ignored = new Set(["a", "after", "afternoon", "am", "an", "and", "are", "around", "as", "at", "before", "between", "both", "can", "check", "class", "classes", "current", "day", "dono", "does", "do", "doctor", "dr", "duration", "earlier", "evening", "faculty", "first", "for", "free", "friend", "from", "give", "had", "has", "have", "her", "his", "how", "i", "instructor", "is", "its", "last", "later", "latest", "lecture", "lectures", "many", "me", "mine", "morning", "most", "my", "new", "next", "night", "of", "official", "on", "or", "parso", "parson", "period", "periods", "please", "pm", "prof", "professor", "schedule", "shanivar", "show", "student", "table", "teacher", "tell", "that", "the", "their", "this", "time", "timetabel", "timetble", "timetabl", "timetable", "to", "today", "tomorrow", "tommorow", "tommorrow", "total", "until", "update", "updated", "verified", "week", "what", "when", "which", "who", "with", "yestarday", "yesteday", "yesterday", "your", "aaj", "ajj", "batao", "kal", "kalle", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
   (globalThis.CompassBrainKernel?.MONTH_NAMES || ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]).forEach((month) => ignored.add(String(month).toLowerCase()));
   const selectionCodes = new Set([
     ...state.schedule.map((item) => String(item.group || "").toUpperCase()),
@@ -3393,7 +3403,8 @@ function namedPersonTimetableRequest(question = "") {
   ]);
   const words = normalizeStudentName(q).split(/\s+/).filter((word) => {
     const resemblesWeekday = DAY_NAMES.some((day) => editDistance(word, day.toLowerCase()) <= 2);
-    return /^[a-z][a-z-]{2,29}$/.test(word) && !ignored.has(word) && !resemblesWeekday && !selectionCodes.has(word.toUpperCase());
+    const resemblesRelativeDay = /^tom+or+ow$|^yest[er|ar]+day$|^parso[n]?$|^today$|^a[a]?j+$/.test(word);
+    return /^[a-z][a-z-]{2,29}$/.test(word) && !ignored.has(word) && !resemblesWeekday && !resemblesRelativeDay && !selectionCodes.has(word.toUpperCase());
   });
   if (!words.length) return null;
   const referenced = findReferencedClasses(q);
@@ -3411,10 +3422,21 @@ function namedPersonTimetableRequest(question = "") {
   if (activeName && (term === activeName || activeName.includes(term) || term.includes(activeName))) return null;
   const dateRequest = requestedTimetableDate(q);
   const day = requestedWeekday(q) || dateRequest?.day || "";
+  const requestedDays = [];
+  if (/\b(?:today|aaj|ajj)\b/.test(q)) requestedDays.push(getIndiaNow().day);
+  if (/\b(?:tomorrow|tomm?or+ow|kal|kalle)\b/.test(q)) requestedDays.push(nextStudyDayInfo(false)?.day || currentAndNext(1).day);
+  if (/\b(?:yesterday)\b/.test(q)) requestedDays.push(indiaCalendarDate(-1).day);
+  if (/\b(?:day\s+after\s+tomorrow|parso|parson)\b/.test(q)) requestedDays.push(indiaCalendarDate(2).day);
+  DAY_NAMES.forEach((d) => {
+    if (new RegExp(`\\b${d.toLowerCase()}\\b`).test(q) && !requestedDays.includes(d)) {
+      requestedDays.push(d);
+    }
+  });
   return {
     term,
     label: term.replace(/\b[a-z]/g, (letter) => letter.toUpperCase()),
     day,
+    days: requestedDays.length ? requestedDays : (day ? [day] : []),
     dateIso: dateRequest?.iso || "",
     teacherCue,
     window: requestedTimetableWindow(q)
@@ -3453,6 +3475,14 @@ function readOnlyStudentTimetableAnswer(request, lookup) {
   if (calendarHoliday && calendarKernel?.isHalfDayNotice?.(calendarHoliday)) {
     return `<p><strong><u>${escapeHtml(dateLabel)} has a GNDEC second-half-day notice.</u></strong></p><p>${escapeHtml(calendarHoliday.name)} is not a full-day closure. Compass will not guess which individual classes change; check the GNDEC notice.</p><p class="answer-source">Official GNDEC holiday calendar and current official roster; this did not change your profile.</p>`;
   }
+  if (request.days?.length > 1) {
+    const dayBlocks = request.days.map((d) => {
+      const entries = classFor(group, d, subgroup);
+      const heading = `${record.name || request.label} · ${subgroup} · ${d}`;
+      return scheduleAnswer(entries, heading);
+    });
+    return `${dayBlocks.join("")}${dateNote}${note}`;
+  }
   const days = request.day ? [request.day] : request.window ? [getIndiaNow().day] : DAY_NAMES;
   const entries = days.flatMap((day) => classFor(group, day, subgroup));
   const scopedDay = request.day || (request.window ? getIndiaNow().day : "");
@@ -3480,26 +3510,129 @@ function readOnlyTeacherTimetableAnswer(request, match, schedule) {
 // active profile or timetable selection.
 function namedPersonComparisonRequest(question = "") {
   const q = canonicalTimetableQuestion(question);
-  if (!/\b(?:vs|versus)\b/.test(q)) return null;
-  const parts = q.split(/\b(?:vs|versus)\b/).map((part) => part.trim()).filter(Boolean);
+  if (!/\b(?:vs|versus|compare|comparison|farak|farq)\b/.test(q)) return null;
+  let parts = [];
+  if (/\b(?:vs|versus)\b/.test(q)) {
+    parts = q.split(/\b(?:vs|versus)\b/).map((part) => part.trim()).filter(Boolean);
+  } else {
+    const compMatch = q.match(/\b(?:compare|comparison|farak|farq)\s+(?:between\s+)?(.*?)\s+(?:and|with|to|se|te|nal|naal)\s+(.*)/i)
+      || q.match(/(.*?)\s+(?:and|with|se)\s+(.*?)\s+(?:ko\s+)?(?:compare|farak|farq)/i);
+    if (compMatch) {
+      parts = [compMatch[1].trim(), compMatch[2].trim()];
+    }
+  }
   if (parts.length !== 2) return null;
-  const ownsPart = (part) => /\b(?:me|my|mine|mera|meri|mere|apna|apni)\b/.test(part);
+  const ownsPart = (part) => /\b(?:me|my|mine|mera|meri|mere|apna|apni|user\s*branch|my\s*branch)\b/.test(part);
   const leftOwn = ownsPart(parts[0]);
   const rightOwn = ownsPart(parts[1]);
-  if (leftOwn === rightOwn) return null;
-  const personPart = leftOwn ? parts[1] : parts[0];
-  const person = namedPersonTimetableRequest(`${personPart} timetable`);
-  if (!person || person.teacherCue) return null;
   const dateRequest = requestedTimetableDate(q);
-  return {
-    person: { ...person, day: requestedWeekday(q) || dateRequest?.day || person.day, dateIso: dateRequest?.iso || person.dateIso },
-    personOnLeft: !leftOwn
-  };
+  const day = requestedWeekday(q) || dateRequest?.day || "";
+
+  if (leftOwn !== rightOwn) {
+    const personPart = leftOwn ? parts[1] : parts[0];
+    const person = namedPersonTimetableRequest(`${personPart} timetable`);
+    if (!person || person.teacherCue) return null;
+    return {
+      type: "student_vs_me",
+      person: { ...person, day: day || person.day, dateIso: dateRequest?.iso || person.dateIso },
+      personOnLeft: !leftOwn
+    };
+  }
+
+  // Check if both sides are named students
+  const leftPerson = namedPersonTimetableRequest(`${parts[0]} timetable`);
+  const rightPerson = namedPersonTimetableRequest(`${parts[1]} timetable`);
+  if (leftPerson && rightPerson && !leftPerson.teacherCue && !rightPerson.teacherCue) {
+    return {
+      type: "two_students",
+      leftPerson: { ...leftPerson, day: day || leftPerson.day, dateIso: dateRequest?.iso || leftPerson.dateIso },
+      rightPerson: { ...rightPerson, day: day || rightPerson.day, dateIso: dateRequest?.iso || rightPerson.dateIso },
+      day,
+      dateIso: dateRequest?.iso || ""
+    };
+  }
+
+  // Check if one side is a student and the other is a section/subsection code
+  const isCode = (text) => /^[A-Z][A-Z0-9]*\d[A-Z0-9]*$|^[A-Z]{2,6}$/i.test(cleanText(text));
+  if (leftPerson && !leftPerson.teacherCue && isCode(parts[1])) {
+    return {
+      type: "student_vs_code",
+      person: { ...leftPerson, day: day || leftPerson.day, dateIso: dateRequest?.iso || leftPerson.dateIso },
+      code: cleanText(parts[1]).toUpperCase(),
+      personOnLeft: true
+    };
+  }
+  if (rightPerson && !rightPerson.teacherCue && isCode(parts[0])) {
+    return {
+      type: "student_vs_code",
+      person: { ...rightPerson, day: day || rightPerson.day, dateIso: dateRequest?.iso || rightPerson.dateIso },
+      code: cleanText(parts[0]).toUpperCase(),
+      personOnLeft: false
+    };
+  }
+
+  return null;
 }
 
 async function resolveNamedPersonComparisonAnswer(question = "") {
   const request = namedPersonComparisonRequest(question);
   if (!request) return "";
+
+  if (request.type === "two_students") {
+    let rosterData;
+    try {
+      rosterData = await loadCurrentRosterRecords();
+    } catch {
+      return "<p><strong><u>Official roster lookup is unavailable.</u></strong></p><p>I cannot verify student subsections for comparison.</p>";
+    }
+    const leftLookup = studentLookupContextFromRecords(`find student ${request.leftPerson.term}`, rosterData.records, rosterData);
+    const rightLookup = studentLookupContextFromRecords(`find student ${request.rightPerson.term}`, rosterData.records, rosterData);
+    if (leftLookup?.status === "multiple") return `<p><strong><u>More than one match was found for ${escapeHtml(request.leftPerson.label)}.</u></strong></p><p>Use the student's CRN or full verified name.</p>`;
+    if (leftLookup?.status !== "single" || !leftLookup.records?.[0]) return `<p><strong><u>No verified student match was found for ${escapeHtml(request.leftPerson.label)}.</u></strong></p><p>Check the spelling or use a student CRN.</p>`;
+    if (rightLookup?.status === "multiple") return `<p><strong><u>More than one match was found for ${escapeHtml(request.rightPerson.label)}.</u></strong></p><p>Use the student's CRN or full verified name.</p>`;
+    if (rightLookup?.status !== "single" || !rightLookup.records?.[0]) return `<p><strong><u>No verified student match was found for ${escapeHtml(request.rightPerson.label)}.</u></strong></p><p>Check the spelling or use a student CRN.</p>`;
+
+    const leftRecord = leftLookup.records[0];
+    const rightRecord = rightLookup.records[0];
+    const leftCode = cleanText(leftRecord.subsection || leftRecord.section).toUpperCase();
+    const rightCode = cleanText(rightRecord.subsection || rightRecord.section).toUpperCase();
+    if (!leftCode) return `<p><strong><u>${escapeHtml(leftRecord.name || request.leftPerson.label)} has no verified timetable subsection.</u></strong></p>`;
+    if (!rightCode) return `<p><strong><u>${escapeHtml(rightRecord.name || request.rightPerson.label)} has no verified timetable subsection.</u></strong></p>`;
+
+    const comparisonQuestion = `${leftCode} vs ${rightCode}${request.day ? ` ${request.day}` : ""}`;
+    const brainResult = runCompassBrain(comparisonQuestion);
+    if (!brainResult?.answer) return "<p><strong><u>Verified timetable comparison is unavailable.</u></strong></p><p>Please try again after the current official timetable finishes loading.</p>";
+    const leftLabel = `${leftRecord.name || request.leftPerson.label} (${leftCode})`;
+    const rightLabel = `${rightRecord.name || request.rightPerson.label} (${rightCode})`;
+    const dateNote = request.dateIso ? `<p class="kb-tip">For ${escapeHtml(request.dateIso)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
+    return `<p><strong>${escapeHtml(leftLabel)} vs ${escapeHtml(rightLabel)}</strong></p><p class="answer-source">Read-only comparison between verified official GNDEC roster records (${escapeHtml(leftLookup.version || "current")}). Your profile and selected timetable were not changed.</p>${brainResult.answer}${dateNote}`;
+  }
+
+  if (request.type === "student_vs_code") {
+    let lookup;
+    try {
+      const rosterData = await loadCurrentRosterRecords();
+      lookup = studentLookupContextFromRecords(`find student ${request.person.term}`, rosterData.records, rosterData);
+    } catch {
+      return `<p><strong><u>Official roster lookup is unavailable.</u></strong></p><p>I cannot verify ${escapeHtml(request.person.label)}'s subsection.</p>`;
+    }
+    if (lookup?.status === "multiple") return `<p><strong><u>More than one official roster match was found for ${escapeHtml(request.person.label)}.</u></strong></p><p>Use the student's CRN or full verified name.</p>`;
+    if (lookup?.status !== "single" || !lookup.records?.[0]) return `<p><strong><u>No verified student match was found for ${escapeHtml(request.person.label)}.</u></strong></p><p>Check the spelling or use a student CRN.</p>`;
+    const record = lookup.records[0];
+    const personCode = cleanText(record.subsection || record.section).toUpperCase();
+    if (!personCode) return `<p><strong><u>${escapeHtml(record.name || request.person.label)} has no verified timetable subsection.</u></strong></p>`;
+    const leftCode = request.personOnLeft ? personCode : request.code;
+    const rightCode = request.personOnLeft ? request.code : personCode;
+    const comparisonQuestion = `${leftCode} vs ${rightCode}${request.person.day ? ` ${request.person.day}` : ""}`;
+    const brainResult = runCompassBrain(comparisonQuestion);
+    if (!brainResult?.answer) return "<p><strong><u>Verified timetable comparison is unavailable.</u></strong></p><p>Please try again after the current official timetable finishes loading.</p>";
+    const leftLabel = request.personOnLeft ? `${record.name || request.person.label} (${personCode})` : request.code;
+    const rightLabel = request.personOnLeft ? request.code : `${record.name || request.person.label} (${personCode})`;
+    const dateNote = request.person.dateIso ? `<p class="kb-tip">For ${escapeHtml(request.person.dateIso)}, date-specific GNDEC notices override the weekly timetable.</p>` : "";
+    return `<p><strong>${escapeHtml(leftLabel)} vs ${escapeHtml(rightLabel)}</strong></p><p class="answer-source">Read-only comparison using official GNDEC roster and timetable data. Your profile and selected timetable were not changed.</p>${brainResult.answer}${dateNote}`;
+  }
+
+  // student_vs_me
   const profile = activeStudentProfile();
   const ownGroup = cleanText(state.selectedGroup).toUpperCase();
   const ownSubgroup = cleanText(state.selectedSubgroup).toUpperCase();
@@ -3811,23 +3944,30 @@ function legacyHolidayAnswer(question) {
   }
 
   // Specific date check
-  const monthNameMatch = q.match(/(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
+  const monthNameMatch = q.match(/(\d{1,2})(?!\d)\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
+  const symbol = kernel.extractDaySymbol ? kernel.extractDaySymbol(q) : null;
+  let checkIso = "";
   if (monthNameMatch) {
     const isFirstNum = /^\d+$/.test(monthNameMatch[1]);
     const dayNum = isFirstNum ? Number(monthNameMatch[1]) : Number(monthNameMatch[2]);
     const monthStr = (isFirstNum ? monthNameMatch[2] : monthNameMatch[1]).toLowerCase();
     if (kernel.MONTHS[monthStr] !== undefined && dayNum >= 1 && dayNum <= 31) {
-      const checkIso = `${baseYear}-${String(kernel.MONTHS[monthStr] + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-      const holiday = kernel.checkDateHoliday(checkIso);
-      const formatted = kernel.formatIsoFull(checkIso);
-      if (holiday) {
-        if (kernel.isHalfDayNotice?.(holiday)) return `<p><strong>${escapeHtml(formatted)} has a GNDEC second-half-day notice.</strong></p><p>${escapeHtml(holiday.name)} is not a full-day closure. Check the GNDEC notice before assuming classes are cancelled.</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`;
-        if (String(holiday.type || "").toLowerCase() === "restricted") return `<p><strong>${escapeHtml(formatted)} is a Restricted Holiday:</strong></p><p>${escapeHtml(holiday.name)}. Optional leave; college may be open, so classes may happen. Check the GNDEC notice.</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`;
-        return `<p><strong>Yes! ${escapeHtml(formatted)} is an official holiday:</strong></p><p><strong>${escapeHtml(holiday.name)}</strong> (${escapeHtml(holiday.type)} Holiday)</p><p>${escapeHtml(holiday.description)}</p><p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`;
-      }
-      const weekday = kernel.weekdayOfIso(checkIso);
-      return `<p><strong>No. ${escapeHtml(formatted)} is not an official gazetted holiday.</strong></p><p>${weekday === "Saturday" || weekday === "Sunday" ? `It falls on a ${weekday} (weekend).` : "It is a regular college working day."}</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`;
+      checkIso = `${baseYear}-${String(kernel.MONTHS[monthStr] + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
     }
+  } else if (symbol && kernel.isValidIsoDate(baseIso)) {
+    const offsets = { today: 0, tomorrow: 1, day_after_tomorrow: 2, yesterday: -1 };
+    if (symbol in offsets) checkIso = kernel.shiftIsoDate(baseIso, offsets[symbol]);
+  }
+  if (checkIso) {
+    const holiday = kernel.checkDateHoliday(checkIso);
+    const formatted = kernel.formatIsoFull(checkIso);
+    if (holiday) {
+      if (kernel.isHalfDayNotice?.(holiday)) return `<p><strong>${escapeHtml(formatted)} has a GNDEC second-half-day notice.</strong></p><p>${escapeHtml(holiday.name)} is not a full-day closure. Check the GNDEC notice before assuming classes are cancelled.</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`;
+      if (String(holiday.type || "").toLowerCase() === "restricted") return `<p><strong>${escapeHtml(formatted)} is a Restricted Holiday:</strong></p><p>${escapeHtml(holiday.name)}. Optional leave; college may be open, so classes may happen. Check the GNDEC notice.</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`;
+      return `<p><strong>Yes! ${escapeHtml(formatted)} is an official holiday:</strong></p><p><strong>${escapeHtml(holiday.name)}</strong> (${escapeHtml(holiday.type)} Holiday)</p><p>${escapeHtml(holiday.description)}</p><p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`;
+    }
+    const weekday = kernel.weekdayOfIso(checkIso);
+    return `<p><strong>No. ${escapeHtml(formatted)} is not an official gazetted holiday.</strong></p><p>${weekday === "Saturday" || weekday === "Sunday" ? `It falls on a ${weekday} (weekend).` : "It is a regular college working day."}</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`;
   }
 
   // Next holiday
@@ -5535,19 +5675,23 @@ function initEvents() {
   closeQuestionSuggestions();
 
   // Multi-Intent Splitter (Hinglish/English)
-  const queries = rawQuestion.split(/\s+(?:and|aur|te|also|plus)\s+(?=(?:what|when|where|who|is|are|tell|show|find|whose|how|kado|kadon|kab|kithe|kaha|kon|kaun|keda|whose)\b)|[?.,;]\s+/i).map(q => q.trim()).filter(Boolean);
+  const queries = rawQuestion.split(/\s+(?:and|aur|te|also|plus)\s+(?=(?:what|when|where|who|is|are|tell|show|find|whose|how|kado|kadon|kab|kithe|kaha|kon|kaun|keda)\b)|(?:\?|;)\s+/i).map(q => q.trim()).filter(Boolean);
+  const isMulti = queries.length > 1;
+  if (isMulti) {
+    ensureChatBubble("user", `<strong>${escapeHtml(rawQuestion)}</strong>`);
+  }
 
   for (const q of queries) {
     await (async () => {
       const question = q;
       const adminCommand = question.match(/^kkj$/i);
     if (adminCommand) {
-      ensureChatBubble("user", "<strong>KKJ admin request</strong>");
+      if (!isMulti) ensureChatBubble("user", "<strong>KKJ admin request</strong>");
       await unlockAdminAi();
       persistChat();
       return;
     }
-    ensureChatBubble("user", `<strong>${escapeHtml(question)}</strong>`);
+    if (!isMulti) ensureChatBubble("user", `<strong>${escapeHtml(question)}</strong>`);
     state.activeFacultyAiContext = null;
     const mentoringAnswer = mentoringClassAnswer(question);
     if (mentoringAnswer) {
@@ -6028,7 +6172,7 @@ function kbSyllabusUnitAnswer(question) {
 }
 
 const KB_OOB = [
-  {id:"admin-kkj",test:/kaushik\s*jain|\bkkj\b|who\s*(?:is|created|built)\s*(?:kaushik|kkj|compass)|creator|author|developer|admin\s*command/,reply:()=>`<p><strong><u>Kaushik Jain (Admin &amp; Creator)</u></strong></p><p>Kaushik Jain is the administrator and creator of GNDEC Compass.</p><p>Typing <strong>kkj</strong> in the chat verifies the configured administrator profile on this device and unlocks the admin AI modes and custom timetable HTML import. Server maintenance endpoints remain protected by the separate administrator API token.</p><p class="answer-source">Compass administrator rule.</p>`},
+  {id:"admin-kkj",test:/kaushik\s*jain|\bkkj\b|who\s*(?:is|created|built|made|developed)\s*(?:this|the)?\s*(?:web|website|web\s*app|app|compass|site|tool|system|kaushik|kkj)?|\b(?:creator|author|developer)\b|who\s+are\s+you|built\s+this\s+web/i,reply:()=>`<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p>Typing <strong>kkj</strong> in the chat verifies the configured administrator profile on this device and unlocks the admin AI modes and custom timetable HTML import. Server maintenance endpoints remain protected by the separate administrator API token.</p><p class="answer-source">Compass administrator rule.</p>`},
   {id:"college-timing",test:/college\s*(timing|time|opens?|closes?|hours)|college\s*kitne\s*baje|college\s*khulta|college\s*khulda|class\s*(timing|time)|what\s*time\s*(?:does\s*\w+|\w+\s*open|does\s*the\s*college)|kitne\s*baje\s*(college|class)/,reply:()=>{const classes=state.selectedGroup?DAY_NAMES.flatMap((day)=>classFor(state.selectedGroup,day)):[];if(!classes.length)return`<p><strong><u>College hours</u></strong></p><p>Office hours are not present in the currently loaded official timetable. Check the latest GNDEC notice or office page.</p>`;const first=Math.min(...classes.map((item)=>item.start)),last=Math.max(...classes.map((item)=>item.end));return`<p><strong><u>College hours · verified timetable span</u></strong></p><p>Your active official timetable runs from as early as <strong>${humanTime(first)}</strong> to as late as <strong>${humanTime(last)}</strong>, depending on the day.</p><p>This describes your classes, not administrative office hours.</p><p class="kb-tip">Ask “today ka timetable” for today’s exact span.</p>`;}},
   {id:"uniform",test:/uniform|dress\s*code|what\s*to\s*wear|wear\s*in\s*college|dress|ਵਰਦੀ|ड्रेस/,reply:()=>`<p><strong><u>Dress code</u></strong></p><p>The loaded timetable and syllabus do not contain a verified dress-code rule. Check the current student notice or ask your mentor before relying on informal advice.</p>`},
   {id:"attendance",test:/attend|attendance|75%?|75\s*percent|bunk|skip\s*class|miss\s*class|haziri|hazri|hajri|ਗੈਰ-ਹਾਜ਼ਰੀ|ऐटेंडेंस/,reply:()=>`<p><strong><u>GNDEC Attendance Rule</u></strong></p><p>A minimum of <strong>75% attendance</strong> is mandatory in all theory and practical courses under official autonomous regulations to sit in End-Semester Examinations (ESE). Compass provides a default target of <strong>76%</strong> (1% safety cushion) in Settings.</p><p class="answer-source">Official GNDEC Autonomous Academic Regulations.</p>`},

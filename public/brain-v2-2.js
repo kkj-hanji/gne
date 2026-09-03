@@ -76,12 +76,12 @@
   }
 
   function mentionsOwnTimetable(text) {
-    return /\bmy\b|\bmine\b|\bme\b|\bapna\b|\bapni\b/.test(String(text || ""));
+    return /\bmy\b|\bmine\b|\bme\b|\bapna\b|\bapni\b|\bmera\b|\bmeri\b|\bmere\b|\buser\s*branch\b|\bmy\s*branch\b|\bour\b|\bhamara\b/.test(String(text || ""));
   }
 
   function comparisonRequest(question, context) {
     const q = kernel.normalize(question);
-    if (!/\bcompare\b|\bcomparison\b|\bvs\b|\bversus\b|\bdifference\b|\bdifferent\b/.test(q)) return null;
+    if (!/\bcompare\b|\bcomparison\b|\bvs\b|\bversus\b|\bdifference\b|\bdifferent\b|\bfarak\b|\bfarq\b|\b(?:common|shared|same)\s+(?:teacher|teachers|faculty|subject|subjects|slot|slots|free)\b/.test(q)) return null;
     const parts = q.split(/\bvs\b|\bversus\b/).map((part) => part.trim()).filter(Boolean);
     const symbol = kernel.extractDaySymbol(q);
     const day = symbol ? kernel.resolveDaySymbol(symbol, String(context?.calendarDate ? kernel.weekdayOfIso(context.calendarDate) : "")) : "";
@@ -116,6 +116,9 @@
           scopeDay: day
         };
       }
+      if (codes.length === 0 && !own) {
+        return { help: true };
+      }
       return null;
     }
     // "my timetable vs ECB2" resolves the own side from the device profile.
@@ -143,7 +146,14 @@
     "DIFFERENCE", "COMPARE", "COMPARISON", "COMMON", "SHARED", "ONLY", "FREE",
     "TIMETABLE", "TIME", "TABLE", "SCHEDULE", "CLASSES", "CLASS", "LECTURES",
     "LECTURE", "PERIODS", "PERIOD", "TODAY", "TOMORROW", "YESTERDAY", "PLEASE",
-    "BETWEEN", "VS", "VERSUS", "BOTH", "DONO"
+    "BETWEEN", "VS", "VERSUS", "BOTH", "DONO",
+    "WITH", "FROM", "USER", "BRANCH", "STUDENT", "STUDENTS", "SECTION", "SUBSECTION",
+    "WEEK", "DETAILS", "ABOUT", "INTO", "TELL", "SHOW", "LIST", "GIVE", "FIND",
+    "CHECK", "KNOW", "SAME", "LIKE", "THAN", "ALSO", "HAVE", "HAS", "HAD",
+    "KA", "KI", "KE", "KO", "SE", "TE", "VICH", "MEIN", "AUR", "NAL", "NAAL",
+    "FARAK", "FARQ", "KARO", "BATAO", "DIKHAO", "DASSO", "DA", "DE", "DI",
+    "HAI", "HAN", "HE", "SI", "SAN", "CH", "NU", "HAFTE", "HAFTA", "GROUPS", "GROUP",
+    "ALL", "ANY", "TEACHER", "FACULTY", "ROOM", "ROOMS", "BRANCHES", "ETC", "SO", "ON"
   ]);
 
   function codesIn(text) {
@@ -222,6 +232,14 @@
 
     const minutesFor = (items) => items.reduce((total, item) => total + (item.end - item.start), 0);
 
+    const leftTeachers = [...new Set(scopedLeft.flatMap((item) => kernel.teacherNames ? kernel.teacherNames(item.teacher) : (item.teacher ? [item.teacher] : [])))].filter(Boolean);
+    const rightTeachers = [...new Set(scopedRight.flatMap((item) => kernel.teacherNames ? kernel.teacherNames(item.teacher) : (item.teacher ? [item.teacher] : [])))].filter(Boolean);
+    const commonTeachers = leftTeachers.filter((t) => rightTeachers.includes(t));
+
+    const leftSubjects = [...new Set(scopedLeft.map((item) => item.subject).filter(Boolean))];
+    const rightSubjects = [...new Set(scopedRight.map((item) => item.subject).filter(Boolean))];
+    const commonSubjects = leftSubjects.filter((s) => rightSubjects.some((rs) => rs.toLowerCase() === s.toLowerCase()));
+
     return {
       leftCount: scopedLeft.length,
       rightCount: scopedRight.length,
@@ -233,7 +251,9 @@
       changedDetail: changedDetail.slice(0, MAX_DIFF_ROWS),
       changedDetailTotal: changedDetail.length,
       leftMinutes: minutesFor(scopedLeft),
-      rightMinutes: minutesFor(scopedRight)
+      rightMinutes: minutesFor(scopedRight),
+      commonTeachers,
+      commonSubjects
     };
   }
 
@@ -244,6 +264,11 @@
   function comparisonAnswer(question, context) {
     const request = comparisonRequest(question, context);
     if (!request) return null;
+    if (request.help) {
+      return kernel.result("COMPARE_HELP", 0.95,
+        `<p><strong><u>Timetable &amp; Student Comparison</u></strong></p><p>Compass can compare any two official timetables or verified students side-by-side:</p><ul><li><strong>Section vs Section:</strong> “Compare ECB vs CSD”</li><li><strong>Subsection vs Subsection:</strong> “ECB1 vs ECB2 on Tuesday” or “CSD2 vs RAI1”</li><li><strong>With your timetable:</strong> “my timetable vs CSD2” or “user branch vs ECB”</li><li><strong>Student vs Student:</strong> “Mohitveer Singh vs me” or “Mohitveer Singh vs Kaushik Jain”</li></ul><p class="answer-source">Read-only comparison using official GNDEC data without altering your profile.</p>`,
+        [], ["explain comparison capabilities with examples"], {});
+    }
     if (Array.isArray(request.tooMany) && request.tooMany.length > 2) {
       return kernel.result("COMPARE_CLARIFY", 0.95,
         `<p>I found ${kernel.escapeHtml(String(request.tooMany.length))} timetable codes: <strong>${kernel.escapeHtml(request.tooMany.join(", "))}</strong>.</p><p>Compass compares two at a time. Try: <strong>Compare ${kernel.escapeHtml(request.tooMany[0])} vs ${kernel.escapeHtml(request.tooMany[1])}</strong>.</p><p class="answer-source">Only verified timetable codes are used; Compass does not choose a pair silently.</p>`,
@@ -289,12 +314,29 @@
     const report = runComparison(leftSel, rightSel, request.scopeDay, context);
     const revision = String(context.datasetVersion || "current");
     const scopeLabel = request.scopeDay ? ` · ${kernel.escapeHtml(request.scopeDay)} only` : " · whole week";
+
+    if (/\b(?:common|shared|same)\s+(?:teacher|teachers|faculty)\b/i.test(question)) {
+      const teacherHeader = `<p><strong><u>Common Faculty: ${kernel.escapeHtml(leftSel.code)} &amp; ${kernel.escapeHtml(rightSel.code)}</u></strong>${scopeLabel}</p>`
+        + `<p>Source: official GNDEC timetable, ${kernel.escapeHtml(revision)}</p>`;
+      const teacherContent = report.commonTeachers.length
+        ? `<p>Found <strong>${report.commonTeachers.length}</strong> shared faculty member${report.commonTeachers.length > 1 ? "s" : ""}:</p><ul>${report.commonTeachers.map((t) => `<li><strong>${kernel.escapeHtml(t)}</strong></li>`).join("")}</ul>`
+        : `<p>No shared faculty members are scheduled between <strong>${kernel.escapeHtml(leftSel.code)}</strong> and <strong>${kernel.escapeHtml(rightSel.code)}</strong>${request.scopeDay ? ` on ${kernel.escapeHtml(request.scopeDay)}` : ""}.</p>`;
+      return kernel.result("TIMETABLE_COMMON_TEACHERS", 0.98,
+        teacherHeader + teacherContent + `<p class="answer-source">Computed from verified faculty timetable assignments.</p>`,
+        { left: leftSel.code, right: rightSel.code, commonTeachers: report.commonTeachers, count: report.commonTeachers.length },
+        ["extract teachers from both timetables", "compute intersection", "render common faculty"]);
+    }
+
     const header = `<p><strong>Compared: ${kernel.escapeHtml(leftSel.code)} and ${kernel.escapeHtml(rightSel.code)}</strong>${scopeLabel}</p>`
       + `<p>Source: official GNDEC timetable, ${kernel.escapeHtml(revision)} · Profile unchanged; your active timetable stays selected.</p>`;
 
     const sections = [];
     sections.push(`<p>${report.shared.length} of ${Math.max(report.leftCount, report.rightCount)} scheduled slots match exactly`
       + `${request.scopeDay ? "" : ` · weekly load: ${kernel.durationLabel(report.leftMinutes)} vs ${kernel.durationLabel(report.rightMinutes)}`}</p>`);
+
+    if (report.commonTeachers.length > 0) {
+      sections.push(`<p><strong>Common Faculty (${report.commonTeachers.length}):</strong> ${kernel.escapeHtml(report.commonTeachers.join(", "))}</p>`);
+    }
 
     if (report.changedDetail.length) {
       const rows = report.changedDetail.map((pair) =>
@@ -479,15 +521,16 @@
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
     const baseIso = String(context.calendarDate || "");
-    if (!kernel.isValidIsoDate(baseIso)) return null;
+    const baseYear = Number(baseIso.slice(0, 4)) || 2026;
 
     const asksSchedule = /\b(?:timetable|schedule|class|classes|lecture|lectures|period|periods)\b/.test(q);
-    const asksHolidayDirect = /\b(?:holiday|chutti|closed|band|off)\b/.test(q);
-    if (!asksSchedule && !asksHolidayDirect) return null;
+    const asksHolidayDirect = /\b(?:holiday|holidays|chutti|chhutti|closed|band|off\s+day|off)\b/.test(q);
+    const holidaySearchResults = kernel.searchHolidays ? kernel.searchHolidays(raw) : [];
+    if (!asksSchedule && !asksHolidayDirect && !holidaySearchResults.length) return null;
 
     let targetIso = "";
     const isoMatch = q.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    const monthMatch = q.match(/(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
+    const monthMatch = q.match(/(\d{1,2})(?!\d)\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
     const symbol = kernel.extractDaySymbol(q);
 
     if (isoMatch) {
@@ -497,18 +540,18 @@
       const dayNum = isFirstNum ? Number(monthMatch[1]) : Number(monthMatch[2]);
       const monthStr = (isFirstNum ? monthMatch[2] : monthMatch[1]).toLowerCase();
       if (kernel.MONTHS[monthStr] !== undefined && dayNum >= 1 && dayNum <= 31) {
-        const year = monthMatch[3] ? Number(monthMatch[3]) : Number(baseIso.slice(0, 4));
+        const year = monthMatch[3] ? Number(monthMatch[3]) : baseYear;
         targetIso = `${year}-${String(kernel.MONTHS[monthStr] + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
       }
-    } else if (symbol) {
+    } else if (symbol && kernel.isValidIsoDate(baseIso)) {
       const offsets = { today: 0, tomorrow: 1, day_after_tomorrow: 2, yesterday: -1 };
       if (symbol in offsets) targetIso = kernel.shiftIsoDate(baseIso, offsets[symbol]);
     }
 
     if (targetIso && kernel.isValidIsoDate(targetIso)) {
       const holiday = kernel.checkDateHoliday(targetIso);
+      const formatted = kernel.formatIsoFull(targetIso);
       if (holiday) {
-        const formatted = kernel.formatIsoFull(targetIso);
         if (kernel.isHalfDayNotice?.(holiday)) {
           return kernel.result("TIMETABLE_HALF_DAY_NOTICE", 0.98,
             `<p><strong>${kernel.escapeHtml(formatted)} has a second-half-day GNDEC notice.</strong></p><p>${kernel.escapeHtml(holiday.name)} is not a full-day closure. Check the GNDEC notice before assuming your classes are cancelled.</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`,
@@ -525,6 +568,46 @@
           `<p><strong>🎉 No classes scheduled on ${kernel.escapeHtml(formatted)}!</strong></p><p>It is an official <strong>${kernel.escapeHtml(holiday.type)} Holiday</strong> for <strong>${kernel.escapeHtml(holiday.name)}</strong>.</p><p>College remains closed for this gazetted occasion (${kernel.escapeHtml(holiday.description)}).</p><p class="answer-source">Official GNDEC Academic & Gazetted Holiday Calendar.</p>`,
           { iso: targetIso, isHoliday: true, holiday: holiday.name },
           ["resolve requested schedule date", "check gazetted holiday registry", "flag official college holiday"]);
+      }
+      if (asksHolidayDirect) {
+        const weekday = kernel.weekdayOfIso(targetIso);
+        const isWeekend = weekday === "Saturday" || weekday === "Sunday";
+        return kernel.result("TIMETABLE_NOT_A_HOLIDAY", 0.98,
+          `<p><strong>No. ${kernel.escapeHtml(formatted)} is not an official gazetted holiday.</strong></p><p>${isWeekend ? `It falls on a ${weekday} (weekend).` : "It is a regular college working day."}</p><p class="answer-source">Official GNDEC Academic & Gazetted Holiday Calendar.</p>`,
+          { iso: targetIso, isHoliday: false },
+          ["resolve requested date", "verify official holiday list", "confirm normal working day"]);
+      }
+    }
+
+    if (asksHolidayDirect) {
+      const mentionedMonth = Object.keys(kernel.MONTHS).find((m) => new RegExp(`\\b${m}\\b`, "i").test(q) && m.length >= 3);
+      if (mentionedMonth !== undefined && kernel.getHolidaysForMonth) {
+        const mIdx = kernel.MONTHS[mentionedMonth];
+        const mName = kernel.MONTH_NAMES[mIdx];
+        const list = kernel.getHolidaysForMonth(mIdx, baseYear);
+        if (!list.length) {
+          return kernel.result("HOLIDAY_MONTH_LIST", 0.98,
+            `<p><strong>There are no gazetted holidays listed in ${kernel.escapeHtml(mName)} ${baseYear}.</strong></p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
+            { month: mName, count: 0 }, ["check holidays for month", "confirm zero gazetted holidays"]);
+        }
+        const items = list.map((h) => `<li><strong>${h.date.slice(8, 10)} ${mName} (${h.day})</strong>: ${kernel.escapeHtml(h.name)} <em>(${kernel.escapeHtml(h.type)})</em></li>`).join("");
+        return kernel.result("HOLIDAY_MONTH_LIST", 0.98,
+          `<p><strong><u>Official Holidays in ${kernel.escapeHtml(mName)} ${baseYear} (${list.length})</u></strong></p><ul>${items}</ul><p class="answer-source">Official GNDEC & Punjab Government Gazetted Holiday Calendar.</p>`,
+          { month: mName, count: list.length }, ["check holidays for month", "render holiday list"]);
+      }
+
+      if (holidaySearchResults.length) {
+        const h = holidaySearchResults[0];
+        const formatted = kernel.formatIsoFull(h.date);
+        const status = kernel.isHalfDayNotice?.(h)
+          ? "Second-half-day notice only. Check the GNDEC notice before assuming classes are cancelled."
+          : String(h.type || "").toLowerCase() === "restricted"
+            ? "Optional leave. College may be open, so classes may happen."
+            : "Official holiday. College is normally closed.";
+        return kernel.result("HOLIDAY_NAMED_LOOKUP", 0.98,
+          `<p><strong>${kernel.escapeHtml(h.name)} (${baseYear})</strong></p><p><strong>Date:</strong> ${kernel.escapeHtml(formatted)}<br /><strong>Category:</strong> ${kernel.escapeHtml(h.type)} Holiday<br /><strong>Status:</strong> ${kernel.escapeHtml(status)}</p><p class="answer-source"><a href="${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.pdf)}" target="_blank" rel="noopener noreferrer">${kernel.escapeHtml(kernel.HOLIDAY_SOURCE.label)} ↗</a></p>`,
+          { holiday: h.name, date: h.date, type: h.type },
+          ["search holiday registry by name", "render verified holiday details"]);
       }
     }
     return null;
@@ -648,6 +731,115 @@
     return null;
   }
 
+  // Creator & Admin Query Handler
+  function creatorAnswer(question) {
+    const raw = String(question || "").trim();
+    const q = kernel.normalize(raw);
+    if (/\b(?:who\s+(?:built|made|created|developed|coded)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|tool|site|system)?|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|creator\s+of\s+(?:this|compass)|kaushik\s*jain|\bkkj\b)\b/i.test(q)
+      || /built\s+this\s+web/i.test(q)) {
+      return kernel.result("CREATOR", 1,
+        `<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p>Typing <strong>kkj</strong> in the chat verifies the configured administrator profile on this device and unlocks the admin AI modes and custom timetable HTML import. Server maintenance endpoints remain protected by the separate administrator API token.</p><p class="answer-source">Official GNDEC Compass creator info.</p>`,
+        {}, ["creator query", "respond with verified author details"]);
+    }
+    return null;
+  }
+
+  // Campus Places & Location Intelligence
+  const CAMPUS_PLACES = [
+    {
+      test: /\b(?:automobile|auto)\s*(?:block|dept|department)?\b/i,
+      name: "Automobile Engineering Block",
+      location: "Adjacent to Mechanical Engineering Block and the Central Workshop.",
+      details: "Houses automobile labs, internal combustion engine facilities, and seminar rooms."
+    },
+    {
+      test: /\b(?:mechanical|mech)\s*(?:block|building|dept|department)?\b/i,
+      name: "Mechanical Engineering Block",
+      location: "Near Central Workshop, facing the main lawn.",
+      details: "Houses mechanical faculty rooms, CAD/CAM labs, dynamics & fluid mechanics labs."
+    },
+    {
+      test: /\b(?:main\s*block|administrative\s*block|admin\s*block|principal\s*office)\b/i,
+      name: "Main Academic / Administrative Block",
+      location: "Central campus building near the main entrance.",
+      details: "Houses Principal's office, examination branch, accounts office, Dean offices, and G-series classrooms (G6, G7, etc.)."
+    },
+    {
+      test: /\b(?:computer\s*science|cse?|it)\s*(?:block|dept|department)?\b/i,
+      name: "Computer Science & IT Block",
+      location: "North wing of the main academic complex.",
+      details: "Houses CSE and IT department offices, computer centre, networking labs, and high-performance computing labs."
+    },
+    {
+      test: /\b(?:electrical|ece?|ee|electronics)\s*(?:block|dept|department)?\b/i,
+      name: "Electrical & Electronics Block",
+      location: "East academic quadrant, connected to the Main Block corridor.",
+      details: "Houses ECE and EE department offices, microprocessor labs, electrical machines lab, and power electronics facilities."
+    },
+    {
+      test: /\b(?:civil)\s*(?:block|dept|department)?\b/i,
+      name: "Civil Engineering Block",
+      location: "South-east academic quadrant near soil mechanics labs.",
+      details: "Houses Civil Engineering department, concrete testing labs, environmental engineering, and surveying labs."
+    },
+    {
+      test: /\b(?:mba|management)\s*(?:block|dept|department)?\b/i,
+      name: "Department of Business Administration (MBA Block)",
+      location: "Near the management & consultancy wing.",
+      details: "Houses MBA lecture halls, management seminar rooms, and case study discussion rooms."
+    },
+    {
+      test: /\b(?:library|central\s*library|reading\s*room)\b/i,
+      name: "Dr. Radhakrishnan Central Library",
+      location: "Centrally situated between the Main Block and Workshop complex.",
+      details: "Houses book lending sections, reference section, digital library lab, and student study halls."
+    },
+    {
+      test: /\b(?:workshop|central\s*workshop|carpentry|foundry|smithy|welding)\b/i,
+      name: "Central Workshop",
+      location: "Behind the Mechanical and Automobile blocks.",
+      details: "Houses manufacturing practice shops: machine shop, welding, fitting, carpentry, smithy, and foundry shops."
+    },
+    {
+      test: /\b(?:auditorium|college\s*audi)\b/i,
+      name: "College Auditorium",
+      location: "Main Block campus complex.",
+      details: "Hosts official college conventions, cultural events, guest lectures, and induction programs."
+    },
+    {
+      test: /\b(?:sports|playground|ground|gym|gymnasium|cricket\s*ground|football\s*ground)\b/i,
+      name: "Sports Complex & Grounds",
+      location: "Opposite the hostel complex on the campus perimeter.",
+      details: "Features the central athletic stadium, cricket ground, football turf, basketball courts, and student gym."
+    },
+    {
+      test: /\b(?:canteen|cafeteria|cafe|food\s*court)\b/i,
+      name: "Student Canteen & Nescafe Corner",
+      location: "Located centrally between academic departments and student hostels.",
+      details: "Serves refreshments, meals, and snacks during breaks."
+    },
+    {
+      test: /\b(?:hostel|hostels|mess)\b/i,
+      name: "Campus Hostels",
+      location: "Residential sector of the GNDEC campus.",
+      details: "Boys Hostels (Hostel 1, 2, 5) and Girls Hostel (Hostel 4) with 24/7 power, dining halls, and indoor sports."
+    }
+  ];
+
+  function campusLocationAnswer(question) {
+    const raw = String(question || "").trim();
+    const q = kernel.normalize(raw);
+    const asksLocation = /\b(?:where\s+is|location\s+of|kahan\s+hai|kaha\s+hai|kithe\s+hai|kithhe\s+hai|kidhar\s+hai|find\s+(?:block|building|place|room|dept|department))\b/i.test(q)
+      || /\b(?:where\s+(?:is|are)\s+the\s+hostels?|where\s+is\s+the\s+library|where\s+is\s+the\s+canteen)\b/i.test(q);
+    if (!asksLocation) return null;
+    const match = CAMPUS_PLACES.find((p) => p.test.test(q));
+    if (!match) return null;
+    return kernel.result("CAMPUS_LOCATION", 0.98,
+      `<p><strong><u>${kernel.escapeHtml(match.name)}</u></strong></p><p><strong>Campus Location:</strong> ${kernel.escapeHtml(match.location)}</p><p>${kernel.escapeHtml(match.details)}</p><p class="answer-source">GNDEC Campus Facilities &amp; Campus Map.</p>`,
+      { place: match.name, location: match.location },
+      ["resolve campus location inquiry", "lookup verified building/facility entry"]);
+  }
+
   // ---- Entry point ----
   function process(input, context = {}) {
     const startedAt = Date.now();
@@ -663,6 +855,8 @@
       if (!original) return complete(kernel.failure("UNSUPPORTED_INTENT"));
       const mergedContext = { ...context, conversation: kernel.createMemory(context.conversation) };
       const candidate = holidayTimetableAnswer(original, mergedContext)
+        || creatorAnswer(original, mergedContext)
+        || campusLocationAnswer(original, mergedContext)
         || routeAndRushAnswer(original, mergedContext)
         || examScenarioAnswer(original, mergedContext)
         || commonFreeSlotsAnswer(original, mergedContext)

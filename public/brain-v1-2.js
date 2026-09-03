@@ -160,7 +160,7 @@
     }
 
     // 1. Is specific date a holiday? e.g., "is on 15 august holiday", "is 15 august a holiday", "15 august ko chutti hai kya"
-    const monthNameMatch = q.match(/(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
+    const monthNameMatch = q.match(/(\d{1,2})(?!\d)\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
     const numericDateMatch = q.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/);
     const isoDateMatch = q.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
 

@@ -983,7 +983,10 @@ export default {
       }
       return Response.json({ error: "That answer could not be completed just now. Please try again or rephrase the question." }, { status: 503 });
     }
-    return env.ASSETS.fetch(request);
+    if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
+      return env.ASSETS.fetch(request);
+    }
+    return new Response("Not Found", { status: 404 });
   },
   async scheduled(_event, env, ctx) {
     // A failed discovery never replaces the active registry: the last verified

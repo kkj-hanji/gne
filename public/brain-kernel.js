@@ -649,7 +649,7 @@
   function searchHolidays(keyword) {
     const q = normalizeHolidayLookup(keyword);
     if (!q) return [];
-    const queryTerms = q.split(" ").filter((term) => term.length >= 4 && !HOLIDAY_LOOKUP_STOP_WORDS.has(term));
+    const queryTerms = q.split(" ").filter((term) => term.length >= 3 && !HOLIDAY_LOOKUP_STOP_WORDS.has(term));
     if (!queryTerms.length) return [];
     const paddedQuery = ` ${q} `;
     return officialHolidayEntries().map((holiday, index) => {
