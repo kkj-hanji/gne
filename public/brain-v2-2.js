@@ -808,7 +808,7 @@
       || /\bwho\s+is\s+kaushik(?:\s+jain)?\b/i.test(q)
       || /\babout\s+(?:compass|developer|creator)\b/i.test(q)) {
       return kernel.result("CREATOR", 1,
-        `<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p>Typing <strong>kkj</strong> in the chat verifies the configured administrator profile on this device and unlocks the admin AI modes and custom timetable HTML import. Server maintenance endpoints remain protected by the separate administrator API token.</p><p class="answer-source">Official GNDEC Compass creator info.</p>`,
+        `<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p class="answer-source">Official GNDEC Compass creator info.</p>`,
         {}, ["creator query", "respond with verified author details"]);
     }
     return null;
