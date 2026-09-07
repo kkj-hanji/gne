@@ -186,8 +186,9 @@
       || CALENDAR_DAYS.some((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(normalized))) add("timetable", 80);
     if (/\b(?:compare|comparison|versus|vs|difference|farak|farq)\b/.test(normalized)
       || /\b(?:common|shared|same|both)\s+free\b|\bwhen are\b.*\bfree\b/.test(normalized)) add("comparison", 98);
-    if (/\b(?:students?|crn|registration|serial|roster|mentor)\b/.test(normalized)) add("student", 75);
-    if (/\b(?:faculty|teacher|professor|designation|qualification|research|publication|official email)\b/.test(normalized)) add("faculty", 75);
+    if (/\b(?:students?|crn|registration|serial|roster|mentor|kitne|kitni|kinne|kinni)\b|\bwho (?:is|are) in\b/.test(normalized)) add("student", 75);
+    if (/\b(?:faculty|teacher|professor|designation|qualification|research|publication|official email|prof|dr|doctor|er|ar|sir|maam|madam)\b/.test(normalized)) add("faculty", 75);
+    if (/\b(?:room|rooms|lab|labs|hall|venue)\b/.test(normalized)) add("room", 70);
     if (/\b(?:where|location|directions?|campus|hostel|library|canteen|dispensary|workshop)\b/.test(normalized)) add("campus", 65);
     if (/\b(?:calculate|calculation|percentage|cgpa|sgpa|attendance|bunk|solve)\b|\d\s*[%+*/^=-]/.test(normalized)) add("calculation", 72);
     if (/\b(?:who (?:built|made|created|developed|coded)|creator|developer|author)\b.*\b(?:compass|app|website|site|this|web|system)\b|\bwho built this\b|\bwho is kaushik(?:\s+jain)?\b|\babout (?:compass|developer|creator)\b/.test(normalized)) add("creator", 100);
@@ -328,7 +329,7 @@
       // Elliptical "and holiday?" shares the preceding date, while "my next
       // class" always retains its independent current-time meaning.
       if (clause.intent === "holiday" && clause.temporal.status === "none" && previous.temporal.status === "resolved"
-        && !/\b(?:next|previous|last|month|year)\b/.test(clause.question)) {
+        && !new RegExp(`\\b(?:next|previous|last|month|year|${Object.keys(MONTHS).join("|")})\\b`, "i").test(clause.question)) {
         clause.question += ` on ${previous.temporal.iso}`;
         clause.temporal = { ...previous.temporal };
         clause.dependsOn.push(previous.id);

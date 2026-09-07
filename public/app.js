@@ -830,7 +830,11 @@ function officialTimetableViewAnswer(question = "") {
     const request = id === "teachers" ? namedPersonTimetableRequest(question, { allowOfficialView: true, allowSelf: true, kind: "teachers" }) : null;
     if (request) {
       const match = timetablePersonCaption(request.term, loaded);
-      return readOnlyTeacherTimetableAnswer(request, match, loaded) || `<p><strong>No verified faculty timetable match for ${escapeHtml(request.label)}.</strong></p><p>This faculty timetable covers the published Applied Sciences release. A missing entry does not mean the teacher has no classes. Check the official faculty timetable or the relevant department.</p>`;
+      const answer = readOnlyTeacherTimetableAnswer(request, match, loaded);
+      if (answer) return answer;
+      const crossMatch = crossTimetableTeacherSchedule(request.term);
+      if (crossMatch.status === "single") return crossTimetableTeacherAnswer(request, crossMatch);
+      return `<p><strong><u>No verified faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>This faculty timetable covers the published Applied Sciences release. A missing entry does not mean the teacher has no classes. Check the official faculty timetable or the relevant department.</p>`;
     }
     return `<p><strong><u>${escapeHtml(view.label)}</u></strong></p><p>I could not resolve a unique entry. Name a verified ${escapeHtml(view.noun)} to see its weekly schedule.</p>${available.length ? `<p><strong>Available:</strong> ${escapeHtml(available.slice(0, 30).join(", "))}${available.length > 30 ? " …" : ""}</p>` : ""}<p class="answer-source">Official GNDEC ${escapeHtml(view.label.toLowerCase())}.</p>`;
   }
@@ -3541,7 +3545,8 @@ function namedPersonTimetableRequest(question = "", options = {}) {
   const friendCue = studentCue;
   const refersToOwnTimetable = /\b(?:my|mine|mera|meri|mere)\b/.test(q) && !friendCue;
   if (refersToOwnTimetable) return null;
-  if (/\b(?:which|what)\s+class(?:es)?\b.*\b(?:lab|room|venue)\b/.test(q)) return null;
+  const roomCue = /\b(?:building|block|lab|room|venue)\b/i.test(q) || /\b[a-z]\d{1,4}\b/i.test(original);
+  if ((roomCue || /\b(?:which|what)\s+class(?:es)?\b.*\b(?:lab|room|venue)\b/.test(q)) && !teacherCue && !studentCue) return null;
   const ignored = new Set(["a", "after", "afternoon", "am", "an", "and", "are", "around", "as", "at", "before", "between", "both", "can", "check", "class", "classes", "compare", "comparison", "current", "da", "day", "de", "di", "dono", "does", "do", "doctor", "dr", "duration", "earlier", "evening", "faculty", "first", "for", "free", "friend", "from", "give", "going", "had", "hai", "hain", "has", "have", "her", "his", "how", "i", "instructor", "is", "its", "ka", "kab", "kardo", "karo", "ke", "ki", "krdo", "last", "later", "latest", "lecture", "lectures", "maam", "madam", "many", "me", "mine", "morning", "most", "my", "new", "next", "night", "now", "of", "official", "on", "or", "parso", "parson", "period", "periods", "please", "pm", "prof", "professor", "right", "schedule", "shanivar", "show", "sir", "student", "table", "teacher", "tell", "that", "the", "their", "this", "time", "timetabel", "timetble", "timetabl", "timetable", "to", "today", "tomorrow", "tommorow", "tommorrow", "total", "until", "update", "updated", "verified", "week", "what", "when", "which", "who", "with", "yestarday", "yesteday", "yesterday", "your", "aaj", "ajj", "batao", "kal", "kalle", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
   (globalThis.CompassBrainKernel?.MONTH_NAMES || ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]).forEach((month) => ignored.add(String(month).toLowerCase()));
   ["er", "ar", "mr", "mrs", "ms", "students", "classmate", "batchmate", "peer"].forEach((word) => ignored.add(word));
@@ -3894,6 +3899,58 @@ async function resolveNamedPersonTimetableAnswer(question = "") {
   return namedTimetableResolutionAnswer(request, { facultySchedule, facultyUnavailable, studentLookup });
 }
 
+function crossTimetableTeacherSchedule(term = "") {
+  const wanted = canonicalFacultyName(term);
+  if (!wanted) return { status: "none", matches: [] };
+  const pool = state.schedule || [];
+  const teacherMap = new Map();
+  pool.forEach((item) => {
+    if (!item.teacher || /not listed/i.test(item.teacher)) return;
+    const names = String(item.teacher).split(/[,&/]/).map((s) => s.trim()).filter(Boolean);
+    names.forEach((t) => {
+      const cName = canonicalFacultyName(t);
+      if (!cName) return;
+      if (!teacherMap.has(t)) teacherMap.set(t, []);
+      teacherMap.get(t).push(item);
+    });
+  });
+
+  const uniqueTeachers = [...teacherMap.keys()];
+  const exact = uniqueTeachers.filter((t) => canonicalFacultyName(t) === wanted);
+  const wantedWords = wanted.split(/\s+/).filter(Boolean);
+  const contained = uniqueTeachers.filter((t) => {
+    const candidate = canonicalFacultyName(t);
+    return wantedWords.length && wantedWords.every((word) => candidate.split(/\s+/).some((part) => part === word || (word.length >= 3 && part.length >= 3 && part.startsWith(word))));
+  });
+  const matches = [...new Set(exact.length ? exact : contained)];
+  const fuzzy = matches.length ? matches : uniqueTeachers.filter((t) => {
+    const words = canonicalFacultyName(t).split(/\s+/);
+    return wantedWords.length && wantedWords.every((word) => words.some((part) => part === word || (word.length >= 4 && part.length >= 4 && editDistance(word, part) <= (word.length >= 7 ? 2 : 1))));
+  });
+
+  if (fuzzy.length === 1) {
+    const teacherName = fuzzy[0];
+    return { status: "single", teacher: teacherName, schedule: teacherMap.get(teacherName) || [] };
+  }
+  if (fuzzy.length > 1) {
+    return { status: "multiple", teachers: fuzzy };
+  }
+  return { status: "none", matches: [] };
+}
+
+function crossTimetableTeacherAnswer(request, crossMatch) {
+  if (crossMatch.status === "multiple") {
+    return `<p><strong><u>More than one faculty timetable matches ${escapeHtml(request.label)}.</u></strong></p><p>Matches: ${escapeHtml(crossMatch.teachers.join(", "))}. Please use the faculty member’s full official name.</p>`;
+  }
+  if (crossMatch.status !== "single" || !crossMatch.schedule?.length) return "";
+  const teacher = crossMatch.teacher;
+  const day = request.day || (request.window ? getIndiaNow().day : "");
+  const entries = crossMatch.schedule.filter((item) => !day || item.day === day);
+  const heading = `${teacher} · Faculty Timetable${day ? ` · ${day}` : ""}${request.dateIso ? ` · ${request.dateIso}` : ""}`;
+  const answer = request.window ? timetableWindowAnswer(entries, heading, request.window) : scheduleAnswer(entries, heading);
+  return `${answer}<p class="answer-source">Official GNDEC cross-schedule faculty timetable. It did not change your profile or selected timetable.</p>`;
+}
+
 // Shared by the network-backed form and the local/Brain entry point. A source
 // failure is distinct from a verified miss; neither authorizes changing types.
 function namedTimetableResolutionAnswer(request, { facultySchedule = [], facultyUnavailable = false, studentLookup = null } = {}) {
@@ -3902,8 +3959,11 @@ function namedTimetableResolutionAnswer(request, { facultySchedule = [], faculty
   const facultyAnswer = readOnlyTeacherTimetableAnswer(request, facultyMatch, facultySchedule);
   const studentAnswer = readOnlyStudentTimetableAnswer(request, studentLookup);
   if (request.teacherCue) {
-    if (facultyUnavailable || !facultySchedule.length) return "<p><strong>Official faculty timetable is unavailable.</strong></p><p>Please refresh the official faculty timetable and try again.</p>";
-    return facultyAnswer || `<p><strong><u>No verified faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>The loaded official release did not match that name. This does not mean the teacher has no classes. Check the official spelling or the relevant department timetable.</p>`;
+    if (facultyAnswer) return facultyAnswer;
+    const crossMatch = crossTimetableTeacherSchedule(request.term);
+    if (crossMatch.status === "single") return crossTimetableTeacherAnswer(request, crossMatch);
+    if (facultyUnavailable || (!facultySchedule.length && crossMatch.status === "none")) return "<p><strong>Official faculty timetable is unavailable.</strong></p><p>Please refresh the official faculty timetable and try again.</p>";
+    return `<p><strong><u>No verified faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>The loaded official release did not match that name. This does not mean the teacher has no classes. Check the official spelling or the relevant department timetable.</p>`;
   }
   if (request.studentCue) return studentAnswer || `<p><strong><u>No verified student timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>The current official roster did not match that name. Compass did not use a faculty timetable. Please check the spelling or use a student CRN.</p>`;
   const hasStudent = ["single", "multiple"].includes(studentLookup?.status);
@@ -3912,6 +3972,8 @@ function namedTimetableResolutionAnswer(request, { facultySchedule = [], faculty
   if ((hasStudent && facultyUnavailable) || (hasFaculty && studentLookup?.status === "error")) return `<p>I found a possible match for ${escapeHtml(request.label)}, but could not check both official sources. Please specify student or teacher.</p>`;
   if (studentAnswer) return studentAnswer;
   if (facultyAnswer) return facultyAnswer;
+  const crossMatch = crossTimetableTeacherSchedule(request.term);
+  if (crossMatch.status === "single") return crossTimetableTeacherAnswer(request, crossMatch);
   return `<p><strong><u>No verified student or faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>Please check the spelling or provide a student CRN. Compass will not substitute your active timetable.</p>`;
 }
 
@@ -4580,6 +4642,7 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 // engine is always retained as the transparent fallback.
 function prepareCompassQuestion(question) {
   let q = canonicalTimetableQuestion(question);
+  if (scopedRosterListRequest(q)) return q;
   const kernel = globalThis.CompassBrainKernel;
   const temporal = kernel?.resolveTemporalQuery?.(q, indiaCalendarDate(0).date.toISOString().slice(0, 10));
   const domain = kernel?.analyzeQuery?.(q).primaryIntent;
@@ -5869,6 +5932,12 @@ async function refreshOfficialData({ discover = true } = {}) {
     await importHtml(await groupsResponse.text(), "Official GNDEC group timetable", sourceInfo, await subgroupsResponse.text());
     if (sourceInfo.fallback) setSourceError("The newer official timetable could not be read. Compass is temporarily using the previous verified release and will retry automatically.");
     await synchronizeStudentProfile();
+    if (typeof window !== "undefined") {
+      const schedulePrewarm = typeof window.requestIdleCallback === "function" ? window.requestIdleCallback : (fn) => window.setTimeout(fn, 2000);
+      schedulePrewarm(() => {
+        loadOfficialTimetableView("teachers").catch(() => {});
+      });
+    }
   } catch (error) {
     const message = error.message || "Official data refresh failed.";
     setSourceError(`${message} Your last verified data was preserved; use “Check for updates” to retry.`);

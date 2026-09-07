@@ -76,6 +76,8 @@
         if (starts.length > 1) return { match: null, ambiguous: starts.map((entry) => entry.code) };
       }
     }
+    const hasTeacherCue = /\b(?:prof(?:essor)?|dr\.?|doctor|instructor|er\.?|engineer|ar\.?|architect|ms\.?|mrs\.?|mr\.?|sir|ma'?am|mam|madam|teacher|faculty)\b/i.test(raw);
+    const hasStudentCue = /\b(?:students?|classmate|batchmate|peer|roll|crn|urn)\b/i.test(raw);
     const faculty = kernel.unique((context.facultyTimetables || []).map((item) => item.group));
     const personKey = (value) => kernel.stripTitles(value).toLowerCase().replace(/\bteacher\b/g, "").replace(/[^a-z]+/g, " ").trim();
     const queryWords = personKey(raw).split(/\s+/).filter(Boolean);
@@ -86,8 +88,23 @@
     });
     if (facultyMatches.length > 1) return { match: null, ambiguous: facultyMatches };
     if (facultyMatches.length === 1) return { match: { code: facultyMatches[0], label: facultyMatches[0], kind: "faculty" } };
-    // Check student roster if available in context
-    if (Array.isArray(context?.studentRoster) && context.studentRoster.length && raw.length >= 3) {
+    // Also check cross-timetable teachers from context.allClasses / context.classes
+    if (hasTeacherCue && queryWords.length) {
+      const pool = Array.isArray(context.allClasses) ? context.allClasses : (Array.isArray(context.classes) ? context.classes : []);
+      const crossTeachers = kernel.unique(pool.filter((c) => c.teacher && !/not listed/i.test(c.teacher)).flatMap((c) => String(c.teacher).split(/[,&/]/).map((s) => s.trim()).filter(Boolean)));
+      const crossMatches = crossTeachers.filter((t) => {
+        const pKey = personKey(t);
+        if (pKey === personKey(raw)) return true;
+        const words = pKey.split(/\s+/);
+        return queryWords.length >= 2 && queryWords.every((w) => words.some((part) => part.startsWith(w) || kernel.editDistance(part, w) <= 1));
+      });
+      if (crossMatches.length === 1) return { match: { code: crossMatches[0], label: crossMatches[0], kind: "faculty" } };
+      if (crossMatches.length > 1) return { match: null, ambiguous: crossMatches };
+      // Explicit teacher cues must NEVER fall through to student roster
+      return { match: null, teacherCue: true };
+    }
+    // Check student roster if available in context (never if query has teacher cues)
+    if (!hasTeacherCue && Array.isArray(context?.studentRoster) && context.studentRoster.length && raw.length >= 3) {
       const norm = raw.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
       const normWords = norm.split(/\s+/).filter(Boolean);
       const studentMatches = context.studentRoster.filter((st) => {
@@ -96,7 +113,7 @@
         if (crn && crn === norm) return true;
         if (name === norm) return true;
         if (normWords.length >= 2 && normWords.every((w) => name.includes(w))) return true;
-        if (norm.length >= 4 && (name.includes(norm) || norm.includes(name))) return true;
+        if (hasStudentCue && norm.length >= 4 && (name.includes(norm) || norm.includes(name))) return true;
         return false;
       });
       if (studentMatches.length === 1) {
@@ -963,6 +980,242 @@
       ["resolve campus location inquiry", "lookup verified building/facility entry"]);
   }
 
+  function cleanCandidateName(input) {
+    return kernel.stripTitles(input)
+      .replace(/\b(?:teacher|faculty|time\s*table|timetable|schedule|class(?:es)?|periods?|lectures?|da|di|de|ka|ki|ke|ko|mein|in|on|at|show|batao|tell|check|today|tomorrow|aaj|kal|parso)\b/gi, " ")
+      .replace(/[^a-z0-9\s]/gi, " ")
+      .trim();
+  }
+
+  function findTeacherClasses(teacherQuery, context) {
+    const personKey = (value) => kernel.stripTitles(value).toLowerCase().replace(/\bteacher\b/g, "").replace(/[^a-z]+/g, " ").trim();
+    const candidate = cleanCandidateName(teacherQuery);
+    const queryKey = personKey(candidate);
+    if (!queryKey || queryKey.length < 2) return null;
+    const queryWords = queryKey.split(/\s+/).filter(Boolean);
+
+    // 1. Check facultyTimetables if available
+    const facultyList = Array.isArray(context.facultyTimetables) ? context.facultyTimetables : [];
+    if (facultyList.length) {
+      const groups = kernel.unique(facultyList.map((item) => item.group));
+      const exact = groups.find((name) => personKey(name) === queryKey);
+      const match = exact || groups.find((name) => {
+        const words = personKey(name).split(/\s+/);
+        return queryWords.length && queryWords.every((word) => word.length >= 3 && words.some((part) => part.startsWith(word) || kernel.editDistance(part, word) <= (word.length >= 7 ? 2 : 1)));
+      });
+      if (match) {
+        const classes = facultyList.filter((item) => item.group === match);
+        return { teacher: match, classes, source: "facultyTimetables" };
+      }
+    }
+
+    // 2. Cross-timetable scan from allClasses
+    const pool = Array.isArray(context.allClasses) ? context.allClasses : (Array.isArray(context.classes) ? context.classes : []);
+    const teacherMap = new Map();
+    pool.forEach((item) => {
+      if (!item.teacher || /not listed/i.test(item.teacher)) return;
+      const names = String(item.teacher).split(/[,&/]/).map((s) => s.trim()).filter(Boolean);
+      names.forEach((t) => {
+        const key = personKey(t);
+        if (!key) return;
+        let isMatch = false;
+        if (key === queryKey) isMatch = true;
+        else if (queryWords.length >= 2 && queryWords.every((w) => key.includes(w))) isMatch = true;
+        else if (queryWords.length === 1 && queryWords[0].length >= 4 && key.split(/\s+/).some((w) => w === queryWords[0] || (w.length >= 4 && kernel.editDistance(w, queryWords[0]) <= 1))) isMatch = true;
+
+        if (isMatch) {
+          if (!teacherMap.has(t)) teacherMap.set(t, []);
+          teacherMap.get(t).push(item);
+        }
+      });
+    });
+
+    if (!teacherMap.size) return null;
+    const [teacher, classes] = [...teacherMap.entries()][0];
+    return { teacher, classes, source: "allClasses" };
+  }
+
+  function teacherTimetableAnswer(input, context) {
+    const q = kernel.normalize(input);
+    const hasTeacherCue = /\b(?:prof(?:essor)?|dr\.?|doctor|instructor|er\.?|engineer|ar\.?|architect|ms\.?|mrs\.?|mr\.?|sir|ma'?am|mam|madam|teacher|faculty)\b/i.test(input);
+    const asksTimetable = /\b(?:time\s*table|timetable|schedule|class(?:es)?|lectures?|periods?|da|di|de|ka|ki|ke)\b/i.test(q);
+    if (!hasTeacherCue && !asksTimetable) return null;
+    if (/\b(?:vs|versus|compare|comparison)\b/i.test(q)) return null;
+
+    const teacherResult = findTeacherClasses(input, context);
+    if (teacherResult) {
+      const { teacher, classes } = teacherResult;
+      const days = kernel.CALENDAR_DAYS.filter((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(q));
+      const targetDay = days.length === 1 ? days[0] : "";
+      const filtered = targetDay ? classes.filter((c) => c.day.toLowerCase() === targetDay.toLowerCase()) : classes;
+      const sorted = [...filtered].sort((a, b) => kernel.CALENDAR_DAYS.indexOf(a.day) - kernel.CALENDAR_DAYS.indexOf(b.day) || a.start - b.start);
+
+      if (!sorted.length) {
+        return kernel.result(
+          "TEACHER_TIMETABLE",
+          0.98,
+          `<p><strong><u>No classes are listed for ${kernel.escapeHtml(teacher)}${targetDay ? ` on ${targetDay}` : ""}.</u></strong></p><p class="answer-source">Official GNDEC weekly timetable.</p>`,
+          { teacher, day: targetDay, classesCount: 0 },
+          ["match verified teacher", "filter classes by day", "render timetable"]
+        );
+      }
+
+      const rows = sorted.map((c) => {
+        const timeStr = c.time || (c.start ? `${Math.floor(c.start / 60)}:${String(c.start % 60).padStart(2, "0")}` : "");
+        const room = c.room ? ` · ${kernel.escapeHtml(c.room)}` : "";
+        const grp = c.group ? ` (${kernel.escapeHtml(c.group)}${c.cohorts ? ` · ${kernel.escapeHtml(c.cohorts)}` : ""})` : "";
+        return `<li><strong>${kernel.escapeHtml(c.day)}${timeStr ? ` ${escapeHtml(timeStr)}` : ""}:</strong> ${kernel.escapeHtml(c.subject)}${room}<span>${grp}</span></li>`;
+      }).join("");
+
+      return kernel.result(
+        "TEACHER_TIMETABLE",
+        0.98,
+        `<p><strong><u>${kernel.escapeHtml(teacher)} · Faculty Timetable${targetDay ? ` · ${targetDay}` : ""}</u></strong></p><ul>${rows}</ul><p class="answer-source">Official GNDEC faculty schedule.</p>`,
+        { teacher, day: targetDay, classesCount: sorted.length },
+        ["match verified teacher", "filter classes by day", "render timetable"]
+      );
+    }
+
+    if (hasTeacherCue && asksTimetable) {
+      const candidate = cleanCandidateName(input);
+      if (candidate && candidate.length >= 3) {
+        return kernel.result(
+          "TEACHER_NOT_FOUND",
+          0.95,
+          `<p><strong><u>No verified faculty timetable match was found for ${kernel.escapeHtml(candidate)}.</u></strong></p><p>The loaded official release did not match that name. This does not mean the teacher has no classes. Check the official spelling or the relevant department timetable.</p>`,
+          { query: candidate },
+          ["detect explicit teacher query", "safely report unverified faculty", "prevent student fall-through"]
+        );
+      }
+    }
+
+    return null;
+  }
+
+  function findRoomClasses(roomQuery, context) {
+    const norm = (s) => String(s || "").trim().toLowerCase().replace(/[-_]/g, " ");
+    const cleaned = norm(roomQuery)
+      .replace(/\b(?:timetable|schedule|class(?:es)?|periods?|lectures?|ka|ki|ke|da|di|de|mein|in|on|at|show|batao|tell|check)\b/g, " ")
+      .replace(/\broom\b/g, " ")
+      .replace(/[^a-z0-9\s]/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+    if (!cleaned || cleaned.length < 2) return null;
+    const target = cleaned;
+    const queryWords = target.split(/\s+/).filter(Boolean);
+
+    const pool = Array.isArray(context.allClasses) ? context.allClasses : (Array.isArray(context.classes) ? context.classes : []);
+    const roomMap = new Map();
+    pool.forEach((item) => {
+      if (!item.room || /not listed/i.test(item.room)) return;
+      const r = norm(item.room);
+      const exact = r === target;
+      const starts = r.startsWith(target) || target.startsWith(r);
+      const contains = target.length >= 3 && r.includes(target);
+      const rWords = r.split(/\s+/).filter(Boolean);
+      const wordMatch = queryWords.length >= 2 && queryWords.every((w) => rWords.includes(w));
+      if (exact || starts || contains || wordMatch) {
+        const canon = String(item.room).trim();
+        if (!roomMap.has(canon)) roomMap.set(canon, []);
+        roomMap.get(canon).push(item);
+      }
+    });
+
+    if (!roomMap.size) return null;
+    const exactKey = [...roomMap.keys()].find((k) => norm(k) === target);
+    if (exactKey) return { room: exactKey, classes: roomMap.get(exactKey) };
+    const [room, classes] = [...roomMap.entries()][0];
+    return { room, classes };
+  }
+
+  function roomTimetableAnswer(input, context) {
+    const q = kernel.normalize(input);
+    const isRoomQuery = /\b(?:room|lab|venue)\b/i.test(input) || /^[a-z]+[- ]?\d+\b/i.test(input.trim()) || /\b[a-z]\d{2,4}\b/i.test(input);
+    if (!isRoomQuery) return null;
+    if (/\b(?:vs|versus|compare|comparison)\b/i.test(q)) return null;
+
+    const roomResult = findRoomClasses(input, context);
+    if (!roomResult) return null;
+
+    const { room, classes } = roomResult;
+    const days = kernel.CALENDAR_DAYS.filter((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(q));
+    const targetDay = days.length === 1 ? days[0] : "";
+    const filtered = targetDay ? classes.filter((c) => c.day.toLowerCase() === targetDay.toLowerCase()) : classes;
+    const sorted = [...filtered].sort((a, b) => kernel.CALENDAR_DAYS.indexOf(a.day) - kernel.CALENDAR_DAYS.indexOf(b.day) || a.start - b.start);
+
+    if (!sorted.length) {
+      return kernel.result(
+        "ROOM_TIMETABLE",
+        0.98,
+        `<p><strong><u>No classes are listed for ${kernel.escapeHtml(room)}${targetDay ? ` on ${targetDay}` : ""}.</u></strong></p><p class="answer-source">Official GNDEC weekly timetable.</p>`,
+        { room, day: targetDay, classesCount: 0 },
+        ["match verified room", "filter classes by day", "render timetable"]
+      );
+    }
+
+    const rows = sorted.map((c) => {
+      const timeStr = c.time || (c.start ? `${Math.floor(c.start / 60)}:${String(c.start % 60).padStart(2, "0")}` : "");
+      const teacher = c.teacher ? ` · ${kernel.escapeHtml(c.teacher)}` : "";
+      const grp = c.group ? ` (${kernel.escapeHtml(c.group)}${c.cohorts ? ` · ${kernel.escapeHtml(c.cohorts)}` : ""})` : "";
+      return `<li><strong>${kernel.escapeHtml(c.day)}${timeStr ? ` ${escapeHtml(timeStr)}` : ""}:</strong> ${kernel.escapeHtml(c.subject)}${teacher}<span>${grp}</span></li>`;
+    }).join("");
+
+    return kernel.result(
+      "ROOM_TIMETABLE",
+      0.98,
+      `<p><strong><u>${kernel.escapeHtml(room)} · Room Timetable${targetDay ? ` · ${targetDay}` : ""}</u></strong></p><ul>${rows}</ul><p class="answer-source">Official GNDEC room schedule.</p>`,
+      { room, day: targetDay, classesCount: sorted.length },
+      ["match verified room", "filter classes by day", "render timetable"]
+    );
+  }
+
+  function studentRosterCountAnswer(input, context) {
+    const q = kernel.normalize(input);
+    const asksCount = /\b(?:how\s+many|count|total|kitne|kitni|kinne|kinni)\b/.test(q);
+    const asksStudents = /\b(?:students?|batch|strength|bachhe|bache|roster)\b/.test(q);
+    if (!asksCount || !asksStudents) return null;
+
+    const roster = Array.isArray(context.studentRoster) ? context.studentRoster : [];
+    if (!roster.length) return null;
+
+    const catalog = selectionCatalog(context);
+    const tokens = q.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+    let matchedTarget = null;
+    let targetType = "section";
+
+    for (const token of tokens) {
+      const match = catalog.find((c) => c.code === token);
+      if (match) {
+        matchedTarget = match.code;
+        targetType = match.kind === "subgroup" ? "subsection" : "section";
+        break;
+      }
+      const branches = ["EC", "CE", "CS", "EE", "ME", "IT", "PE", "RAI"];
+      if (branches.includes(token)) {
+        matchedTarget = token;
+        targetType = "branch";
+        break;
+      }
+    }
+
+    if (!matchedTarget) return null;
+
+    const count = roster.filter((st) => {
+      if (targetType === "subsection") return String(st.subsection || "").toUpperCase() === matchedTarget;
+      if (targetType === "section") return String(st.section || "").toUpperCase() === matchedTarget;
+      if (targetType === "branch") return String(st.branch || "").toUpperCase() === matchedTarget;
+      return false;
+    }).length;
+
+    return kernel.result(
+      "STUDENT_COUNT",
+      0.98,
+      `<p><strong><u>${kernel.escapeHtml(matchedTarget)}: ${count} verified student${count === 1 ? "" : "s"}</u></strong></p><p>${kernel.escapeHtml(targetType[0].toUpperCase() + targetType.slice(1))} count from the current official GNDEC roster.</p><p class="answer-source">Read-only count from current official student rosters.</p>`,
+      { target: matchedTarget, count, type: targetType },
+      ["extract target cohort", "filter verified roster records", "render verified count"]
+    );
+  }
+
   // ---- Entry point ----
   function process(input, context = {}) {
     const startedAt = Date.now();
@@ -980,6 +1233,9 @@
       const candidate = holidayTimetableAnswer(original, mergedContext)
         || creatorAnswer(original, mergedContext)
         || capabilitiesAnswer(original, mergedContext)
+        || studentRosterCountAnswer(original, mergedContext)
+        || teacherTimetableAnswer(original, mergedContext)
+        || roomTimetableAnswer(original, mergedContext)
         || commonFreeSlotsAnswer(original, mergedContext)
         || comparisonAnswer(original, mergedContext)
         || comparisonFollowUp(original, mergedContext)
