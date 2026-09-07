@@ -8,14 +8,13 @@
     "dev": "wrangler dev --port 3000 --ip 0.0.0.0",
     "start": "wrangler dev --port 3000 --ip 0.0.0.0",
     "deploy": "wrangler deploy",
-    "build": "echo 'Applet build successful'",
-    "lint": "node --test",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "lint": "node --check public/app.js && node --check public/brain-kernel.js && node --check public/brain-v1-2.js && node --check public/brain-v2-2.js && node --check public/brain-v2.js && node --check src/worker.js",
     "test": "node --test",
     "test:models": "node --env-file=.env scripts/nvidia-model-check.mjs",
     "build:syllabus-index": "node scripts/build-syllabus-index.mjs"
   },
   "devDependencies": {
-    "jsdom": "^30.0.1",
     "linkedom": "^0.18.13"
   },
   "dependencies": {

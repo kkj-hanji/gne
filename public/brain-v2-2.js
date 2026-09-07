@@ -76,6 +76,16 @@
         if (starts.length > 1) return { match: null, ambiguous: starts.map((entry) => entry.code) };
       }
     }
+    const faculty = kernel.unique((context.facultyTimetables || []).map((item) => item.group));
+    const personKey = (value) => kernel.stripTitles(value).toLowerCase().replace(/\bteacher\b/g, "").replace(/[^a-z]+/g, " ").trim();
+    const queryWords = personKey(raw).split(/\s+/).filter(Boolean);
+    const exactFaculty = faculty.filter((name) => personKey(name) === personKey(raw));
+    const facultyMatches = exactFaculty.length ? exactFaculty : faculty.filter((name) => {
+      const words = personKey(name).split(/\s+/);
+      return queryWords.length && queryWords.every((word) => word.length >= 4 && words.some((part) => part.startsWith(word) || kernel.editDistance(part, word) <= (word.length >= 7 ? 2 : 1)));
+    });
+    if (facultyMatches.length > 1) return { match: null, ambiguous: facultyMatches };
+    if (facultyMatches.length === 1) return { match: { code: facultyMatches[0], label: facultyMatches[0], kind: "faculty" } };
     // Check student roster if available in context
     if (Array.isArray(context?.studentRoster) && context.studentRoster.length && raw.length >= 3) {
       const norm = raw.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
@@ -124,13 +134,13 @@
       "TIMETABLE", "SCHEDULE", "CLASSES", "CLASS", "LECTURES", "LECTURE", "PERIODS", "PERIOD",
       "TODAY", "TOMORROW", "TOMMOROW", "TOMMORROW", "YESTERDAY", "FREE", "SLOTS", "SLOT", "BREAK", "TIME",
       "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY",
-      "SIR", "MAAM", "MADAM", "PROF", "PROFESSOR", "DR", "DOCTOR", "STUDENT", "ME", "MY",
+      "SIR", "MAAM", "MADAM", "PROF", "PROFESSOR", "DR", "DOCTOR", "TEACHER", "STUDENT", "ME", "MY",
       "VS", "VERSUS", "AND", "WITH", "BETWEEN", "ON", "AT", "IN", "KA", "KI", "KE", "KO",
       "SE", "TE", "NAL", "NAAL", "AUR", "DA", "DE", "DI", "HAI", "HAN", "COMPARE", "COMPARISON"
     ]);
     const words = String(text || "").trim().split(/\s+/).filter((w) => {
       const upper = w.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      return upper && !ignored.has(upper);
+      return upper && !/^\d/.test(upper) && !ignored.has(upper);
     });
     return words.join(" ");
   }
@@ -146,7 +156,8 @@
     }
     const parts = q.split(/\bvs\b|\bversus\b/).map((part) => part.trim()).filter(Boolean);
     const symbol = kernel.extractDaySymbol(q);
-    const day = symbol ? kernel.resolveDaySymbol(symbol, String(context?.calendarDate ? kernel.weekdayOfIso(context.calendarDate) : "")) : "";
+    const temporal = kernel.resolveTemporalQuery(q, context.calendarDate);
+    const day = temporal.status === "resolved" ? temporal.day : symbol ? kernel.resolveDaySymbol(symbol, String(context?.calendarDate ? kernel.weekdayOfIso(context.calendarDate) : "")) : "";
     // Natural comparison phrasing also uses “and”, “or”, or “between”, not
     // only “vs”. Resolve exactly two verified timetable codes; never guess a
     // pair when three or more were supplied.
@@ -186,8 +197,12 @@
     // "my timetable vs ECB2" resolves the own side from the device profile.
     const leftOwn = mentionsOwnTimetable(parts[0]);
     const rightOwn = mentionsOwnTimetable(parts[1]);
-    const leftToken = leftOwn ? "" : (lastCode(parts[0]) || cleanCandidateName(parts[0]));
-    const rightToken = rightOwn ? "" : (firstCode(parts[1]) || cleanCandidateName(parts[1]));
+    const leftName = cleanCandidateName(parts[0]);
+    const rightName = cleanCandidateName(parts[1]);
+    const leftNamed = !leftOwn && resolveSelection(leftName, context);
+    const rightNamed = !rightOwn && resolveSelection(rightName, context);
+    const leftToken = leftOwn ? "" : (leftNamed?.match || leftNamed?.ambiguous ? leftName : lastCode(parts[0]) || leftName);
+    const rightToken = rightOwn ? "" : (rightNamed?.match || rightNamed?.ambiguous ? rightName : firstCode(parts[1]) || rightName);
     if ((!leftToken && !leftOwn) || (!rightToken && !rightOwn)) return null;
     return {
       left: leftOwn ? activeProfileSelection(context) : resolveSelection(leftToken, context),
@@ -240,6 +255,7 @@
   }
 
   function classesFor(selection, context) {
+    if (selection.kind === "faculty") return kernel.chronological((context.facultyTimetables || []).filter((item) => item.group === selection.code));
     const wanted = String(selection.code || "").toUpperCase();
     const all = kernel.chronological((Array.isArray(context.allClasses) && context.allClasses.length ? context.allClasses : (Array.isArray(context.classes) ? context.classes : [])));
     if (selection.kind !== "subgroup") {
@@ -275,24 +291,34 @@
     const scopedLeft = scopeDay ? left.filter((item) => item.day === scopeDay) : left;
     const scopedRight = scopeDay ? right.filter((item) => item.day === scopeDay) : right;
 
-    const leftKeys = new Map(scopedLeft.map((item) => [keyFor(item), item]));
-    const rightKeys = new Map(scopedRight.map((item) => [keyFor(item), item]));
+    const bySlot = (items) => {
+      const slots = new Map();
+      items.forEach((item) => slots.set(keyFor(item), [...(slots.get(keyFor(item)) || []), item]));
+      return slots;
+    };
+    const leftKeys = bySlot(scopedLeft);
+    const rightKeys = bySlot(scopedRight);
 
     const shared = [];
     const leftOnly = [];
     const changedDetail = [];
     const rightOnly = [];
-    leftKeys.forEach((item, key) => {
-      const other = rightKeys.get(key);
-      if (!other) { leftOnly.push(item); return; }
-      if (String(other.subject).toLowerCase() === String(item.subject).toLowerCase()
-        && String(other.teacher).toLowerCase() === String(item.teacher).toLowerCase()
-        && String(other.room).toLowerCase() === String(item.room).toLowerCase()) shared.push(item);
-      else changedDetail.push({ left: item, right: other });
+    const sameDetails = (a, b) => ["subject", "teacher", "room"].every((key) => String(a[key] || "").toLowerCase() === String(b[key] || "").toLowerCase());
+    leftKeys.forEach((items, key) => {
+      const remaining = [...(rightKeys.get(key) || [])];
+      const unmatched = [];
+      items.forEach((item) => {
+        const index = remaining.findIndex((other) => sameDetails(item, other));
+        if (index >= 0) { shared.push(item); remaining.splice(index, 1); }
+        else unmatched.push(item);
+      });
+      unmatched.forEach((item) => {
+        if (remaining.length) changedDetail.push({ left: item, right: remaining.shift() });
+        else leftOnly.push(item);
+      });
+      rightOnly.push(...remaining);
     });
-    rightKeys.forEach((item, classKey) => {
-      if (!leftKeys.has(classKey)) rightOnly.push(item);
-    });
+    rightKeys.forEach((items, classKey) => { if (!leftKeys.has(classKey)) rightOnly.push(...items); });
 
     const minutesFor = (items) => items.reduce((total, item) => total + (item.end - item.start), 0);
 
@@ -379,7 +405,9 @@
 
     const report = runComparison(leftSel, rightSel, request.scopeDay, context);
     const revision = String(context.datasetVersion || "current");
-    const scopeLabel = request.scopeDay ? ` · ${kernel.escapeHtml(request.scopeDay)} only` : " · whole week";
+    const temporal = kernel.resolveTemporalQuery(question, context.calendarDate);
+    const scopeLabel = (request.scopeDay ? ` · ${kernel.escapeHtml(request.scopeDay)} only` : " · whole week")
+      + (temporal.status === "resolved" ? ` · ${kernel.escapeHtml(temporal.iso)}` : "");
 
     if (/\b(?:common|shared|same)\s+(?:teacher|teachers|faculty)\b/i.test(question)) {
       const teacherHeader = `<p><strong><u>Common Faculty: ${kernel.escapeHtml(leftLabel)} &amp; ${kernel.escapeHtml(rightLabel)}</u></strong>${scopeLabel}</p>`
@@ -595,13 +623,22 @@
     const asksHolidayDirect = /\b(?:holiday|holidays|chutti|chhutti|closed|band|off\s+day|off)\b/.test(q);
     const holidaySearchResults = kernel.searchHolidays ? kernel.searchHolidays(raw) : [];
     if (!asksSchedule && !asksHolidayDirect && !holidaySearchResults.length) return null;
+    const requestedYear = Number(q.match(/\b(20\d{2})\b/)?.[1] || (baseYear + (/\bnext year\b/.test(q) ? 1 : /\b(?:previous|last) year\b/.test(q) ? -1 : 0)));
+    if ((asksHolidayDirect || holidaySearchResults.length) && requestedYear !== 2026) return kernel.result("HOLIDAY_UNAVAILABLE", 1,
+      `<p>I do not have a verified GNDEC holiday list for ${requestedYear}.</p>`, {}, ["check holiday source year before lookup"]);
 
     let targetIso = "";
     const isoMatch = q.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
     const monthMatch = q.match(/(\d{1,2})(?!\d)\s+([a-z]+)(?:\s+(\d{4}))?/) || q.match(/([a-z]+)\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
     const symbol = kernel.extractDaySymbol(q);
 
-    if (isoMatch) {
+    const temporal = kernel.resolveTemporalQuery(q, baseIso);
+    if (["invalid", "conflict"].includes(temporal.status)) {
+      return kernel.result("DATE_CLARIFY", 1, `<p>${kernel.escapeHtml(temporal.reason)}</p>`, {}, ["validate requested date"]);
+    }
+    if (temporal.status === "resolved") {
+      targetIso = temporal.iso;
+    } else if (isoMatch) {
       targetIso = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
     } else if (monthMatch) {
       const isFirstNum = /^\d+$/.test(monthMatch[1]);
@@ -638,10 +675,12 @@
           ["resolve requested schedule date", "check gazetted holiday registry", "flag official college holiday"]);
       }
       if (asksHolidayDirect) {
+        if (!targetIso.startsWith("2026-")) return kernel.result("HOLIDAY_UNAVAILABLE", 1,
+          `<p>I do not have a verified GNDEC holiday list for ${kernel.escapeHtml(targetIso.slice(0, 4))}.</p>`, {}, ["check holiday source coverage"]);
         const weekday = kernel.weekdayOfIso(targetIso);
         const isWeekend = weekday === "Saturday" || weekday === "Sunday";
         return kernel.result("TIMETABLE_NOT_A_HOLIDAY", 0.98,
-          `<p><strong>No. ${kernel.escapeHtml(formatted)} is not an official gazetted holiday.</strong></p><p>${isWeekend ? `It falls on a ${weekday} (weekend).` : "It is a regular college working day."}</p><p class="answer-source">Official GNDEC Academic & Gazetted Holiday Calendar.</p>`,
+          `<p><strong>${kernel.escapeHtml(formatted)} has no gazetted holiday listed in the loaded GNDEC 2026 calendar.</strong></p><p>${isWeekend ? `It falls on a ${weekday} (weekend).` : "This alone does not confirm college is open; academic breaks and current notices may apply."}</p><p class="answer-source">Official GNDEC Holiday Calendar.</p>`,
           { iso: targetIso, isHoliday: false },
           ["resolve requested date", "verify official holiday list", "confirm normal working day"]);
       }
@@ -799,16 +838,18 @@
     return null;
   }
 
-  // Creator & Admin Query Handler
+  // Public creator attribution contains no administration or access details.
   function creatorAnswer(question) {
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
     if (/\b(?:who\s+(?:built|made|created|developed|coded)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|tool|site|system)?|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|creator\s+of\s+(?:this|compass))\b/i.test(q)
       || /built\s+this\s+web/i.test(q)
       || /\bwho\s+is\s+kaushik(?:\s+jain)?\b/i.test(q)
-      || /\babout\s+(?:compass|developer|creator)\b/i.test(q)) {
+      || /\babout\s+(?:compass|developer|creator)\b/i.test(q)
+      || /^(?:developer|website creator|who make this)$/.test(q)) {
+      const project = kernel.PROJECT_METADATA;
       return kernel.result("CREATOR", 1,
-        `<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p class="answer-source">Official GNDEC Compass creator info.</p>`,
+        `<p><strong><u>${kernel.escapeHtml(project.creator)} from ${kernel.escapeHtml(project.creatorBranch)} - ${kernel.escapeHtml(project.creatorSection)} (${kernel.escapeHtml(project.creatorBatch)} Batch)</u></strong></p><p>${kernel.escapeHtml(project.creator)} built this web app (${kernel.escapeHtml(project.name)}).</p>`,
         {}, ["creator query", "respond with verified author details"]);
     }
     return null;

@@ -6,6 +6,10 @@
   "use strict";
 
   const VERSION = "1.0.0";
+  const PROJECT_METADATA = Object.freeze({
+    name: "GNDEC Compass", creator: "Kaushik Jain", creatorBranch: "ECE",
+    creatorSection: "B1", creatorBatch: "2026"
+  });
   const LIMITS = Object.freeze({
     input: 1200,
     answer: 64000,
@@ -61,14 +65,18 @@
     [/\b(?:syllbus|sylabus|syllubus)\b/g, "syllabus"],
     [/\b(?:subjet|subjets|subect)\b/g, "subjects"],
     [/\b(?:tomor+ow|tomm?or+ow|tmr+w?|tmro|tmrw|tom|tomoro|tomrw|kl|kal|kalle)\b/g, "tomorrow"],
-    [/\b(?:tod+ay|aaj|ajj)\b/g, "today"],
+    [/\b(?:tod+ay|aaj|ajj|aj)\b/g, "today"],
     [/\b(?:nxt|agle|agli|agla)\b/g, "next"],
     [/\b(?:campass|compas|compss)\b/g, "compass"],
     [/\b(?:phy|phys)\b/g, "physics"],
     [/\b(?:chem|chemi)\b/g, "chemistry"],
-    [/\b(?:m1|m2|math|mathe)\b/g, "maths"],
+    [/\b(?:math|mathe)\b/g, "maths"],
+    [/\b(?:stu)\b/g, "students"],
+    [/\b(?:cnt)\b/g, "count"],
+    [/\b(?:cred)\b/g, "credits"],
+    [/\b(?:krdo|kardo|kro)\b/g, "compare"],
     [/\b(?:eco|econ)\b/g, "economics"],
-    [/\b([a-z]{2,4})[- ]([a-z]?\d)\b/gi, "$1$2"],
+    [/\b((?:ec|cs|ce|ee|it|me|rai)[a-z]?)[- ]([a-z]?\d)\b/gi, "$1$2"],
     [/\b(?:clas+|cls|lectur+|lecture|lec|lect|period|periods|ghanta|ghante)\b/g, "class"],
     [/\b(?:batao|btado|dikhao|dikha|dasso|daso)\b/g, "show"],
     [/\b(?:kinne\s+vaje|kitne\s+baje|kis\s+time)\b/g, "when"],
@@ -153,7 +161,12 @@
   }
 
   function normalize(input) {
-    let normalized = clean(input);
+    let normalized = clean(String(input || "").slice(0, LIMITS.input))
+      // Split a digit-bearing identifier from a known temporal suffix only.
+      // Never run spelling correction over arbitrary college identifiers.
+      .replace(/\b([a-z]{1,6}\d{1,3})(tmro|tmrw|tomorrow|today|kal|tue|mon|wed|thu|fri)\b/g, "$1 $2")
+      .replace(/\b(?:kal|kl)\b(?=[^;?]*\b(?:tha|thi|the|si|was|were|had)\b)/g, "yesterday")
+      .replace(/\b(?:parso|parson)\b(?=[^;?]*\b(?:tha|thi|si|was|were|had)\b)/g, "day before yesterday");
     PHRASES.forEach(([pattern, replacement]) => { normalized = normalized.replace(pattern, replacement); });
     return normalized.replace(/\btime\s*table\b/g, "timetable").replace(/\s+/g, " ").trim();
   }
@@ -217,7 +230,8 @@
         const left = text.slice(cursor, match.index).trim();
         const right = text.slice(matcher.lastIndex).trim();
         const leftIsComparison = /\b(?:compare|comparison|vs|versus|farak|farq)\b/i.test(left);
-        const preserveComparison = leftIsComparison && (comparisonQualifier.test(right) || !startsIndependentQuestion.test(right));
+        const rightHasIndependentDomain = /\b(?:holiday|credits?|syllabus|calculate)\b/.test(right);
+        const preserveComparison = leftIsComparison && !rightHasIndependentDomain && (comparisonQualifier.test(right) || !startsIndependentQuestion.test(right));
         const independent = startsIndependentQuestion.test(right) || startsIndependentContext.test(right);
         if (left && independent && !preserveComparison) {
           pieces.push(left);
@@ -233,8 +247,94 @@
       .filter(Boolean)
       .flatMap(splitConjunctions);
     if (parts.length < 2) return [normalizedWithoutMarkers];
-    const useful = parts.filter((part) => analyzeQuery(part).primaryIntent !== "unknown");
-    return useful.length >= 2 ? useful.slice(0, 4) : [normalizedWithoutMarkers];
+    // An unsupported second question still deserves an answer/clarification.
+    // Bounds are enforced by the planner, never by silently dropping clauses.
+    return parts;
+  }
+
+  // Calendar arithmetic uses ISO dates at UTC midnight; the caller supplies
+  // today's Asia/Kolkata date. No host-timezone or Date rollover guessing.
+  function resolveTemporalQuery(input, baseIso) {
+    const q = normalize(input);
+    const none = { status: "none", dates: [] };
+    const numericDate = /^(?:20\d{2}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-](?:20\d{2}|\d{2}))$/.test(q);
+    if (/\b(?:calculate|solve|credits?|percent(?:age)?)\b/.test(q) || (!numericDate && /^[\d\s+*/^().%=-]+$/.test(q))) return none;
+    if (!isValidIsoDate(baseIso)) return none;
+    const found = [];
+    const add = (text, year, month, day) => found.push({ text, iso: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` });
+    const occupied = [];
+    for (const m of q.matchAll(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g)) {
+      add(m[0], Number(m[1]), Number(m[2]), Number(m[3]));
+      occupied.push([m.index, m.index + m[0].length]);
+    }
+    for (const m of q.matchAll(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](20\d{2}|\d{2}))?\b/g)) {
+      if (occupied.some(([start, end]) => m.index >= start && m.index < end)) continue;
+      // A bare subtraction is arithmetic, not a date.
+      if (!m[3] && m[0].includes("-") && !/\b(?:date|on|holiday|timetable|schedule|class)\b/.test(q)) continue;
+      add(m[0], m[3] ? Number(m[3]) + (m[3].length === 2 ? 2000 : 0) : Number(baseIso.slice(0, 4)), Number(m[2]), Number(m[1]));
+    }
+    const monthWords = Object.keys(MONTHS).join("|");
+    for (const m of q.matchAll(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${monthWords})(?:\\s+(20\\d{2}))?\\b`, "g"))) {
+      add(m[0], Number(m[3] || baseIso.slice(0, 4)), MONTHS[m[2]] + 1, Number(m[1]));
+    }
+    if (!found.length) for (const m of q.matchAll(new RegExp(`\\b(${monthWords})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+(20\\d{2}))?\\b`, "g"))) {
+      add(m[0], Number(m[3] || baseIso.slice(0, 4)), MONTHS[m[1]] + 1, Number(m[2]));
+    }
+    const relative = /\b(day before yesterday|day after tomorrow|yesterday|tomorrow|today)\b/g;
+    const offsets = { "day before yesterday": -2, yesterday: -1, today: 0, tomorrow: 1, "day after tomorrow": 2 };
+    for (const m of q.matchAll(relative)) found.push({ text: m[0], iso: shiftIsoDate(baseIso, offsets[m[0]]) });
+    const weekdays = [...q.matchAll(/\b(?:(this|next|coming|previous|last)\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|thurs|fri|sat|sun)\b/g)];
+    if (found.some((entry) => !isValidIsoDate(entry.iso))) return { status: "invalid", dates: [], reason: "That calendar date does not exist." };
+    if (found.length) {
+      const dates = [...new Set(found.map((entry) => entry.iso))];
+      if (dates.length === 1 && weekdays.length === 1 && !weekdayOfIso(dates[0]).toLowerCase().startsWith(weekdays[0][2].slice(0, 3))) {
+        return { status: "conflict", dates, reason: `That date is ${formatIsoFull(dates[0])}; the supplied weekday does not match.` };
+      }
+      return { status: dates.length === 1 ? "resolved" : "multiple", dates, iso: dates[0], day: weekdayOfIso(dates[0]), text: found.map((entry) => entry.text).join(" and ") };
+    }
+    if (weekdays.length) {
+      const dates = weekdays.map((m) => {
+        const target = CALENDAR_DAYS.findIndex((day) => day.toLowerCase().startsWith(m[2].slice(0, 3)));
+        const current = CALENDAR_DAYS.indexOf(weekdayOfIso(baseIso));
+        let delta = (target - current + 7) % 7;
+        if (m[1] === "previous" || m[1] === "last") delta = -((current - target + 7) % 7 || 7);
+        if (m[1] === "next") delta = delta || 7;
+        if (m[1] === "this") delta = target - current;
+        return shiftIsoDate(baseIso, delta);
+      });
+      return { status: dates.length === 1 ? "resolved" : "multiple", dates, iso: dates[0], day: weekdayOfIso(dates[0]), text: weekdays.map((m) => m[0]).join(" and ") };
+    }
+    const week = q.match(/\b(this|next|last|previous)\s+week\b/);
+    if (week) {
+      const offset = week[1] === "next" ? 7 : /last|previous/.test(week[1]) ? -7 : 0;
+      const monday = shiftIsoDate(baseIso, offset - CALENDAR_DAYS.indexOf(weekdayOfIso(baseIso)));
+      return { status: "range", dates: CALENDAR_DAYS.map((_, i) => shiftIsoDate(monday, i)), text: week[0] };
+    }
+    return none;
+  }
+
+  // A bounded query plan keeps clause-local dates and explicit dependencies.
+  // Execution and entity lookup remain with the existing verified data adapters.
+  function planQuery(input, context = {}) {
+    if (String(input || "").length > LIMITS.input) return { status: "limited", clauses: [], reason: "Please shorten the message to 1,200 characters." };
+    const parts = decomposeQuery(input);
+    if (parts.length > 4) return { status: "limited", clauses: [], reason: "Please ask up to four questions in one message." };
+    const clauses = parts.map((question, index) => {
+      const analysis = analyzeQuery(question);
+      return { id: index, question, intent: analysis.primaryIntent, temporal: resolveTemporalQuery(question, context.calendarDate), dependsOn: [] };
+    });
+    for (let i = 1; i < clauses.length; i++) {
+      const clause = clauses[i], previous = clauses[i - 1];
+      // Elliptical "and holiday?" shares the preceding date, while "my next
+      // class" always retains its independent current-time meaning.
+      if (clause.intent === "holiday" && clause.temporal.status === "none" && previous.temporal.status === "resolved"
+        && !/\b(?:next|previous|last|month|year)\b/.test(clause.question)) {
+        clause.question += ` on ${previous.temporal.iso}`;
+        clause.temporal = { ...previous.temporal };
+        clause.dependsOn.push(previous.id);
+      }
+    }
+    return { status: "ready", clauses };
   }
 
   function escapeHtml(value) {
@@ -1404,6 +1504,7 @@
 
   globalScope.CompassBrainKernel = Object.freeze({
     VERSION,
+    PROJECT_METADATA,
     LIMITS,
     DAYS,
     CALENDAR_DAYS,
@@ -1414,6 +1515,8 @@
     normalize,
     analyzeQuery,
     decomposeQuery,
+    resolveTemporalQuery,
+    planQuery,
     escapeHtml,
     humanTime,
     durationLabel,

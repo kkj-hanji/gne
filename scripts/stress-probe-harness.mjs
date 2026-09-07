@@ -15,7 +15,7 @@ const sourceUnderTest = appSource.replace(
   ""
 ).replace(
   /function kbClean/,
-  "globalThis.__brainIntegrationTest = { state, answerWithoutAi, runCompassBrain, setCompassBrainV2Enabled, resetBrainConversation, buildScheduleIndex, sanitizeSchedule };\nfunction kbClean"
+  "globalThis.__brainIntegrationTest = { state, answerWithoutAi, runCompassBrain, setCompassBrainV2Enabled, resetBrainConversation, buildScheduleIndex, sanitizeSchedule, parseFetTimetable, parseSyllabusText, parseStudentSectionText, compassQueryPlan, requestedTime, requestedTimetableDate, requestedOfficialTimetableView, namedPersonTimetableRequest };\nfunction kbClean"
 );
 
 export function createAppHarness() {

@@ -573,6 +573,7 @@ test("regression: misspelled weekday resolves to the closest real day", () => {
 
 test("regression: room schedule view lists verified classes for a room code", () => {
   const { api } = createAppHarness();
+  api.state.timetableViews.set("rooms", { schedule: api.state.schedule.filter(row => row.room === "G6").map(row => ({ ...row, group: "G6" })) });
   const wholeWeek = api.answerWithoutAi("G6 timetable");
   assert.match(wholeWeek, /G6/);
   assert.match(wholeWeek, /PHYSICS/);

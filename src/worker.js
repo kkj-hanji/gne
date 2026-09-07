@@ -34,12 +34,12 @@ const ADMIN_OWNER_CRN = "2617070";
 // /time_tables after validation. Keeping this snapshot means a first visit
 // still works if GNDEC is temporarily unavailable.
 const FALLBACK_SOURCES = {
-  groups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_groups_days_horizontal.html",
-  teachers: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_teachers_days_horizontal.html",
-  rooms: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_rooms_days_horizontal.html",
-  subjects: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_subjects_days_horizontal.html",
-  years: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_years_days_horizontal.html",
-  subgroups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/30_08_2026%20FINAL_FILE_subgroups_days_horizontal.html"
+  groups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/31_08_2026%20FINAL_FILE_groups_days_horizontal.html",
+  teachers: "https://appsc.gndec.ac.in/sites/default/files/2026-08/31_08_2026%20FINAL_FILE_teachers_days_horizontal.html",
+  rooms: "https://appsc.gndec.ac.in/sites/default/files/2026-08/31_08_2026%20FINAL_FILE_rooms_days_horizontal.html",
+  subjects: "https://appsc.gndec.ac.in/sites/default/files/2026-08/31_08_2026%20FINAL_FILE_subjects_days_horizontal.html",
+  years: "https://appsc.gndec.ac.in/sites/default/files/2026-08/31_08_2026%20FINAL_FILE_years_days_horizontal.html",
+  subgroups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/31_08_2026%20FINAL_FILE_subgroups_days_horizontal.html"
 };
 
 // Retain the preceding verified release for first-load recovery. Automatic
@@ -53,7 +53,7 @@ const LEGACY_FALLBACK_SOURCES = {
   years: "https://appsc.gndec.ac.in/sites/default/files/2026-08/09_08_2026%20FINAL_FILE%20R4_years_days_horizontal.html",
   subgroups: "https://appsc.gndec.ac.in/sites/default/files/2026-08/09_08_2026%20FINAL_FILE%20R4_subgroups_days_horizontal.html"
 };
-const FALLBACK_SOURCE_FOOTER = "FET 7.6.4 · 8/30/26 10:39 PM";
+const FALLBACK_SOURCE_FOOTER = "FET 7.6.4 · 8/31/26 10:28 PM";
 const LEGACY_FALLBACK_SOURCE_FOOTER = "FET 7.6.4 · 8/13/26 9:12 AM";
 
 const FALLBACK_STUDENT_SECTION_SOURCES = {
@@ -98,7 +98,7 @@ const SYSTEM_PROMPT = "You are GNDEC Compass, a college assistant. Reply in the 
 
 function fallbackRegistry() {
   return {
-    version: "30-08-2026 (bootstrap fallback)",
+    version: "01-09-2026 (bootstrap fallback)",
     mode: "fallback",
     discoveredAt: null,
     checkedAt: null,

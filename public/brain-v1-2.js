@@ -375,46 +375,37 @@
       }
     }
 
-    // 4. Subject Credits Lookup: e.g. "Physics credits", "PPS credits", "Maths credits", "Economics credits"
-    const asksTotalCredits = /\b(?:total|my|overall|how many)\s+credits?\b|\bcredits?\s+(?:in|of)\s+(?:first|1st|sem|semester|year|b\.?tech)\b/.test(q);
-    if (asksTotalCredits) {
-      return kernel.result("ACADEMIC_TOTAL_CREDITS", 0.99,
-        `<p><strong><u>Official GNDEC B.Tech First-Year Credit Scheme</u></strong></p><p>• <strong>Physics Group (Semester 1/2):</strong> ~20.5 Credits<br />• <strong>Chemistry Group (Semester 1/2):</strong> ~19.5 Credits<br />• <strong>Total First-Year Credits:</strong> ~40 Credits (out of 160 total B.Tech credits under autonomous regulations)</p><p class="answer-source">Official GNDEC Autonomous Study Scheme (AICTE Model Curriculum).</p>`,
-        { firstYearCredits: 40, totalBTechCredits: 160 },
-        ["retrieve autonomous study scheme", "summarize first year credit allocation"]);
-    }
-
-    const asksSubjectCredits = /\bcredits?\b/.test(q) && /\b(?:physics|math|maths|mathematics|chemistry|pps|programming|english|drawing|electrical|workshop|manufacturing|economics|eco|hvpe|ethics|values|evs|environmental)\b/.test(q);
-    if (asksSubjectCredits) {
-      const subjectCreditsMap = {
-        physics: { name: "Applied Physics (BTPH-101-18 / BTPH-102-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
-        math: { name: "Mathematics (BTAM-101-18 / BTAM-102-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
-        maths: { name: "Mathematics (BTAM-101-18 / BTAM-102-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
-        mathematics: { name: "Mathematics (BTAM-101-18 / BTAM-102-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
-        chemistry: { name: "Applied Chemistry (BTCH-101-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
-        pps: { name: "Programming for Problem Solving (BTPS-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits (Lab is separate 1.5 Cr)" },
-        programming: { name: "Programming for Problem Solving (BTPS-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits (Lab is separate 1.5 Cr)" },
-        english: { name: "English (BTHU-101-18)", credits: 2, breakdown: "2 Lectures = 2 Credits" },
-        electrical: { name: "Basic Electrical Engineering (BTEE-101-18)", credits: 4, breakdown: "3 Lectures + 1 Tutorial = 4 Credits" },
-        drawing: { name: "Engineering Graphics & Design (BTME-101-18)", credits: 3, breakdown: "1 Lecture + 4 Practical/Drawing hrs = 3 Credits" },
-        workshop: { name: "Workshop/Manufacturing Practices (BTMP-101-18)", credits: 3, breakdown: "1 Lecture + 4 Practical hrs = 3 Credits" },
-        manufacturing: { name: "Manufacturing Practices (BTMP-101-18)", credits: 3, breakdown: "1 Lecture + 4 Practical hrs = 3 Credits" },
-        economics: { name: "Economics for Engineers (HSMC-101-18 / HSMC-102-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
-        eco: { name: "Economics for Engineers (HSMC-101-18 / HSMC-102-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
-        hvpe: { name: "Human Values & Professional Ethics (HVPE-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
-        ethics: { name: "Human Values & Professional Ethics (HVPE-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
-        values: { name: "Human Values & Professional Ethics (HVPE-101-18)", credits: 3, breakdown: "3 Lectures = 3 Credits" },
-        evs: { name: "Environmental Sciences (EVS-101-18)", credits: 0, breakdown: "Non-credit mandatory audit course (Satisfactory / Non-Satisfactory)" },
-        environmental: { name: "Environmental Sciences (EVS-101-18)", credits: 0, breakdown: "Non-credit mandatory audit course (Satisfactory / Non-Satisfactory)" }
-      };
-      const foundKey = Object.keys(subjectCreditsMap).find((key) => new RegExp(`\\b${key}\\b`, "i").test(q));
-      if (foundKey) {
-        const sc = subjectCreditsMap[foundKey];
-        return kernel.result("ACADEMIC_SUBJECT_CREDITS", 0.99,
-          `<p><strong><u>${kernel.escapeHtml(sc.name)}</u></strong></p><p>• <strong>Total Credits:</strong> ${kernel.escapeHtml(String(sc.credits))} Credits<br />• <strong>Teaching Scheme:</strong> ${kernel.escapeHtml(sc.breakdown)}</p><p class="answer-source">Official GNDEC First-Year Autonomous Study Scheme.</p>`,
-          { subject: sc.name, credits: sc.credits },
-          ["identify course", "retrieve official credit allocation", "render course credits breakdown"]);
+    // Credits must come from the loaded, applicable official syllabus. The
+    // old 2018 course map and approximate first-year total are not evidence.
+    if (/\bcredits?\b/.test(q)) {
+      const courses = Array.isArray(context.syllabus) ? context.syllabus : [];
+      const valid = courses.filter((course) => course.code && course.title && String(course.credits ?? "").trim() !== "" && Number.isFinite(Number(course.credits)) && Number(course.credits) >= 0);
+      const asksTotal = /\b(?:total|overall|how many|my)\s+credits?\b/.test(q);
+      let matches = valid.filter((course) => q.includes(String(course.code).toLowerCase()));
+      if (asksTotal && matches.length >= 2) {
+        const distinct = [...new Map(matches.map((course) => [course.code, course])).values()];
+        const total = distinct.reduce((sum, course) => sum + Math.round(Number(course.credits) * 100), 0) / 100;
+        return kernel.result("ACADEMIC_TOTAL_CREDITS", 0.99,
+          `<p><strong>${total} Credits</strong> across ${kernel.escapeHtml(distinct.map((course) => course.code).join(", "))}.</p><p class="answer-source">Sum of the named courses in the loaded official syllabus.</p>`,
+          { credits: total, codes: distinct.map((course) => course.code) }, ["resolve named course codes", "sum published credits"]);
       }
+      if (!matches.length) matches = valid.filter((course) => String(course.title).toLowerCase().split(/\W+/).some((word) => word.length >= 5 && q.split(/\W+/).includes(word)));
+      if (asksTotal) {
+        // A syllabus catalogue includes alternatives; it cannot establish a
+        // student's semester enrollment or its credits from a section alone.
+        return kernel.result("ACADEMIC_CREDITS_CLARIFY", 1,
+          "<p>Please specify the course codes to total. A first-year syllabus includes alternative courses; it does not by itself verify your semester's enrollment.</p>",
+          {}, ["distinguish syllabus catalogue from enrolled courses"]);
+      }
+      if (!matches.length) return kernel.result("ACADEMIC_CREDITS_UNAVAILABLE", 1,
+        "<p>I could not verify that course's credits from the loaded official syllabus. Load the current syllabus or specify its course code.</p>",
+        {}, ["require authoritative course credits"]);
+      const distinct = [...new Map(matches.map((course) => [course.code, course])).values()];
+      const rows = distinct.map((course) => `<li><strong>${kernel.escapeHtml(course.title)} (${kernel.escapeHtml(course.code)})</strong>: ${Number(course.credits)} Credits</li>`).join("");
+      return kernel.result("ACADEMIC_SUBJECT_CREDITS", 0.99,
+        `<p><strong>Official syllabus credits</strong></p><ul>${rows}</ul><p class="answer-source">Loaded GNDEC study scheme; theory and practical courses are listed separately.</p>`,
+        { courses: distinct.map((course) => ({ code: course.code, credits: Number(course.credits) })) },
+        ["resolve applicable syllabus courses", "read published credits"]);
     }
 
     // 5. General CGPA Formula explanation

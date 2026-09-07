@@ -2,6 +2,8 @@
 
 Compass Brain is a browser-side deterministic reasoning layer. Every engine uses no LLM, embedding service, or external inference dependency.
 
+The [5 September 2026 upgrade report](compass-upgrade-2026-09-05.md) describes the shared query planner, source audit, date/entity changes, updated roster behavior, and verification limits. It supersedes older capability and roster-enumeration descriptions below where they differ.
+
 ## Layered brain chain
 
 Since the 2026-08-25 upgrade, three independent deterministic engines share one kernel and are tried in order:

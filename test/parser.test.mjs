@@ -385,8 +385,8 @@ test("answers timetable verification directly and never substitutes the active t
   assert.doesNotMatch(verification, /ACTIVE MONDAY COURSE/);
 
   const friend = answerWithoutAi("Mohitveer or Mohitveer Singh Tuesday timetable");
-  assert.match(friend, /cannot verify mohitveer mohitveer singh’s timetable from a name alone/i);
-  assert.match(friend, /will not show your active/i);
+  assert.match(friend, /No verified student or faculty timetable match was found for Mohitveer Singh/i);
+  assert.match(friend, /will not substitute your active/i);
   assert.doesNotMatch(friend, /ACTIVE TUESDAY COURSE/);
 
   const explicit = answerWithoutAi("ECB2 Tuesday timetable");
@@ -536,6 +536,47 @@ test("resolves a named student or faculty timetable from verified source data wi
   assert.equal(state.selectedSubgroup, "ECB1");
   state.nowOverride = null;
   state.student = null;
+});
+
+test("keeps explicit teacher, student, room, and calendar questions on their verified routes", () => {
+  const { state, buildScheduleIndex, answerWithoutAi, namedPersonTimetableRequest } = context.__parserTest;
+  state.nowOverride = "2026-09-07T04:30:00.000Z";
+  state.schedule = [{ id: "active", group: "ECB", day: "Monday", start: 570, end: 630, subject: "ACTIVE COURSE", teacher: "DR ACTIVE", room: "A1", type: "L", cohorts: "ECB1" }];
+  state.selectedGroup = "ECB";
+  state.selectedSubgroup = "ECB1";
+  state.rosterCache = { version: "07-09-2026", records: [{ name: "CHAHAT JAIN", branch: "CS", section: "CSA", subsection: "CSA2" }] };
+  state.timetableViews = new Map([["teachers", { schedule: [{ id: "faculty", group: "DR CHAHAT JAIN", day: "Monday", start: 570, end: 630, subject: "FACULTY COURSE", teacher: "DR CHAHAT JAIN", room: "F113", type: "L", cohorts: "" }] }]]);
+  buildScheduleIndex();
+
+  const teacher = answerWithoutAi("teacher timetable dr. chahat jain");
+  assert.match(teacher, /FACULTY COURSE/);
+  assert.doesNotMatch(teacher, /CSA2/);
+
+  const student = answerWithoutAi("student timetable Chahat Jain");
+  assert.match(student, /CSA2/);
+  assert.doesNotMatch(student, /FACULTY COURSE/);
+
+  const untyped = answerWithoutAi("Chahat Jain timetable");
+  assert.match(untyped, /both a student and a faculty timetable/i);
+
+  state.timetableViews = new Map();
+  const missingTeacher = answerWithoutAi("teacher timetable dr. chahat jain");
+  assert.match(missingTeacher, /No verified faculty timetable match|Official faculty timetable is not loaded/i);
+  assert.doesNotMatch(missingTeacher, /CSA2/);
+
+  ["room timetable Comp Lab MBA", "subject timetable Programming for Problem Solving", "section timetable CSD", "programme timetable B.Tech first year"].forEach((question) => {
+    assert.equal(namedPersonTimetableRequest(question), null, question);
+  });
+
+  ["today date", "today day", "what is the date today"].forEach((question) => {
+    const answer = answerWithoutAi(question);
+    assert.match(answer, /India calendar date/);
+    assert.doesNotMatch(answer, /timetable|ACTIVE COURSE/i);
+  });
+  assert.match(answerWithoutAi("current time"), /Current GNDEC time/);
+  state.nowOverride = null;
+  state.rosterCache = null;
+  state.timetableViews = new Map();
 });
 
 test("counts one exact official branch, section, or subsection without combining results", () => {
@@ -929,7 +970,7 @@ test("service worker caches only an unused response copy and absorbs cache-write
   assert.match(serviceWorkerSource, /response\.bodyUsed/);
   assert.match(serviceWorkerSource, /copy = response\.clone\(\)/);
   assert.match(serviceWorkerSource, /cache\.put\(request, copy\)\)\.catch\(\(\) => \{\}\)/);
-  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260903-1"/);
+  assert.match(appSource, /serviceWorker\.register\("\/sw\.js\?v=20260905-1"/);
 });
 
 test("keeps actual Hindi and Punjabi timetable questions on the fast local path", () => {

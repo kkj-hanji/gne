@@ -77,7 +77,7 @@ test("latest bootstrap release falls back to the previous verified timetable wit
   globalThis.fetch = async (input) => {
     const url = String(input);
     requested.push(url);
-    if (url.includes("30_08_2026%20FINAL_FILE_subgroups")) return new Response("Unavailable", { status: 503 });
+    if (url.includes("31_08_2026%20FINAL_FILE_subgroups")) return new Response("Unavailable", { status: 503 });
     if (url.includes("09_08_2026%20FINAL_FILE%20R4_subgroups")) return new Response(fet("previous-verified"), { status: 200 });
     throw new Error(`Unexpected fetch ${url}`);
   };

@@ -110,6 +110,7 @@ test("Common free periods and shared slots computation", () => {
 
 test("Academic credits and scheme inquiries without external AI", () => {
   const { context, api } = createHarness();
+  api.state.syllabus = [{ code: "ECON-TEST", title: "Economics for Engineers", credits: "3" }];
 
   const econCredits = api.runCompassBrain("Economics credits");
   assert.ok(econCredits);
@@ -119,8 +120,9 @@ test("Academic credits and scheme inquiries without external AI", () => {
 
   const totalCredits = api.runCompassBrain("how many total credits in first year");
   assert.ok(totalCredits);
-  assert.equal(totalCredits.intent, "ACADEMIC_TOTAL_CREDITS");
-  assert.match(totalCredits.answer, /40 Credits/);
+  assert.equal(totalCredits.intent, "ACADEMIC_CREDITS_CLARIFY");
+  assert.match(totalCredits.answer, /course codes|enrollment/);
+  assert.doesNotMatch(totalCredits.answer, /40 Credits/);
 });
 
 test("Capabilities and Creator questions resolve deterministically", () => {

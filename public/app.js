@@ -179,11 +179,12 @@ function makeEntry({ group, day, start, duration, subject, teacher, room, type, 
   };
 }
 
-function parseDetailedCell(cell, group, day, start, duration) {
+function parseDetailedCell(cell, group, day, start, duration, view) {
   const table = cell.querySelector("table.detailed");
   if (!table) return [];
   const cohortCells = directCells(table.querySelector("tr.studentsset"));
-  const subjectCells = directCells(table.querySelector("tr.line1"));
+  const subjectRow = [...table.querySelectorAll("tr")].find((row) => row.querySelector(".subject"));
+  const subjectCells = directCells(subjectRow || (view === "subjects" ? table.querySelector("tr.line0") : null));
   const teacherCells = directCells(table.querySelector("tr.teacher"));
   const roomCells = directCells(table.querySelector("tr.room"));
 
@@ -192,26 +193,26 @@ function parseDetailedCell(cell, group, day, start, duration) {
     day,
     start,
     duration,
-    subject: readNestedCell(subjectCell, ".subject"),
-    teacher: cleanText(teacherCells[index]?.textContent || ""),
-    room: cleanText(roomCells[index]?.textContent || ""),
+    subject: readNestedCell(subjectCell, ".subject") || (view === "subjects" ? group : ""),
+    teacher: cleanText(teacherCells[index]?.textContent || "") || (view === "teachers" ? group : ""),
+    room: cleanText(roomCells[index]?.textContent || "") || (view === "rooms" ? group : ""),
     type: readNestedCell(subjectCell, ".activitytag"),
     cohorts: cleanText(cohortCells[index]?.textContent || "")
   })).filter(Boolean);
 }
 
-function parseCell(cell, group, day, start, duration) {
+function parseCell(cell, group, day, start, duration, view) {
   if (cell.classList.contains("empty") || cleanText(cell.textContent) === "") return [];
-  const detailedEntries = parseDetailedCell(cell, group, day, start, duration);
+  const detailedEntries = parseDetailedCell(cell, group, day, start, duration, view);
   if (detailedEntries.length) return detailedEntries;
   return [makeEntry({
     group,
     day,
     start,
     duration,
-    subject: readNestedCell(cell, ".subject"),
-    teacher: readNestedCell(cell, ".teacher"),
-    room: readNestedCell(cell, ".room"),
+    subject: readNestedCell(cell, ".subject") || (view === "subjects" && cell.querySelector(".activitytag") ? group : ""),
+    teacher: readNestedCell(cell, ".teacher") || (view === "teachers" ? group : ""),
+    room: readNestedCell(cell, ".room") || (view === "rooms" ? group : ""),
     type: readNestedCell(cell, ".activitytag"),
     cohorts: readNestedCell(cell, ".studentsset")
   })].filter(Boolean);
@@ -219,7 +220,7 @@ function parseCell(cell, group, day, start, duration) {
 
 // FET renders the first column as time and uses rowspans for practicals.
 // This builds a visual row before extracting each weekday cell.
-function parseFetTimetable(html) {
+function parseFetTimetable(html, view = "groups") {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const schedule = [];
   [...doc.querySelectorAll("table")].forEach((table) => {
@@ -246,7 +247,7 @@ function parseFetTimetable(html) {
         const rowSpan = Number(cell.getAttribute("rowspan") || 1);
         const nextStart = rowTimes[rowIndex + rowSpan];
         const duration = nextStart && nextStart > start ? nextStart - start : 50 * rowSpan;
-        schedule.push(...parseCell(cell, group, headers[column], start, duration));
+        schedule.push(...parseCell(cell, group, headers[column], start, duration, view));
         const columnSpan = Number(cell.getAttribute("colspan") || 1);
         for (let span = 0; span < columnSpan; span += 1) {
           if (rowSpan > 1) activeSpans[column + span] = rowSpan - 1;
@@ -755,30 +756,55 @@ function isTimetableComparisonQuestion(question = "") {
   return /\b(?:compare|comparison|vs|versus|difference|different|farak|farq)\b/.test(q);
 }
 
+function isExplicitTeacherTimetableQuestion(question = "") {
+  const q = canonicalTimetableQuestion(question);
+  const timetable = "(?:time\\s*table|timetable|schedule)";
+  return new RegExp(`\\b(?:teacher|faculty)\\s+(?:${timetable})\\b|\\b${timetable}\\s+(?:of|for)\\s+(?:a\\s+)?(?:teacher|faculty)\\b|\\b(?:teacher|faculty)\\s+(?!(?:ka|ki|ke|da|di|de|today|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday)\\b)(?:(?:dr|prof(?:essor)?|doctor)\\.?\\s+)?[a-z][a-z.'-]*(?:\\s+[a-z][a-z.'-]*){0,3}\\s+${timetable}\\b`, "i").test(q);
+}
+
 function requestedOfficialTimetableView(question = "") {
   const q = canonicalTimetableQuestion(question);
   if (isTimetableComparisonQuestion(q)) return "";
   const timetableWords = /\b(?:time\s*table|timetable|schedule|class(?:es)?)\b/i.test(q);
   if (!timetableWords) return "";
-  if (/\b(?:faculty|teacher)\b/.test(q)) return "teachers";
-  if (/\b(?:room|venue|location)\b/.test(q)) return "rooms";
-  if (/\b(?:subject|course)\b/.test(q)) return "subjects";
+  if (isExplicitTeacherTimetableQuestion(q)) return "teachers";
+  if (/\broom\b/.test(q) || /\b(?:venue|location)\s+(?:timetable|schedule)\b/.test(q)) return "rooms";
+  if (/\b(?:subject|course)\b/.test(q) && /\b(?:timetable|schedule)\b/.test(q)) return "subjects";
   if (/\b(?:program|programme|year)\b/.test(q)) return "years";
   if (/\b(?:subsection|subgroup|sub section)\b/.test(q)) return "subgroups";
   if (/\b(?:section|group)\b/.test(q)) return "groups";
   return "";
 }
 
-function viewCaptionForQuestion(question, schedule) {
+function viewCaptionForQuestion(question, schedule, viewId = "") {
   const q = normalizeStudentName(canonicalTimetableQuestion(question));
+  if (viewId === "teachers") {
+    const request = namedPersonTimetableRequest(question, { allowOfficialView: true, allowSelf: true, kind: "teachers" });
+    // Full published captions preserve distinctions such as Dr/Ms and the
+    // department suffix. Only drop honorifics for a non-exact name lookup.
+    const exact = [...new Set(schedule.map(item => cleanText(item.group)).filter(Boolean))]
+      .filter(caption => (` ${q} `).includes(` ${normalizeStudentName(caption)} `) && canonicalFacultyName(caption) === canonicalFacultyName(request?.term || ""))
+      .sort((a, b) => b.length - a.length);
+    if (exact.length && (exact.length === 1 || exact[0].length > exact[1].length)) return exact[0];
+    const match = request ? timetablePersonCaption(request.term, schedule) : null;
+    return match?.status === "single" ? match.captions[0] : "";
+  }
   const captions = [...new Set(schedule.map((item) => cleanText(item.group)).filter(Boolean))];
-  const normalized = (value) => normalizeStudentName(value).replace(/^(?:dr|er|prof|professor)\s+/, "");
+  const normalized = (value) => normalizeStudentName(canonicalTimetableQuestion(value)).replace(/^(?:dr|er|prof|professor)\s+/, "");
+  const exact = captions.filter(caption => (` ${q} `).includes(` ${normalized(caption)} `)).sort((a, b) => normalized(b).length - normalized(a).length);
+  if (exact.length && (exact.length === 1 || normalized(exact[0]).length > normalized(exact[1]).length)) return exact[0];
   const direct = captions.filter((caption) => {
-    const full = normalizeStudentName(caption);
+    const full = normalizeStudentName(canonicalTimetableQuestion(caption));
     const withoutTitle = normalized(caption);
-    return (full.length >= 2 && q.includes(full)) || (withoutTitle.length >= 3 && q.includes(withoutTitle));
+    const short = normalized(caption.replace(/\s*\([^)]*\)/g, ""));
+    const shortMatch = short.length >= 2 && new RegExp(`(?:^| )${short.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?: |$)`).test(q);
+    const phraseMatch = (value) => value.length >= 2 && (` ${q} `).includes(` ${value} `);
+    return shortMatch || phraseMatch(full) || phraseMatch(withoutTitle);
   });
   if (direct.length === 1) return direct[0];
+  // Codes identify distinct rooms/cohorts/courses. Never turn an unknown code
+  // such as F114 into F113 through edit distance, or pick one of two matches.
+  if (direct.length > 1 || /\b[a-z]*\d+[a-z]*\b/.test(q)) return "";
   const words = q.split(" ").filter((word) => word.length >= 3);
   const fuzzy = captions.filter((caption) => {
     const pieces = normalized(caption).split(" ").filter((word) => word.length >= 3);
@@ -787,21 +813,36 @@ function viewCaptionForQuestion(question, schedule) {
   return fuzzy.length === 1 ? fuzzy[0] : "";
 }
 
+function unavailableOfficialTimetableAnswer(id) {
+  return `<p><strong><u>Official ${escapeHtml(OFFICIAL_TIMETABLE_VIEWS[id].label.toLowerCase())} is not loaded.</u></strong></p><p>Refresh this official timetable and try again. A different timetable cannot verify this request.</p>`;
+}
+
 function officialTimetableViewAnswer(question = "") {
   const id = requestedOfficialTimetableView(question);
   const view = OFFICIAL_TIMETABLE_VIEWS[id];
   const loaded = state.timetableViews.get(id)?.schedule || [];
   if (!view || !loaded.length) return "";
-  const caption = viewCaptionForQuestion(question, loaded);
+  const caption = viewCaptionForQuestion(question, loaded, id);
   if (!caption) {
     // A comparison request owns two codes; a single-code view must not steal it.
     if (/\b(?:vs|versus)\b/i.test(canonicalTimetableQuestion(question))) return "";
     const available = [...new Set(loaded.map((item) => cleanText(item.group)).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-    return `<p><strong><u>${escapeHtml(view.label)}</u></strong></p><p>Name a verified ${escapeHtml(view.noun)} to see its weekly schedule.</p>${available.length ? `<p><strong>Available:</strong> ${escapeHtml(available.slice(0, 30).join(", "))}${available.length > 30 ? " …" : ""}</p>` : ""}<p class="answer-source">Official GNDEC ${escapeHtml(view.label.toLowerCase())}.</p>`;
+    const request = id === "teachers" ? namedPersonTimetableRequest(question, { allowOfficialView: true, allowSelf: true, kind: "teachers" }) : null;
+    if (request) {
+      const match = timetablePersonCaption(request.term, loaded);
+      return readOnlyTeacherTimetableAnswer(request, match, loaded) || `<p><strong>No verified faculty timetable match for ${escapeHtml(request.label)}.</strong></p><p>This faculty timetable covers the published Applied Sciences release. A missing entry does not mean the teacher has no classes. Check the official faculty timetable or the relevant department.</p>`;
+    }
+    return `<p><strong><u>${escapeHtml(view.label)}</u></strong></p><p>I could not resolve a unique entry. Name a verified ${escapeHtml(view.noun)} to see its weekly schedule.</p>${available.length ? `<p><strong>Available:</strong> ${escapeHtml(available.slice(0, 30).join(", "))}${available.length > 30 ? " …" : ""}</p>` : ""}<p class="answer-source">Official GNDEC ${escapeHtml(view.label.toLowerCase())}.</p>`;
   }
-  const day = requestedWeekday(question);
+  // Names are data. FIRST YEAR is not a request for the first period; subject
+  // abbreviations and room names must not become date/time qualifiers.
+  const qualifiers = canonicalTimetableQuestion(question).replace(canonicalTimetableQuestion(caption), " ");
+  const dateRequest = requestedTimetableDate(qualifiers);
+  const day = dateRequest?.day || requestedWeekday(qualifiers);
   const entries = loaded.filter((item) => item.group === caption && (!day || item.day === day));
-  return scheduleAnswer(entries, `${caption} · ${view.label}${day ? ` · ${day}` : ""}`);
+  const window = requestedTimetableWindow(qualifiers);
+  if (window) return timetableWindowAnswer(entries.filter((item) => item.day === (day || getIndiaNow().day)), `${caption} · ${view.label} · ${day || getIndiaNow().day}`, window);
+  return scheduleAnswer(entries, `${caption} · ${view.label}${day ? ` · ${day}` : ""}${dateRequest ? ` · ${dateRequest.iso}` : ""}`);
 }
 
 async function loadOfficialTimetableView(id) {
@@ -815,7 +856,7 @@ async function loadOfficialTimetableView(id) {
   const loading = (async () => {
     const response = await fetch(`/api/timetable?source=${encodeURIComponent(id)}`, { cache: "no-cache" });
     if (!response.ok) throw new Error(`The official ${view.label.toLowerCase()} could not be loaded.`);
-    const schedule = sanitizeSchedule(parseFetTimetable(await response.text()));
+    const schedule = sanitizeSchedule(parseFetTimetable(await response.text(), id));
     if (!schedule.length) throw new Error(`The official ${view.label.toLowerCase()} could not be read.`);
     state.timetableViews.set(id, { revision: source.contentHash || source.url, schedule });
     return schedule;
@@ -858,7 +899,7 @@ function explicitTimetableSelectionAnswer(question = "") {
     : DAY_NAMES.flatMap((weekday) => classFor(selection.group, weekday, selection.subgroup));
   const label = selection.subgroup || selection.group;
   if (window) return timetableWindowAnswer(entries, `${label}${day ? ` · ${day}` : ""}`, window);
-  return scheduleAnswer(entries, `${label} timetable${day ? ` · ${day}` : ""}`);
+  return scheduleAnswer(entries, `${label} timetable${day ? ` · ${day}` : ""}${dateRequest ? ` · ${dateRequest.iso}` : ""}`);
 }
 
 function activeTimetableLabel() {
@@ -2240,6 +2281,10 @@ function requestedWeekday(question) {
 function requestedTimetableDate(question = "") {
   const q = canonicalTimetableQuestion(question);
   const kernel = globalThis.CompassBrainKernel;
+  if (kernel?.resolveTemporalQuery) {
+    const resolved = kernel.resolveTemporalQuery(q, indiaCalendarDate(0).date.toISOString().slice(0, 10));
+    return resolved.status === "resolved" ? { iso: resolved.iso, day: resolved.day } : null;
+  }
   const months = kernel?.MONTHS || { january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6, august: 7, september: 8, october: 9, november: 10, december: 11 };
   const relativeOffset = /\byesterday\b/.test(q) ? -1 : /\b(?:day\s+after\s+tomorrow|parso|parson)\b/.test(q) ? 2 : /\b(?:tomorrow|tomm?or+ow|kal|kalle)\b/.test(q) ? 1 : /\b(?:today|aaj|ajj)\b/.test(q) ? 0 : null;
   if (relativeOffset !== null) {
@@ -2267,12 +2312,15 @@ function requestedTime(question) {
   const q = canonicalTimetableQuestion(question);
   const colon = q.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/);
   if (colon) {
-    let minutes = (Number(colon[1]) % 12) * 60 + Number(colon[2]);
+    const hour = Number(colon[1]);
+    if (Number(colon[2]) > 59 || hour > 23 || (colon[3] && (hour < 1 || hour > 12))) return null;
+    let minutes = (colon[3] ? hour % 12 : hour) * 60 + Number(colon[2]);
     if (colon[3] === "pm") minutes += 720;
     return minutes;
   }
   const meridiem = q.match(/\b(\d{1,2})\s*(am|pm)\b/);
   if (meridiem) {
+    if (Number(meridiem[1]) < 1 || Number(meridiem[1]) > 12) return null;
     const hours = Number(meridiem[1]) % 12;
     return hours * 60 + (meridiem[2] === "pm" ? 720 : 0);
   }
@@ -2435,13 +2483,45 @@ function requestedScheduleDate(question) {
   return { date: date.toISOString().slice(0, 10), day: new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(date), label: new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", weekday: "long", timeZone: "UTC" }).format(date) };
 }
 
+function isPlainCalendarQuestion(question = "") {
+  const q = canonicalTimetableQuestion(question).replace(/\b(today|tomorrow|yesterday)['’]s\b/g, "$1");
+  if (/\b(?:timetable|schedule|class(?:es)?|lectures?|periods?)\b/.test(q)) return false;
+  if (!/\b(?:date|day|weekday|time)\b/.test(q)) return false;
+  // Calendar vocabulary plus a date is sufficient, independent of word order.
+  // Other domain words (exam, holiday, subject...) keep their own intent.
+  const rest = q.replace(/\b(?:what|which|tell|show|me|please|is|are|it|the|s|on|of|for|in|today|tomorrow|yesterday|current|now|day|date|weekday|time|after|before|next|this|previous|last|ka|ki|ke|da|di|de|hai|hain|aa|kya|batao|india|ist)\b/g, " ")
+    .replace(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/g, " ")
+    .replace(/\d+(?:st|nd|rd|th)?|[^\p{L}]/gu, "");
+  return !rest;
+}
+
 function calendarQuestionAnswer(question) {
   const q = canonicalTimetableQuestion(question);
-  const asksCalendar = /\b(?:what|which|tell|show)\b.*\b(?:date|day|weekday)\b|\b(?:date|day|weekday)\b.*\b(?:what|which|is)\b/.test(q);
+  // Keep short calendar questions such as "today date" and "today day" out
+  // of the timetable path. They are common natural phrasing, not shorthand
+  // for a personal schedule.
+  const asksCalendar = isPlainCalendarQuestion(q);
   if (!asksCalendar) return "";
   const base = indiaCalendarDate(0).date;
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const format = (date) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(date);
+  if (/\btime\b/.test(q)) {
+    if (/\b(?:tomorrow|yesterday|next|previous)\b/.test(q)) return "<p>Please specify a time to convert, or ask for the current time.</p>";
+    return `<p><strong>Current GNDEC time:</strong> <strong>${escapeHtml(getIndiaNow().time)}</strong>.</p><p class="answer-source">Asia/Kolkata time.</p>`;
+  }
+  const temporal = globalThis.CompassBrainKernel?.resolveTemporalQuery?.(q, base.toISOString().slice(0, 10));
+  if (temporal?.status === "resolved" && temporal.iso) {
+    const date = new Date(`${temporal.iso}T00:00:00Z`);
+    return `<p><strong>${escapeHtml(dayNames[date.getUTCDay()])}, ${escapeHtml(format(date))}</strong>.</p><p class="answer-source">India calendar date.</p>`;
+  }
+  // The independent fallback also accepts ISO dates when the shared kernel
+  // is disabled or unavailable.
+  const iso = q.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (iso) {
+    const date = new Date(`${iso[0]}T00:00:00Z`);
+    if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0, 10) !== iso[0]) return "<p><strong>That date is not valid.</strong></p>";
+    return `<p><strong>${escapeHtml(dayNames[date.getUTCDay()])}, ${escapeHtml(format(date))}</strong>.</p><p class="answer-source">India calendar date.</p>`;
+  }
   const nextDay = q.match(/\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/)?.[1];
   if (nextDay) {
     const target = dayNames.findIndex((value) => value.toLowerCase() === nextDay);
@@ -2451,12 +2531,16 @@ function calendarQuestionAnswer(question) {
     date.setUTCDate(date.getUTCDate() + offset);
     return `<p><strong>Next ${escapeHtml(dayNames[target])}</strong> is <strong>${escapeHtml(format(date))}</strong>.</p><p class="answer-source">Calculated from today's India calendar date.</p>`;
   }
-  const relative = q.match(/\b(day after tomorrow|today|tomorrow)\b/);
+  if (/\b(?:current|now|today)\b/.test(q) && /\btime\b/.test(q)) {
+    const now = getIndiaNow();
+    return `<p><strong>Current GNDEC time:</strong> <strong>${escapeHtml(now.time)}</strong>.</p><p class="answer-source">Asia/Kolkata time.</p>`;
+  }
+  const relative = q.match(/\b(day after tomorrow|yesterday|today|tomorrow|current)\b/);
   if (relative) {
     const date = new Date(base.getTime());
-    const offset = relative[1] === "day after tomorrow" ? 2 : relative[1] === "tomorrow" ? 1 : 0;
+    const offset = relative[1] === "day after tomorrow" ? 2 : relative[1] === "tomorrow" ? 1 : relative[1] === "yesterday" ? -1 : 0;
     if (offset) date.setUTCDate(date.getUTCDate() + offset);
-    const label = offset === 2 ? "Day after tomorrow" : offset ? "Tomorrow" : "Today";
+    const label = offset === 2 ? "Day after tomorrow" : offset === 1 ? "Tomorrow" : offset === -1 ? "Yesterday" : "Today";
     return `<p><strong>${label}</strong> is <strong>${escapeHtml(dayNames[date.getUTCDay()])}, ${escapeHtml(format(date))}</strong>.</p><p class="answer-source">India calendar date.</p>`;
   }
   const months = { january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2, april: 3, apr: 3, may: 4, june: 5, jun: 5, july: 6, jul: 6, august: 7, aug: 7, september: 8, sep: 8, sept: 8, october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11 };
@@ -2466,7 +2550,7 @@ function calendarQuestionAnswer(question) {
     day = Number(match[1]); month = months[match[2]]; year = Number(match[3] || base.getUTCFullYear());
   } else {
     match = q.match(/\b(\d{1,2})[\-/](\d{1,2})[\-/](\d{2}|\d{4})\b/);
-    if (!match) return "";
+    if (!match) return `<p><strong>Today</strong> is <strong>${escapeHtml(dayNames[base.getUTCDay()])}, ${escapeHtml(format(base))}</strong>.</p><p class="answer-source">India calendar date.</p>`;
     day = Number(match[1]); month = Number(match[2]) - 1; year = Number(match[3]);
   }
   if (year < 100) year += 2000;
@@ -3436,25 +3520,40 @@ function timetableVerificationAnswer(question = "") {
 // profile. The name is first resolved against a current official roster or
 // official faculty timetable; only then may it select a section/subsection.
 function namedPersonTimetableRequest(question = "", options = {}) {
+  const original = String(question || "");
   const q = canonicalTimetableQuestion(question);
   const asksTimetable = /\b(?:time\s*table|timetable|schedule|class(?:es)?|lectures?|periods?)\b/.test(q);
   if (!options?.allowComparison && isTimetableComparisonQuestion(q)) return null;
-  if (!asksTimetable || requestedTimetableSelection(q)) return null;
-  const teacherCue = /\b(?:teacher|faculty|prof(?:essor)?|dr\.?|doctor|instructor|sir|ma'?am|madam)\b/.test(q);
-  const friendCue = /\b(?:friend|classmate|batchmate|peer|student)\b/.test(q);
+  if (!asksTimetable || (!options.allowOfficialView && requestedTimetableSelection(q))) return null;
+  // A requested official view has a stronger type than a name-shaped token.
+  // For example, "room timetable Comp Lab" must not search the student roster
+  // for a person named "comp lab" before opening the room timetable.
+  const requestedView = requestedOfficialTimetableView(q);
+  const rawTeacherCue = /\b(?:prof(?:essor)?|dr\.?|doctor|instructor|sir|ma'?am|madam)\b/i.test(original);
+  if (requestedView && !options.allowOfficialView) return null;
+  if (!options.allowOfficialView && /\b(?:teacher name|who teaches|which teacher|what teacher|(?:with|and) (?:the )?(?:teacher|faculty))\b/.test(q)) return null;
+  // Generic phrases such as "teacher name" and "which teacher teaches maths"
+  // are subject questions. An honorific is the strong signal that a person,
+  // rather than a timetable field, was named.
+  const inferredTeacherCue = /\b[a-z]{3,}(?:\s+[a-z]{3,}){0,2}\s+teacher\s+(?:ka|ki|ke|da|di|de)\b/.test(q);
+  const teacherCue = options.kind === "teachers" || rawTeacherCue || inferredTeacherCue || /\b(?:teacher|faculty|prof(?:essor)?|dr\.?|doctor|instructor|sir|ma'?am|madam)\b/.test(q);
+  const studentCue = /\b(?:students?|friend|classmate|batchmate|peer)\b/.test(q);
+  const friendCue = studentCue;
   const refersToOwnTimetable = /\b(?:my|mine|mera|meri|mere)\b/.test(q) && !friendCue;
   if (refersToOwnTimetable) return null;
   if (/\b(?:which|what)\s+class(?:es)?\b.*\b(?:lab|room|venue)\b/.test(q)) return null;
   const ignored = new Set(["a", "after", "afternoon", "am", "an", "and", "are", "around", "as", "at", "before", "between", "both", "can", "check", "class", "classes", "compare", "comparison", "current", "da", "day", "de", "di", "dono", "does", "do", "doctor", "dr", "duration", "earlier", "evening", "faculty", "first", "for", "free", "friend", "from", "give", "going", "had", "hai", "hain", "has", "have", "her", "his", "how", "i", "instructor", "is", "its", "ka", "kab", "kardo", "karo", "ke", "ki", "krdo", "last", "later", "latest", "lecture", "lectures", "maam", "madam", "many", "me", "mine", "morning", "most", "my", "new", "next", "night", "now", "of", "official", "on", "or", "parso", "parson", "period", "periods", "please", "pm", "prof", "professor", "right", "schedule", "shanivar", "show", "sir", "student", "table", "teacher", "tell", "that", "the", "their", "this", "time", "timetabel", "timetble", "timetabl", "timetable", "to", "today", "tomorrow", "tommorow", "tommorrow", "total", "until", "update", "updated", "verified", "week", "what", "when", "which", "who", "with", "yestarday", "yesteday", "yesterday", "your", "aaj", "ajj", "batao", "kal", "kalle", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
   (globalThis.CompassBrainKernel?.MONTH_NAMES || ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]).forEach((month) => ignored.add(String(month).toLowerCase()));
+  ["er", "ar", "mr", "mrs", "ms", "students", "classmate", "batchmate", "peer"].forEach((word) => ignored.add(word));
   const selectionCodes = new Set([
     ...state.schedule.map((item) => String(item.group || "").toUpperCase()),
     ...state.schedule.flatMap((item) => cohortTokens(item.cohorts || ""))
   ]);
-  const words = normalizeStudentName(q).split(/\s+/).filter((word) => {
+  const departmentHint = teacherCue ? q.match(/\(([^)]+)\)/)?.[1] || "" : "";
+  const words = normalizeStudentName(departmentHint ? q.replace(/\([^)]*\)/g, " ") : q).split(/\s+/).filter((word) => {
     const resemblesWeekday = DAY_NAMES.some((day) => editDistance(word, day.toLowerCase()) <= 2);
     const resemblesRelativeDay = /^tom+or+ow$|^yest[er|ar]+day$|^parso[n]?$|^today$|^a[a]?j+$/.test(word);
-    return /^[a-z][a-z-]{2,29}$/.test(word) && !ignored.has(word) && !resemblesWeekday && !resemblesRelativeDay && !selectionCodes.has(word.toUpperCase());
+    return (teacherCue ? /^[a-z][a-z-]{0,29}$/ : /^[a-z][a-z-]{2,29}$/).test(word) && !ignored.has(word) && !resemblesWeekday && !resemblesRelativeDay && !selectionCodes.has(word.toUpperCase());
   });
   if (!words.length) return null;
   const referenced = findReferencedClasses(q);
@@ -3462,22 +3561,22 @@ function namedPersonTimetableRequest(question = "", options = {}) {
     const entityWords = normalizeStudentName(`${item.subject || ""} ${item.teacher || ""}`).split(/\s+/).filter((word) => word.length >= 3);
     return words.some((word) => entityWords.some((entity) => entity === word || entity.startsWith(word) || word.startsWith(entity) || editDistance(entity, word) <= (Math.max(entity.length, word.length) >= 8 ? 2 : 1)));
   });
-  const term = [...new Set(words)].slice(0, 4).join(" ");
+  const term = [...new Set(words)].slice(0, 8).join(" ") + (departmentHint ? ` (${departmentHint})` : "");
   // An honorific such as "sir" or "ma'am" is a strong person cue. After the
   // honorific has been removed from the lookup term, allow the verified
-  // faculty-first/roster-second resolver to decide the person's kind.
+  // faculty resolver to verify the person's identity without using a roster.
   if (!looksLikePlainStudentNameQuery(term) && !teacherCue) return null;
   // A full person name is more specific than a coincidental timetable word
   // (for example a weekday embedded in a course title). One-word subject
   // fragments still stay on the timetable route.
-  if (hasKnownTimetableReference && !teacherCue && words.length < 2) return null;
+  if (hasKnownTimetableReference && !rawTeacherCue && !options.kind && words.length < 2) return null;
   const activeName = normalizeStudentName(activeStudentProfile()?.name || "");
-  if (!options?.allowSelf && activeName && (term === activeName || activeName.includes(term) || term.includes(activeName))) return null;
+  if (!options?.allowSelf && !teacherCue && activeName && (term === activeName || activeName.includes(term) || term.includes(activeName))) return null;
   const dateRequest = requestedTimetableDate(q);
   const day = requestedWeekday(q) || dateRequest?.day || "";
   const requestedDays = [];
   if (/\b(?:today|aaj|ajj)\b/.test(q)) requestedDays.push(getIndiaNow().day);
-  if (/\b(?:tomorrow|tomm?or+ow|kal|kalle)\b/.test(q)) requestedDays.push(nextStudyDayInfo(false)?.day || currentAndNext(1).day);
+  if (/\b(?:tomorrow|tomm?or+ow|kal|kalle)\b/.test(q) && !/day\s+after\s+tomorrow/.test(q)) requestedDays.push(indiaCalendarDate(1).day);
   if (/\b(?:yesterday)\b/.test(q)) requestedDays.push(indiaCalendarDate(-1).day);
   if (/\b(?:day\s+after\s+tomorrow|parso|parson)\b/.test(q)) requestedDays.push(indiaCalendarDate(2).day);
   DAY_NAMES.forEach((d) => {
@@ -3492,22 +3591,29 @@ function namedPersonTimetableRequest(question = "", options = {}) {
     days: requestedDays.length ? requestedDays : (day ? [day] : []),
     dateIso: dateRequest?.iso || "",
     teacherCue,
+    studentCue,
     window: requestedTimetableWindow(q)
   };
 }
 
 function timetablePersonCaption(term = "", schedule = []) {
   const wanted = canonicalFacultyName(term);
-  const captions = [...new Set((Array.isArray(schedule) ? schedule : []).map((item) => cleanText(item.group)).filter(Boolean))];
+  const department = normalizeStudentName(String(term).match(/\(([^)]+)\)/)?.[1] || "");
+  const captions = [...new Set((Array.isArray(schedule) ? schedule : []).map((item) => cleanText(item.group)).filter(Boolean))]
+    .filter(caption => !department || normalizeStudentName(caption.match(/\(([^)]+)\)/)?.[1] || "") === department);
   if (!wanted || !captions.length) return { status: "none", captions: [] };
   const exact = captions.filter((caption) => canonicalFacultyName(caption) === wanted);
-  const wantedWords = wanted.split(/\s+/).filter((word) => word.length >= 3);
+  const wantedWords = wanted.split(/\s+/).filter(Boolean);
   const contained = captions.filter((caption) => {
     const candidate = canonicalFacultyName(caption);
-    return wantedWords.length && wantedWords.every((word) => candidate === word || candidate.split(/\s+/).some((part) => part === word || part.startsWith(word) || word.startsWith(part)));
+    return wantedWords.length && wantedWords.every((word) => candidate.split(/\s+/).some((part) => part === word || (word.length >= 3 && part.length >= 3 && part.startsWith(word))));
   });
   const matches = [...new Set(exact.length ? exact : contained)];
-  return { status: matches.length === 1 ? "single" : matches.length > 1 ? "multiple" : "none", captions: matches };
+  const fuzzy = matches.length ? matches : captions.filter((caption) => {
+    const words = canonicalFacultyName(caption).split(/\s+/);
+    return wantedWords.length && wantedWords.every((word) => words.some((part) => part === word || (word.length >= 4 && part.length >= 4 && editDistance(word, part) <= (word.length >= 7 ? 2 : 1))));
+  });
+  return { status: fuzzy.length === 1 ? "single" : fuzzy.length > 1 ? "multiple" : "none", captions: fuzzy };
 }
 
 function readOnlyStudentTimetableAnswer(request, lookup) {
@@ -3552,7 +3658,7 @@ function readOnlyTeacherTimetableAnswer(request, match, schedule) {
   const caption = match.captions[0];
   const day = request.day || (request.window ? getIndiaNow().day : "");
   const entries = (Array.isArray(schedule) ? schedule : []).filter((item) => item.group === caption && (!day || item.day === day));
-  const heading = `${caption} · Faculty timetable${day ? ` · ${day}` : ""}`;
+  const heading = `${caption} · Faculty timetable${day ? ` · ${day}` : ""}${request.dateIso ? ` · ${request.dateIso}` : ""}`;
   const answer = request.window ? timetableWindowAnswer(entries, heading, request.window) : scheduleAnswer(entries, heading);
   return `${answer}<p class="answer-source">Read-only result from the current official GNDEC faculty timetable. It did not change your profile or selected timetable.</p>`;
 }
@@ -3655,6 +3761,13 @@ function namedPersonComparisonRequest(question = "") {
 async function resolveNamedPersonComparisonAnswer(question = "") {
   const request = namedPersonComparisonRequest(question);
   if (!request) return "";
+  if (!/\b(?:student|crn|registration)\b/i.test(question)) {
+    try {
+      if (!state.timetableViews.get("teachers")?.schedule?.length) await loadOfficialTimetableView("teachers");
+      const comparison = runCompassBrain(question);
+      if (comparison?.intent === "TIMETABLE_COMPARISON" || comparison?.intent === "TIMETABLE_COMMON_TEACHERS") return comparison.answer;
+    } catch { /* Verified roster comparison remains independently available. */ }
+  }
 
   const calendarKernel = globalThis.CompassBrainKernel;
   const dateIso = request.dateIso || request.person?.dateIso || "";
@@ -3763,20 +3876,40 @@ async function resolveNamedPersonComparisonAnswer(question = "") {
 async function resolveNamedPersonTimetableAnswer(question = "") {
   const request = namedPersonTimetableRequest(question);
   if (!request) return "";
-  const teacherResult = async () => {
+  if (request.teacherCue && request.studentCue) return namedTimetableResolutionAnswer(request);
+  let facultySchedule = [];
+  let facultyUnavailable = false;
+  let studentLookup = null;
+  if (!request.studentCue) {
     try {
-      const schedule = await loadOfficialTimetableView("teachers");
-      return readOnlyTeacherTimetableAnswer(request, timetablePersonCaption(request.term, schedule), schedule);
-    } catch { return ""; }
-  };
-  let studentAnswer = "";
-  try {
-    const rosterData = await loadCurrentRosterRecords();
-    const lookup = studentLookupContextFromRecords(`find student ${request.term}`, rosterData.records, rosterData);
-    studentAnswer = readOnlyStudentTimetableAnswer(request, lookup);
-  } catch { /* Try the official faculty timetable below before failing safely. */ }
-  const facultyAnswer = await teacherResult();
-  if (request.teacherCue) return facultyAnswer || studentAnswer || `<p><strong><u>No verified student or faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>Please use the full official name or a student CRN. Compass will not show your timetable as theirs.</p>`;
+      facultySchedule = await loadOfficialTimetableView("teachers");
+    } catch { facultyUnavailable = true; }
+  }
+  if (!request.teacherCue) {
+    try {
+      const rosterData = await loadCurrentRosterRecords();
+      studentLookup = studentLookupContextFromRecords(`find student ${request.term}`, rosterData.records, rosterData);
+    } catch { studentLookup = { handled: true, status: "error" }; }
+  }
+  return namedTimetableResolutionAnswer(request, { facultySchedule, facultyUnavailable, studentLookup });
+}
+
+// Shared by the network-backed form and the local/Brain entry point. A source
+// failure is distinct from a verified miss; neither authorizes changing types.
+function namedTimetableResolutionAnswer(request, { facultySchedule = [], facultyUnavailable = false, studentLookup = null } = {}) {
+  if (request.teacherCue && request.studentCue) return `<p><strong><u>Do you mean a teacher or a student?</u></strong></p><p>${escapeHtml(request.label)} was requested with both types, so Compass will not choose a timetable source for you.</p>`;
+  const facultyMatch = timetablePersonCaption(request.term, facultySchedule);
+  const facultyAnswer = readOnlyTeacherTimetableAnswer(request, facultyMatch, facultySchedule);
+  const studentAnswer = readOnlyStudentTimetableAnswer(request, studentLookup);
+  if (request.teacherCue) {
+    if (facultyUnavailable || !facultySchedule.length) return "<p><strong>Official faculty timetable is unavailable.</strong></p><p>Please refresh the official faculty timetable and try again.</p>";
+    return facultyAnswer || `<p><strong><u>No verified faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>The loaded official release did not match that name. This does not mean the teacher has no classes. Check the official spelling or the relevant department timetable.</p>`;
+  }
+  if (request.studentCue) return studentAnswer || `<p><strong><u>No verified student timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>The current official roster did not match that name. Compass did not use a faculty timetable. Please check the spelling or use a student CRN.</p>`;
+  const hasStudent = ["single", "multiple"].includes(studentLookup?.status);
+  const hasFaculty = ["single", "multiple"].includes(facultyMatch.status);
+  if (hasStudent && hasFaculty) return `<p><strong><u>${escapeHtml(request.label)} matches both a student and a faculty timetable.</u></strong></p><p>Please say “student” or “teacher” so Compass uses the correct verified source.</p>`;
+  if ((hasStudent && facultyUnavailable) || (hasFaculty && studentLookup?.status === "error")) return `<p>I found a possible match for ${escapeHtml(request.label)}, but could not check both official sources. Please specify student or teacher.</p>`;
   if (studentAnswer) return studentAnswer;
   if (facultyAnswer) return facultyAnswer;
   return `<p><strong><u>No verified student or faculty timetable match was found for ${escapeHtml(request.label)}.</u></strong></p><p>Please check the spelling or provide a student CRN. Compass will not substitute your active timetable.</p>`;
@@ -4064,7 +4197,7 @@ function legacyHolidayAnswer(question) {
       return `<p><strong>Yes! ${escapeHtml(formatted)} is an official holiday:</strong></p><p><strong>${escapeHtml(holiday.name)}</strong> (${escapeHtml(holiday.type)} Holiday)</p><p>${escapeHtml(holiday.description)}</p><p class="answer-source">Official GNDEC & Punjab Government Gazetted Calendar.</p>`;
     }
     const weekday = kernel.weekdayOfIso(checkIso);
-    return `<p><strong>No. ${escapeHtml(formatted)} is not an official gazetted holiday.</strong></p><p>${weekday === "Saturday" || weekday === "Sunday" ? `It falls on a ${weekday} (weekend).` : "It is a regular college working day."}</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`;
+    return `<p><strong>No. ${escapeHtml(formatted)} is not an official gazetted holiday.</strong></p><p>${weekday === "Saturday" || weekday === "Sunday" ? `It falls on a ${weekday} (weekend).` : "No gazetted holiday is listed; academic breaks and current notices may still apply."}</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`;
   }
 
   // Next holiday
@@ -4139,6 +4272,8 @@ function legacyAcademicMarkingAnswer(question) {
 // Brain v2 may answer first, but every unsupported, uncertain, malformed, or
 // failing Brain result returns here without changing existing factual logic.
 function legacyAnswerWithoutAi(question, studentLookup = null, facultyLookup = null) {
+  const requestedView = requestedOfficialTimetableView(question);
+  if (requestedView) return officialTimetableViewAnswer(question) || unavailableOfficialTimetableAnswer(requestedView);
   const workflowAnswer = approvedCompassWorkflowAnswer(question);
   if (workflowAnswer) return workflowAnswer;
   // Do this before the legacy name-lookup route: “Hostel Timings” is an
@@ -4310,6 +4445,7 @@ function setCompassBrainV2Enabled(enabled) {
 }
 
 function resetBrainConversation() {
+  state.queryConversation = null;
   state.brainConversation = null;
   state.lastTimetableSubject = "";
   state.rosterLookupConversation = null;
@@ -4359,10 +4495,10 @@ function compassBrainContext(overrides = {}) {
     datasetVersion: state.metadata?.version || "",
     allClasses: (() => {
       const combined = [
-        ...(Array.isArray(state.allClasses) ? state.allClasses : []),
         ...(Array.isArray(state.schedule) ? state.schedule : []),
+        ...(Array.isArray(state.allClasses) && (!state.allClassesVersion || state.allClassesVersion === state.metadata?.version) ? state.allClasses : []),
         ...(state.timetablesCache && typeof state.timetablesCache === "object"
-          ? Object.values(state.timetablesCache).flatMap((t) => Array.isArray(t?.classes || t?.schedule) ? (t.classes || t.schedule) : [])
+          ? Object.values(state.timetablesCache).filter((t) => t?.version && t.version === state.metadata?.version).flatMap((t) => Array.isArray(t?.classes || t?.schedule) ? (t.classes || t.schedule) : [])
           : [])
       ];
       const seen = new Set();
@@ -4379,6 +4515,7 @@ function compassBrainContext(overrides = {}) {
     })(),
     studentRoster: Array.isArray(state.rosterCache?.records) ? state.rosterCache.records : [],
     facultyDirectory: Array.isArray(state.facultyCache?.records) ? state.facultyCache.records : [],
+    facultyTimetables: state.timetableViews.get("teachers")?.schedule || [],
     collegeEvents: Array.isArray(state.collegeEventsCache) ? state.collegeEventsCache : [],
     notices: Array.isArray(state.noticesCache) ? state.noticesCache : [],
     timetables: state.timetablesCache || {},
@@ -4441,7 +4578,125 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 
 // One public local-answer entry point. Brain v2 is tried first and the legacy
 // engine is always retained as the transparent fallback.
+function prepareCompassQuestion(question) {
+  let q = canonicalTimetableQuestion(question);
+  const kernel = globalThis.CompassBrainKernel;
+  const temporal = kernel?.resolveTemporalQuery?.(q, indiaCalendarDate(0).date.toISOString().slice(0, 10));
+  const domain = kernel?.analyzeQuery?.(q).primaryIntent;
+  const calendarQuestion = isPlainCalendarQuestion(q);
+  const selection = requestedTimetableSelection(q);
+  const roomPool = [...state.schedule, ...(state.timetableViews.get("rooms")?.schedule || [])];
+  const room = roomPool.some((item) => {
+    const code = cleanText(item.room || item.group).match(/^[a-z]+[- ]?\d+\b/i)?.[0];
+    return code && new RegExp(`\\b${code.replace(/[- ]/g, "[- ]?")}\\b`, "i").test(q);
+  });
+  if (room && !selection && !/\b(?:room|teacher|syllabus|credits|classes|where|which)\b/.test(q)) q = `room ${q}`;
+  // An entity plus a day is a schedule request even without the word timetable.
+  if (!calendarQuestion && !/\b(?:timetable|schedule|class|classes)\b/.test(q) && !["holiday", "syllabus", "student", "comparison", "calculation"].includes(domain)) {
+    if (selection || room || (temporal && temporal.status !== "none" && /[a-z]{3}/i.test(q.replace(temporal.text || "", "")))) q += " timetable";
+    if (room && !selection && !/\broom\b/.test(q)) q = `room ${q}`;
+  }
+  return q;
+}
+
+function compassQueryPlan(question) {
+  const kernel = globalThis.CompassBrainKernel;
+  const plan = kernel?.planQuery?.(question, { calendarDate: indiaCalendarDate(0).date.toISOString().slice(0, 10) });
+  if (!plan) return { status: "ready", clauses: [{ question }] };
+  const scopeKey = `${state.selectedGroup}|${state.selectedSubgroup}|${activeStudentProfile()?.crn || activeStudentProfile()?.name || ""}|${state.metadata?.version || ""}`;
+  const memory = state.queryConversation;
+  let previous = memory?.scopeKey === scopeKey && Date.now() - memory.at < 5 * 60 * 1000 ? memory : null;
+  plan.clauses.forEach((clause) => {
+    const raw = clause.question;
+    const temporal = clause.temporal;
+    const selection = requestedTimetableSelection(raw);
+    const explicitCodes = new Set((raw.match(/\b[a-z][a-z0-9]*\b/gi) || []).map((word) => requestedTimetableSelection(word)?.code).filter(Boolean));
+    const onlyDate = temporal?.status === "resolved" && !raw.replace(temporal.text, "").replace(/\b(?:what|about|on|and|show|please)\b/g, "").trim();
+    if (previous && onlyDate) clause.question = `${previous.target} timetable on ${temporal.iso}`;
+    if (previous && explicitCodes.size < 2 && !(/\b(?:my|mine|me)\b/.test(raw) && selection) && /\bcompare\b/.test(raw) && !/\b(?:vs|versus)\b/.test(raw)) {
+      if (/\b(?:my|mine|me)\b/.test(raw) && !selection) clause.question = `${previous.target} vs my timetable`;
+      else if (selection && selection.code !== previous.target) clause.question = `${previous.target} vs ${selection.code}`;
+      if (clause.question !== raw) {
+        const iso = temporal?.iso || previous.iso;
+        if (iso) clause.question += ` on ${iso}`;
+        clause.dependsOn.push(previous.id ?? "conversation");
+      }
+    }
+    clause.question = prepareCompassQuestion(clause.question);
+    const person = namedPersonTimetableRequest(clause.question);
+    const faculty = person ? timetablePersonCaption(person.term, state.timetableViews.get("teachers")?.schedule || []) : null;
+    const student = person && state.rosterCache?.records?.length ? studentLookupContextFromRecords(`find student ${person.term}`, state.rosterCache.records, state.rosterCache) : null;
+    const own = /\b(?:my|mine)\b/.test(clause.question) && /\b(?:timetable|schedule|class|classes)\b/.test(clause.question);
+    const target = selection?.code || (own ? state.selectedSubgroup || state.selectedGroup : "") || (faculty?.status === "single" ? faculty.captions[0] : student?.status === "single" ? student.records[0].name : person?.term || "");
+    if (target && !isTimetableComparisonQuestion(clause.question)) {
+      previous = { target, iso: temporal?.iso || "", id: clause.id, scopeKey, at: Date.now() };
+      // Unresolved names can bind a later clause symbolically, but are never
+      // persisted as a verified conversational identity.
+      if (selection || own || faculty?.status === "single" || student?.status === "single") state.queryConversation = previous;
+    }
+  });
+  return plan;
+}
+
+function temporalClarification(question) {
+  const resolved = globalThis.CompassBrainKernel?.resolveTemporalQuery?.(question, indiaCalendarDate(0).date.toISOString().slice(0, 10));
+  if (["invalid", "conflict"].includes(resolved?.status)) return `<p><strong>Please check the date.</strong></p><p>${escapeHtml(resolved.reason)}</p>`;
+  const q = canonicalTimetableQuestion(question);
+  if (/\b(?:timetable|schedule)\b/.test(q) && !/\b(?:syllabus|credits|course code)\b/.test(q)) {
+    const version = String(state.metadata?.version || "").match(/^(\d{2})-(\d{2})-(20\d{2})/);
+    const effectiveIso = version ? `${version[3]}-${version[2]}-${version[1]}` : "";
+    if (effectiveIso && resolved?.dates?.some((date) => date < effectiveIso)) return `<p>The loaded timetable takes effect on <strong>${escapeHtml(effectiveIso)}</strong>. I cannot verify an earlier timetable from this release. Check the official timetable archive for the requested date.</p>`;
+    const pool = [...state.schedule, ...[...state.timetableViews.values()].flatMap((view) => view.schedule || [])];
+    for (const match of q.matchAll(/\b([a-z]{1,8}\d{1,3})\b/g)) {
+      // Explicit view queries validate identifiers against that view after it
+      // loads; the active section alone cannot validate every room/course.
+      if (requestedOfficialTimetableView(q)) continue;
+      if (requestedTimetableSelection(match[1])) continue;
+      const known = pool.some((item) => [item.group, item.room, item.subject].some((value) => new RegExp(`\\b${match[1]}\\b`, "i").test(String(value || ""))));
+      if (!known) return `<p>I could not verify <strong>${escapeHtml(match[1].toUpperCase())}</strong> in the loaded timetables. Specify its section, room, or course, or refresh the official data.</p>`;
+    }
+  }
+  return "";
+}
+
+function datedPersonalTimetableAnswer(question) {
+  const q = canonicalTimetableQuestion(question);
+  if (!/\b(?:timetable|schedule|classes)\b/.test(q) || /\b(?:compare|vs|teacher|room|subject|programme|syllabus|credits|next class|current)\b/.test(q)) return "";
+  const date = requestedTimetableDate(q);
+  if (!date || namedPersonTimetableRequest(q) || requestedTimetableSelection(q)) return "";
+  if (!state.selectedGroup || !state.schedule.length) return "<p>Load your official timetable and select your section first.</p>";
+  const holiday = globalThis.CompassBrainKernel?.checkDateHoliday?.(date.iso);
+  if (holiday?.closed) return `<p><strong>${escapeHtml(date.iso)} · ${escapeHtml(holiday.name)}</strong></p><p>This is listed as an official GNDEC holiday. Check current notices for exceptions.</p>`;
+  return `${dayScheduleAnswer(classFor(state.selectedGroup, date.day), date.day, `${date.day} · ${date.iso}`)}<p class="answer-source">Date-specific timetable not verified. This is the weekly pattern from ${escapeHtml(state.metadata?.version || "the loaded timetable")}; I will not guess a special-day lecture. Current notices can override this pattern.</p>`;
+}
+
 function answerWithoutAi(question, engine = null, contextOverrides = {}) {
+  const plan = compassQueryPlan(question);
+  if (plan.status !== "ready") return `<p>${escapeHtml(plan.reason)}</p>`;
+  if (!plan.clauses.length) return localClarificationAnswer();
+  return plan.clauses.map((clause) => {
+    let answer;
+    try { answer = temporalClarification(clause.question) || answerSingleCompassQuestion(clause.question, engine, contextOverrides); }
+    catch {
+      try { answer = legacyAnswerWithoutAi(clause.question); } catch { /* Malformed source data must still produce a useful response. */ }
+    }
+    if (typeof answer !== "string" || !answer.trim()) answer = localClarificationAnswer();
+    return plan.clauses.length > 1 ? `<section><p><strong>${escapeHtml(clause.question)}</strong></p>${answer}</section>` : answer;
+  }).join("");
+}
+
+function answerSingleCompassQuestion(question, engine = null, contextOverrides = {}) {
+  const requestedView = requestedOfficialTimetableView(question);
+  if (requestedView) return officialTimetableViewAnswer(question) || unavailableOfficialTimetableAnswer(requestedView);
+  const rosterList = scopedRosterListRequest(question);
+  if (rosterList) return scopedRosterListAnswer(rosterList, state.rosterCache || {});
+  const namedRequest = namedPersonTimetableRequest(question);
+  if (namedRequest) {
+    const facultySchedule = state.timetableViews.get("teachers")?.schedule || [];
+    const roster = state.rosterCache;
+    const studentMatch = roster?.records?.length ? studentLookupContextFromRecords(`find student ${namedRequest.term}`, roster.records, roster) : null;
+    return namedTimetableResolutionAnswer(namedRequest, { facultySchedule, studentLookup: studentMatch });
+  }
   const workflowAnswer = approvedCompassWorkflowAnswer(question);
   if (workflowAnswer) return workflowAnswer;
   // Keep mutable hostel/mess questions out of every Brain path until there is
@@ -4451,10 +4706,10 @@ function answerWithoutAi(question, engine = null, contextOverrides = {}) {
   }
   const mentoringAnswer = mentoringClassAnswer(question);
   if (mentoringAnswer) return mentoringAnswer;
-  const officialViewAnswer = officialTimetableViewAnswer(question);
-  if (officialViewAnswer) return officialViewAnswer;
   const explicitSelectionAnswer = explicitTimetableSelectionAnswer(question);
   if (explicitSelectionAnswer) return explicitSelectionAnswer;
+  const datedAnswer = datedPersonalTimetableAnswer(question);
+  if (datedAnswer) return datedAnswer;
   const contextualAnswer = contextualLocalFollowupAnswer(question);
   if (contextualAnswer) return contextualAnswer;
   const calendarAnswer = calendarQuestionAnswer(question);
@@ -4640,6 +4895,28 @@ function rosterCountRequest(question = "") {
   const asksCount = /\b(?:how\s+many|count|total|kitne|kitni|kinne|kinni)\b/.test(q);
   const asksStudents = /\b(?:students?|student|batch|strength)\b/.test(q);
   return asksCount && asksStudents ? { question: q } : null;
+}
+
+function scopedRosterListRequest(question) {
+  const q = canonicalTimetableQuestion(question);
+  if (/\b(?:count|total|how many|crn|registration|mentor|compare|vs)\b/.test(q)) return null;
+  if (!/\bstudents\b|\bwho (?:is|are) in\b/.test(q)) return null;
+  const selection = requestedTimetableSelection(q);
+  const branch = SECTION_LIST_BRANCHES.find((code) => new RegExp(`\\b${code}\\b`, "i").test(q));
+  const code = selection?.code || branch || q.match(/\b[a-z]{1,5}\d{1,3}\b/i)?.[0]?.toUpperCase();
+  return code ? { question: q, code, type: selection ? selection.subgroup ? "subsection" : "section" : branch ? "branch" : "unknown" } : null;
+}
+
+function scopedRosterListAnswer(request, rosterData) {
+  if (request.type === "unknown") return `<p>${escapeHtml(request.code)} is not a verified roster section or subsection. A room timetable cannot establish which students belong to that room.</p>`;
+  const records = Array.isArray(rosterData.records) ? rosterData.records : [];
+  const unavailable = rosterData.unavailableBranches || [];
+  const branch = SECTION_LIST_BRANCHES.find((code) => request.code.startsWith(code));
+  if (!records.length || unavailable.includes(branch)) return `<p>The current ${escapeHtml(branch || request.code)} roster is unavailable. Refresh the official roster before listing students.</p>`;
+  const matches = records.filter((record) => String(record[request.type] || "").toUpperCase() === request.code);
+  if (!matches.length) return `<p>No ${escapeHtml(request.code)} students could be verified in the loaded roster.</p>`;
+  const names = matches.slice(0, 20).map((record) => `<li>${escapeHtml(record.name)} · ${escapeHtml(record.subsection || record.section)}</li>`).join("");
+  return `<p><strong>${escapeHtml(request.code)}: ${matches.length} students in the loaded official roster</strong></p><ul>${names}</ul>${matches.length > 20 ? `<p>Showing the first 20 names. Search a name to narrow the list.</p>` : ""}<p class="answer-source">Current official GNDEC ${escapeHtml(branch || "branch")} roster. Only names and timetable sections are shown.</p>`;
 }
 
 function rosterCountAnswer(question = "", rosterData = {}) {
@@ -4900,7 +5177,7 @@ const FACULTY_DEPARTMENT_ALIASES = Object.freeze([
 ]);
 
 function canonicalFacultyName(value = "") {
-  return normalizeStudentName(String(value).replace(/\([^)]*\)/g, " ")).replace(/^(?:dr|er|prof|professor|ar)\s+/, "").trim();
+  return normalizeStudentName(String(value).replace(/\([^)]*\)/g, " ")).replace(/^(?:(?:dr|er|prof|professor|ar|mr|mrs|ms)\s+)+/, "").trim();
 }
 
 function facultyDetailFlags(question = "") {
@@ -5692,7 +5969,7 @@ function syncMobileViewport() {
 function registerOfflineShell() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js?v=20260903-1", { scope: "/" }).catch(() => {
+    navigator.serviceWorker.register("/sw.js?v=20260905-1", { scope: "/" }).catch(() => {
       // Service workers are an optional enhancement. The live app and its
       // deterministic fallback continue normally when registration is blocked.
     });
@@ -5822,28 +6099,40 @@ function initEvents() {
 
   // Shared bounded intent decomposition handles English, Hinglish, and Roman
   // Punjabi while preserving conjunctions inside comparisons and names.
-  const decomposed = globalThis.CompassBrainKernel?.decomposeQuery?.(rawQuestion);
-  const queries = Array.isArray(decomposed) && decomposed.length
-    ? decomposed
-    : rawQuestion.split(/\s+(?:and|aur|te|also|plus)\s+(?=(?:what|when|where|who|is|are|tell|show|find|whose|how|kado|kadon|kab|kithe|kaha|kon|kaun|keda)\b)|(?:\?|;)\s+/i).map(q => q.trim()).filter(Boolean);
-  const isMulti = queries.length > 1;
-  if (isMulti) {
-    ensureChatBubble("user", `<strong>${escapeHtml(rawQuestion)}</strong>`);
+  const queryPlan = compassQueryPlan(rawQuestion);
+  ensureChatBubble("user", `<strong>${escapeHtml(rawQuestion)}</strong>`);
+  if (queryPlan.status !== "ready") {
+    ensureChatBubble("assistant", `<p>${escapeHtml(queryPlan.reason)}</p>`);
+    persistChat();
+    return;
   }
+  const queries = queryPlan.clauses.length
+    ? queryPlan.clauses.map((clause) => clause.question)
+    : rawQuestion.split(/\s+(?:and|aur|te|also|plus)\s+(?=(?:what|when|where|who|is|are|tell|show|find|whose|how|kado|kadon|kab|kithe|kaha|kon|kaun|keda)\b)|(?:\?|;)\s+/i).map(q => q.trim()).filter(Boolean);
 
   for (const q of queries) {
     await (async () => {
       const question = q;
+      const dateClarification = temporalClarification(question);
+      if (dateClarification) {
+        ensureChatBubble("assistant", dateClarification);
+        persistChat();
+        return;
+      }
       const adminCommand = question.match(/^kkj$/i);
     if (adminCommand) {
-      if (!isMulti) ensureChatBubble("user", "<strong>KKJ admin request</strong>");
       await unlockAdminAi();
       persistChat();
       return;
     }
-    if (!isMulti) ensureChatBubble("user", `<strong>${escapeHtml(question)}</strong>`);
     state.activeFacultyAiContext = null;
-    const mentoringAnswer = mentoringClassAnswer(question);
+    const calendarAnswer = calendarQuestionAnswer(question);
+    if (calendarAnswer) {
+      ensureChatBubble("assistant", calendarAnswer);
+      persistChat();
+      return;
+    }
+    const mentoringAnswer = requestedOfficialTimetableView(question) ? "" : mentoringClassAnswer(question);
     if (mentoringAnswer) {
       ensureChatBubble("assistant", mentoringAnswer);
       persistChat();
@@ -5910,13 +6199,14 @@ function initEvents() {
       persistChat();
       return;
     }
-    const countRequest = rosterCountRequest(question);
+    const listRequest = scopedRosterListRequest(question);
+    const countRequest = rosterCountRequest(question) || listRequest;
     if (countRequest) {
       const countBubble = ensureChatBubble("assistant thinking", "<p><strong>Counting the current official student roster…</strong></p>");
       try {
         const rosterData = await loadCurrentRosterRecords();
         countBubble.className = "chat-bubble assistant";
-        countBubble.innerHTML = `${rosterCountAnswer(countRequest.question, rosterData)}${followupSuggestions(question)}`;
+        countBubble.innerHTML = `${listRequest ? scopedRosterListAnswer(listRequest, rosterData) : rosterCountAnswer(countRequest.question, rosterData)}${followupSuggestions(question)}`;
       } catch (error) {
         countBubble.className = "chat-bubble assistant";
         countBubble.innerHTML = `<p><strong><u>Official roster count unavailable</u></strong></p><p>${escapeHtml(error.message || "Please try again.")}</p>`;
@@ -6331,7 +6621,7 @@ function kbSyllabusUnitAnswer(question) {
 }
 
 const KB_OOB = [
-  {id:"admin-kkj",test:/who\s+(?:created|built|made|developed)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|site|tool|system)|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|\b(?:creator|author|developer)\s+of\s+(?:this|compass|the\s+app)\b|who\s+are\s+you|built\s+this\s+web/i,reply:()=>`<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Admin &amp; Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p>.</p><p class="answer-source">Compass administrator rule.</p>`},
+  {id:"creator",test:/who\s+(?:created|built|made|developed)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|site|tool|system)|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|\b(?:creator|author|developer)\s+of\s+(?:this|compass|the\s+app)\b|who\s+are\s+you|built\s+this\s+web/i,reply:()=>`<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p class="answer-source">Compass project information.</p>`},
   {id:"college-timing",test:/college\s*(timing|time|opens?|closes?|hours)|college\s*kitne\s*baje|college\s*khulta|college\s*khulda|class\s*(timing|time)|what\s*time\s*(?:does\s*\w+|\w+\s*open|does\s*the\s*college)|kitne\s*baje\s*(college|class)/,reply:()=>{const classes=state.selectedGroup?DAY_NAMES.flatMap((day)=>classFor(state.selectedGroup,day)):[];if(!classes.length)return`<p><strong><u>College hours</u></strong></p><p>Office hours are not present in the currently loaded official timetable. Check the latest GNDEC notice or office page.</p>`;const first=Math.min(...classes.map((item)=>item.start)),last=Math.max(...classes.map((item)=>item.end));return`<p><strong><u>College hours · verified timetable span</u></strong></p><p>Your active official timetable runs from as early as <strong>${humanTime(first)}</strong> to as late as <strong>${humanTime(last)}</strong>, depending on the day.</p><p>This describes your classes, not administrative office hours.</p><p class="kb-tip">Ask “today ka timetable” for today’s exact span.</p>`;}},
   {id:"uniform",test:/uniform|dress\s*code|what\s*to\s*wear|wear\s*in\s*college|dress|ਵਰਦੀ|ड्रेस/,reply:()=>`<p><strong><u>Dress code</u></strong></p><p>The loaded timetable and syllabus do not contain a verified dress-code rule. Check the current student notice or ask your mentor before relying on informal advice.</p>`},
   {id:"attendance",test:/attend|attendance|75%?|75\s*percent|bunk|skip\s*class|miss\s*class|haziri|hazri|hajri|ਗੈਰ-ਹਾਜ਼ਰੀ|ऐटेंडेंस/,reply:()=>`<p><strong><u>GNDEC Attendance Rule</u></strong></p><p>A minimum of <strong>75% attendance</strong> is mandatory in all theory and practical courses under official autonomous regulations to sit in End-Semester Examinations (ESE). Compass provides a default target of <strong>76%</strong> (1% safety cushion) in Settings.</p><p class="answer-source">Official GNDEC Autonomous Academic Regulations.</p>`},
