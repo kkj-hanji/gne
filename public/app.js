@@ -201,10 +201,99 @@ function parseDetailedCell(cell, group, day, start, duration, view) {
   })).filter(Boolean);
 }
 
-function parseCell(cell, group, day, start, duration, view) {
+// Low-detail FET exports omit semantic CSS classes. Their rows/line breaks
+// still carry a defined layout, which differs for each timetable dimension.
+function plainFetLines(cell) {
+  const copy = cell.cloneNode(true);
+  copy.querySelectorAll("br").forEach(br => br.replaceWith("\n"));
+  return copy.textContent.split(/\n/).map(cleanText).filter(Boolean);
+}
+
+function plainFetSubject(value, subjects) {
+  const tagged = cleanText(value).match(/^(.+?)\s+([LTP])$/);
+  if (tagged) return { subject: tagged[1], type: tagged[2] };
+  return subjects.has(cleanText(value)) ? { subject: cleanText(value), type: "" } : null;
+}
+
+function plainFetTail(fields, catalog) {
+  if (!fields.length) return { teacher: "", room: "" };
+  if (fields.length === 2) return { teacher: fields[0], room: fields[1] };
+  if (fields.length !== 1) return null;
+  const value = fields[0];
+  if (!value) return { teacher: "", room: "" };
+  const room = catalog.rooms.has(value) || /\b(?:LAB|LABORATORY|WORKSHOPS?|HALL)\b/i.test(value) || /^[A-Z]\d{1,3}(?:\s*\([^)]*\))?$/.test(value);
+  const teacher = catalog.teachers.has(value) || /^(?:DR|ER|MS|MR|MRS|PROF(?:ESSOR)?)\b/i.test(value);
+  if (room === teacher) return null; // Missing fields cannot shift a person into a room.
+  return { teacher: teacher ? value : "", room: room ? value : "" };
+}
+
+function plainFetFields(lines, group, view, catalog) {
+  if (!lines.length || lines.every(line => !line || /^[-–—]+$/.test(line))) return null;
+  if (view === "subjects") {
+    if (!/^[LTP]?$/.test(lines[0]) || lines.length < 2) return null;
+    const tail = plainFetTail(lines.slice(2), catalog);
+    return tail && { subject: group, type: lines[0], cohorts: lines[1], ...tail };
+  }
+  const index = lines.findIndex(line => plainFetSubject(line, catalog.subjects));
+  if (index < 0) return null;
+  const subject = plainFetSubject(lines[index], catalog.subjects);
+  const before = lines.slice(0, index);
+  const after = lines.slice(index + 1);
+  if (view === "teachers") {
+    if (before.length < 1 || before.length > 2 || after.length > 1) return null;
+    return { ...subject, cohorts: before.at(-1), teacher: before.length === 2 ? before[0] : group, room: after[0] || "" };
+  }
+  if (view === "rooms") {
+    if (before.length < 1 || before.length > 2 || after.length) return null;
+    return { ...subject, cohorts: before[0], teacher: before[1] || "", room: group };
+  }
+  if (before.length > 1) return null;
+  const tail = plainFetTail(after, catalog);
+  return tail && { ...subject, cohorts: before[0] || "", ...tail };
+}
+
+function plainFetCatalog(doc) {
+  const catalog = { subjects: new Set(), teachers: new Set(), rooms: new Set() };
+  // Seed names only from rows with explicit positions. This also recognizes
+  // an untagged occurrence of a subject whose tag is present elsewhere.
+  doc.querySelectorAll("td").forEach(cell => {
+    if (cell.querySelector("table")) return;
+    for (const line of plainFetLines(cell)) {
+      const tagged = line.match(/^(.+?)\s+[LTP]$/);
+      if (tagged) catalog.subjects.add(tagged[1]);
+    }
+  });
+  doc.querySelectorAll("table.detailed").forEach(table => {
+    const rows = [...table.querySelectorAll("tr")].filter(row => row.closest("table") === table).map(row => directCells(row).map(cell => cleanText(cell.textContent)));
+    if (rows.length !== 4) return;
+    rows[2].filter(Boolean).forEach(value => catalog.teachers.add(value));
+    rows[3].filter(Boolean).forEach(value => catalog.rooms.add(value));
+  });
+  return catalog;
+}
+
+function parsePlainFetCell(cell, group, day, start, duration, view, catalog) {
+  const table = cell.querySelector("table.detailed");
+  let columns;
+  if (table) {
+    const rows = [...table.querySelectorAll("tr")].filter(row => row.closest("table") === table).map(row => directCells(row).map(cell => cleanText(cell.textContent)));
+    const width = rows[0]?.length || 0;
+    if (!width || rows.some(row => row.length !== width)) return [];
+    // Keep empty matrix fields so concurrent classes cannot swap teachers.
+    columns = Array.from({ length: width }, (_, i) => rows.map(row => row[i]));
+  } else columns = [plainFetLines(cell)];
+  const entries = columns.map(lines => {
+    const fields = plainFetFields(lines, group, view, catalog);
+    return fields ? makeEntry({ group, day, start, duration, ...fields }) : null;
+  });
+  return entries.every(Boolean) ? entries : [];
+}
+
+function parseCell(cell, group, day, start, duration, view, catalog) {
   if (cell.classList.contains("empty") || cleanText(cell.textContent) === "") return [];
   const detailedEntries = parseDetailedCell(cell, group, day, start, duration, view);
   if (detailedEntries.length) return detailedEntries;
+  if (!cell.querySelector(".subject, .activitytag")) return parsePlainFetCell(cell, group, day, start, duration, view, catalog);
   return [makeEntry({
     group,
     day,
@@ -223,6 +312,8 @@ function parseCell(cell, group, day, start, duration, view) {
 function parseFetTimetable(html, view = "groups") {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const schedule = [];
+  const catalog = plainFetCatalog(doc);
+  let unparsedCells = 0;
   [...doc.querySelectorAll("table")].forEach((table) => {
     const group = cleanText(table.querySelector("caption .name")?.textContent || "");
     const headers = [...table.querySelectorAll("thead .xAxis")].map((header) => cleanText(header.textContent));
@@ -247,7 +338,9 @@ function parseFetTimetable(html, view = "groups") {
         const rowSpan = Number(cell.getAttribute("rowspan") || 1);
         const nextStart = rowTimes[rowIndex + rowSpan];
         const duration = nextStart && nextStart > start ? nextStart - start : 50 * rowSpan;
-        schedule.push(...parseCell(cell, group, headers[column], start, duration, view));
+        const entries = parseCell(cell, group, headers[column], start, duration, view, catalog);
+        if (!entries.length && cleanText(cell.textContent) && !/^[-–—]+$/.test(cleanText(cell.textContent)) && !cell.classList.contains("empty") && !cell.classList.contains("break")) unparsedCells++;
+        schedule.push(...entries);
         const columnSpan = Number(cell.getAttribute("colspan") || 1);
         for (let span = 0; span < columnSpan; span += 1) {
           if (rowSpan > 1) activeSpans[column + span] = rowSpan - 1;
@@ -257,12 +350,22 @@ function parseFetTimetable(html, view = "groups") {
     });
   });
   const unique = new Map(schedule.map((item) => [item.id, item]));
-  return [...unique.values()].sort((a, b) => a.group.localeCompare(b.group) || DAY_NAMES.indexOf(a.day) - DAY_NAMES.indexOf(b.day) || a.start - b.start);
+  const result = [...unique.values()].sort((a, b) => a.group.localeCompare(b.group) || DAY_NAMES.indexOf(a.day) - DAY_NAMES.indexOf(b.day) || a.start - b.start);
+  Object.defineProperty(result, "unparsedCells", { value: unparsedCells });
+  return result;
 }
 
 function isValidScheduleEntry(item) {
   return Boolean(item && typeof item.group === "string" && item.group && typeof item.day === "string" && DAY_NAMES.includes(item.day)
     && typeof item.subject === "string" && item.subject && Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start);
+}
+
+function readVerifiedFetTimetable(html, view = "groups") {
+  const schedule = parseFetTimetable(html, view);
+  if (!schedule.length || schedule.unparsedCells) {
+    throw new Error(`The official ${view} timetable format could not be read completely. The saved timetable has not been replaced.`);
+  }
+  return sanitizeSchedule(schedule);
 }
 
 function sanitizeSchedule(schedule) {
@@ -860,7 +963,7 @@ async function loadOfficialTimetableView(id) {
   const loading = (async () => {
     const response = await fetch(`/api/timetable?source=${encodeURIComponent(id)}`, { cache: "no-cache" });
     if (!response.ok) throw new Error(`The official ${view.label.toLowerCase()} could not be loaded.`);
-    const schedule = sanitizeSchedule(parseFetTimetable(await response.text(), id));
+    const schedule = readVerifiedFetTimetable(await response.text(), id);
     if (!schedule.length) throw new Error(`The official ${view.label.toLowerCase()} could not be read.`);
     state.timetableViews.set(id, { revision: source.contentHash || source.url, schedule });
     return schedule;
@@ -5695,10 +5798,8 @@ function academicOverlayFromSchedule(schedule, profile = activeStudentProfile())
 }
 
 async function importHtml(html, source, sourceInfo = {}, subgroupHtml = "") {
-  const schedule = parseFetTimetable(html);
-  if (!schedule.length) throw new Error("No class entries were found. Choose the published FET group timetable HTML file.");
-  const subgroupSchedule = subgroupHtml ? parseFetTimetable(subgroupHtml) : [];
-  if (subgroupHtml && !subgroupSchedule.length) throw new Error("The verified subgroup timetable could not be read.");
+  const schedule = readVerifiedFetTimetable(html);
+  const subgroupSchedule = subgroupHtml ? readVerifiedFetTimetable(subgroupHtml, "subgroups") : [];
   saveData(schedule, source, sourceInfo, academicOverlayFromSchedule(subgroupSchedule));
   showToast(`${schedule.length} class entries loaded for ${state.groups.length} groups.`);
 }
@@ -5709,7 +5810,7 @@ async function refreshAcademicOverlay() {
   try {
     const response = await fetch("/api/timetable?source=subgroups", { cache: "no-cache" });
     if (!response.ok) return;
-    const overlay = academicOverlayFromSchedule(parseFetTimetable(await response.text()));
+    const overlay = academicOverlayFromSchedule(readVerifiedFetTimetable(await response.text(), "subgroups"));
     // A successful official subgroup file is authoritative even when the
     // student's old academic group no longer appears in a newer release.
     state.academicOverlay = overlay;
@@ -5904,6 +6005,31 @@ async function synchronizeStudentProfile() {
   } finally { state.profileSyncing = false; }
 }
 
+async function readOfficialTimetableRelease(registry, fallback = false) {
+  const responses = await Promise.all(["groups", "subgroups"].map(id => fetch(`/api/timetable?source=${id}${fallback ? "&fallback=1" : ""}`, { cache: "no-cache" })));
+  if (responses.some(response => !response.ok)) throw new Error("Unable to contact the complete official timetable release.");
+  // Both views must belong to the same release, even when only one failed.
+  if (responses.some(response => isPreviousVerifiedTimetableResponse(response) !== fallback)) throw new Error("The official timetable views need a matching release.");
+  for (const header of ["X-GNDEC-Version", "X-GNDEC-Source-Footer"]) {
+    const values = responses.map(response => response.headers.get(header) || "");
+    if (values[0] !== values[1]) throw new Error("The official timetable views have different release metadata.");
+  }
+  const [groupsHtml, subgroupsHtml] = await Promise.all(responses.map(response => response.text()));
+  return {
+    schedule: readVerifiedFetTimetable(groupsHtml, "groups"),
+    subgroupSchedule: readVerifiedFetTimetable(subgroupsHtml, "subgroups"),
+    sourceInfo: loadedTimetableSourceInfo(registry, responses[0])
+  };
+}
+
+async function loadReadableTimetableRelease(registry) {
+  try { return await readOfficialTimetableRelease(registry); }
+  catch {
+    try { return await readOfficialTimetableRelease(registry, true); }
+    catch { throw new Error("The current official timetable and its previous release could not be read safely. Your saved timetable is unchanged."); }
+  }
+}
+
 async function refreshOfficialData({ discover = true } = {}) {
   const button = $("refresh-button");
   button.disabled = true;
@@ -5911,25 +6037,8 @@ async function refreshOfficialData({ discover = true } = {}) {
   setSourceError();
   try {
     const registry = await loadSourceRegistry({ refresh: discover });
-    let [groupsResponse, subgroupsResponse] = await Promise.all([
-      fetch("/api/timetable?source=groups", { cache: "no-cache" }),
-      fetch("/api/timetable?source=subgroups", { cache: "no-cache" })
-    ]);
-    if (!groupsResponse.ok || !subgroupsResponse.ok) throw new Error("Unable to contact the complete official timetable release.");
-    // A timetable release is only safe as a pair: never combine a newer group
-    // view with an older subgroup view. If either source reached its retained
-    // fallback, request both views from that same previous verified release.
-    if (isPreviousVerifiedTimetableResponse(groupsResponse) || isPreviousVerifiedTimetableResponse(subgroupsResponse)) {
-      [groupsResponse, subgroupsResponse] = await Promise.all([
-        fetch("/api/timetable?source=groups&fallback=1", { cache: "no-cache" }),
-        fetch("/api/timetable?source=subgroups&fallback=1", { cache: "no-cache" })
-      ]);
-      if (!groupsResponse.ok || !subgroupsResponse.ok || !isPreviousVerifiedTimetableResponse(groupsResponse) || !isPreviousVerifiedTimetableResponse(subgroupsResponse)) {
-        throw new Error("The latest official timetable is unavailable and its previous verified release could not be loaded safely.");
-      }
-    }
-    const sourceInfo = loadedTimetableSourceInfo(registry, groupsResponse);
-    await importHtml(await groupsResponse.text(), "Official GNDEC group timetable", sourceInfo, await subgroupsResponse.text());
+    const { schedule, subgroupSchedule, sourceInfo } = await loadReadableTimetableRelease(registry);
+    saveData(schedule, "Official GNDEC group timetable", sourceInfo, academicOverlayFromSchedule(subgroupSchedule));
     if (sourceInfo.fallback) setSourceError("The newer official timetable could not be read. Compass is temporarily using the previous verified release and will retry automatically.");
     await synchronizeStudentProfile();
     if (typeof window !== "undefined") {
@@ -6038,7 +6147,7 @@ function syncMobileViewport() {
 function registerOfflineShell() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js?v=20260905-1", { scope: "/" }).catch(() => {
+    navigator.serviceWorker.register("/sw.js?v=20260910-1", { scope: "/" }).catch(() => {
       // Service workers are an optional enhancement. The live app and its
       // deterministic fallback continue normally when registration is blocked.
     });
