@@ -230,7 +230,7 @@
       while ((match = matcher.exec(text))) {
         const left = text.slice(cursor, match.index).trim();
         const right = text.slice(matcher.lastIndex).trim();
-        const leftIsComparison = /\b(?:compare|comparison|vs|versus|farak|farq)\b/i.test(left);
+        const leftIsComparison = /\b(?:compare|comparison|vs|versus|different|difference|farak|farq)\b/i.test(left);
         const rightHasIndependentDomain = /\b(?:holiday|credits?|syllabus|calculate)\b/.test(right);
         const preserveComparison = leftIsComparison && !rightHasIndependentDomain && (comparisonQualifier.test(right) || !startsIndependentQuestion.test(right));
         const independent = startsIndependentQuestion.test(right) || startsIndependentContext.test(right);
@@ -290,6 +290,12 @@
       const dates = [...new Set(found.map((entry) => entry.iso))];
       if (dates.length === 1 && weekdays.length === 1 && !weekdayOfIso(dates[0]).toLowerCase().startsWith(weekdays[0][2].slice(0, 3))) {
         return { status: "conflict", dates, reason: `That date is ${formatIsoFull(dates[0])}; the supplied weekday does not match.` };
+      }
+      if (dates.length === 2 && /\b(?:from|between)\b.*\b(?:to|through|and)\b/.test(q) && !/\b(?:compare|comparison|difference|different|vs|versus)\b/.test(q)) {
+        if (dates[1] < dates[0]) return { status: "invalid", dates: [], reason: "The end date is before the start date." };
+        const length = Math.round((Date.parse(dates[1]) - Date.parse(dates[0])) / 86400000) + 1;
+        if (length > 31) return { status: "limited", dates: [], reason: "Please request a date range of at most 31 days." };
+        return { status: "range", dates: Array.from({ length }, (_, index) => shiftIsoDate(dates[0], index)), text: found.map((entry) => entry.text).join(" to ") };
       }
       return { status: dates.length === 1 ? "resolved" : "multiple", dates, iso: dates[0], day: weekdayOfIso(dates[0]), text: found.map((entry) => entry.text).join(" and ") };
     }

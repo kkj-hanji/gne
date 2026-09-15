@@ -39,15 +39,13 @@ for (const [branch, source] of Object.entries(registry.studentSectionSources)) {
   const pages = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const content = await (await pdf.getPage(i)).getTextContent();
-    const rows = new Map();
-    for (const item of content.items.filter(item => item.str)) {
-      const y = Math.round(item.transform[5] * 10) / 10;
-      rows.set(y, [...(rows.get(y) || []), { x: item.transform[4], text: item.str }]);
-    }
-    pages.push([...rows.entries()].sort(([a], [b]) => b - a).map(([, items]) => items.sort((a, b) => a.x - b.x).map(item => item.text).join("\t")).join("\n"));
+    pages.push(api.pdfTextFromItems(content.items));
   }
-  const records = api.parseStudentSectionText(pages.join("\n\f\n"), branch);
+  const extracted = pages.join("\n\f\n");
+  const sourceRows = extracted.split(/\n/).filter(line => /^\d+\t/.test(line) && line.split(/\t+/).filter(value => value.trim()).length >= 10).length;
+  const records = api.parseStudentSectionText(extracted, branch);
   assert.ok(records.length, `${branch} must have parsed official roster records`);
+  assert.equal(records.length, sourceRows, `${branch}: every numbered permanent roster row must parse, not just one accidental match`);
   rosterRecords.push(...records);
   await pdf.destroy();
   console.log(`${branch}: official roster parsed (${records.length} records); identifiers omitted from audit output.`);

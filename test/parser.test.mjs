@@ -1011,7 +1011,7 @@ test("parses Permanent Sections mentor phone and venue without retaining parent 
   const { parseStudentSectionText } = context.__parserTest;
   const row = ["12", "1234567", "TEST STUDENT", "FATHER NAME", "MOTHER NAME", "EC", "ECB", "ECB1", "ECBM1", "DR TEST MENTOR", "9999999999", "F108"].join("\t");
   const [record] = [...parseStudentSectionText(row, "EC")].map((value) => ({ ...value, oldSerialNos: [...value.oldSerialNos] }));
-  assert.deepEqual(record, { serialNo: "12", currentSerialNo: "12", newSerialNo: "", oldSerialNos: [], crn: "1234567", name: "TEST STUDENT", registrationNo: "", branch: "EC", section: "ECB", subsection: "ECB1", mentor: "DR TEST MENTOR", mentorPhone: "9999999999", academicGroup: "ECBM1", mentorVenue: "F108", venue: "F108", rosterVersion: "", rosterRevision: "", rosterSchemaVersion: 3 });
+  assert.deepEqual(record, { serialNo: "12", currentSerialNo: "12", newSerialNo: "", oldSerialNos: [], crn: "1234567", name: "TEST STUDENT", registrationNo: "", branch: "EC", section: "ECB", subsection: "ECB1", mentor: "DR TEST MENTOR", mentorPhone: "9999999999", academicGroup: "ECBM1", mentorVenue: "F108", venue: "F108", rosterVersion: "", rosterRevision: "", rosterSchemaVersion: 4 });
   assert.doesNotMatch(JSON.stringify(record), /FATHER NAME|MOTHER NAME/);
 });
 
@@ -1019,8 +1019,33 @@ test("parses the current Permanent Sections layout with CRN and registration num
   const { parseStudentSectionText } = context.__parserTest;
   const row = ["42", "2615231", "26012797", "MOHITVEER SINGH", "KARAMJIT SINGH", "ARPINDER KAUR", "CS", "CSD", "CSD2", "CSDM2", "ER. JAGDEEP KAUR", "9592007098", "G17"].join("\t");
   const [record] = [...parseStudentSectionText(row, "CS")].map((value) => ({ ...value, oldSerialNos: [...value.oldSerialNos] }));
-  assert.deepEqual(record, { serialNo: "42", currentSerialNo: "42", newSerialNo: "", oldSerialNos: [], crn: "2615231", name: "MOHITVEER SINGH", registrationNo: "26012797", branch: "CS", section: "CSD", subsection: "CSD2", mentor: "ER. JAGDEEP KAUR", mentorPhone: "9592007098", academicGroup: "CSDM2", mentorVenue: "G17", venue: "G17", rosterVersion: "", rosterRevision: "", rosterSchemaVersion: 3 });
+  assert.deepEqual(record, { serialNo: "42", currentSerialNo: "42", newSerialNo: "", oldSerialNos: [], crn: "2615231", name: "MOHITVEER SINGH", registrationNo: "26012797", branch: "CS", section: "CSD", subsection: "CSD2", mentor: "ER. JAGDEEP KAUR", mentorPhone: "9592007098", academicGroup: "CSDM2", mentorVenue: "G17", venue: "G17", rosterVersion: "", rosterRevision: "", rosterSchemaVersion: 4 });
   assert.doesNotMatch(JSON.stringify(record), /KARAMJIT SINGH|ARPINDER KAUR/);
+});
+
+test("15 September roster field order resolves every branch without mixing names or identifiers", () => {
+  const { parseStudentSectionText } = context.__parserTest;
+  for (const branch of ["CE", "CS", "EC", "EE", "IT", "ME", "RAI"]) {
+    const section = branch === "RAI" ? "RAI" : branch + "B";
+    const columns = ["17", "26012345", "2612345", branch, "TEST STUDENT", "MOTHER NAME", "FATHER NAME", section, section + "1", section + "M1", "DR TEST MENTOR", "9999999999", "F108", "COORDINATOR NAME"];
+    const records = parseStudentSectionText(columns.join("\t"), branch);
+    assert.equal(records.length, 1, branch);
+    const record = records[0];
+    assert.equal(record.registrationNo, "26012345");
+    assert.equal(record.crn, "2612345");
+    assert.equal(record.name, "TEST STUDENT");
+    assert.equal(record.branch, branch);
+    assert.equal(record.subsection, section + "1");
+    assert.equal(record.mentor, "DR TEST MENTOR");
+    assert.equal(record.mentorPhone, "9999999999");
+    assert.equal(record.mentorVenue, "F108");
+    assert.equal(record.rosterSchemaVersion, 4);
+    assert.doesNotMatch(JSON.stringify(record), /MOTHER NAME|FATHER NAME|COORDINATOR NAME/);
+    assert.equal(parseStudentSectionText(columns.join("\t"), branch === "EC" ? "CS" : "EC").length, 0, "Reject wrong branch source");
+    const malformed = [...columns];
+    malformed.splice(2, 1);
+    assert.equal(parseStudentSectionText(columns.join("\t") + "\n" + malformed.join("\t"), branch).length, 0, "Do not report partial branch strength");
+  }
 });
 
 test("matches every supported exact student identifier and preserves serial history on roster refresh", () => {

@@ -9,13 +9,16 @@ const v12Source = await readFile(new URL("../public/brain-v1-2.js", import.meta.
 const v22Source = await readFile(new URL("../public/brain-v2-2.js", import.meta.url), "utf8");
 const v2Source = await readFile(new URL("../public/brain-v2.js", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+const analysisSource = await readFile(new URL("../public/schedule-analysis.js", import.meta.url), "utf8");
+const examSource = await readFile(new URL("../public/exam-schedule.js", import.meta.url), "utf8");
+const calendarSource = await readFile(new URL("../public/academic-calendar.js", import.meta.url), "utf8");
 
 const sourceUnderTest = appSource.replace(
   /restoreData\(\);[\s\S]*?(?=function kbClean)/,
   ""
 ).replace(
   /function kbClean/,
-  "globalThis.__brainIntegrationTest = { state, answerWithoutAi, runCompassBrain, setCompassBrainV2Enabled, resetBrainConversation, buildScheduleIndex, sanitizeSchedule, parseFetTimetable, parseSyllabusText, parseStudentSectionText, compassQueryPlan, requestedTime, requestedTimetableDate, requestedOfficialTimetableView, namedPersonTimetableRequest };\nfunction kbClean"
+  "globalThis.__brainIntegrationTest = { state, answerWithoutAi, runCompassBrain, setCompassBrainV2Enabled, resetBrainConversation, buildScheduleIndex, sanitizeSchedule, parseFetTimetable, parseSyllabusText, parseStudentSectionText, pdfTextFromItems, compassQueryPlan, requestedTime, requestedTimetableDate, requestedOfficialTimetableView, namedPersonTimetableRequest };\nfunction kbClean"
 );
 
 export function createAppHarness() {
@@ -41,6 +44,9 @@ export function createAppHarness() {
   vm.runInContext(v12Source, context);
   vm.runInContext(v22Source, context);
   vm.runInContext(v2Source, context);
+  vm.runInContext(analysisSource, context);
+  vm.runInContext(examSource, context);
+  vm.runInContext(calendarSource, context);
   vm.runInContext(sourceUnderTest, context);
   const api = context.__brainIntegrationTest;
   // Sunday 2026-08-16 10:00 IST -> weekend edge; next study day = Monday.

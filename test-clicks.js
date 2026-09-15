@@ -16,7 +16,7 @@ test("chat form renders every compound answer and rejects invalid dates", async 
     location: { hash: "", search: "", href: "http://localhost/" },
     fetch: async () => { throw new Error("Offline fixture"); }
   });
-  for (const name of ["brain-kernel.js", "brain-v1-2.js", "brain-v2-2.js", "brain-v2.js"]) vm.runInContext(await readFile(`public/${name}`, "utf8"), context);
+  for (const name of ["brain-kernel.js", "brain-v1-2.js", "brain-v2-2.js", "brain-v2.js", "exam-schedule.js", "academic-calendar.js", "schedule-analysis.js"]) vm.runInContext(await readFile(`public/${name}`, "utf8"), context);
   const source = (await readFile("public/app.js", "utf8")).replace(/restoreData\(\);[\s\S]*?(?=function kbClean)/, "");
   vm.runInContext(source, context);
   vm.runInContext('state.nowOverride = "2026-09-03T04:30:00Z"; initEvents();', context);
@@ -63,5 +63,22 @@ test("chat form renders every compound answer and rejects invalid dates", async 
   const failedTeacher = await submit("teacher timetable dr. chahat jain");
   assert.match(failedTeacher, /unavailable/i);
   assert.doesNotMatch(failedTeacher, /CSA2|FACULTY ONLY COURSE/);
+  vm.runInContext('state.selectedGroup = "ECB"; state.nowOverride = "2026-09-15T10:00:00Z";', context);
+  for (const question of ["my exam timetable", "mera next paper kab hai", "EC B EDG exam time"]) {
+    const answer = await submit(question);
+    assert.match(answer, /MSE-I/);
+    assert.match(answer, /User-supplied/);
+    assert.match(answer, question.includes("EDG") ? /11:00 AM–12:30 PM/ : /12:45 PM/);
+    assert.doesNotMatch(answer, /FACULTY ONLY COURSE|ROOM ONLY COURSE|Checking.*roster/);
+  }
+  const examsAndDate = await submit("my exam date sheet and what is today date");
+  assert.match(examsAndDate, /MSE-I/);
+  assert.match(examsAndDate, /India calendar date/);
+  assert.match(await submit("first year final exams"), /2026-12-02 onwards/);
+  assert.match(await submit("room F113 timetable next week"), /2026-09-21.*ROOM ONLY COURSE/s);
+  assert.match(await submit("how many classes in room F113 next week"), /1 scheduled class entries.*60 minutes/s);
+  assert.doesNotMatch(await submit("who created this website"), /\bkkj\b|admin|unlock|token/i);
+  vm.runInContext('renderReferenceLinks();', context);
+  assert.ok(document.querySelector('#reference-links a[href="/data/mse1-sem1-2026-09-14.pdf"]'));
   assert.equal(document.querySelectorAll(".thinking").length, 0);
 });
