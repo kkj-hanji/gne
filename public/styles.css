@@ -216,7 +216,8 @@ button:disabled,input:disabled,select:disabled{opacity:.62;cursor:not-allowed}
 .week-table:focus-visible{outline-offset:4px}
 .week-grid-view{overflow:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
 .week-grid-view:focus-visible{outline-offset:4px}
-.week-grid{display:grid;min-width:880px;grid-template-columns:96px repeat(5,minmax(150px,1fr))}
+/* Remove 14px of outer spacing per day while preserving class-card widths. */
+.week-grid{display:grid;width:calc(100% - 70px);min-width:810px;grid-template-columns:96px repeat(5,minmax(136px,1fr))}
 .week-grid>div{padding:12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
 .week-grid>div:nth-child(6n){border-right:0}
 .week-head{position:sticky;top:0;z-index:2;background:#1a2536;color:#b9e6d2;font-size:11px;font-weight:850;letter-spacing:.8px;text-transform:uppercase}
@@ -224,6 +225,8 @@ button:disabled,input:disabled,select:disabled{opacity:.62;cursor:not-allowed}
 .week-time-start{color:var(--text)}
 .week-time-end{color:var(--faint)}
 .week-cell{min-height:80px}
+.week-grid>.week-cell{padding:5px;min-height:60px}
+.week-grid>.week-cell>.week-class:last-child{margin-bottom:0}
 .week-class{margin-bottom:6px;padding:7px 9px;border-left:3px solid var(--green);border-radius:7px;background:rgba(52,211,153,.09);font-size:12px}
 .week-class strong{display:block;color:var(--text)}
 .week-class span{display:block;margin-top:3px;color:var(--muted)}

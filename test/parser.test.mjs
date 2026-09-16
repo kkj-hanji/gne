@@ -1455,7 +1455,7 @@ test("exposes the student lookup control and uses only the Worker section-list r
   assert.match(stylesSource, /-webkit-text-size-adjust:100%/);
   assert.match(stylesSource, /@media\(max-width:280px\)/);
   assert.match(stylesSource, /\.week-table\{[^}]*overflow:auto/);
-  assert.match(stylesSource, /\.week-grid\{[^}]*min-width:880px/);
+  assert.match(stylesSource, /\.week-grid\{[^}]*min-width:810px/);
   assert.match(stylesSource, /\.week-time\{[^}]*flex-direction:column/);
   assert.match(appSource, /class="week-time-start"/);
   assert.match(appSource, /class="week-time-end"/);
