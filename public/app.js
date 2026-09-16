@@ -751,7 +751,7 @@ function sortedGroups() {
 function hydrateGroupControls() {
   const options = sortedGroups();
   [$("group-select"), $("timetable-group")].forEach((select) => {
-    select.innerHTML = options.length ? options.map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(groupLabel(group))}</option>`).join("") : "<option>Load timetable data first</option>";
+    select.innerHTML = options.length ? options.map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(select.id === "timetable-group" ? group : groupLabel(group))}</option>`).join("") : "<option>Load timetable data first</option>";
     select.disabled = !options.length;
     select.value = state.selectedGroup;
   });
@@ -771,13 +771,30 @@ function subgroupsFor(group) {
 }
 
 function hydrateSubgroupControl() {
-  const select = $("subgroup-select");
   const subgroups = subgroupsFor(state.selectedGroup);
-  if (!subgroups.includes(state.selectedSubgroup)) state.selectedSubgroup = subgroups[0] || "";
+  if (!subgroups.includes(state.selectedSubgroup)) state.selectedSubgroup = "";
   localStorage.setItem(SUBGROUP_STORAGE_KEY, state.selectedSubgroup);
-  select.disabled = !state.groups.length;
-  select.innerHTML = `<option value="">All students</option>${subgroups.map((subgroup) => `<option value="${escapeHtml(subgroup)}">${escapeHtml(subgroup)}</option>`).join("")}`;
-  select.value = state.selectedSubgroup;
+  [$("subgroup-select"), $("timetable-subgroup")].filter(Boolean).forEach((select) => {
+    select.disabled = !state.groups.length || !subgroups.length;
+    const label = !state.groups.length ? "Load data first" : !subgroups.length ? "Whole section (no subsections)" : "Whole section";
+    select.innerHTML = `<option value="">${label}</option>${subgroups.map((subgroup) => `<option value="${escapeHtml(subgroup)}">${escapeHtml(subgroup)}</option>`).join("")}`;
+    select.value = state.selectedSubgroup;
+  });
+  const note = $("timetable-selection-note");
+  if (note) note.textContent = `${state.selectedGroup ? `${groupLabel(state.selectedGroup)} · ${state.selectedSubgroup || "Whole section"}. ` : ""}Used for Timetable, Today and Ask Compass on this device.`;
+}
+
+function changeTimetableSelection(group, subgroup = "") {
+  if (!state.groups.includes(group) || (subgroup && !subgroupsFor(group).includes(subgroup))) return;
+  const groupChanged = state.selectedGroup !== group;
+  resetBrainConversation();
+  state.selectedGroup = group;
+  state.selectedSubgroup = subgroup;
+  localStorage.setItem(GROUP_STORAGE_KEY, group);
+  if (groupChanged) recordGroupUsage(group);
+  hydrateGroupControls();
+  renderTimetableSearchSuggestions();
+  renderEverything();
 }
 
 function isMissingTimetableDetail(value, label) {
@@ -6349,9 +6366,8 @@ function initEvents() {
     target.scrollIntoView?.({ behavior: "smooth", block: "center" });
     window.setTimeout(() => target.focus(), 220);
   }));
-  $("group-select").addEventListener("change", (event) => { resetBrainConversation(); state.selectedGroup = event.target.value; state.selectedSubgroup = ""; localStorage.setItem(GROUP_STORAGE_KEY, state.selectedGroup); recordGroupUsage(state.selectedGroup); hydrateGroupControls(); renderTimetableSearchSuggestions(); renderEverything(); showToast(`${state.selectedGroup} is now your timetable.`); });
-  $("subgroup-select").addEventListener("change", (event) => { resetBrainConversation(); state.selectedSubgroup = event.target.value; localStorage.setItem(SUBGROUP_STORAGE_KEY, state.selectedSubgroup); renderEverything(); });
-  $("timetable-group").addEventListener("change", (event) => { resetBrainConversation(); state.selectedGroup = event.target.value; state.selectedSubgroup = ""; localStorage.setItem(GROUP_STORAGE_KEY, state.selectedGroup); recordGroupUsage(state.selectedGroup); hydrateGroupControls(); renderTimetableSearchSuggestions(); renderEverything(); });
+  [$("group-select"), $("timetable-group")].forEach((select) => select.addEventListener("change", (event) => changeTimetableSelection(event.target.value)));
+  [$("subgroup-select"), $("timetable-subgroup")].filter(Boolean).forEach((select) => select.addEventListener("change", (event) => changeTimetableSelection(state.selectedGroup, event.target.value)));
   $("timetable-search").addEventListener("input", renderWeek);
   $("question-input").addEventListener("input", updateQuestionSuggestions);
   $("question-input").addEventListener("focus", updateQuestionSuggestions);
