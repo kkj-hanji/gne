@@ -484,7 +484,6 @@ function saveData(schedule, source, sourceInfo = {}, academicOverlay = []) {
   state.academicOverlayGroup = cleanText(activeStudentProfile().academicGroup);
   state.groups = [...new Set(schedule.map((entry) => entry.group))].sort((a, b) => a.localeCompare(b));
   buildScheduleIndex();
-  renderTimetableSearchSuggestions();
   const primarySource = Array.isArray(sourceInfo?.sources) ? sourceInfo.sources.find((item) => item.id === "groups") : null;
   state.metadata = {
     source,
@@ -520,7 +519,6 @@ function restoreData() {
       state.groups = [...new Set(state.schedule.map((entry) => entry.group))].sort((a, b) => a.localeCompare(b));
       state.metadata = saved.metadata;
       buildScheduleIndex();
-      renderTimetableSearchSuggestions();
     }
   } catch { localStorage.removeItem(STORAGE_KEY); }
   state.timetableUpdate = loadPendingTimetableUpdate();
@@ -793,7 +791,6 @@ function changeTimetableSelection(group, subgroup = "") {
   localStorage.setItem(GROUP_STORAGE_KEY, group);
   if (groupChanged) recordGroupUsage(group);
   hydrateGroupControls();
-  renderTimetableSearchSuggestions();
   renderEverything();
 }
 
@@ -1253,30 +1250,28 @@ function renderDaySchedule() {
 
 function renderWeek() {
   const group = $("timetable-group").value || state.selectedGroup;
-  const search = $("timetable-search").value.trim().toLowerCase();
   const weekTable = $("week-table");
   const weekGridView = $("week-grid-view");
-  const classes = DAY_NAMES.flatMap((day) => classFor(group, day))
-    .filter((item) => !search || `${item.subject} ${item.teacher} ${item.room} ${item.type}`.toLowerCase().includes(search));
+  const classes = DAY_NAMES.flatMap((day) => classFor(group, day));
   const resultStatus = $("timetable-result-status");
   if (!classes.length) {
     if (weekTable) {
       weekTable.hidden = false;
-      weekTable.innerHTML = "<div class=\"empty-list\">No matching classes found.</div>";
+      weekTable.innerHTML = "<div class=\"empty-list\">No classes are available for this selection.</div>";
     }
     if (weekGridView) {
       weekGridView.hidden = true;
       weekGridView.innerHTML = "";
     }
-    if (resultStatus) resultStatus.textContent = search ? `No classes match “${$("timetable-search").value.trim()}”.` : "No timetable classes are available for this selection.";
+    if (resultStatus) resultStatus.textContent = "No timetable classes are available for this selection.";
     return;
   }
   const activeDays = DAY_NAMES.filter((day) => classes.some((item) => item.day === day));
-  if (resultStatus) resultStatus.textContent = `${classes.length} ${classes.length === 1 ? "class" : "classes"} across ${activeDays.length} ${activeDays.length === 1 ? "day" : "days"}${search ? ` matching “${$("timetable-search").value.trim()}”` : ""}.`;
+  if (resultStatus) resultStatus.textContent = `${classes.length} ${classes.length === 1 ? "class" : "classes"} across ${activeDays.length} ${activeDays.length === 1 ? "day" : "days"}.`;
   const listMarkup = `<div class="week-list">${DAY_NAMES.map((day) => {
     const dayEntries = classes.filter((item) => item.day === day).sort((left, right) => left.start - right.start || left.subject.localeCompare(right.subject));
     const dayClasses = classFor(group, day);
-    const freeSlots = search ? 0 : officialFreeLectureSlots(dayClasses).length;
+    const freeSlots = officialFreeLectureSlots(dayClasses).length;
     const classCountStr = `${dayEntries.length} ${dayEntries.length === 1 ? "class" : "classes"}`;
     const freeCountStr = freeSlots ? `, ${freeSlots} free` : "";
     return `<section class="week-list-day"><div class="week-list-head"><h3>${day}</h3><span>${classCountStr}${freeCountStr}</span></div>${dayEntries.length
@@ -1393,25 +1388,6 @@ function renderWeek() {
     weekGridView.hidden = true;
     weekGridView.innerHTML = "";
   }
-}
-
-function renderTimetableSearchSuggestions() {
-  const datalist = $("timetable-search-suggestions");
-  if (!datalist) return;
-  const group = $("timetable-group")?.value || state.selectedGroup;
-  const classes = DAY_NAMES.flatMap((day) => classFor(group, day));
-  const options = [
-    ...new Set(classes.map((item) => item.subject).filter(Boolean)).values()
-  ].sort().map((value) => ({ value, label: "Subject" }));
-  const seen = new Set(options.map((item) => item.value.toLowerCase()));
-  [
-    ...classes.map((item) => ({ value: item.teacher, label: "Teacher" })),
-    ...classes.map((item) => ({ value: item.room, label: "Room" }))
-  ].filter((item) => item.value && !/not listed/i.test(item.value)).sort((a, b) => a.value.localeCompare(b.value)).forEach((item) => {
-    const key = item.value.toLowerCase();
-    if (!seen.has(key)) { seen.add(key); options.push(item); }
-  });
-  datalist.innerHTML = options.slice(0, 80).map((item) => `<option value="${escapeHtml(item.value)}" label="${escapeHtml(item.label)}"></option>`).join("");
 }
 
 // A small, human-readable catalogue makes suggestions useful immediately on a
@@ -5191,7 +5167,6 @@ function saveManualProfile() {
     localStorage.setItem(GROUP_STORAGE_KEY, state.selectedGroup);
     localStorage.setItem(SUBGROUP_STORAGE_KEY, state.selectedSubgroup);
     if (state.groups.length) hydrateGroupControls();
-    renderTimetableSearchSuggestions();
     renderEverything();
     showToast("Kept your profile timetable.");
     return;
@@ -6368,7 +6343,6 @@ function initEvents() {
   }));
   [$("group-select"), $("timetable-group")].forEach((select) => select.addEventListener("change", (event) => changeTimetableSelection(event.target.value)));
   [$("subgroup-select"), $("timetable-subgroup")].filter(Boolean).forEach((select) => select.addEventListener("change", (event) => changeTimetableSelection(state.selectedGroup, event.target.value)));
-  $("timetable-search").addEventListener("input", renderWeek);
   $("question-input").addEventListener("input", updateQuestionSuggestions);
   $("question-input").addEventListener("focus", updateQuestionSuggestions);
   $("question-input").addEventListener("blur", (event) => {

@@ -127,7 +127,7 @@ test("labels all live groups with their department while retaining the source co
 
 test("keeps the original full weekly grid on narrow screens so timetable gaps remain visible", () => {
   const { state, parseFetTimetable, buildScheduleIndex, renderWeek } = context.__parserTest;
-  document.body.innerHTML = `<select id="timetable-group"><option value="CSA" selected>CSA</option></select><input id="timetable-search" value="" /><p id="timetable-result-status"></p><div id="week-table"></div>`;
+  document.body.innerHTML = `<select id="timetable-group"><option value="CSA" selected>CSA</option></select><p id="timetable-result-status"></p><div id="week-table"></div>`;
   state.schedule = parseFetTimetable(FET_FIXTURE);
   state.selectedGroup = "CSA";
   state.selectedSubgroup = "";
@@ -145,12 +145,6 @@ test("keeps the original full weekly grid on narrow screens so timetable gaps re
   assert.equal(document.querySelectorAll(".week-mobile, .mobile-day").length, 0);
   assert.match(document.getElementById("week-table").textContent, /PROGRAMMING/);
   assert.match(document.getElementById("timetable-result-status").textContent, /3 classes across 2 days/);
-
-  document.getElementById("timetable-search").value = "math";
-  renderWeek();
-  assert.ok(document.querySelector(".week-grid"));
-  assert.equal(document.querySelectorAll(".week-mobile, .mobile-day").length, 0);
-  assert.match(document.getElementById("timetable-result-status").textContent, /1 class across 1 day/);
 });
 
 test("typing suggestions rank intent, typos, and active timetable facts locally", () => {
@@ -1429,7 +1423,7 @@ test("exposes the student lookup control and uses only the Worker section-list r
   assert.match(pageSource, /Mentor venue/);
   assert.match(pageSource, /registration number/);
   assert.match(pageSource, /Student searches in chat are read-only and never change your profile/i);
-  assert.match(pageSource, /id="timetable-search-suggestions"/);
+  assert.doesNotMatch(pageSource, /id="timetable-search(?:-suggestions)?"/);
   assert.match(pageSource, /id="compass-question-suggestions"/);
   assert.match(pageSource, /aria-autocomplete="list"[^>]*aria-controls="question-live-suggestions"[^>]*aria-expanded="false"/);
   assert.match(pageSource, /id="chat-window"[^>]*role="log"/);

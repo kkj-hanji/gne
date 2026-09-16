@@ -15,7 +15,7 @@
     <link rel="manifest" href="manifest.webmanifest?v=20260821-13" />
     <link rel="icon" type="image/svg+xml" href="icon.svg?v=20260821-13" />
     <link rel="apple-touch-icon" href="icon.svg?v=20260821-13" />
-    <link rel="stylesheet" href="styles.css?v=20260916-1" />
+    <link rel="stylesheet" href="styles.css?v=20260916-2" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -147,11 +147,10 @@
         </section>
 
         <section class="page" id="timetable" data-page="timetable">
-          <div class="page-intro"><p class="eyebrow">WEEK VIEW</p><h1>Your timetable</h1><p>Filter the timetable by group, day, subject, teacher, or room.</p></div>
+          <div class="page-intro"><p class="eyebrow">WEEK VIEW</p><h1>Your timetable</h1><p>Choose a section and subsection to view your weekly timetable.</p></div>
           <div class="timetable-toolbar">
             <div class="field"><label for="timetable-group">Section</label><select id="timetable-group" aria-describedby="timetable-selection-note" disabled><option>Load data first</option></select></div>
             <div class="field"><label for="timetable-subgroup">Subsection</label><select id="timetable-subgroup" aria-describedby="timetable-selection-note" disabled><option>Choose a section first</option></select></div>
-            <div class="field timetable-search-field"><label for="timetable-search">Find a class</label><input id="timetable-search" type="search" inputmode="search" enterkeyhint="search" list="timetable-search-suggestions" autocomplete="off" spellcheck="false" placeholder="Subject, teacher, room..." /><datalist id="timetable-search-suggestions"></datalist></div>
             <p class="timetable-selection-note" id="timetable-selection-note">Used for Timetable, Today and Ask Compass on this device.</p>
           </div>
           <p class="timetable-result-status" id="timetable-result-status" role="status" aria-live="polite">No timetable data loaded yet.</p>
@@ -391,6 +390,6 @@
     <script src="exam-schedule.js?v=20260915-1"></script>
     <script src="schedule-analysis.js?v=20260915-1"></script>
     <script src="academic-calendar.js?v=20260915-1"></script>
-    <script src="app.js?v=20260916-1"></script>
+    <script src="app.js?v=20260916-2"></script>
   </body>
 </html>
