@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-18T14:14:26.798Z",
+  "checkedAt": "2026-09-18T14:16:29.534Z",
   "source": "https://gndec.ac.in/?q=node/6",
   "roles": [
     {
@@ -251,6 +251,12 @@
     {
       "profileId": "76",
       "phone": "9988033488",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "507",
+      "phone": "9876956479",
       "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
       "phoneLabel": "Public mentoring contact from the official student roster"
     },

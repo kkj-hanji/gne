@@ -16,12 +16,12 @@
   PDF requests are bounded, and an in-flight source revision cannot replace the
   cache with data from the previous registry. Offline lookup requires a valid
   previously cached index; first visits still need a download.
-- **Faculty data:** `public/data/faculty-directory-index.json` contains 270
-  official faculty/staff records across 14 directory departments, with 270
+- **Faculty data:** `public/data/faculty-directory-index.json` contains 272
+  official faculty/staff records across 14 directory departments, with 272
   successfully checked professional profiles. The shared faculty loader tries
   the snapshot before the live API. Missing indexed matches retry the API.
 - **Contacts:** `public/data/faculty-contacts.json` records 20 published
-  administrative roles and 33 individually sourced supplements. Search results
+  administrative roles and 34 individually sourced supplements. Search results
   include a collapsed Office & contact details panel with published landline,
   phone, email, provenance and check date. Mentor numbers are explicitly labelled
   as public mentoring contacts; shared role-office lines are not personal lines.
@@ -122,13 +122,13 @@ reasoning while retaining deterministic execution and the existing fallback.
 
 Automated tests cover tutorial rendering, shared selection state, concurrent and
 offline index loading, outdated/partial indexes, source changes, missing-name
-fallback, all 270 official faculty names, contact disclosures, active-profile HOD
+fallback, all 272 official faculty names, contact disclosures, active-profile HOD
 lookup, conflicting roles, professional-field privacy, and room occupancy across
 seven area types, boundaries and malformed requests. Existing query, date,
 comparison, exam, roster-parser and Worker tests remain part of `npm test`.
 
 The live audit checked 2,250 official timetable queries with zero failures and
-parsed every numbered row of all seven current rosters. All 270 faculty names
+parsed every numbered row of all seven current rosters. All 272 faculty names
 were tested for correct identity or explicit ambiguity. Tests run sequentially
 so the existing timing assertion is not distorted by concurrent CPU-heavy tests.
 `npm test`: 274 passed, zero failures. `npm run lint` and `npm run build` passed.
