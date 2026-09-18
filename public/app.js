@@ -4802,6 +4802,7 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 // engine is always retained as the transparent fallback.
 function prepareCompassQuestion(question) {
   let q = canonicalTimetableQuestion(question);
+  if (globalThis.CompassRoomAvailability?.matches(q)) return q;
   if (globalThis.CompassAcademicCalendar?.matches(q)) return q;
   if (isTomorrowCardQuestion(q)) return q;
   if (globalThis.CompassExams?.matches(q)) return q;
@@ -5024,6 +5025,10 @@ function timetableAnalysisAnswer(question) {
 }
 
 function answerSingleCompassQuestion(question, engine = null, contextOverrides = {}) {
+  const rooms = roomAvailabilityAnswer(question);
+  if (rooms) return rooms;
+  const role = facultyRoleRequest(question);
+  if (role && facultyContacts) return facultyRoleAnswer(facultyRoleLookup(role, facultyContacts));
   const academic = academicCalendarAnswer(question);
   if (academic) return academic;
   const exams = examQuestionAnswer(question);
@@ -5254,25 +5259,26 @@ async function fetchCurrentRosterRecords() {
   const cacheKey = currentRosterCacheKey();
   const discoveredBranches = state.sourceRegistry?.studentSectionSources?.map((source) => source.branch).filter(Boolean) || [];
   const branches = discoveredBranches.length ? discoveredBranches : SECTION_LIST_BRANCHES;
-  const rosterLoads = await Promise.race([
-    Promise.all(branches.map(async (branch) => {
-      try {
-        const response = await fetch(`/api/section-list?branch=${branch}`);
-        if (!response.ok) throw new Error("Roster unavailable");
-        return { branch, records: parseStudentSectionText(await pdfTextFromResponse(response), branch), error: "" };
-      } catch (error) { return { branch, records: [], error: error.message || "Roster unavailable" }; }
-    })),
-    new Promise((_, reject) => window.setTimeout(() => reject(new Error("The official section lists took too long to load. Please try again.")), 45000))
-  ]);
+  const readRoster = async (branch, history = "") => {
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    let timer;
+    try {
+      const records = await Promise.race([
+        (async () => {
+          const response = await fetch(`/api/section-list?branch=${branch}${history ? `&history=${encodeURIComponent(history)}` : ""}`, controller ? { signal: controller.signal } : {});
+          if (!response.ok) throw new Error("Roster unavailable");
+          return parseStudentSectionText(await pdfTextFromResponse(response), branch);
+        })(),
+        new Promise((_, reject) => { timer = window.setTimeout(() => { controller?.abort(); reject(new Error("Roster request timed out")); }, 45000); })
+      ]);
+      return { branch, records, error: "" };
+    } catch (error) { return { branch, records: [], error: error.message || "Roster unavailable" }; }
+    finally { window.clearTimeout?.(timer); }
+  };
+  const rosterLoads = await Promise.all(branches.map(branch => readRoster(branch)));
   const successfulLoads = rosterLoads.filter((entry) => entry.records.length);
   if (!successfulLoads.length) throw new Error("Current official student rosters could not be read.");
-  const historicalLoads = await Promise.all(branches.flatMap((branch) => rosterHistorySourcesForBranch(branch).map(async (source) => {
-    try {
-      const response = await fetch(`/api/section-list?branch=${branch}&history=${encodeURIComponent(source.id || "1")}`);
-      if (!response.ok) throw new Error("Historical roster unavailable");
-      return { branch, records: parseStudentSectionText(await pdfTextFromResponse(response), branch) };
-    } catch { return { branch, records: [] }; }
-  })));
+  const historicalLoads = await Promise.all(branches.flatMap(branch => rosterHistorySourcesForBranch(branch).map(source => readRoster(branch, source.id || "1"))));
   const historyByBranch = new Map();
   historicalLoads.forEach((entry) => historyByBranch.set(entry.branch, [...(historyByBranch.get(entry.branch) || []), ...entry.records]));
   const sourceDates = (state.sourceRegistry?.studentSectionSources || []).map((source) => source.url?.match(/(\d{2})[_-](\d{2})[_-](20\d{2})(?:_\d+)?\.pdf/i)?.slice(1).join("-"));
@@ -5285,6 +5291,7 @@ async function fetchCurrentRosterRecords() {
     version: rosterVersion,
     loadedAt: Date.now()
   };
+  if (currentRosterCacheKey() !== cacheKey) return loadCurrentRosterRecords();
   state.rosterCache = loaded;
   const sources = state.sourceRegistry?.studentSectionSources || [];
   if (!loaded.unavailableBranches.length && sources.length === SECTION_LIST_BRANCHES.length) {
@@ -5589,6 +5596,32 @@ function canonicalFacultyName(value = "") {
   return normalizeStudentName(String(value).replace(/\([^)]*\)/g, " ")).replace(/^(?:(?:dr|er|prof|professor|ar|mr|mrs|ms)\s+)+/, "").trim();
 }
 
+function facultyDepartmentForQuestion(question) {
+  const q = canonicalTimetableQuestion(question).replace(/\b(?:tell|give|show|find|for|to)\s+me\b/g, " ");
+  return FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(q))?.[0] || "";
+}
+
+function roomAvailabilityAnswer(question) {
+  const engine = globalThis.CompassRoomAvailability;
+  const q = canonicalTimetableQuestion(question);
+  if (!engine?.matches(q)) return "";
+  const clarification = temporalClarification(`${q} room timetable`);
+  if (clarification) return clarification;
+  const date = requestedTimetableDate(q);
+  let time = requestedTime(q);
+  if (time === null && (date || /\b(?:at|am|pm)\b|\d{1,2}:\d{2}/.test(q))) return "<p>What time should I check? Include AM/PM, for example “free rooms in S tomorrow at 2 PM”.</p>";
+  const now = getIndiaNow();
+  if (time === null) time = now.minutes;
+  const day = date?.day || now.day;
+  const stored = state.timetableViews.get("rooms");
+  const source = state.sourceRegistry?.sources?.find(item => item.id === "rooms");
+  if (!stored?.schedule?.length || source && stored.revision !== (source.contentHash || source.url)) return "<p>The current official room timetable is unavailable. I cannot verify empty rooms from a single section's timetable.</p>";
+  const result = engine.resolve(q, stored.schedule, day, time);
+  if (result.error) return `<p>${escapeHtml(result.error)}</p>`;
+  const label = `${day}${date ? ` · ${date.iso}` : ""} · ${humanTime(time)}`;
+  return `<p><strong>${escapeHtml(label)}: ${result.rooms.length} rooms with no class listed</strong></p>${result.rooms.length ? `<p>${result.rooms.slice(0, 40).map(escapeHtml).join(", ")}</p>` : "<p>All matching rooms have a class listed at this time.</p>"}${result.rooms.length > 40 ? "<p>Showing the first 40 rooms; specify an area to narrow the list.</p>" : ""}<p class="answer-source">Checked ${result.checked} published room labels against the official weekly room timetable. This does not confirm access, permission, unscheduled bookings or date-specific changes. S/F/G/A filters refer to published code prefixes.</p>`;
+}
+
 function facultyDetailFlags(question = "") {
   const q = canonicalTimetableQuestion(question);
   const flags = {
@@ -5611,15 +5644,19 @@ function facultyLookupRequest(question = "") {
   if (isHolidayCalendarQuestion(q)) return null;
   const role = facultyRoleRequest(q);
   if (role) return { role, term: "", fields: facultyDetailFlags(q) };
-  const department = FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(q))?.[0] || "";
-  let knownTeacher = state.selectedGroup ? referencedTeacherName(q) : "";
+  const department = facultyDepartmentForQuestion(q);
+  const activeTeacher = state.selectedGroup ? referencedTeacherName(q) : "";
+  // A partial surname in the active timetable must not replace a different
+  // person's full name. The directory performs its own ambiguity-aware search.
+  let knownTeacher = activeTeacher && normalizeStudentName(q).includes(canonicalFacultyName(activeTeacher)) ? activeTeacher : "";
   const subjectTeacherCue = /\b(?:who|name|teacher|teachers|faculty|sir|mam|maam|madam|prof|professor|dr|doctor|instructor|teach|teaches|teaching|taught)\b/i.test(q);
   const professionalDetailCue = /\b(?:phone|mobile|landline|telephone|office|cabin|email|mail|contact|experience|qualification|degree|education|research|interest|speciali[sz]ation|expertise|publications?|papers?|journal|conference|memberships?|vidwan|profile|details?|information|info|designation|position|post)\b/i.test(q);
   const explicitDepartmentCue = /\b(?:department|dept|applied science|computer science|information technology|electrical engineering|civil engineering|mechanical engineering|electronics(?:\s+and|\s*&)?\s+communication)\b/i.test(q);
   const explicitStudentCue = /\b(?:student|roll|crn|urn|roster|registration|classmate|batchmate)\b/i.test(q);
   if (explicitStudentCue && !subjectTeacherCue && !professionalDetailCue) return null;
   if (!knownTeacher && state.selectedGroup && subjectTeacherCue && !explicitDepartmentCue) {
-    const subjectClasses = findReferencedClasses(q);
+    const subjectWords = normalizeStudentName(q).split(" ");
+    const subjectClasses = findReferencedClasses(q).filter(item => normalizeStudentName(item.subject).split(" ").some(word => word.length >= 4 && !/^(?:class|professional|development)$/.test(word) && subjectWords.some(token => token === word || token === `${word}s`)));
     const subjectTeachers = [...new Set(subjectClasses.flatMap((item) => teacherNames(item.teacher)))];
     // “Math teacher” means the teacher assigned to this student's active
     // timetable, not a directory search for a person named “math”. A request
@@ -5662,7 +5699,7 @@ function facultyRoleRequest(question) {
   const q = canonicalTimetableQuestion(question);
   const kind = /\b(?:hods?|heads? of departments?|department heads?)\b/.test(q) ? "hod" : /\bdeans?\b/.test(q) ? "dean" : /\bprincipal\b/.test(q) ? "principal" : /\bchief warden\b/.test(q) ? "chief warden" : /\bcontroller of exam(?:ination)?s?\b/.test(q) ? "controller" : "";
   if (!kind || /\b(?:timetable|schedule|class)\b/.test(q)) return null;
-  let department = FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(q))?.[0] || "";
+  let department = facultyDepartmentForQuestion(q);
   if (kind === "hod" && !department && /\b(?:my|our|mera|hamara|sada)\b/.test(q)) {
     const branch = activeStudentProfile().branch;
     department = FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(branch))?.[0] || "";
@@ -5687,7 +5724,7 @@ function facultyRoleLookup(request, data) {
 
 function withFacultyContacts(record) {
   const person = facultyContacts?.people.find(item => item.profileId === String(record.profileId));
-  const roles = facultyContacts?.roles.filter(item => canonicalFacultyName(item.name) === canonicalFacultyName(record.name)) || [];
+  const roles = facultyContacts?.roles.filter(item => item.profileId ? String(item.profileId) === String(record.profileId) : canonicalFacultyName(item.name) === canonicalFacultyName(record.name)) || [];
   return { ...record, ...(person || {}), publishedRoles: roles, contactCheckedAt: facultyContacts?.checkedAt || "", contactSource: person?.source || "", phoneSource: person?.phoneSource || "" };
 }
 
@@ -5817,12 +5854,16 @@ function facultyContactDetails(record) {
   const sources = [...new Set([record.contactSource, record.phoneSource, ...roles.map(role => role.source)].filter(Boolean))];
   const links = sources.filter(url => { try { const u = new URL(url); return u.protocol === "https:" && (u.hostname === "gndec.ac.in" || u.hostname.endsWith(".gndec.ac.in")); } catch { return false; } }).map(url => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Official contact source ↗</a>`).join(" · ");
   const roleRows = roles.map(role => `<p><strong>${value(role.role)}</strong>${role.conflict ? `<br />${value(role.conflict)}` : ""}<br />Landline: ${value(role.landline)}<br />Phone: ${value(role.phone)}<br />Email: ${value(role.email)}<br /><small>${value(role.contactScope)}</small></p>`).join("");
-  return `<details class="answer-disclosure faculty-contact-disclosure"><summary><span>Office &amp; contact details</span><b aria-hidden="true">+</b></summary><div class="answer-disclosure-body"><p><strong>Office / Cabin:</strong> ${value(record.office || record.cabin)}<br /><strong>Landline:</strong> ${value(record.landline)}<br /><strong>Phone:</strong> ${value(record.phone)}<br /><strong>Email:</strong> ${value(record.email)}</p>${roleRows}${links ? `<p class="answer-source">${links} · Source snapshot checked ${value(record.contactCheckedAt?.slice(0, 10))}. Role contacts may be shared office lines.</p>` : ""}</div></details>`;
+  return `<details class="answer-disclosure faculty-contact-disclosure"><summary><span>Office &amp; contact details</span><b aria-hidden="true">+</b></summary><div class="answer-disclosure-body"><p><strong>Office / Cabin:</strong> ${value(record.office || record.cabin)}<br /><strong>Landline:</strong> ${value(record.landline)}<br /><strong>Phone:</strong> ${value(record.phone)}${record.phoneLabel ? ` (${value(record.phoneLabel)})` : ""}<br /><strong>Email:</strong> ${value(record.email)}</p>${roleRows}${links ? `<p class="answer-source">${links} · Source snapshot checked ${value(record.contactCheckedAt?.slice(0, 10))}. Role contacts may be shared office lines.</p>` : ""}</div></details>`;
 }
 
 function facultyRoleAnswer(lookup) {
   if (!lookup.records.length) return `<p>Which ${escapeHtml(lookup.query)} do you mean? Specify the department or responsibility, such as “EC HOD” or “dean academics”. I could not verify a matching appointment from the available official records.</p>`;
-  return `<p><strong>Published GNDEC administration details</strong></p>${lookup.records.map(role => `<p><strong>${escapeHtml(role.role)}</strong><br />${role.conflict ? escapeHtml(role.conflict) : escapeHtml(role.name)}</p>${facultyContactDetails({ name: role.name, publishedRoles: [role], contactCheckedAt: lookup.checkedAt })}`).join("")}<p class="answer-source">Official source snapshot checked ${escapeHtml(lookup.checkedAt?.slice(0, 10) || "date unavailable")}; appointments can change.</p>`;
+  const cards = lookup.records.map(role => {
+    const person = !role.conflict && role.profileId ? facultyContacts?.people.find(item => item.profileId === role.profileId) : null;
+    return `<p><strong>${escapeHtml(role.role)}</strong><br />${role.conflict ? escapeHtml(role.conflict) : escapeHtml(role.name)}</p>${facultyContactDetails({ ...person, contactSource: person?.source, name: role.name, publishedRoles: [role], contactCheckedAt: lookup.checkedAt })}`;
+  });
+  return `<p><strong>Published GNDEC administration details</strong></p>${cards.join("")}<p class="answer-source">Official source snapshot checked ${escapeHtml(lookup.checkedAt?.slice(0, 10) || "date unavailable")}; appointments can change.</p>`;
 }
 
 function legacyFacultyLookupAnswer(lookup) {
@@ -6622,6 +6663,15 @@ function initEvents() {
       return;
     }
     state.activeFacultyAiContext = null;
+    if (globalThis.CompassRoomAvailability?.matches(canonicalTimetableQuestion(question))) {
+      const bubble = ensureChatBubble("assistant thinking", "<p>Checking the official room timetable…</p>");
+      try { await loadOfficialTimetableView("rooms"); }
+      catch { /* the answer reports missing or obsolete data safely */ }
+      bubble.className = "chat-bubble assistant";
+      bubble.innerHTML = roomAvailabilityAnswer(question);
+      persistChat();
+      return;
+    }
     const academic = academicCalendarAnswer(question);
     if (academic) { ensureChatBubble("assistant", academic); persistChat(); return; }
     const exams = examQuestionAnswer(question);

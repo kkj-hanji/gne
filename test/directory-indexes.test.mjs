@@ -61,7 +61,7 @@ test('faculty contact questions resolve the faculty, expose sourced contacts col
   faculty.generatedAt = new Date().toISOString();
   const contacts = JSON.parse(await readFile('public/data/faculty-contacts.json', 'utf8'));
   h.context.fetch = async url => ({ ok: true, json: async () => url.includes('contacts') ? contacts : faculty });
-  for (const question of ['Dr Chahat Jain phone', 'Chahat Jain landline number', 'teacher Chahat Jain email', 'where is Chahat Jain office']) {
+  for (const question of ['Dr Chahat Jain phone', 'give me Chahat Jain phone', 'Chahat Jain landline number', 'teacher Chahat Jain email', 'where is Chahat Jain office']) {
     assert.equal(h.dir.studentLookupRequest(question), null);
     const lookup = await h.dir.resolveChatFacultyLookup(question, { includeProfile: false });
     assert.equal(lookup.status, 'single', question);
@@ -102,4 +102,18 @@ test('tutorial badges depend only on published type, never subject wording', () 
   const { dir } = harness();
   assert.match(dir.timetableTypeTag({ type: 't' }), /aria-label="Tutorial"/);
   for (const type of ['L','P','',undefined]) assert.equal(dir.timetableTypeTag({ type, subject: 'tutorial' }), '');
+});
+
+test('every bundled official faculty name resolves to its own identity or an explicit ambiguity', async () => {
+  const h = harness();
+  const faculty = JSON.parse(await readFile('public/data/faculty-directory-index.json', 'utf8'));
+  faculty.generatedAt = new Date().toISOString();
+  const contacts = JSON.parse(await readFile('public/data/faculty-contacts.json', 'utf8'));
+  h.context.fetch = async url => ({ ok: true, json: async () => url.includes('contacts') ? contacts : faculty });
+  for (const person of faculty.records) {
+    const lookup = await h.dir.resolveChatFacultyLookup(`teacher ${person.name} phone`, { includeProfile: false });
+    assert.ok(['single', 'multiple'].includes(lookup?.status), `${person.name}: ${lookup?.status}`);
+    assert.ok(lookup.records.some(record => record.profileId === person.profileId), `${person.name}: wrong identity`);
+    if (lookup.status === 'single') assert.equal(lookup.records[0].profileId, person.profileId);
+  }
 });

@@ -904,18 +904,19 @@ test("faculty lookup renders directory facts before profile enrichment and reuse
     if (String(url) === "/api/faculty/profile?id=99") return { ok: true, async json() { return { profile: { profileId: "99", name: "DR JASMEET KAUR", photoUrl: "https://gndec.ac.in/images/jasmeet.jpg", qualifications: ["PhD Physics"], experience: "10 years" } }; } };
     throw new Error(`Unexpected fetch: ${url}`);
   };
+  const apiCalls = () => calls.filter(call => call.url.startsWith("/api/"));
   const { api } = createHarness(fetchImpl);
   const base = await api.resolveChatFacultyLookup("full details of DR JASMEET KAUR", { includeProfile: false });
   assert.equal(base.status, "single");
-  assert.equal(calls.length, 1, "the profile request must not block the first verified answer");
-  assert.equal(calls[0].cache, "no-cache");
+  assert.equal(apiCalls().length, 1, "the profile request must not block the first verified answer");
+  assert.equal(apiCalls()[0].cache, "no-cache");
   const baseAnswer = api.legacyFacultyLookupAnswer(base);
   assert.match(baseAnswer, /Showing verified directory facts now/i);
   assert.doesNotMatch(baseAnswer, /<img|Experience[\s\S]*Not published/i);
 
   const enriched = await api.enrichFacultyLookupProfile(base);
-  assert.equal(calls.length, 2);
-  assert.equal(calls[1].cache, "default");
+  assert.equal(apiCalls().length, 2);
+  assert.equal(apiCalls()[1].cache, "default");
   assert.equal(enriched.profilePending, false);
   const answer = api.legacyFacultyLookupAnswer(enriched);
   assert.match(answer, /PhD Physics/i);
@@ -923,7 +924,7 @@ test("faculty lookup renders directory facts before profile enrichment and reuse
 
   api.state.facultyCache = null;
   const restored = await api.loadFacultyDirectory();
-  assert.equal(calls.length, 2, "the verified four-hour device cache should avoid another network lookup");
+  assert.equal(apiCalls().length, 2, "the verified four-hour device cache should avoid another network lookup");
   assert.equal(restored.records[0].photoUrl, "https://gndec.ac.in/images/jasmeet.jpg");
 });
 

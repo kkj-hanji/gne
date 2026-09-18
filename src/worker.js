@@ -210,8 +210,8 @@ export function parseFacultyProfileHtml(html, profileId = "") {
     ["name", "name"], ["designation", "designation"], ["email", "email"], ["experience", "experience"],
     ["qualification", "qualifications"], ["no. of publications (journal):", "journalPublications"],
     ["no. of publications (conference):", "conferencePublications"], ["professional memberships:", "memberships"],
-    ["research interest", "researchInterests"]
-    , ["office", "office"], ["office / cabin", "office"], ["cabin", "cabin"],
+    ["research interest", "researchInterests"],
+    ["office", "office"], ["office / cabin", "office"], ["cabin", "cabin"],
     ["office phone", "landline"], ["landline", "landline"], ["work phone", "phone"], ["office email", "email"]
   ]);
   for (const row of String(html || "").matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {

@@ -35,6 +35,10 @@ test("official faculty parsers keep professional fields and exclude personal bir
   assert.equal("dateOfBirth" in profile, false);
   assert.doesNotMatch(JSON.stringify(profile), /26\.12\.1987/);
   assert.equal(parseFacultyProfileHtml(`<table><tr><th>Photo</th><td><img src="https://tracker.example/photo.jpg"></td></tr></table>`, "126").photoUrl, undefined);
+  const contacts = parseFacultyProfileHtml('<table><tr><th>Office:</th><td>Verified test office</td></tr><tr><th>Office Phone</th><td>0161-1234567</td></tr><tr><th>Home Address</th><td>PRIVATE VALUE</td></tr></table>');
+  assert.equal(contacts.office, 'Verified test office');
+  assert.equal(contacts.landline, '0161-1234567');
+  assert.doesNotMatch(JSON.stringify(contacts), /PRIVATE VALUE/);
 });
 
 test("faculty photo proxy accepts Sanjam Kaur Sidhu's verified 13.3 MB image while retaining a bounded limit", async () => {

@@ -1467,7 +1467,7 @@ test("exposes the student lookup control and uses only the Worker section-list r
   assert.doesNotMatch(pageSource, /Kaushik Jain/);
   assert.doesNotMatch(pageSource, /Temporary Sections/i);
   assert.doesNotMatch(pageSource, /DELHI · INDIA/);
-  assert.match(appSource, /fetch\(`\/api\/section-list\?branch=\$\{branch\}`\)/);
+  assert.match(appSource, /fetch\(`\/api\/section-list\?branch=\$\{branch\}/);
   assert.match(appSource, /const SECTION_LIST_BRANCHES = \["CE", "CS", "EC", "EE", "IT", "ME", "RAI"\]/);
   const chatSubmit = appSource.slice(appSource.indexOf('$("question-form").addEventListener("submit"'), appSource.indexOf('const clearChat = $("clear-chat")'));
   assert.ok(chatSubmit.indexOf("contextualLocalFollowupAnswer(question)") < chatSubmit.indexOf("studentLookupRequest(question"), "contextual syllabus follow-ups must resolve before roster lookup");

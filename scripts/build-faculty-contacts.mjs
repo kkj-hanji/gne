@@ -24,6 +24,14 @@ for (const role of roles.filter(item => /Alumni|Chief Warden/.test(item.role))) 
   role.conflictSource = 'https://erp.gndec.ac.in/gndec';
 }
 // Individually verified supplements; no office inferred from teaching/mentoring rooms.
+async function checkedPage(url, required) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) throw new Error(`Contact source unavailable: ${url}`);
+  const text = (await response.text()).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  if (!required.every(pattern => pattern.test(text))) throw new Error(`Contact source changed; review before publishing: ${url}`);
+}
+await checkedPage('https://ece.gndec.ac.in/', [/Munish Rattan/i, /Ground Floor, Electronics Block/i]);
+await checkedPage('https://it.gndec.ac.in/', [/Kulvinder Singh Mann/i, /9915507920/]);
 const people = [
   { profileId: '42', office: 'Ground Floor, Electronics Block, GNDEC, Ludhiana', source: 'https://ece.gndec.ac.in/' },
 ];
@@ -32,6 +40,15 @@ const mann = directory.records.find(record => /kulvinder.*mann/i.test(record.nam
 if (mann) people.push({ profileId: mann.profileId, phone: '9915507920', source: 'https://it.gndec.ac.in/' });
 const roster = JSON.parse(await readFile('public/data/student-roster-index.json', 'utf8'));
 const canonical = value => value.toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\b(dr|er|prof|pf|mr|ms|mrs)\b/g, ' ').replace(/\s+/g, ' ').trim();
+for (const role of roles) {
+  const matches = directory.records.filter(record => canonical(record.name).replace(/ /g, '') === canonical(role.name).replace(/ /g, ''));
+  if (matches.length === 1) role.profileId = matches[0].profileId;
+  // The IT department page independently identifies its HOD by full name.
+  if (/^HoD.*Information Technology/i.test(role.role) && mann) {
+    role.profileId = mann.profileId;
+    role.identitySource = 'https://it.gndec.ac.in/';
+  }
+}
 for (const record of directory.records) {
   const matches = roster.records.filter(student => canonical(student.mentor) === canonical(record.name));
   const phones = [...new Set(matches.map(student => student.mentorPhone).filter(phone => /^[6-9]\d{9}$/.test(phone)))];
