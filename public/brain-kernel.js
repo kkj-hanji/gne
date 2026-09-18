@@ -117,7 +117,7 @@
     [/\b(?:shanivar|shanivaar)\b/g, "saturday"],
     [/\b(?:ravivar|ravivaar|aitvar|aitvaar|etwar)\b/g, "sunday"],
     [/\b(?:imarat|building|block)\b/g, "building"],
-    [/\b(?:marks?|number|ank|aank|nomber)\b|\u0905\u0902\u0915|\u0a05\u0a70\u0a15/gu, " marks "],
+    [/\b(?:marks?|ank|aank)\b|\u0905\u0902\u0915|\u0a05\u0a70\u0a15/gu, " marks "],
     [/\b(?:credits?|cred|creds|kredit|kredits)\b/gi, " credits "],
     [/\u0917\u0923\u093f\u0924|\u0a17\u0a23\u0a3f\u0a24/gu, " maths "],
     [/(?:\u092d\u094c\u0924\u093f\u0915|\u092b\u093f\u091c\u093f\u0915\u094d\u0938|\u0a2d\u0a4c\u0a24\u093f\u0915|\u0a2b\u0a3f\u0a1c\u0a3c\u093f\u0a15\u0a38|\u0a2b\u0a3f\u0a1c\u0a3c\u0a3f\u0a15\u0a38)/gu, " physics "],

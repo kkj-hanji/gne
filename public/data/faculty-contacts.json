@@ -1,0 +1,388 @@
+{
+  "checkedAt": "2026-09-18T02:39:48.809Z",
+  "source": "https://gndec.ac.in/?q=node/6",
+  "roles": [
+    {
+      "role": "Principal",
+      "name": "Dr. Sehijpal Singh",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "principal@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Civil Engineering",
+      "name": "Dr. Jagbir Singh",
+      "landline": "0161-5064536",
+      "phone": "",
+      "email": "ce@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Computer Science and Engineering",
+      "name": "Dr. Kiran Jyoti",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "cse@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Electrical Engineering",
+      "name": "Dr. KD Singh",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "ee@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Electronics and Communication Engineering",
+      "name": "Dr. Munish Rattan",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "ece@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Information Technology",
+      "name": "Dr. KS Maan",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "it@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Mechanical & Production Engineering",
+      "name": "Dr. Harmeet Singh",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "cme@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Computer Applications and Computer Centre",
+      "name": "Dr. Jasbir Singh Saini",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "mca@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HoD - Business Administraton",
+      "name": "Dr. Parampal Singh",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "mba@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "Controller of Examination",
+      "name": "Dr.Jasmaninder Singh Grewal",
+      "landline": "",
+      "phone": "9815323023",
+      "email": "jsgrewal23023@gmail.com",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "AR Admin",
+      "name": "Mr. Ramandeep Singh",
+      "landline": "0161-5064501",
+      "phone": "",
+      "email": "ramandeep.pta@gmail.com",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "AR Accounts",
+      "name": "Dr. Harnam Singh Farwaha",
+      "landline": "",
+      "phone": "9988332600",
+      "email": "accounts@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "Dean Academics",
+      "name": "Dr. Akshay Girdhar",
+      "landline": "0161-5064704",
+      "phone": "",
+      "email": "deanacademic@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "HR Manager",
+      "name": "Dr. Gurdeep Kaur",
+      "landline": "",
+      "phone": "8528002375",
+      "email": "hrm@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "Training & Placement Officer",
+      "name": "Pf. Gagandeep Singh Sodhi",
+      "landline": "0161-2501106",
+      "phone": "",
+      "email": "tpo@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "Dean (R&C)",
+      "name": "Dr. Harvinder Singh",
+      "landline": "0161-2491193",
+      "phone": "",
+      "email": "deanconsultancy@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "Dean (Alumni)",
+      "name": "Er. Rupinderjit Singh",
+      "landline": "",
+      "phone": "9872169597",
+      "email": "rjhkathuria@yahoo.co.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line.",
+      "conflict": "Official administration and ERP pages list different holders. Current appointment needs confirmation.",
+      "conflictSource": "https://erp.gndec.ac.in/gndec"
+    },
+    {
+      "role": "Dean (Student's Welfare)",
+      "name": "Dr. Parminder Singh",
+      "landline": "0161-5064551",
+      "phone": "",
+      "email": "parminder2u@gmail.com",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "Dean (Skill Enhancement Cell)",
+      "name": "Dr. Akshay Girdhar",
+      "landline": "",
+      "phone": "",
+      "email": "skill_cell@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line."
+    },
+    {
+      "role": "Chief Warden",
+      "name": "Dr. Shehbaaz Singh Brar",
+      "landline": "0161-5064532",
+      "phone": "",
+      "email": "cwb@gndec.ac.in",
+      "source": "https://gndec.ac.in/?q=node/6",
+      "contactScope": "Office contact published for this role; not necessarily a direct personal line.",
+      "conflict": "Official administration and ERP pages list different holders. Current appointment needs confirmation.",
+      "conflictSource": "https://erp.gndec.ac.in/gndec"
+    }
+  ],
+  "people": [
+    {
+      "profileId": "42",
+      "office": "Ground Floor, Electronics Block, GNDEC, Ludhiana",
+      "source": "https://ece.gndec.ac.in/"
+    },
+    {
+      "profileId": "53",
+      "phone": "9915507920",
+      "source": "https://it.gndec.ac.in/"
+    },
+    {
+      "profileId": "348",
+      "phone": "9872323794",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CE%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "349",
+      "phone": "9988336072",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CE%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "244",
+      "phone": "9815830889",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CE%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "445",
+      "phone": "7973564254",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "383",
+      "phone": "7508008004",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "206",
+      "phone": "8727063634",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "76",
+      "phone": "9988033488",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "382",
+      "phone": "6283041751",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "446",
+      "phone": "9592007098",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/CS%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "271",
+      "phone": "8872489340",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EE%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "277",
+      "phone": "9988826611",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EE%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "62",
+      "phone": "9872219178",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EE%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "126",
+      "phone": "7837005620",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EC%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "117",
+      "phone": "9888182283",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EC%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "358",
+      "phone": "9842800003",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EC%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "482",
+      "phone": "7986903288",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EC%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "468",
+      "phone": "9501724761",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EC%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "52",
+      "phone": "9814828414",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/IT%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "198",
+      "phone": "6284162034",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/IT%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "199",
+      "phone": "9501011768",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/IT%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "280",
+      "phone": "9872046435",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/IT%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "430",
+      "phone": "8196000983",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/IT%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "454",
+      "phone": "8288833123",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/IT%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "502",
+      "phone": "8288833123",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/IT%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "393",
+      "phone": "7986903288",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/EC%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "6",
+      "phone": "9592200299",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/RAI%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "373",
+      "phone": "9914255011",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/ME%20Permanent%20Section%2015_09_2026_0.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "492",
+      "phone": "9592457515",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/RAI%20Permanent%20Section%2015_09_2026.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "187",
+      "phone": "8427605599",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/ME%20Permanent%20Section%2015_09_2026_0.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "166",
+      "phone": "9988702731",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/ME%20Permanent%20Section%2015_09_2026_0.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    },
+    {
+      "profileId": "298",
+      "phone": "9914255011",
+      "phoneSource": "https://appsc.gndec.ac.in/sites/default/files/2026-09/ME%20Permanent%20Section%2015_09_2026_0.pdf",
+      "phoneLabel": "Public mentoring contact from the official student roster"
+    }
+  ]
+}

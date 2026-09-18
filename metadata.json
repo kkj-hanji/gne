@@ -2,5 +2,5 @@
   "name": "GNDEC Compass",
   "description": "Verified timetable, student profile lookup, syllabus help, and private college-day assistant for GNDEC students.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": ["k"]
 }

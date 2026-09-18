@@ -28,7 +28,7 @@ test("Timetable and Profile selectors share validated subsection state and updat
     state.schedule = [
       {id:"one",group:"ECB",cohorts:"ECB1",day:"Wednesday",start:570,end:630,subject:"FIRST LAB",teacher:"TEACHER",room:"A9",type:"P"},
       {id:"two",group:"ECB",cohorts:"ECB2",day:"Wednesday",start:570,end:630,subject:"SECOND LAB",teacher:"TEACHER",room:"A10",type:"P"},
-      {id:"shared",group:"ECB",cohorts:"ECB",day:"Wednesday",start:630,end:690,subject:"SHARED THEORY",teacher:"TEACHER",room:"A9",type:"L"},
+      {id:"shared",group:"ECB",cohorts:"ECB",day:"Wednesday",start:630,end:690,subject:"SHARED THEORY",teacher:"TEACHER",room:"A9",type:"T"},
       {id:"cs",group:"CSD",cohorts:"CSD2",day:"Wednesday",start:570,end:630,subject:"CS CLASS",teacher:"TEACHER",room:"A9",type:"L"},
       {id:"rai",group:"RAI",cohorts:"RAI",day:"Wednesday",start:570,end:630,subject:"RAI CLASS",teacher:"TEACHER",room:"A9",type:"L"}
     ];
@@ -46,6 +46,7 @@ test("Timetable and Profile selectors share validated subsection state and updat
   assert.equal(api.state.selectedSubgroup, "ECB2");
   assert.match(select("week-table").textContent, /SECOND LAB|SHARED THEORY/);
   assert.doesNotMatch(select("week-table").textContent, /FIRST LAB/);
+  assert.ok(select("week-table").querySelector('.timetable-type-tag[aria-label="Tutorial"]'));
   const answer = api.answerWithoutAi("my timetable today");
   assert.match(answer, /SECOND LAB/); assert.doesNotMatch(answer, /FIRST LAB/);
   change("subgroup-select", "ECB1");

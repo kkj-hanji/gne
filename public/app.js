@@ -21,6 +21,11 @@ const AI_ADMIN_VIEW_STORAGE_KEY = "gndec-compass-ai-admin-view-v1";
 const ADMIN_AI_MODE_STORAGE_KEY = "gndec-compass-admin-ai-mode-v1";
 const ADMIN_OWNER_CRN = "2617070";
 const ROSTER_SCHEMA_VERSION = 4;
+const ROSTER_INDEX_STORAGE_KEY = "gndec-compass-roster-index-v4";
+const DIRECTORY_INDEX_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+let rosterLoading = null;
+let facultyContacts = null;
+let facultyContactsLoading = null;
 const MAX_CHAT_MESSAGES = 60;
 const MAX_CHAT_MESSAGE_HTML = 30000;
 const SECTION_LIST_BRANCHES = ["CE", "CS", "EC", "EE", "IT", "ME", "RAI"];
@@ -705,6 +710,11 @@ function classTypeLabel(value) {
   return type || "Class";
 }
 
+function timetableTypeTag(item) {
+  return String(item.type || "").trim().toUpperCase() === "T"
+    ? `<small class="timetable-type-tag" title="${classTypeLabel("T")}" aria-label="Tutorial">T</small>` : "";
+}
+
 function expandRoomLocation(room) {
   if (!room) return "";
   let r = room;
@@ -1275,7 +1285,7 @@ function renderWeek() {
     const classCountStr = `${dayEntries.length} ${dayEntries.length === 1 ? "class" : "classes"}`;
     const freeCountStr = freeSlots ? `, ${freeSlots} free` : "";
     return `<section class="week-list-day"><div class="week-list-head"><h3>${day}</h3><span>${classCountStr}${freeCountStr}</span></div>${dayEntries.length
-      ? `<div class="week-list-cards">${dayEntries.map((item) => `<article class="week-list-card"><div class="week-list-time"><strong>${humanTime(item.start)}</strong><span>${humanTime(item.end)}</span></div><div class="week-list-body"><strong>${escapeHtml(item.subject)}</strong><span>${escapeHtml(item.teacher)}</span><span>${escapeHtml(expandRoomLocation(item.room))}${item.type ? ` · ${escapeHtml(classTypeLabel(item.type))}` : ""}</span></div></article>`).join("")}</div>`
+      ? `<div class="week-list-cards">${dayEntries.map((item) => `<article class="week-list-card"><div class="week-list-time"><strong>${humanTime(item.start)}</strong><span>${humanTime(item.end)}</span></div><div class="week-list-body"><strong>${escapeHtml(item.subject)} ${timetableTypeTag(item)}</strong><span>${escapeHtml(item.teacher)}</span><span>${escapeHtml(expandRoomLocation(item.room))}${item.type ? ` · ${escapeHtml(classTypeLabel(item.type))}` : ""}</span></div></article>`).join("")}</div>`
       : "<div class=\"week-list-empty\">No class listed for this day.</div>"}</section>`;
   }).join("")}</div>`;
   // Always keep every official bell row visible, including rows that are free
@@ -1304,7 +1314,7 @@ function renderWeek() {
         const top = ((c.start - earliestStart) / totalMinutes) * 100;
         const height = ((c.end - c.start) / totalMinutes) * 100;
         spatialMarkup += `<div class="spatial-block" style="top:calc(${top}% + 36px); height:calc(${height}% - 4px); left:6px; right:6px;">
-           <strong style="margin-bottom:2px; font-size:14px; line-height:1.2; text-overflow:ellipsis; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(c.subject)}</strong>
+           <strong style="margin-bottom:2px; font-size:14px; line-height:1.2; text-overflow:ellipsis; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(c.subject)} ${timetableTypeTag(c)}</strong>
            <span class="spatial-room">${escapeHtml(c.room || "TBA")} · ${escapeHtml(c.teacher)}</span>
            <span class="spatial-time" style="font-size:11px; margin-top:auto;">${humanTime(c.start)}</span>
         </div>`;
@@ -1329,8 +1339,8 @@ function renderWeek() {
       const cells = DAY_NAMES.map((day) => {
         const dayClasses = classes.filter((item) => item.day === day && item.start === start);
         const continuing = dayClasses.length ? [] : classes.filter((item) => item.day === day && item.start < start && item.end > start);
-        const cellClasses = dayClasses.map((item) => `<div class="week-class"><strong>${escapeHtml(item.subject)}</strong><span>${escapeHtml(item.room)} · ${escapeHtml(item.teacher)}</span></div>`).join("");
-        const continuationNotice = continuing.map((item) => `<div class="week-class continuation"><strong>${escapeHtml(item.subject)}</strong><span>Continues (${escapeHtml(item.room)})</span></div>`).join("");
+        const cellClasses = dayClasses.map((item) => `<div class="week-class"><strong>${escapeHtml(item.subject)} ${timetableTypeTag(item)}</strong><span>${escapeHtml(item.room)} · ${escapeHtml(item.teacher)}</span></div>`).join("");
+        const continuationNotice = continuing.map((item) => `<div class="week-class continuation"><strong>${escapeHtml(item.subject)} ${timetableTypeTag(item)}</strong><span>Continues (${escapeHtml(item.room)})</span></div>`).join("");
         return `<div class="week-cell">${cellClasses || continuationNotice || ""}</div>`;
       }).join("");
       return `${label}${cells}`;
@@ -1355,7 +1365,7 @@ function renderWeek() {
         if (starts.length) {
           const contents = starts.map((item) => `
             <div class="week-class">
-              <strong>${escapeHtml(item.subject)}</strong>
+              <strong>${escapeHtml(item.subject)} ${timetableTypeTag(item)}</strong>
               <span>${escapeHtml(item.room || "TBA")} · ${escapeHtml(item.teacher)}</span>
             </div>
           `).join("");
@@ -1364,7 +1374,7 @@ function renderWeek() {
         if (continuing.length) {
           const contents = continuing.map((item) => `
             <div class="week-class continuation">
-              <strong>${escapeHtml(item.subject)}</strong>
+              <strong>${escapeHtml(item.subject)} ${timetableTypeTag(item)}</strong>
               <span>Continues (${escapeHtml(item.room || "TBA")})</span>
             </div>
           `).join("");
@@ -2100,7 +2110,7 @@ function referencedTeacherName(question) {
     return q.includes(full) || (withoutTitle.length >= 5 && q.includes(withoutTitle));
   });
   if (exact) return exact;
-  const words = q.split(" ").filter((word) => word.length >= 5);
+  const words = q.split(" ").filter((word) => word.length >= 5 && !/^(?:teacher|faculty|professor|timetable|schedule|tomorrow|today|phone|email|office|landline|number|contact)$/.test(word));
   const candidates = teachers.filter((teacher) => normalizeStudentName(teacher).split(" ").some((part) => part.length >= 5 && words.some((word) => word === part || editDistance(word, part) <= (part.length >= 7 ? 2 : 1))));
   return candidates.length === 1 ? candidates[0] : "";
 }
@@ -4725,6 +4735,7 @@ function compassBrainContext(overrides = {}) {
     })(),
     studentRoster: Array.isArray(state.rosterCache?.records) ? state.rosterCache.records : [],
     facultyDirectory: Array.isArray(state.facultyCache?.records) ? state.facultyCache.records : [],
+    renderFacultyContacts: facultyContactDetails,
     facultyTimetables: state.timetableViews.get("teachers")?.schedule || [],
     collegeEvents: Array.isArray(state.collegeEventsCache) ? state.collegeEventsCache : [],
     notices: Array.isArray(state.noticesCache) ? state.noticesCache : [],
@@ -4751,6 +4762,7 @@ function validateBrainResult(result, engine) {
 }
 
 function runCompassBrain(question, engine = null, contextOverrides = {}) {
+  if (contextOverrides.facultyLookup?.status === "roles") return null;
   const mode = brainV2Mode();
   if (mode === "legacy") {
     state.lastBrainDiagnostic = { fallback: true, reason: "BRAIN_DISABLED" };
@@ -5180,12 +5192,66 @@ function saveManualProfile() {
 function currentRosterCacheKey() {
   const sources = state.sourceRegistry?.studentSectionSources || [];
   const historySources = state.sourceRegistry?.studentHistorySources || [];
-  return `schema:${ROSTER_SCHEMA_VERSION}|` + ([...sources.map((source) => `current:${source.branch}:${source.contentHash || source.url || ""}`), ...historySources.map((source) => `history:${source.branch}:${source.id || ""}:${source.contentHash || source.url || ""}`)].sort().join("|") || "fallback-rosters");
+  return `schema:${ROSTER_SCHEMA_VERSION}|` + ([...sources.map((source) => `current:${source.branch}:${source.url}:${source.contentHash || ""}`), ...historySources.map((source) => `history:${source.branch}:${source.id || ""}:${source.url}:${source.contentHash || ""}`)].sort().join("|") || "fallback-rosters");
 }
 
-async function loadCurrentRosterRecords() {
+function rosterIndexUsable(index) {
+  if (index?.schemaVersion !== ROSTER_SCHEMA_VERSION || !Array.isArray(index.records) || !index.records.length || !Array.isArray(index.sources)) return false;
+  const age = Date.now() - Date.parse(index.generatedAt);
+  if (!Number.isFinite(age) || age < -60000 || age > DIRECTORY_INDEX_MAX_AGE_MS) return false;
+  const current = state.sourceRegistry?.studentSectionSources || [];
+  if (current.length && (current.length !== index.sources.length || current.some(source => !index.sources.some(saved => saved.branch === source.branch && saved.url === source.url && saved.contentHash === source.contentHash)))) return false;
+  return SECTION_LIST_BRANCHES.every(branch => index.sources.some(source => source.branch === branch && source.verified && source.count === index.records.filter(record => record.branch === branch && record.name && record.section && record.crn).length));
+}
+
+async function directoryJson(url, timeoutMs = 8000) {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  let timer;
+  try {
+    return await Promise.race([
+      (async () => {
+        const response = await fetch(url, controller ? { signal: controller.signal } : {});
+        if (!response.ok) throw new Error("Directory resource unavailable");
+        return response.json();
+      })(),
+      new Promise((_, reject) => { timer = window.setTimeout(() => { controller?.abort(); reject(new Error("Directory request timed out")); }, timeoutMs); })
+    ]);
+  } finally { window.clearTimeout(timer); }
+}
+
+async function loadCurrentRosterRecords(options = {}) {
+  const key = currentRosterCacheKey();
+  if (!options.force && state.rosterCache?.key === key && Date.now() - state.rosterCache.loadedAt < DIRECTORY_INDEX_MAX_AGE_MS) return state.rosterCache;
+  if (rosterLoading?.key === key && (!options.force || rosterLoading.force)) return rosterLoading.promise;
+  const pending = { key, force: Boolean(options.force) };
+  pending.promise = (async () => {
+    if (!options.force) {
+      let index;
+      try { index = JSON.parse(localStorage.getItem(ROSTER_INDEX_STORAGE_KEY) || "null"); } catch { /* optional device cache */ }
+      if (!rosterIndexUsable(index)) {
+        try {
+          index = await directoryJson("/data/student-roster-index.json");
+        } catch { index = null; }
+      }
+      if (rosterIndexUsable(index)) {
+        const dates = [...new Set(index.sources.map(source => source.url.match(/(\d{2})[_-](\d{2})[_-](20\d{2})(?:_\d+)?\.pdf/i)?.slice(1).join("-")))].filter(Boolean);
+        const loaded = { key, records: index.records.map(normalizeStudentRecord), loadedBranches: index.sources.map(source => source.branch), unavailableBranches: [], version: `files dated ${dates.join(", ") || index.generatedAt.slice(0, 10)}`, loadedAt: Date.parse(index.generatedAt), indexed: true };
+        if (currentRosterCacheKey() !== key) return loadCurrentRosterRecords();
+        state.rosterCache = loaded;
+        try { localStorage.setItem(ROSTER_INDEX_STORAGE_KEY, JSON.stringify(index)); } catch { /* quota or private mode */ }
+        return loaded;
+      }
+    }
+    const loaded = await fetchCurrentRosterRecords();
+    return loaded;
+  })();
+  rosterLoading = pending;
+  try { return await pending.promise; }
+  finally { if (rosterLoading === pending) rosterLoading = null; }
+}
+
+async function fetchCurrentRosterRecords() {
   const cacheKey = currentRosterCacheKey();
-  if (state.rosterCache?.key === cacheKey && Array.isArray(state.rosterCache.records) && Date.now() - state.rosterCache.loadedAt < 15 * 60 * 1000) return state.rosterCache;
   const discoveredBranches = state.sourceRegistry?.studentSectionSources?.map((source) => source.branch).filter(Boolean) || [];
   const branches = discoveredBranches.length ? discoveredBranches : SECTION_LIST_BRANCHES;
   const rosterLoads = await Promise.race([
@@ -5220,6 +5286,10 @@ async function loadCurrentRosterRecords() {
     loadedAt: Date.now()
   };
   state.rosterCache = loaded;
+  const sources = state.sourceRegistry?.studentSectionSources || [];
+  if (!loaded.unavailableBranches.length && sources.length === SECTION_LIST_BRANCHES.length) {
+    try { localStorage.setItem(ROSTER_INDEX_STORAGE_KEY, JSON.stringify({ schemaVersion: ROSTER_SCHEMA_VERSION, generatedAt: new Date().toISOString(), sources: sources.map(source => ({ ...source, count: loaded.records.filter(record => record.branch === source.branch).length })), records: loaded.records })); } catch { /* optional cache */ }
+  }
   return loaded;
 }
 
@@ -5274,7 +5344,7 @@ function rosterCountAnswer(question = "", rosterData = {}) {
   return `<p><strong><u>${escapeHtml(choice.code)}: ${escapeHtml(String(choice.count))} verified student${choice.count === 1 ? "" : "s"}</u></strong></p><p>${escapeHtml(choice.type[0].toUpperCase() + choice.type.slice(1))} count from the current official GNDEC roster.</p>${partialWarning}<p class="answer-source">Read-only result from current official student rosters (${escapeHtml(rosterData.version || "current")}).</p>`;
 }
 
-async function lookupStudent(name) {
+async function lookupStudent(name, refreshed = false) {
   const query = normalizeStudentName(name);
   const identifierQuery = normalizeStudentIdentifier(name);
   const looksLikeIdentifier = Boolean(identifierQuery && /\d/.test(identifierQuery) && /^[A-Z0-9]+$/.test(identifierQuery));
@@ -5282,13 +5352,14 @@ async function lookupStudent(name) {
   const result = $("student-lookup-result");
   result.textContent = "Checking the current official student rosters...";
   let rosterData;
-  try { rosterData = await loadCurrentRosterRecords(); }
+  try { rosterData = await loadCurrentRosterRecords({ force: refreshed }); }
   catch (error) { throw new Error(`${error.message || "Current official student rosters could not be read."} Your saved profile was not changed.`); }
   const allStudents = rosterData.records;
   const identifierMatches = looksLikeIdentifier ? resolveStudentIdentifierMatches(allStudents, identifierQuery, state.student) : [];
   const exactNameMatches = allStudents.filter((record) => normalizeStudentName(record.name) === query);
   const ranked = query.length >= 3 ? allStudents.map((record) => ({ record, score: studentMatchScore(record, query) })).filter((match) => match.score > 0).sort((a, b) => b.score - a.score || a.record.name.localeCompare(b.record.name)).map((match) => match.record) : [];
   const matches = (identifierMatches.length ? identifierMatches : exactNameMatches.length ? exactNameMatches : ranked).slice(0, 8);
+  if (!matches.length && rosterData.indexed && !refreshed) return lookupStudent(name, true);
   const automaticallySafe = identifierMatches.length === 1 || exactNameMatches.length === 1;
   if (automaticallySafe && matches.length === 1) {
     applyStudentRecord(matches[0]);
@@ -5352,6 +5423,7 @@ function isHolidayCalendarQuestion(question = "") {
 }
 
 function studentLookupRequest(question = "", rememberedRecord = null) {
+  if (facultyRoleRequest(question) || /\b(?:phone|mobile|landline|telephone|office|cabin|email)\b/i.test(question) && !/\b(?:student|mentor|crn|roster)\b/i.test(question)) return null;
   const original = String(question || "").normalize("NFKC").trim();
   const q = canonicalTimetableQuestion(original);
   if (isHolidayCalendarQuestion(q)) return null;
@@ -5456,8 +5528,12 @@ async function resolveChatStudentLookup(question) {
   if (!request) return null;
   if (request.followup && state.rosterLookupConversation?.record) return studentLookupContextFromRecords(question, [], { version: state.rosterLookupConversation.version }, state.rosterLookupConversation.record);
   try {
-    const rosterData = await loadCurrentRosterRecords();
-    const context = studentLookupContextFromRecords(question, rosterData.records, rosterData);
+    let rosterData = await loadCurrentRosterRecords();
+    let context = studentLookupContextFromRecords(question, rosterData.records, rosterData);
+    if (rosterData.indexed && (context?.status === "none" || request.flags?.previousSerials)) {
+      rosterData = await loadCurrentRosterRecords({ force: true });
+      context = studentLookupContextFromRecords(question, rosterData.records, rosterData);
+    }
     if (context?.status === "single") state.rosterLookupConversation = { record: context.records[0], version: context.version };
     else if (context) state.rosterLookupConversation = null;
     return context;
@@ -5516,7 +5592,8 @@ function canonicalFacultyName(value = "") {
 function facultyDetailFlags(question = "") {
   const q = canonicalTimetableQuestion(question);
   const flags = {
-    designation: /\b(?:designation|position|post|rank)\b/.test(q), email: /\b(?:email|mail|contact)\b/.test(q),
+    designation: /\b(?:designation|position|post|rank)\b/.test(q), email: /\b(?:email|mail|contact|phone|mobile|landline|telephone|number)\b/.test(q),
+    contact: /\b(?:email|mail|contact|phone|mobile|landline|telephone|number)\b/.test(q), office: /\b(?:office|cabin)\b/.test(q),
     experience: /\bexperience\b/.test(q), qualifications: /\b(?:qualification|degree|education)\b/.test(q),
     publications: /\b(?:publication|paper|journal|conference)\b/.test(q), memberships: /\b(?:membership|professional body)\b/.test(q),
     research: /\b(?:research|interest|speciali[sz]ation|expertise)\b/.test(q), profile: /\b(?:profile|details?|information|info|about)\b/.test(q)
@@ -5532,10 +5609,12 @@ function facultyLookupRequest(question = "") {
   // Holiday words must always remain on the verified holiday-calendar route;
   // otherwise short phrases such as “next holiday” look like a person's name.
   if (isHolidayCalendarQuestion(q)) return null;
+  const role = facultyRoleRequest(q);
+  if (role) return { role, term: "", fields: facultyDetailFlags(q) };
   const department = FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(q))?.[0] || "";
   let knownTeacher = state.selectedGroup ? referencedTeacherName(q) : "";
   const subjectTeacherCue = /\b(?:who|name|teacher|teachers|faculty|sir|mam|maam|madam|prof|professor|dr|doctor|instructor|teach|teaches|teaching|taught)\b/i.test(q);
-  const professionalDetailCue = /\b(?:email|mail|contact|experience|qualification|degree|education|research|interest|speciali[sz]ation|expertise|publications?|papers?|journal|conference|memberships?|vidwan|profile|details?|information|info|designation|position|post)\b/i.test(q);
+  const professionalDetailCue = /\b(?:phone|mobile|landline|telephone|office|cabin|email|mail|contact|experience|qualification|degree|education|research|interest|speciali[sz]ation|expertise|publications?|papers?|journal|conference|memberships?|vidwan|profile|details?|information|info|designation|position|post)\b/i.test(q);
   const explicitDepartmentCue = /\b(?:department|dept|applied science|computer science|information technology|electrical engineering|civil engineering|mechanical engineering|electronics(?:\s+and|\s*&)?\s+communication)\b/i.test(q);
   const explicitStudentCue = /\b(?:student|roll|crn|urn|roster|registration|classmate|batchmate)\b/i.test(q);
   if (explicitStudentCue && !subjectTeacherCue && !professionalDetailCue) return null;
@@ -5553,11 +5632,11 @@ function facultyLookupRequest(question = "") {
   const listDepartment = Boolean(department && !knownTeacher && /\b(?:list|show|all|who|names?|faculty|staff|teachers?)\b/.test(q) && !professionalDetailCue);
   const facultyCue = /\b(?:faculty|staff|teacher|professor|prof|doctor|sir|mam|maam|madam|hod|dean|instructor|designation|official\s+email|research|qualification|experience|publications?|vidwan)\b|\b(?:dr|prof)\.?\s+[a-z]/i.test(q);
   const plainName = looksLikePlainStudentNameQuery(q);
-  if (!listDepartment && !knownTeacher && !facultyCue && !plainName) return null;
+  if (!listDepartment && !knownTeacher && !facultyCue && !plainName && !professionalDetailCue) return null;
   if (/\b(?:faculty|teacher)\s+timetable\b/.test(q) && !knownTeacher) return null;
   let term = knownTeacher || q
     .replace(/\b(?:find|search|lookup|locate|verify|show|tell|give|please|who|what|which|is|are|about|of|for|the|me|and|ka|ki|ke|da|di|de|all|every|full|complete|official|details?|information|info|profile)\b/g, " ")
-    .replace(/\b(?:faculty|staff|teacher|professor|prof|doctor|sir|mam|maam|madam|hod|dean|instructor|designation|position|post|email|mail|contact|experience|qualification|degree|education|research|interest|specialization|specialisation|expertise|publication|publications|paper|papers|journal|conference|membership|memberships|vidwan)\b/g, " ")
+    .replace(/\b(?:phone|mobile|landline|telephone|number|office|cabin|where|at|faculty|staff|teacher|professor|prof|doctor|sir|mam|maam|madam|hod|dean|instructor|designation|position|post|email|mail|contact|experience|qualification|degree|education|research|interest|specialization|specialisation|expertise|publication|publications|paper|papers|journal|conference|membership|memberships|vidwan)\b/g, " ")
     .replace(/\b(?:dr|er|prof|ar)\.?\b/g, " ")
     .replace(/[^a-z0-9@._+-]+/gi, " ").replace(/\s+/g, " ").trim();
   if (department) {
@@ -5567,20 +5646,75 @@ function facultyLookupRequest(question = "") {
   return { term: canonicalFacultyName(term), department, listDepartment, fields: facultyDetailFlags(q) };
 }
 
-async function loadFacultyDirectory() {
+async function loadFacultyContacts() {
+  if (facultyContacts) return facultyContacts;
+  if (!facultyContactsLoading) facultyContactsLoading = (async () => {
+    const data = await directoryJson("/data/faculty-contacts.json");
+    if (!Array.isArray(data?.roles) || !Array.isArray(data.people)) throw new Error("Faculty contact sources unavailable");
+    facultyContacts = data;
+    return data;
+  })();
+  try { return await facultyContactsLoading; }
+  finally { facultyContactsLoading = null; }
+}
+
+function facultyRoleRequest(question) {
+  const q = canonicalTimetableQuestion(question);
+  const kind = /\b(?:hods?|heads? of departments?|department heads?)\b/.test(q) ? "hod" : /\bdeans?\b/.test(q) ? "dean" : /\bprincipal\b/.test(q) ? "principal" : /\bchief warden\b/.test(q) ? "chief warden" : /\bcontroller of exam(?:ination)?s?\b/.test(q) ? "controller" : "";
+  if (!kind || /\b(?:timetable|schedule|class)\b/.test(q)) return null;
+  let department = FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(q))?.[0] || "";
+  if (kind === "hod" && !department && /\b(?:my|our|mera|hamara|sada)\b/.test(q)) {
+    const branch = activeStudentProfile().branch;
+    department = FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(branch))?.[0] || "";
+  }
+  return { kind, department, question: q };
+}
+
+function facultyRoleLookup(request, data) {
+  let records = data.roles.filter(record => record.role.toLowerCase().startsWith(request.kind));
+  if (request.department) {
+    const wanted = request.department.toLowerCase().replace(/&/g, "and").replace(/ engg\.?/g, " engineering");
+    records = records.filter(record => record.role.toLowerCase().replace(/&/g, "and").includes(wanted) || (wanted === "mechanical engineering" && /mechanical/i.test(record.role)) || (wanted === "computer applications" && /computer applications/i.test(record.role)));
+  }
+  if (request.kind === "dean") {
+    const categories = [[/\bacademic/, /academic/i], [/\b(?:research|consultancy|r&c)\b/, /r&c/i], [/\balumni\b/, /alumni/i], [/\b(?:student|welfare)\b/, /welfare/i], [/\bskill\b/, /skill/i]];
+    const category = categories.find(([pattern]) => pattern.test(request.question));
+    if (category) records = records.filter(record => category[1].test(record.role));
+    else if (!/\b(?:all|list|deans)\b/.test(request.question)) records = [];
+  }
+  return { handled: true, status: "roles", records, query: request.kind, checkedAt: data.checkedAt, source: data.source };
+}
+
+function withFacultyContacts(record) {
+  const person = facultyContacts?.people.find(item => item.profileId === String(record.profileId));
+  const roles = facultyContacts?.roles.filter(item => canonicalFacultyName(item.name) === canonicalFacultyName(record.name)) || [];
+  return { ...record, ...(person || {}), publishedRoles: roles, contactCheckedAt: facultyContacts?.checkedAt || "", contactSource: person?.source || "", phoneSource: person?.phoneSource || "" };
+}
+
+async function loadFacultyDirectory(options = {}) {
   // The bundled file is only an offline starter set. It must never prevent a
   // lookup from fetching GNDEC's complete current public directory.
-  if (state.facultyCache?.records?.length && !state.facultyCache.fallback) return state.facultyCache;
+  if (!options.force && state.facultyCache?.records?.length && !state.facultyCache.fallback) return state.facultyCache;
   const bundledFallback = state.facultyCache?.fallback ? state.facultyCache : null;
   try {
     const stored = JSON.parse(localStorage.getItem(FACULTY_DIRECTORY_STORAGE_KEY) || "null");
-    if (stored && Number.isFinite(stored.savedAt) && Date.now() - stored.savedAt <= FACULTY_DIRECTORY_MAX_AGE_MS && Array.isArray(stored.payload?.records) && stored.payload.records.length) {
+    if (!options.force && stored && Number.isFinite(stored.savedAt) && Date.now() - stored.savedAt <= FACULTY_DIRECTORY_MAX_AGE_MS && Array.isArray(stored.payload?.records) && stored.payload.records.length) {
       state.facultyCache = stored.payload;
       return state.facultyCache;
     }
   } catch { /* a corrupt or blocked cache must never break faculty lookup */ }
   if (facultyDirectoryLoading) return facultyDirectoryLoading;
   facultyDirectoryLoading = (async () => {
+    if (!options.force) {
+      try {
+        const snapshot = await directoryJson("/data/faculty-directory-index.json");
+        const age = Date.now() - Date.parse(snapshot?.generatedAt);
+        if (snapshot?.records?.length && age >= -60000 && age <= DIRECTORY_INDEX_MAX_AGE_MS) {
+          state.facultyCache = { ...snapshot, indexed: true, fallback: false };
+          return state.facultyCache;
+        }
+      } catch { /* live directory remains the fallback */ }
+    }
     const response = await fetch("/api/faculty", { cache: "no-cache" });
     const payload = await response.json();
     if (!response.ok || !Array.isArray(payload.records) || !payload.records.length) throw new Error(payload.error || "Official GNDEC faculty directory could not be read.");
@@ -5637,8 +5771,10 @@ async function resolveChatFacultyLookup(question, options = {}) {
   const request = facultyLookupRequest(question);
   if (!request) return null;
   try {
-    const directory = await loadFacultyDirectory();
-    const records = directory.records.filter((record) => !request.department || record.department === request.department);
+    const directoryPromise = request.role ? null : loadFacultyDirectory({ force: options.refresh });
+    const [directory] = await Promise.all([directoryPromise, loadFacultyContacts().catch(() => null)]);
+    if (request.role) return facultyContacts ? facultyRoleLookup(request.role, facultyContacts) : { handled: true, status: "error", message: "The official administration details could not be loaded." };
+    const records = directory.records.filter((record) => !request.department || record.department === request.department).map(withFacultyContacts);
     if (request.listDepartment) return { handled: true, status: "list", query: request.department, records: records.slice(0, 80), fields: request.fields, source: directory.source, checkedAt: directory.checkedAt, unavailableDepartments: directory.unavailableDepartments || [] };
     if (!request.term) return { handled: true, status: "needs-query", query: "", records: [], fields: request.fields, source: directory.source, checkedAt: directory.checkedAt };
     const exact = records.filter((record) => canonicalFacultyName(record.name) === request.term || normalizeStudentName(record.email) === normalizeStudentName(request.term));
@@ -5646,6 +5782,7 @@ async function resolveChatFacultyLookup(question, options = {}) {
     let matches = exact.length ? exact : ranked.map((item) => item.record);
     if (!exact.length && ranked.length && ranked[0].score >= 180 && (!ranked[1] || ranked[0].score - ranked[1].score >= 40)) matches = [ranked[0].record];
     matches = matches.slice(0, 8);
+    if (!matches.length && directory.indexed && !options.refresh) return resolveChatFacultyLookup(question, { ...options, refresh: true });
     if (matches.length === 1) matches[0] = { ...matches[0], timetableClasses: facultyTimetableClasses(matches[0]) };
     const profilePending = options.includeProfile === false && matches.length === 1 && Boolean(matches[0].profileId) && !(matches[0].photoUrl && (matches[0].qualifications || matches[0].experience || matches[0].researchInterests));
     const lookup = { handled: true, status: matches.length === 1 ? "single" : matches.length ? "multiple" : "none", query: request.term, records: matches, fields: request.fields, source: directory.source, checkedAt: directory.checkedAt, unavailableDepartments: directory.unavailableDepartments || [], profilePending };
@@ -5674,8 +5811,23 @@ function facultyPhotoMarkup(record = {}) {
   return `<figure class="faculty-profile-photo"><a class="faculty-photo-link" href="${safeDirectImageUrl}" target="_blank" rel="noopener noreferrer" aria-label="Open the official profile photo of ${escapeHtml(name)}"><img src="${imageUrl}" data-faculty-photo-fallback="${safeDirectImageUrl}" alt="Official GNDEC profile photo of ${escapeHtml(name)}" width="120" height="140" loading="lazy" decoding="async" referrerpolicy="no-referrer" /></a><figcaption><a href="${safeDirectImageUrl}" target="_blank" rel="noopener noreferrer">Open image</a><span aria-hidden="true"> · </span><a href="${profileUrl}" target="_blank" rel="noopener noreferrer">Official profile ↗</a></figcaption></figure>`;
 }
 
+function facultyContactDetails(record) {
+  const value = text => escapeHtml(text || "Not published in the verified sources");
+  const roles = record.publishedRoles || [];
+  const sources = [...new Set([record.contactSource, record.phoneSource, ...roles.map(role => role.source)].filter(Boolean))];
+  const links = sources.filter(url => { try { const u = new URL(url); return u.protocol === "https:" && (u.hostname === "gndec.ac.in" || u.hostname.endsWith(".gndec.ac.in")); } catch { return false; } }).map(url => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Official contact source ↗</a>`).join(" · ");
+  const roleRows = roles.map(role => `<p><strong>${value(role.role)}</strong>${role.conflict ? `<br />${value(role.conflict)}` : ""}<br />Landline: ${value(role.landline)}<br />Phone: ${value(role.phone)}<br />Email: ${value(role.email)}<br /><small>${value(role.contactScope)}</small></p>`).join("");
+  return `<details class="answer-disclosure faculty-contact-disclosure"><summary><span>Office &amp; contact details</span><b aria-hidden="true">+</b></summary><div class="answer-disclosure-body"><p><strong>Office / Cabin:</strong> ${value(record.office || record.cabin)}<br /><strong>Landline:</strong> ${value(record.landline)}<br /><strong>Phone:</strong> ${value(record.phone)}<br /><strong>Email:</strong> ${value(record.email)}</p>${roleRows}${links ? `<p class="answer-source">${links} · Source snapshot checked ${value(record.contactCheckedAt?.slice(0, 10))}. Role contacts may be shared office lines.</p>` : ""}</div></details>`;
+}
+
+function facultyRoleAnswer(lookup) {
+  if (!lookup.records.length) return `<p>Which ${escapeHtml(lookup.query)} do you mean? Specify the department or responsibility, such as “EC HOD” or “dean academics”. I could not verify a matching appointment from the available official records.</p>`;
+  return `<p><strong>Published GNDEC administration details</strong></p>${lookup.records.map(role => `<p><strong>${escapeHtml(role.role)}</strong><br />${role.conflict ? escapeHtml(role.conflict) : escapeHtml(role.name)}</p>${facultyContactDetails({ name: role.name, publishedRoles: [role], contactCheckedAt: lookup.checkedAt })}`).join("")}<p class="answer-source">Official source snapshot checked ${escapeHtml(lookup.checkedAt?.slice(0, 10) || "date unavailable")}; appointments can change.</p>`;
+}
+
 function legacyFacultyLookupAnswer(lookup) {
   if (!lookup?.handled) return "";
+  if (lookup.status === "roles") return facultyRoleAnswer(lookup);
   const sourceLink = `<a href="${escapeHtml(lookup.source || "https://gndec.ac.in/faculty/")}" target="_blank" rel="noopener noreferrer">Official GNDEC faculty directory ↗</a>`;
   if (lookup.status === "error") return `<p><strong><u>Faculty lookup unavailable</u></strong></p><p>${escapeHtml(lookup.message || "Try again shortly.")}</p>`;
   if (lookup.status === "needs-query") return "<p><strong><u>Which faculty member?</u></strong></p><p>Give a name, department, or official email.</p>";
@@ -5709,7 +5861,7 @@ function legacyFacultyLookupAnswer(lookup) {
     ? `<details class="answer-disclosure faculty-details-disclosure"><summary><span>Professional details${classes.length ? " and class schedule" : ""}</span><b aria-hidden="true">+</b></summary><div class="answer-disclosure-body">${detailContent}</div></details>`
     : `<div class="faculty-inline-details">${detailContent}</div>`;
   const enrichmentStatus = profilePending ? '<p class="answer-source faculty-profile-loading">Showing verified directory facts now. Loading the official professional profile and photo…</p>' : lookup.profileUnavailable ? '<p class="answer-warning">The directory facts are verified, but the detailed official profile is temporarily unavailable.</p>' : "";
-  return `<p><strong><u>Verified GNDEC faculty details</u></strong></p><div class="faculty-answer-layout">${facultyPhotoMarkup(record)}${identity}</div>${enrichmentStatus}${details}<p class="answer-source">${sourceLink}. Professional public information only.</p>`;
+  return `<p><strong><u>Verified GNDEC faculty details</u></strong></p><div class="faculty-answer-layout">${facultyPhotoMarkup(record)}${identity}</div>${facultyContactDetails(record)}${enrichmentStatus}${details}<p class="answer-source">${sourceLink}. Professional public information only.</p>`;
 }
 
 function setActiveFacultyAiContext(record, lookup) {

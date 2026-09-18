@@ -211,12 +211,15 @@ export function parseFacultyProfileHtml(html, profileId = "") {
     ["qualification", "qualifications"], ["no. of publications (journal):", "journalPublications"],
     ["no. of publications (conference):", "conferencePublications"], ["professional memberships:", "memberships"],
     ["research interest", "researchInterests"]
+    , ["office", "office"], ["office / cabin", "office"], ["cabin", "cabin"],
+    ["office phone", "landline"], ["landline", "landline"], ["work phone", "phone"], ["office email", "email"]
   ]);
   for (const row of String(html || "").matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
     const heading = row[1].match(/<th\b[^>]*>([\s\S]*?)<\/th>/i);
     const value = row[1].match(/<td\b[^>]*>([\s\S]*?)<\/td>/i);
     if (!heading || !value) continue;
-    const headingText = textOnly(heading[1]).toLowerCase();
+    const rawHeading = textOnly(heading[1]).toLowerCase();
+    const headingText = allowed.has(rawHeading) ? rawHeading : rawHeading.replace(/:\s*$/, "");
     if (headingText === "photo") {
       const image = value[1].match(/<img\b[^>]*\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i);
       const photoUrl = safeFacultyPhotoUrl(image?.[1] || image?.[2] || image?.[3] || "");
@@ -282,7 +285,7 @@ async function facultyDirectoryResponse(request, ctx) {
 async function facultyProfileResponse(request, ctx, profileId) {
   if (!/^\d{1,8}$/.test(profileId)) return Response.json({ error: "Invalid faculty profile." }, { status: 400 });
   const cache = caches.default;
-  const cacheKey = new Request(`${new URL(request.url).origin}/__gndec-cache/faculty-profile-v1/${profileId}`);
+  const cacheKey = new Request(`${new URL(request.url).origin}/__gndec-cache/faculty-profile-v2/${profileId}`);
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
   try {
