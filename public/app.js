@@ -5412,6 +5412,7 @@ async function lookupStudent(name, refreshed = false) {
   const matches = (identifierMatches.length ? identifierMatches : exactNameMatches.length ? exactNameMatches : ranked).slice(0, 8);
   if (!matches.length && rosterData.indexed && !refreshed) return lookupStudent(name, true);
   const automaticallySafe = identifierMatches.length === 1 || exactNameMatches.length === 1;
+  if (automaticallySafe && matches.length === 1 && rosterData.indexed && !refreshed) return lookupStudent(name, true);
   if (automaticallySafe && matches.length === 1) {
     applyStudentRecord(matches[0]);
     return;
@@ -5581,7 +5582,7 @@ async function resolveChatStudentLookup(question) {
   try {
     let rosterData = await loadCurrentRosterRecords();
     let context = studentLookupContextFromRecords(question, rosterData.records, rosterData);
-    if (rosterData.indexed && (context?.status === "none" || request.flags?.previousSerials)) {
+    if (rosterData.indexed && (context?.status === "single" || context?.status === "none" || request.flags?.previousSerials)) {
       rosterData = await loadCurrentRosterRecords({ force: true });
       context = studentLookupContextFromRecords(question, rosterData.records, rosterData);
     }

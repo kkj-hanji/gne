@@ -13,3 +13,6 @@ git commit -m "chore: sync project changes $(Get-Date -Format 'yyyy-MM-dd HH:mm'
 git push origin $branch
 
 Write-Host "Pushed all changes to origin/$branch"
+
+npm run deploy                                
+                
