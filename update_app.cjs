@@ -16,7 +16,7 @@ function expandRoomLocation(room) {
   if (!room) return "";
   let r = room;
   // Expand common lab abbreviations
-  r = r.replace(/\\bCOMP LAB\\b/gi, "Computer Lab");
+  r = r.replace(/\\bCOMP LAB\\b/gi, "Computational Lab");
   r = r.replace(/\\bMECH LAB\\b/gi, "Mechanical Lab");
   r = r.replace(/\\bCHEM LAB\\b/gi, "Chemistry Lab");
   r = r.replace(/\\bPHY LAB\\b/gi, "Physics Lab");
