@@ -5,7 +5,7 @@ $changes = git status --porcelain
 
 if (-not $changes) {
   Write-Host "No Git changes to push."
-  exit 0
+
 }
 
 git add -A
