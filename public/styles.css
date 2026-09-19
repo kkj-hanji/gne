@@ -246,6 +246,47 @@ button:disabled,input:disabled,select:disabled{opacity:.62;cursor:not-allowed}
 .week-list-body strong{color:var(--text);font-size:14px}
 .week-list-body span{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
 .week-list-empty{padding:8px 0 2px;color:var(--muted);font-size:13px}
+/* Optional timetable views: density changes spacing, never text size. */
+.tt-view-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:12px 0}
+.tt-view-controls[hidden],.tt-view-controls [hidden]{display:none}
+.tt-view-buttons{display:flex;flex-wrap:wrap;gap:6px}
+.tt-view-buttons button{min-height:44px;padding:8px 16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer}
+.tt-view-buttons button[aria-pressed="true"]{border-color:var(--green);color:var(--green);background:rgba(52,211,153,.1)}
+.tt-view-controls .field{max-width:220px}
+.tt-legend,.tt-scroll-hint{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.tt-scroll-hint{flex-basis:100%}
+.tt-experience-setting{margin:16px 0;padding:16px 0;border-block:1px solid var(--line)}
+.tt-experience-setting p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.5}
+.timetable-modern{max-width:100%;min-width:0}
+.timetable-modern-week{max-height:70vh;max-height:70dvh}
+.tt-agenda{padding:12px;display:grid;gap:16px}
+.tt-agenda h3{margin:4px 0 10px;font-size:16px}
+.tt-detail{margin:0 0 8px;border:1px solid var(--line);border-left:3px solid var(--green);border-radius:9px;background:rgba(52,211,153,.08);font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.tt-detail summary{padding:12px;min-height:44px;cursor:pointer}
+.tt-detail summary strong{font-size:14px}
+.tt-detail summary span{display:block;color:var(--muted);font-size:13px}
+.tt-detail dl{margin:0;padding:0 12px 12px}
+.tt-detail dt{font-weight:700;margin-top:6px}
+.tt-detail dd{margin:0;color:var(--muted)}
+.tt-week{width:100%;min-width:810px;table-layout:fixed;border-spacing:0}
+.tt-week caption{text-align:left}
+.tt-week th,.tt-week td{padding:5px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+.tt-week th{background:#1a2536;font-size:13px;padding:10px}
+.tt-week thead th{position:sticky;top:0;z-index:2}
+.tt-week th:first-child{width:96px;position:sticky;left:0;z-index:1}
+.tt-week thead th:first-child{z-index:3}
+.tt-week .tt-detail:last-child{margin-bottom:0}
+.tt-empty{color:var(--muted);font-size:13px}
+body.compact-timetable .tt-detail summary{padding:8px}
+body.compact-timetable .tt-detail dl{padding:0 8px 8px}
+body.compact-timetable .tt-agenda{gap:10px;padding:8px}
+.chat-copy{float:inline-end;display:inline-grid;place-items:center;min-width:36px;min-height:36px;margin:0 0 6px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--muted);font-size:21px;cursor:pointer}
+.chat-copy:hover{color:var(--green);border-color:var(--green)}
+.chat-bubble{display:flow-root}
+.chat-bubble.user .chat-copy{color:#052e1f;border-color:rgba(5,46,31,.4)}
+.chat-bubble.user .chat-copy:hover{background:rgba(5,46,31,.08)}
+.chat-copy:focus-visible,.tt-detail summary:focus-visible,.tt-view-buttons button:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+.chat-copy-buffer{position:fixed;left:-10000px;top:0}
 /* ---------- Buttons ---------- */
 .primary-button,.outline-button,.file-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:12px;font:inherit;font-weight:800;cursor:pointer;white-space:nowrap;transition:filter .15s,border-color .15s,background .15s}
 .primary-button{min-height:44px;padding:0 18px;background:linear-gradient(135deg,var(--green),#10b981);color:#052e1f;box-shadow:0 8px 20px rgba(52,211,153,.25)}

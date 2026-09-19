@@ -15,7 +15,7 @@
     <link rel="manifest" href="manifest.webmanifest?v=20260821-13" />
     <link rel="icon" type="image/svg+xml" href="icon.svg?v=20260821-13" />
     <link rel="apple-touch-icon" href="icon.svg?v=20260821-13" />
-    <link rel="stylesheet" href="styles.css?v=20260918-2" />
+    <link rel="stylesheet" href="styles.css?v=20260919-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -154,6 +154,16 @@
             <p class="timetable-selection-note" id="timetable-selection-note">Used for Timetable, Today and Ask Compass on this device.</p>
           </div>
           <p class="timetable-result-status" id="timetable-result-status" role="status" aria-live="polite">No timetable data loaded yet.</p>
+          <div id="timetable-view-controls" class="tt-view-controls" hidden>
+            <div class="tt-view-buttons" role="group" aria-label="Timetable view">
+              <button type="button" data-timetable-view="day" aria-pressed="false">Day</button>
+              <button type="button" data-timetable-view="list" aria-pressed="false">List</button>
+              <button type="button" data-timetable-view="week" aria-pressed="false">Week</button>
+            </div>
+            <div id="timetable-view-day-field" class="field"><label for="timetable-view-day">Day</label><select id="timetable-view-day"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
+            <p class="tt-legend">L · Lecture &nbsp; T · Tutorial &nbsp; P · Practical / Lab</p>
+            <p id="timetable-scroll-hint" class="tt-scroll-hint" hidden>↔ Scroll sideways for all days. Day and time headers stay visible.</p>
+          </div>
           <div id="week-table" class="week-table" role="region" aria-label="Weekly timetable" aria-describedby="timetable-result-status" tabindex="0"><div class="empty-list">No timetable data loaded yet.</div></div>
           <div id="week-grid-view" class="week-grid-view" role="region" aria-label="Weekly timetable grid" hidden></div>
         </section>
@@ -317,6 +327,17 @@
                 </label>
               </div>
 
+              <div class="field tt-experience-setting">
+                <label for="settings-timetable-experience">Optional timetable experience</label>
+                <select id="settings-timetable-experience" aria-describedby="timetable-experience-help">
+                  <option value="classic">Current layout (existing settings)</option>
+                  <option value="day">Day — one day at a time</option>
+                  <option value="list">List — readable weekly agenda</option>
+                  <option value="week">Week — grid with pinned headers</option>
+                </select>
+                <p id="timetable-experience-help">New views add quick Day / List / Week buttons and expandable class details. Your existing grid and axis choices are kept; choose Current layout to use them again. Compact spacing keeps text the same size in new views.</p>
+              </div>
+
               <div class="settings-row" id="settings-swap-axes-row">
                 <div class="settings-row-text">
                   <strong>Swap Day &amp; Time axes (Transposed Grid)</strong>
@@ -391,6 +412,6 @@
     <script src="schedule-analysis.js?v=20260915-1"></script>
     <script src="academic-calendar.js?v=20260915-1"></script>
     <script src="room-availability.js?v=20260918-2"></script>
-    <script src="app.js?v=20260918-2"></script>
+    <script src="app.js?v=20260919-1"></script>
   </body>
 </html>

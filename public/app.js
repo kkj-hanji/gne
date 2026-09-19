@@ -53,6 +53,7 @@ function defaultSettings() {
     compactTimetable: false,
     timetableGridView: true,
     timetableSwapAxes: false,
+    timetableExperience: "classic",
     reduceMotion: false,
     attendanceTarget: 76,
     attendanceAlerts: true,
@@ -1258,11 +1259,51 @@ function renderDaySchedule() {
     : `<article class="schedule-item ${isToday && item.start <= now.minutes && item.end > now.minutes ? "current" : ""}"><div class="schedule-time">${humanTime(item.start)}<br /><span>${humanTime(item.end)}</span></div><div><div class="schedule-name">${escapeHtml(item.subject)}</div><div class="schedule-sub">${escapeHtml(classTypeLabel(item.type))}</div></div><div class="schedule-teacher">${escapeHtml(item.teacher)}</div><div class="schedule-room">${escapeHtml(expandRoomLocation(item.room))}</div></article>`).join("") : "<div class=\"empty-list\">No classes are listed for this day.</div>";
 }
 
+// Optional views share the exact same filtered schedule as the original layout.
+let timetableViewDay = "";
+function renderTimetableExperience(mode, classes) {
+  const controls = $("timetable-view-controls");
+  const table = $("week-table");
+  if (!table) return;
+  const modern = mode !== "classic";
+  if (controls) controls.hidden = !modern;
+  table.classList.toggle("timetable-modern", modern);
+  table.classList.toggle("timetable-modern-week", mode === "week");
+  table.setAttribute("aria-label", modern ? `${mode} timetable` : "Weekly timetable");
+  if (!modern) return;
+  const days = [...DAY_NAMES, "Saturday", "Sunday"];
+  const today = getIndiaNow().day;
+  const day = days.includes(timetableViewDay) ? timetableViewDay : today;
+  controls?.querySelectorAll("[data-timetable-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.timetableView === mode)));
+  const daySelect = $("timetable-view-day");
+  if (daySelect) daySelect.value = day;
+  if ($("timetable-view-day-field")) $("timetable-view-day-field").hidden = mode !== "day";
+  if ($("timetable-scroll-hint")) $("timetable-scroll-hint").hidden = mode !== "week";
+  const sorted = (entries) => [...entries].sort((a, b) => a.start - b.start || a.subject.localeCompare(b.subject));
+  const card = (entry, continuing = false) => `<details class="tt-detail"><summary><strong>${escapeHtml(entry.subject)}</strong><span>${continuing ? "Continues · " : ""}${humanTime(entry.start)}–${humanTime(entry.end)}</span><span>${escapeHtml(entry.room || "Room not listed")}${entry.type ? ` · ${escapeHtml(classTypeLabel(entry.type))}` : ""}</span></summary><dl><dt>Teacher</dt><dd>${escapeHtml(entry.teacher || "Not listed")}</dd><dt>Section / subsection</dt><dd>${escapeHtml(entry.cohorts || entry.group || "Not listed")}</dd><dt>Day</dt><dd>${escapeHtml(entry.day)}</dd><dt>Duration</dt><dd>${entry.end - entry.start} minutes</dd></dl></details>`;
+  const shown = mode === "day" ? classes.filter((entry) => entry.day === day) : classes;
+  const status = $("timetable-result-status");
+  if (status) status.textContent = `${shown.length} ${shown.length === 1 ? "class" : "classes"}${mode === "day" ? ` on ${day}` : " in the weekly schedule"}. Tap a class for details. Weekly pattern; dated notices may change classes.`;
+  table.hidden = false;
+  if (mode === "week") {
+    const times = [...new Set([...BELL_STARTS, ...classes.map((entry) => entry.start)])].sort((a, b) => a - b);
+    table.innerHTML = `<table class="tt-week"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(activeTimetableLabel())}</caption><thead><tr><th scope="col">Time</th>${DAY_NAMES.map((name) => `<th scope="col">${name}</th>`).join("")}</tr></thead><tbody>${times.map((time) => `<tr><th scope="row">${humanTime(time)}</th>${DAY_NAMES.map((name) => `<td>${sorted(classes.filter((entry) => entry.day === name && entry.start <= time && entry.end > time)).map((entry) => card(entry, entry.start < time)).join("") || '<span class="tt-empty">No class listed</span>'}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  } else {
+    table.innerHTML = `<div class="tt-agenda">${(mode === "day" ? [day] : DAY_NAMES).map((name) => `<section><h3>${name}${name === today ? " · Today" : ""}</h3>${sorted(shown.filter((entry) => entry.day === name)).map((entry) => card(entry)).join("") || '<p class="tt-empty">No class listed for this day.</p>'}</section>`).join("")}</div>`;
+  }
+}
+
 function renderWeek() {
   const group = $("timetable-group").value || state.selectedGroup;
   const weekTable = $("week-table");
   const weekGridView = $("week-grid-view");
   const classes = DAY_NAMES.flatMap((day) => classFor(group, day));
+  const experience = ["day", "list", "week"].includes(state.settings?.timetableExperience) ? state.settings.timetableExperience : "classic";
+  renderTimetableExperience(experience, classes);
+  if (experience !== "classic") {
+    if (weekGridView) { weekGridView.hidden = true; weekGridView.innerHTML = ""; }
+    return;
+  }
   const resultStatus = $("timetable-result-status");
   if (!classes.length) {
     if (weekTable) {
@@ -4564,6 +4605,7 @@ function saveSettings(patch = {}) {
     || Object.prototype.hasOwnProperty.call(patch, "showHinglishChips")
     || Object.prototype.hasOwnProperty.call(patch, "showDynamicChips")) renderQuestionChips();
   if (Object.prototype.hasOwnProperty.call(patch, "timetableGridView")
+    || Object.prototype.hasOwnProperty.call(patch, "timetableExperience")
     || Object.prototype.hasOwnProperty.call(patch, "timetableSwapAxes")
     || Object.prototype.hasOwnProperty.call(patch, "compactTimetable")) {
     renderWeek();
@@ -4610,6 +4652,8 @@ function renderSettingsPage() {
   const restHoli = $("settings-restricted-holidays");
   if (restHoli) restHoli.checked = s.showRestrictedHolidays !== false;
   const ttGrid = $("settings-timetable-grid");
+  const experience = $("settings-timetable-experience");
+  if (experience) experience.value = ["day", "list", "week"].includes(s.timetableExperience) ? s.timetableExperience : "classic";
   if (ttGrid) ttGrid.checked = s.timetableGridView !== false;
   const swapRow = $("settings-swap-axes-row");
   if (swapRow) swapRow.hidden = s.timetableGridView === false;
@@ -5942,6 +5986,66 @@ function safeStoredChatHtml(value) {
   return container.innerHTML;
 }
 
+function addChatCopyButton(bubble) {
+  if (bubble.classList.contains("thinking") || bubble.classList.contains("streaming") || bubble.querySelector(".chat-copy")) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "chat-copy";
+  const label = bubble.classList.contains("user") ? "Copy question" : "Copy main answer";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.innerHTML = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
+  bubble.prepend(button);
+}
+
+function chatCopyText(bubble) {
+  const content = bubble.cloneNode(true);
+  content.querySelectorAll(".chat-copy, script, style").forEach((node) => node.remove());
+  if (!bubble.classList.contains("user")) {
+    // Retain caveats, source dates, and uncertainty: those can change the meaning.
+    // Remove suggestions and model diagnostics, not factual warnings or citations.
+    content.querySelectorAll(".kb-followups, .answer-model").forEach((node) => node.remove());
+    content.querySelectorAll(".answer-source").forEach((node) => {
+      if (node.textContent.trim() === "Official GNDEC weekly timetable.") node.remove();
+    });
+  }
+  const blocks = new Set(["P", "DIV", "SECTION", "ARTICLE", "LI", "UL", "OL", "H1", "H2", "H3", "H4", "TR", "DETAILS", "SUMMARY", "DT", "DD"]);
+  const plain = (node) => {
+    if (node.nodeType === 3) return node.textContent;
+    if (node.nodeName === "BR") return "\n";
+    const value = [...node.childNodes].map(plain).join("");
+    if (node.nodeName === "TD" || node.nodeName === "TH") return `${value}\t`;
+    return blocks.has(node.nodeName) ? `\n${value}\n` : value;
+  };
+  return plain(content).replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+async function copyChatBubble(button) {
+  const bubble = button.closest(".chat-bubble");
+  if (!bubble) return;
+  const value = chatCopyText(bubble);
+  if (!value) { showToast("There is no answer text to copy yet."); return; }
+  let copied = false;
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      copied = true;
+    }
+  } catch { /* Try the local browser fallback when clipboard permission is blocked. */ }
+  if (!copied) {
+    const previousFocus = document.activeElement;
+    const field = document.createElement("textarea");
+    field.value = value;
+    field.className = "chat-copy-buffer";
+    field.setAttribute("aria-label", "Text to copy");
+    document.body.appendChild(field);
+    try { field.select(); copied = document.execCommand?.("copy") === true; }
+    catch { copied = false; }
+    finally { field.remove(); previousFocus?.focus?.({ preventScroll: true }); }
+  }
+  showToast(copied ? (bubble.classList.contains("user") ? "Question copied" : "Main answer copied") : "Copy was blocked by your browser. Select the text to copy it manually.");
+}
+
 function ensureChatBubble(role, html) {
   const windowEl = $("chat-window");
   const welcome = $("chat-welcome");
@@ -5951,6 +6055,7 @@ function ensureChatBubble(role, html) {
   bubble.setAttribute("role", "article");
   bubble.setAttribute("aria-label", role.includes("user") ? "You" : role.includes("thinking") ? "Compass is working" : "Compass");
   bubble.innerHTML = html;
+  addChatCopyButton(bubble);
   if (windowEl) {
     windowEl.appendChild(bubble);
     windowEl.scrollTop = windowEl.scrollHeight;
@@ -5961,10 +6066,12 @@ function ensureChatBubble(role, html) {
 function persistChat() {
   const windowEl = $("chat-window");
   if (!windowEl) return;
-  const messages = [...windowEl.querySelectorAll(".chat-bubble")].slice(-MAX_CHAT_MESSAGES).map((bubble) => ({
-    role: bubble.classList.contains("user") ? "user" : "assistant",
-    html: bubble.innerHTML.slice(0, MAX_CHAT_MESSAGE_HTML)
-  }));
+  const messages = [...windowEl.querySelectorAll(".chat-bubble")].slice(-MAX_CHAT_MESSAGES).map((bubble) => {
+    addChatCopyButton(bubble);
+    const content = bubble.cloneNode(true);
+    content.querySelectorAll(".chat-copy").forEach((button) => button.remove());
+    return { role: bubble.classList.contains("user") ? "user" : "assistant", html: content.innerHTML.slice(0, MAX_CHAT_MESSAGE_HTML) };
+  });
   try { localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages)); } catch { /* storage full or blocked */ }
 }
 
@@ -6135,6 +6242,7 @@ async function unlockAdminAi() {
     bubble.className = "chat-bubble assistant";
     bubble.innerHTML = `<p><strong><u>Admin unlock failed.</u></strong></p><p>${escapeHtml(error.message || "Check this device's saved profile.")}</p>`;
   }
+  addChatCopyButton(bubble);
 }
 
 let activeToastTimeout = null;
@@ -6516,6 +6624,21 @@ function registerOfflineShell() {
 }
 
 function initEvents() {
+  $("settings-timetable-experience")?.addEventListener("change", (event) => {
+    saveSettings({ timetableExperience: event.target.value });
+  });
+  $("timetable-view-controls")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-timetable-view]");
+    if (button) saveSettings({ timetableExperience: button.dataset.timetableView });
+  });
+  $("timetable-view-day")?.addEventListener("change", (event) => {
+    timetableViewDay = event.target.value;
+    renderWeek();
+  });
+  $("chat-window")?.addEventListener("click", (event) => {
+    const button = event.target.closest(".chat-copy");
+    if (button) { event.preventDefault(); void copyChatBubble(button); }
+  });
   // The HTML datalist is a no-script/older-browser fallback. Once the richer
   // accessible listbox is running, detach it to avoid two dropdowns at once.
   if ($("question-live-suggestions")) $("question-input")?.removeAttribute("list");
