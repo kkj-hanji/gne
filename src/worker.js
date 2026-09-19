@@ -793,92 +793,36 @@ export default {
       if (!adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
       try {
         const response = await fetch("https://gndec.ac.in/?q=holidays", { headers: { "Accept": "text/html" }, cf: { cacheTtl: 3600 } });
-        const html = response.ok ? await response.text() : "";
-        const hasOfficialDoc = /LoH26\.pdf|acjul-dec26\.pdf|holidays/i.test(html);
+        if (!response.ok) throw new Error("Official holiday page could not be fetched.");
+        const html = await response.text();
+        const hasOfficialDoc = /href\s*=\s*["'](?:https:\/\/(?:www\.)?gndec\.ac\.in)?\/sites\/default\/files\/LoH26\.pdf["']/i.test(html);
         return Response.json({
           ok: true,
-          status: "verified",
+          status: hasOfficialDoc ? "document_link_detected" : "document_link_not_found",
+          verified: false,
+          synchronized: false,
           sourceUrl: "https://gndec.ac.in/?q=holidays",
-          calendarPdfUrl: "https://gndec.ac.in/sites/default/files/LoH26.pdf",
+          calendarPdfUrl: hasOfficialDoc ? "https://gndec.ac.in/sites/default/files/LoH26.pdf" : null,
           fetchedAt: new Date().toISOString(),
           officialCalendarDetected: hasOfficialDoc,
-          message: "Official GNDEC holiday list verified and synchronized with kernel registry."
+          message: hasOfficialDoc ? "The official page links to the holiday PDF. Its contents were not checked or synchronized by this request." : "The page was fetched, but the expected holiday PDF link was not found. No holiday data was verified or changed."
         });
       } catch (error) {
         return Response.json({ ok: false, error: error.message || "Failed to fetch holidays" }, { status: 502 });
       }
     }
 
-    if (url.pathname === "/api/admin/ai/roster-qa") {
+    const unavailableAdminTools = new Set([
+      "roster-qa", "syllabus-gaps", "notice-summarizer", "alias-builder",
+      "query-log-analyzer", "translation-assistant", "debug-replay"
+    ]);
+    if (url.pathname.startsWith("/api/admin/ai/") && unavailableAdminTools.has(url.pathname.slice("/api/admin/ai/".length))) {
       if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
       return Response.json({
-        ok: true,
-        checkedAt: new Date().toISOString(),
-        branchesChecked: STUDENT_BRANCHES,
-        duplicateNamesFound: 0,
-        unmatchedRegistrations: 0,
-        status: "All current branch rosters are consistent."
-      });
-    }
-
-    if (url.pathname === "/api/admin/ai/syllabus-gaps") {
-      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
-      return Response.json({
-        ok: true,
-        checkedAt: new Date().toISOString(),
-        subjectsWithFullUnits: 33,
-        subjectsWithoutUnits: 0,
-        status: "All 33 first-year courses have complete unit and course outcome breakdowns."
-      });
-    }
-
-    if (url.pathname === "/api/admin/ai/notice-summarizer") {
-      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
-      return Response.json({
-        ok: true,
-        checkedAt: new Date().toISOString(),
-        noticesSummarized: 0,
-        summary: "No urgent schedule change circulars currently active."
-      });
-    }
-
-    if (url.pathname === "/api/admin/ai/alias-builder") {
-      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
-      return Response.json({
-        ok: true,
-        languages: ["Hinglish", "English", "Punjabi", "Hindi"],
-        totalPhraseAliases: 120,
-        status: "Multilingual normalization tables synchronized with kernel."
-      });
-    }
-
-    if (url.pathname === "/api/admin/ai/query-log-analyzer") {
-      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
-      return Response.json({
-        ok: true,
-        handledRate: 0.992,
-        topIntents: ["DAY_SCHEDULE", "UPCOMING_CLASS", "HOLIDAY_DATE_CHECK", "ACADEMIC_CGPA_CALCULATION", "TIMETABLE_COMPARISON"],
-        avgProcessingMs: 1.4
-      });
-    }
-
-    if (url.pathname === "/api/admin/ai/translation-assistant") {
-      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
-      return Response.json({
-        ok: true,
-        supportedTargetLanguages: ["Hindi", "Punjabi", "Hinglish"],
-        status: "Ready for translation requests."
-      });
-    }
-
-    if (url.pathname === "/api/admin/ai/debug-replay") {
-      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
-      return Response.json({
-        ok: true,
-        replayedAt: new Date().toISOString(),
-        testedVersions: ["2.2.0", "1.2.0", "2.12.0", "legacy"],
-        status: "Determinism verified across all brain versions."
-      });
+        ok: false,
+        status: "not_implemented",
+        error: "This admin operation has no implemented execution or verification yet. No audit, update or replay was performed."
+      }, { status: 501 });
     }
 
     if (url.pathname === "/api/sources") {

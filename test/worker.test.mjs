@@ -274,10 +274,36 @@ test("admin API token is required and accepts the owner's casing variants", asyn
       method: "POST",
       headers: { "Authorization": `Bearer ${suppliedToken}` }
     }), { ADMIN_API_TOKEN: "kkj" }, { waitUntil() {} });
-    assert.equal(response.status, 200, suppliedToken);
+    assert.equal(response.status, 501, suppliedToken);
   }
   const missingSecret = await worker.fetch(new Request(endpoint, { method: "POST", headers: { "Authorization": "Bearer kkj" } }), {}, { waitUntil() {} });
   assert.equal(missingSecret.status, 401);
   const wrongToken = await worker.fetch(new Request(endpoint, { method: "POST", headers: { "X-Compass-Admin-Key": "not-kkj" } }), { ADMIN_API_TOKEN: "kkj" }, { waitUntil() {} });
   assert.equal(wrongToken.status, 401);
+});
+
+test("unimplemented admin tools never report fabricated audit results or measurements", async () => {
+  for (const tool of ['roster-qa','syllabus-gaps','notice-summarizer','alias-builder','query-log-analyzer','translation-assistant','debug-replay']) {
+    const response = await worker.fetch(new Request(`https://compass.test/api/admin/ai/${tool}`, { method: 'POST', headers: { Authorization: 'Bearer test-token' } }), { ADMIN_API_TOKEN: 'test-token' }, { waitUntil() {} });
+    assert.equal(response.status, 501);
+    const data = await response.json();
+    assert.equal(data.ok, false); assert.equal(data.status, 'not_implemented');
+    assert.doesNotMatch(JSON.stringify(data), /handledRate|avgProcessingMs|duplicateNamesFound|subjectsWithFullUnits|replayedAt|noticesSummarized/);
+  }
+});
+
+test("holiday admin fetch reports page evidence without claiming PDF verification or synchronization", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const [body, status, detected] of [['Upstream unavailable', 503, false], ['<h1>Holidays</h1>', 200, false], ['<a href="/sites/default/files/LoH26.pdf">Holidays</a>', 200, true]]) {
+      globalThis.fetch = async () => new Response(body, { status });
+      const response = await worker.fetch(new Request('https://compass.test/api/admin/ai/holidays-fetch', { headers: { Authorization: 'Bearer test-token' } }), { ADMIN_API_TOKEN: 'test-token' }, { waitUntil() {} });
+      assert.equal(response.status, status === 200 ? 200 : 502);
+      const data = await response.json();
+      if (status !== 200) { assert.equal(data.ok, false); continue; }
+      assert.equal(data.officialCalendarDetected, detected);
+      assert.equal(data.verified, false); assert.equal(data.synchronized, false);
+      assert.equal(data.calendarPdfUrl, detected ? 'https://gndec.ac.in/sites/default/files/LoH26.pdf' : null);
+    }
+  } finally { globalThis.fetch = originalFetch; }
 });
