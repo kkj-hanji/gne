@@ -29,8 +29,9 @@ test('roster index: one download for concurrent lookups; device cache works with
   h.context.fetch = () => { throw new Error('Offline'); };
   assert.equal((await h.dir.loadCurrentRosterRecords()).records.length, 7);
   const lookup = await h.dir.resolveChatStudentLookup('find EC TEST STUDENT');
-  assert.equal(lookup.status, 'single');
-  assert.equal(lookup.records[0].subsection, 'ECB1');
+  // Exact personal details require the existing live PDF recheck.
+  assert.equal(lookup.status, 'error');
+  assert.equal(lookup.records.length, 0);
 });
 
 test('roster index rejects outdated, partial, changed-source and malformed data', () => {

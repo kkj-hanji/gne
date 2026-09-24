@@ -863,3 +863,5 @@ body.compact-timetable .transposed-grid > div {
 body.compact-timetable .transposed-cell {
   min-height: 60px;
 }
+/* Keep saved relative-date answers visibly tied to their original question. */
+.chat-timestamp { display: block; margin-top: .75rem; font-size: .72rem; opacity: .72; }

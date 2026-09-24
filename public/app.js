@@ -898,6 +898,7 @@ function requestedOfficialTimetableView(question = "") {
   if (/\b(?:my|mine|our|i|we|me)\b/.test(q) && globalThis.CompassScheduleAnalysis?.request(q)?.operation === "rank") return "";
   const timetableWords = /\b(?:time\s*table|timetable|schedule|class(?:es)?)\b/i.test(q);
   if (!timetableWords) return "";
+  if (/\b[fsga]\d{1,3}[a-z]?\b/.test(q) && /\b(?:timetable|schedule)\b/.test(q) && !/\b(?:my|mine|our|teacher|faculty|subject|course|section|group)\b/.test(q)) return "rooms";
   if (isExplicitTeacherTimetableQuestion(q)) return "teachers";
   if (/\broom\b/.test(q) || /\b(?:venue|location)\s+(?:timetable|schedule)\b/.test(q)) return "rooms";
   if (/\b(?:subject|course)\b/.test(q) && /\b(?:timetable|schedule)\b/.test(q)) return "subjects";
@@ -2336,6 +2337,7 @@ function canonicalTimetableQuestion(question = "") {
     .replace(/\b(?:padhata|padhati|padhate|padhaata|padhaati|padhaunda|padhaundi|padhonda|padhondi)\b/g, "teaches")
     .replace(/\b(?:aur|atte)\b/g, "and")
     .replace(/\b(?:syllbus|sylabus|syllubus)\b/g, "syllabus")
+    .replace(/\b([fsga])\s+(\d{1,3}[a-z]?)\b/g, "$1$2")
     .replace(/\b(?:subjet|subjets|subect)\b/g, "subject")
     .replace(/\s+/g, " ").trim();
 }
@@ -4330,7 +4332,7 @@ function answerFromKnowledgeBase(question) {
   const academic = academicCalendarAnswer(question);
   if (academic) return { reply: academic, source: "Official GNDEC Academic Section" };
   const exams = examQuestionAnswer(question);
-  if (exams) return { reply: exams, source: `Supplied GNDEC date sheet · ${globalThis.CompassExams.source.issued}` };
+  if (exams) return { reply: exams, source: `Supplied GNDEC date sheet · ${globalThis.CompassPracticals?.matches(question) ? globalThis.CompassPracticals.source.issued : globalThis.CompassExams.source.issued}` };
   const hasExplicitSyllabusCourse = state.syllabus.length && syllabusCoursesForQuestion(question).length > 0;
   const syllabusFollowup = hasExplicitSyllabusCourse ? "" : answerSyllabusFollowup(question);
   if (syllabusFollowup) return { reply: `${syllabusFollowup}${followupSuggestions(question)}`, source: "Official GNDEC syllabus" };
@@ -4846,6 +4848,7 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 // engine is always retained as the transparent fallback.
 function prepareCompassQuestion(question) {
   let q = canonicalTimetableQuestion(question);
+  if (globalThis.CompassPracticals?.matches(q)) return q;
   if (globalThis.CompassRoomAvailability?.matches(q)) return q;
   if (globalThis.CompassAcademicCalendar?.matches(q)) return q;
   if (isTomorrowCardQuestion(q)) return q;
@@ -4972,6 +4975,16 @@ function academicCalendarAnswer(question) {
 }
 
 function examQuestionAnswer(question) {
+  const practical = globalThis.CompassPracticals;
+  if (practical?.matches(question)) {
+    const today = indiaCalendarDate(0).date.toISOString().slice(0, 10);
+    const q = canonicalTimetableQuestion(question);
+    const result = practical.resolve(q, { section: state.selectedGroup, today, minutes: getIndiaNow().minutes,
+      temporal: globalThis.CompassBrainKernel?.resolveTemporalQuery?.(`${q} date`, today) });
+    if (!result) return "";
+    const rows = result.workshops.map(row => `<p><strong>${escapeHtml(row.section)}1 / ${escapeHtml(row.section)}2 · ${escapeHtml(row.date)} · Manufacturing Practices (Workshops)</strong><br />Periods ${escapeHtml(row.periods)} · ${escapeHtml(row.correctedTime || row.printedTime)}${row.end === null ? '<br /><strong>End time unconfirmed:</strong> the handwritten AM/PM conflicts with the printed period numbers. Confirm with the workshop in-charge.' : ""}</p>`).join("");
+    return `<p><strong>${escapeHtml(result.source.title)}</strong></p>${result.message ? `<p>${escapeHtml(result.message)}</p>` : ""}${rows}<p class="answer-source"><a href="${result.source.url}" target="_blank" rel="noopener noreferrer">Read the transcribed notices</a><br />${escapeHtml(result.source.provenance)} Times are IST. Later notices may revise this schedule.</p>`;
+  }
   const exams = globalThis.CompassExams;
   if (!exams?.matches(question)) return "";
   const today = indiaCalendarDate(0).date.toISOString().slice(0, 10);
@@ -5684,6 +5697,8 @@ function facultyDetailFlags(question = "") {
 
 function facultyLookupRequest(question = "") {
   const q = canonicalTimetableQuestion(question);
+  // Course content must not become a person lookup just because it says details.
+  if (/\b(?:units?|chapters?|syllabus|course\s+outcomes?|textbooks?)\b/.test(q) && !/\b(?:teacher|faculty|professor|who\s+teaches)\b/.test(q)) return null;
   // Holiday words must always remain on the verified holiday-calendar route;
   // otherwise short phrases such as “next holiday” look like a person's name.
   if (isHolidayCalendarQuestion(q)) return null;
@@ -5966,6 +5981,7 @@ function safeStoredChatHtml(value) {
   const allowedTags = new Set(["A", "B", "BR", "BUTTON", "DETAILS", "DIV", "EM", "FIGCAPTION", "FIGURE", "H2", "H3", "HEADER", "IMG", "LI", "OL", "P", "SECTION", "SMALL", "SPAN", "STRONG", "SUMMARY", "U", "UL"]);
   const allowedAttributes = new Set(["alt", "aria-hidden", "aria-label", "aria-selected", "class", "data-faculty-photo-fallback", "data-kb-followup", "decoding", "height", "href", "loading", "open", "referrerpolicy", "rel", "role", "src", "target", "title", "type", "width"]);
   const officialUrl = (raw) => {
+    if (/^\/(?:notices\/mse1-practicals-2026\.html|data\/mse1-sem1-2026-09-14\.pdf)$/.test(String(raw || ""))) return true;
     if (/^\/api\/faculty\/photo\?id=\d{1,8}$/.test(String(raw || ""))) return true;
     try {
       const url = new URL(raw, location.origin);
@@ -6001,7 +6017,7 @@ function addChatCopyButton(bubble) {
 
 function chatCopyText(bubble) {
   const content = bubble.cloneNode(true);
-  content.querySelectorAll(".chat-copy, script, style").forEach((node) => node.remove());
+  content.querySelectorAll(".chat-copy, .chat-timestamp, script, style").forEach((node) => node.remove());
   if (!bubble.classList.contains("user")) {
     // Retain caveats, source dates, and uncertainty: those can change the meaning.
     // Remove suggestions and model diagnostics, not factual warnings or citations.
@@ -6047,7 +6063,16 @@ async function copyChatBubble(button) {
   showToast(copied ? (bubble.classList.contains("user") ? "Question copied" : "Main answer copied") : "Copy was blocked by your browser. Select the text to copy it manually.");
 }
 
-function ensureChatBubble(role, html) {
+function renderChatTimestamp(bubble) {
+  bubble.querySelectorAll(".chat-timestamp").forEach(node => node.remove());
+  const date = new Date(bubble.dataset.createdAt || "");
+  const stamp = document.createElement("small");
+  stamp.className = "chat-timestamp";
+  stamp.textContent = Number.isNaN(date.getTime()) ? "Saved conversation · date not recorded" : new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(date) + " IST";
+  bubble.appendChild(stamp);
+}
+
+function ensureChatBubble(role, html, createdAt = new Date().toISOString()) {
   const windowEl = $("chat-window");
   const welcome = $("chat-welcome");
   if (welcome) welcome.hidden = true;
@@ -6056,6 +6081,8 @@ function ensureChatBubble(role, html) {
   bubble.setAttribute("role", "article");
   bubble.setAttribute("aria-label", role.includes("user") ? "You" : role.includes("thinking") ? "Compass is working" : "Compass");
   bubble.innerHTML = html;
+  bubble.dataset.createdAt = createdAt || "";
+  renderChatTimestamp(bubble);
   addChatCopyButton(bubble);
   if (windowEl) {
     windowEl.appendChild(bubble);
@@ -6068,10 +6095,11 @@ function persistChat() {
   const windowEl = $("chat-window");
   if (!windowEl) return;
   const messages = [...windowEl.querySelectorAll(".chat-bubble")].slice(-MAX_CHAT_MESSAGES).map((bubble) => {
+    renderChatTimestamp(bubble);
     addChatCopyButton(bubble);
     const content = bubble.cloneNode(true);
-    content.querySelectorAll(".chat-copy").forEach((button) => button.remove());
-    return { role: bubble.classList.contains("user") ? "user" : "assistant", html: content.innerHTML.slice(0, MAX_CHAT_MESSAGE_HTML) };
+    content.querySelectorAll(".chat-copy, .chat-timestamp").forEach((button) => button.remove());
+    return { role: bubble.classList.contains("user") ? "user" : "assistant", createdAt: bubble.dataset.createdAt || "", html: content.innerHTML.slice(0, MAX_CHAT_MESSAGE_HTML) };
   });
   try { localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages)); } catch { /* storage full or blocked */ }
 }
@@ -6082,7 +6110,7 @@ function restoreChat() {
     if (!Array.isArray(saved) || !saved.length) return;
     saved.slice(-MAX_CHAT_MESSAGES).forEach((message) => {
       if (!message || typeof message.html !== "string") return;
-      ensureChatBubble(message.role === "user" ? "user" : "assistant", safeStoredChatHtml(message.html));
+      ensureChatBubble(message.role === "user" ? "user" : "assistant", safeStoredChatHtml(message.html), message.createdAt || "");
     });
     // Model diagnostics are visible only on an enrolled Kaushik admin device.
     const windowEl = $("chat-window");
@@ -6290,9 +6318,22 @@ async function refreshAcademicOverlay() {
 }
 
 async function loadSourceRegistry({ refresh = false } = {}) {
-  const response = await fetch(`/api/sources${refresh ? "?refresh=1" : ""}`, { cache: "no-cache" });
-  if (!response.ok) throw new Error("Unable to check official GNDEC sources.");
-  state.sourceRegistry = await response.json();
+  let registry;
+  // Some browsers/proxies return a cached HTML page for an API URL. Retry
+  // once at a fresh URL, and never replace a usable registry with that page.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const query = new URLSearchParams(refresh ? { refresh: "1" } : {});
+    if (attempt) query.set("retry", String(Date.now()));
+    const response = await fetch(`/api/sources${query.toString() ? `?${query}` : ""}`, { cache: "no-store", headers: { Accept: "application/json" } });
+    const text = await response.text();
+    if (response.ok && !/^\s*</.test(text)) {
+      try { registry = JSON.parse(text); } catch { registry = null; }
+      if (registry && typeof registry.version === "string" && Array.isArray(registry.sources) && ["groups", "subgroups"].every(id => registry.sources.some(source => source?.id === id && /^https:\/\/appsc\.gndec\.ac\.in\//.test(source.url || "")))) break;
+    }
+    registry = null;
+  }
+  if (!registry) throw new Error("The update service returned an unreadable response. Try again with browser data-saving mode off, or open Compass in Chrome or Edge.");
+  state.sourceRegistry = registry;
   renderStatus();
   renderReferenceLinks();
   return state.sourceRegistry;
@@ -6362,36 +6403,37 @@ function currentTimetableNoticeLinks(extraLinks = [], occupiedUrls = [], current
 
 function renderReferenceLinks() {
   const container = $("reference-links");
-  if (!container || !state.sourceRegistry) return;
+  if (!container) return;
+  const registry = state.sourceRegistry || {};
   const makeLink = (link, prominent = false) => `<a class="${prominent ? "reference-link prominent" : "reference-link"}" href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer noopener"><span>${escapeHtml(link.label)}${link.note ? `<small>${escapeHtml(link.note)}</small>` : ""}</span><b aria-hidden="true">↗</b></a>`;
   const makeGroup = (title, note, links, prominent = false) => links.length ? `<section class="reference-group"><div class="reference-group-head"><div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(note)}</p></div></div><div class="reference-link-grid">${links.map((link, index) => makeLink(link, prominent && index === 0)).join("")}</div></section>` : "";
   const timetableOrder = ["groups", "subgroups", "subjects", "teachers", "rooms", "years"];
-  const timetable = timetableOrder.map((id) => (state.sourceRegistry.sources || []).find((source) => source.id === id)).filter(Boolean).map((source) => ({ ...source, note: source.verified ? "Verified current view" : "Official timetable view" }));
+  const timetable = timetableOrder.map((id) => (registry.sources || []).find((source) => source.id === id)).filter(Boolean).map((source) => ({ ...source, note: source.verified ? "Verified current view" : "Official timetable view" }));
   const branchOrder = ["CE", "CS", "EC", "EE", "IT", "ME", "RAI"];
-  const studentLists = [...(state.sourceRegistry.studentSectionSources || [])].sort((left, right) => branchOrder.indexOf(left.branch) - branchOrder.indexOf(right.branch)).map((source) => ({ label: `${source.branch} current student roster`, note: source.verified ? "Verified official PDF" : "Official PDF", url: source.url }));
+  const studentLists = [...(registry.studentSectionSources || [])].sort((left, right) => branchOrder.indexOf(left.branch) - branchOrder.indexOf(right.branch)).map((source) => ({ label: `${source.branch} current student roster`, note: source.verified ? "Verified official PDF" : "Official PDF", url: source.url }));
   const profileBranch = branchCodeForProfile(activeStudentProfile());
   const personalList = profileBranch ? studentLists.find((source) => source.label.startsWith(`${profileBranch} `)) : null;
-  const currentAcademicCalendar = state.sourceRegistry.academicCalendarSource?.url
-    ? { label: state.sourceRegistry.academicCalendarSource.label || "Current academic calendar", note: state.sourceRegistry.academicCalendarSource.verified ? "Verified current official PDF" : "Official PDF", url: state.sourceRegistry.academicCalendarSource.url }
+  const currentAcademicCalendar = registry.academicCalendarSource?.url
+    ? { label: registry.academicCalendarSource.label || "Current academic calendar", note: registry.academicCalendarSource.verified ? "Verified current official PDF" : "Official PDF", url: registry.academicCalendarSource.url }
     : { label: "Academic Calendar Jul-Dec 2026", note: "Last verified official PDF", url: "https://gndec.ac.in/sites/default/files/acjul-dec26.pdf" };
   const startHere = [
-    { label: "Latest official timetable index", note: `Verified ${state.sourceRegistry.version || "source"}`, url: "https://appsc.gndec.ac.in/time_tables" },
+    { label: "Latest official timetable index", note: `Verified ${registry.version || "source"}`, url: "https://appsc.gndec.ac.in/time_tables" },
     currentAcademicCalendar,
     { label: "GNDEC Official Holidays 2026", note: "Gazetted holidays", url: "https://gndec.ac.in/sites/default/files/LoH26.pdf" },
     { label: "Academic Calendar Jan-Jun 2026", note: "Academic span", url: "https://gndec.ac.in/sites/default/files/AC%20jan-jun26.pdf" },
     ...(personalList ? [{ ...personalList, label: `My ${profileBranch} current roster` }] : [])
   ];
   const otherStudentLists = personalList ? studentLists.filter((source) => source.url !== personalList.url) : studentLists;
-  const groupSourceUrl = (state.sourceRegistry.sources || []).find((source) => source.id === "groups")?.url || "";
+  const groupSourceUrl = (registry.sources || []).find((source) => source.id === "groups")?.url || "";
   const currentReleaseMonth = referenceReleaseMonth(groupSourceUrl);
   const occupiedUrls = [
     ...timetable.map((item) => item.url),
     ...studentLists.map((item) => item.url),
-    state.sourceRegistry.syllabusSource?.url
+    registry.syllabusSource?.url
   ].filter(Boolean);
-  const timetableNotices = currentTimetableNoticeLinks(state.sourceRegistry.extraLinks || [], occupiedUrls, currentReleaseMonth);
-  const currentSyllabus = state.sourceRegistry.syllabusSource?.url
-    ? { label: state.sourceRegistry.syllabusSource.label || "First-year study scheme & syllabus", note: state.sourceRegistry.syllabusSource.verified ? "Current verified official PDF" : "Official PDF", url: state.sourceRegistry.syllabusSource.url }
+  const timetableNotices = currentTimetableNoticeLinks(registry.extraLinks || [], occupiedUrls, currentReleaseMonth);
+  const currentSyllabus = registry.syllabusSource?.url
+    ? { label: registry.syllabusSource.label || "First-year study scheme & syllabus", note: registry.syllabusSource.verified ? "Current verified official PDF" : "Official PDF", url: registry.syllabusSource.url }
     : { label: "First-year syllabus", note: "Applied Sciences syllabus page", url: "https://appsc.gndec.ac.in/node/27" };
   const academicLinks = [
     currentSyllabus,
@@ -6416,6 +6458,7 @@ function renderReferenceLinks() {
     { label: "Official Timetable Index", note: "Current and archived timetable releases", url: "https://appsc.gndec.ac.in/time_tables" }
   ];
   container.innerHTML = [
+    makeGroup("Supplied exam notices", "Transcribed from supplied documents; official web publication has not been verified.", [{ label: "MSE-I practical and workshop notices", note: "5?9 October 2026 ? workshop times confirmed by supplier", url: "/notices/mse1-practicals-2026.html" }, { label: "MSE-I theory date sheet", note: "Supplied PDF ? issued 14 September 2026", url: "/data/mse1-sem1-2026-09-14.pdf" }]),
     makeGroup("Start here", "The most useful official links for this device.", startHere),
     ...(globalThis.CompassExams ? [makeGroup("Exam date sheet", "Supplied GNDEC Applied Sciences document. Official web link pending; later notices may revise these dates.", [{ label: globalThis.CompassExams.source.title, note: `Issued ${globalThis.CompassExams.source.issued} · PDF`, url: globalThis.CompassExams.source.pdfUrl }])] : []),
     makeGroup("Current timetable", "Verified views from the latest official release, in student-first order.", timetable, true),

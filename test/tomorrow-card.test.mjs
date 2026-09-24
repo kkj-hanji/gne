@@ -49,7 +49,9 @@ test("clearing chat then clicking the rendered Tomorrow card uses the selected s
   assert.ok(chip, "The actual fresh-chat suggestion exists");
   chip.dispatchEvent(new window.Event("click", { bubbles: true }));
   await new Promise((resolve) => setTimeout(resolve, 150));
-  assert.equal(document.querySelector(".chat-bubble.user")?.textContent, "Show tomorrow as a simple card");
+  const userBubble = document.querySelector(".chat-bubble.user").cloneNode(true);
+  userBubble.querySelectorAll(".chat-timestamp, .chat-copy").forEach(node => node.remove());
+  assert.equal(userBubble.textContent, "Show tomorrow as a simple card");
   const answer = document.querySelector(".chat-bubble.assistant");
   assert.ok(answer.querySelector(".answer-day-card"));
   assert.match(answer.textContent, /16 Sept/);

@@ -16,7 +16,7 @@ test("chat form renders every compound answer and rejects invalid dates", async 
     location: { hash: "", search: "", href: "http://localhost/" },
     fetch: async () => { throw new Error("Offline fixture"); }
   });
-  for (const name of ["brain-kernel.js", "brain-v1-2.js", "brain-v2-2.js", "brain-v2.js", "exam-schedule.js", "academic-calendar.js", "schedule-analysis.js"]) vm.runInContext(await readFile(`public/${name}`, "utf8"), context);
+  for (const name of ["brain-kernel.js", "brain-v1-2.js", "brain-v2-2.js", "brain-v2.js", "exam-schedule.js", "practical-exams.js", "academic-calendar.js", "schedule-analysis.js"]) vm.runInContext(await readFile(`public/${name}`, "utf8"), context);
   const source = (await readFile("public/app.js", "utf8")).replace(/restoreData\(\);[\s\S]*?(?=function kbClean)/, "");
   vm.runInContext(source, context);
   vm.runInContext('state.nowOverride = "2026-09-03T04:30:00Z"; initEvents();', context);
@@ -32,7 +32,9 @@ test("chat form renders every compound answer and rejects invalid dates", async 
     assert.equal(input.value, question, "Enter without selecting a suggestion must preserve the input");
     document.getElementById("question-form").dispatchEvent(new window.Event("submit", { cancelable: true }));
     await new Promise(resolve => setTimeout(resolve, 100));
-    assert.equal(document.querySelector(".chat-bubble.user")?.textContent, question, "Display exactly the submitted question");
+    const userBubble = document.querySelector(".chat-bubble.user").cloneNode(true);
+    userBubble.querySelectorAll(".chat-timestamp, .chat-copy").forEach(node => node.remove());
+    assert.equal(userBubble.textContent, question, "Display exactly the submitted question");
     assert.equal(document.querySelectorAll(".chat-bubble.user").length, 1);
     return document.getElementById("chat-window").textContent;
   };
@@ -53,6 +55,15 @@ test("chat form renders every compound answer and rejects invalid dates", async 
     state.timetableViews.set("teachers", { revision: "fixture", schedule: [{ id: "faculty", group: "DR. CHAHAT JAIN", subject: "FACULTY ONLY COURSE", teacher: "DR. CHAHAT JAIN", room: "F113", day: "Monday", start: 570, end: 630, type: "L" }] });
     state.timetableViews.set("rooms", { revision: "fixture", schedule: [{ id: "room", group: "F113", subject: "ROOM ONLY COURSE", teacher: "ANOTHER TEACHER", room: "F113", day: "Monday", start: 630, end: 690, type: "L" }] });
   `, context);
+  context.syllabusFixture = JSON.parse(await readFile("public/data/first-year-syllabus-index.json", "utf8")).pages;
+  vm.runInContext('state.syllabusPages = syllabusFixture; state.syllabus = parseSyllabusText(syllabusFixture.map(page => page.text).join("\\f"));', context);
+  const syllabus = await submit("Physics unit 1 details");
+  assert.match(syllabus, /Basics of electromagnetic theory/);
+  assert.doesNotMatch(syllabus, /No verified faculty match|directory record matched/);
+  assert.match(await submit("F 113 timetable"), /ROOM ONLY COURSE/);
+  vm.runInContext('state.selectedGroup = "ECB"; state.nowOverride = "2026-09-24T10:00:00Z";', context);
+  assert.match(await submit("my workshop MSE1"), /12:30 PM to 2:30 PM/);
+  assert.match(await submit("Physics lab MSE1"), /5?9 October 2026/);
   const teacher = await submit("teacher timetable dr. chahat jain");
   assert.match(teacher, /FACULTY ONLY COURSE/);
   assert.doesNotMatch(teacher, /CSA2|ROOM ONLY COURSE/);

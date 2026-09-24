@@ -930,6 +930,7 @@ export default {
       }
       return Response.json({ error: "That answer could not be completed just now. Please try again or rephrase the question." }, { status: 503 });
     }
+    if (url.pathname.startsWith("/api/")) return Response.json({ error: "Unknown API endpoint." }, { status: 404, headers: { "Cache-Control": "no-store" } });
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
       return env.ASSETS.fetch(request);
     }
