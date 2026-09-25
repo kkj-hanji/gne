@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 1,
+  "revision": "seed-20260924-2",
+  "publishedAt": "2026-09-24T17:53:38.530Z",
+  "events": [
+    {
+      "id": "mse1-theory-0",
+      "kind": "theory",
+      "title": "Chemistry",
+      "date": "2026-09-25",
+      "endDate": "2026-09-25",
+      "start": 555,
+      "end": 645,
+      "report": 540,
+      "sections": [
+        "CSA",
+        "CSB",
+        "CSC",
+        "CSD",
+        "CSE",
+        "CSF",
+        "ITA",
+        "ITB",
+        "ITC"
+      ],
+      "source": "User-supplied GNDEC seating PDF and message for 25 September 2026; official web publication not verified",
+      "sourceUrl": "/data/seating-2026-09-25-chemistry.pdf",
+      "note": "Report 15 minutes before the exam. Follow the printed seating arrangement. Row-I is from the entrance side. Seating applies only to 25 September 2026, not subsequent papers."
+    },
+    {
+      "id": "mse1-theory-1",
+      "kind": "theory",
+      "title": "Mathematics-I",
+      "date": "2026-09-28",
+      "endDate": "2026-09-28",
+      "start": 555,
+      "end": 645,
+      "report": null,
+      "sections": [
+        "CSA",
+        "CSB",
+        "CSC",
+        "CSD",
+        "CSE",
+        "CSF",
+        "ITA",
+        "ITB",
+        "ITC"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-2",
+      "kind": "theory",
+      "title": "PPS",
+      "date": "2026-09-29",
+      "endDate": "2026-09-29",
+      "start": 555,
+      "end": 645,
+      "report": null,
+      "sections": [
+        "CSA",
+        "CSB",
+        "CSC",
+        "CSD",
+        "CSE",
+        "CSF",
+        "ITA",
+        "ITB",
+        "ITC"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-3",
+      "kind": "theory",
+      "title": "BEEE",
+      "date": "2026-09-30",
+      "endDate": "2026-09-30",
+      "start": 555,
+      "end": 645,
+      "report": null,
+      "sections": [
+        "CSA",
+        "CSB",
+        "CSC",
+        "CSD",
+        "CSE",
+        "CSF",
+        "ITA",
+        "ITB",
+        "ITC"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-4",
+      "kind": "theory",
+      "title": "English",
+      "date": "2026-10-01",
+      "endDate": "2026-10-01",
+      "start": 555,
+      "end": 645,
+      "report": null,
+      "sections": [
+        "CSA",
+        "CSB",
+        "CSC",
+        "CSD",
+        "CSE",
+        "CSF",
+        "ITA",
+        "ITB",
+        "ITC"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-5",
+      "kind": "theory",
+      "title": "Physics",
+      "date": "2026-09-25",
+      "endDate": "2026-09-25",
+      "start": 765,
+      "end": 855,
+      "report": 750,
+      "sections": [
+        "MEA",
+        "MEB",
+        "CEA",
+        "CEB",
+        "EEA",
+        "EEB",
+        "ECA",
+        "ECB",
+        "RAI"
+      ],
+      "source": "User-supplied GNDEC seating PDF and message for 25 September 2026; official web publication not verified",
+      "sourceUrl": "/data/seating-2026-09-25-physics.pdf",
+      "note": "Report 15 minutes before the exam. Follow the printed seating arrangement. Row-I is from the entrance side. Seating applies only to 25 September 2026, not subsequent papers."
+    },
+    {
+      "id": "mse1-theory-6",
+      "kind": "theory",
+      "title": "Mathematics-I",
+      "date": "2026-09-28",
+      "endDate": "2026-09-28",
+      "start": 555,
+      "end": 645,
+      "report": null,
+      "sections": [
+        "MEA",
+        "MEB",
+        "CEA",
+        "CEB",
+        "EEA",
+        "EEB",
+        "ECA",
+        "ECB",
+        "RAI"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-7",
+      "kind": "theory",
+      "title": "PPS",
+      "date": "2026-09-29",
+      "endDate": "2026-09-29",
+      "start": 555,
+      "end": 645,
+      "report": null,
+      "sections": [
+        "MEA",
+        "MEB",
+        "CEA",
+        "CEB",
+        "EEA",
+        "EEB",
+        "ECA",
+        "ECB",
+        "RAI"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-8",
+      "kind": "theory",
+      "title": "EDG",
+      "date": "2026-09-30",
+      "endDate": "2026-09-30",
+      "start": 555,
+      "end": 645,
+      "report": null,
+      "sections": [
+        "MEA",
+        "MEB",
+        "CEA",
+        "CEB",
+        "RAI"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-9",
+      "kind": "theory",
+      "title": "EDG",
+      "date": "2026-09-30",
+      "endDate": "2026-09-30",
+      "start": 660,
+      "end": 750,
+      "report": null,
+      "sections": [
+        "EEA",
+        "EEB",
+        "ECA",
+        "ECB"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-theory-10",
+      "kind": "theory",
+      "title": "Economics",
+      "date": "2026-10-01",
+      "endDate": "2026-10-01",
+      "start": 765,
+      "end": 855,
+      "report": null,
+      "sections": [
+        "MEA",
+        "MEB",
+        "CEA",
+        "CEB",
+        "EEA",
+        "EEB",
+        "ECA",
+        "ECB",
+        "RAI"
+      ],
+      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
+      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
+      "note": "Times are IST. Later notices may revise this schedule."
+    },
+    {
+      "id": "mse1-workshop-meb",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-07",
+      "endDate": "2026-10-07",
+      "start": 630,
+      "end": 750,
+      "report": null,
+      "sections": [
+        "MEB"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 3–4. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-mea",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-08",
+      "endDate": "2026-10-08",
+      "start": 510,
+      "end": 630,
+      "report": null,
+      "sections": [
+        "MEA"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 1–2. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-rai",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-08",
+      "endDate": "2026-10-08",
+      "start": 510,
+      "end": 630,
+      "report": null,
+      "sections": [
+        "RAI"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 1–2. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-ceb",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-08",
+      "endDate": "2026-10-08",
+      "start": 870,
+      "end": 990,
+      "report": null,
+      "sections": [
+        "CEB"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 7–8. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-eca",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-08",
+      "endDate": "2026-10-08",
+      "start": 870,
+      "end": 990,
+      "report": null,
+      "sections": [
+        "ECA"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 7–8. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-cea",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-09",
+      "endDate": "2026-10-09",
+      "start": 630,
+      "end": 750,
+      "report": null,
+      "sections": [
+        "CEA"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 3–4. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-eea",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-09",
+      "endDate": "2026-10-09",
+      "start": 750,
+      "end": 870,
+      "report": null,
+      "sections": [
+        "EEA"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 5–6. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-ecb",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-09",
+      "endDate": "2026-10-09",
+      "start": 750,
+      "end": 870,
+      "report": null,
+      "sections": [
+        "ECB"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 5–6. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-workshop-eeb",
+      "kind": "workshop",
+      "title": "Manufacturing Practices (Workshops)",
+      "date": "2026-10-09",
+      "endDate": "2026-10-09",
+      "start": 870,
+      "end": 990,
+      "report": null,
+      "sections": [
+        "EEB"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "Periods 7–8. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
+    },
+    {
+      "id": "mse1-practical-window",
+      "kind": "practical",
+      "title": "Physics, Chemistry and English lab MSE-I",
+      "date": "2026-10-05",
+      "endDate": "2026-10-09",
+      "start": null,
+      "end": null,
+      "report": null,
+      "sections": [
+        "CSA",
+        "CSB",
+        "CSC",
+        "CSD",
+        "CSE",
+        "CSF",
+        "ITA",
+        "ITB",
+        "ITC",
+        "MEA",
+        "MEB",
+        "CEA",
+        "CEB",
+        "EEA",
+        "EEB",
+        "ECA",
+        "ECB",
+        "RAI"
+      ],
+      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "sourceUrl": "/notices/mse1-practicals-2026.html",
+      "note": "In your respective lab turns; exact individual lab date/time is not provided. Keep files ready and prepare for viva. If a scheduled examination falls on a holiday, the notice moves it to the corresponding day of the following week. Confirm your lab turn with the lab in-charge."
+    }
+  ],
+  "seats": []
+}

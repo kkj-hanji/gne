@@ -15,7 +15,7 @@
     <link rel="manifest" href="manifest.webmanifest?v=20260821-13" />
     <link rel="icon" type="image/svg+xml" href="icon.svg?v=20260821-13" />
     <link rel="apple-touch-icon" href="icon.svg?v=20260821-13" />
-    <link rel="stylesheet" href="styles.css?v=20260924-1" />
+    <link rel="stylesheet" href="styles.css?v=20260925-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -63,6 +63,7 @@
             </div>
           </div>
 
+          <div id="exam-notice-banner" class="holiday-banner exam-notice-banner" hidden></div>
           <div id="holiday-banner" class="holiday-banner" hidden></div>
 
           <section class="live-stack" aria-label="Live schedule">
@@ -185,6 +186,9 @@
             </ol>
           </section>
 
+          <section class="panel exam-profile-panel" id="profile-exam-card" hidden></section>
+          <p class="panel-note" id="profile-regular-schedule"></p>
+          <p class="panel-note" id="exam-update-status" role="status"></p>
           <section class="panel profile-panel">
             <div class="profile-grid">
               <span>CRN <strong id="profile-crn">—</strong></span>
@@ -286,6 +290,8 @@
               </div>
             </article>
           </section>
+
+          <section class="panel settings-card exam-admin-panel" id="exam-admin-panel" hidden></section>
 
           <!-- Section: Display, Theme & Timetable Views -->
           <section class="panel settings-card">
@@ -404,6 +410,9 @@
     </nav>
 
     <div class="toast" id="toast" role="status"></div>
+    <script src="exam-domain.js?v=20260925-1"></script>
+    <script src="exam-desk.js?v=20260925-1"></script>
+    <script src="admin-exams.js?v=20260925-1"></script>
     <script src="brain-kernel.js?v=20260918-2"></script>
     <script src="brain-v1-2.js?v=20260905-1"></script>
     <script src="brain-v2-2.js?v=20260905-1"></script>
@@ -413,6 +422,6 @@
     <script src="schedule-analysis.js?v=20260915-1"></script>
     <script src="academic-calendar.js?v=20260915-1"></script>
     <script src="room-availability.js?v=20260918-2"></script>
-    <script src="app.js?v=20260924-1"></script>
+    <script src="app.js?v=20260925-1"></script>
   </body>
 </html>

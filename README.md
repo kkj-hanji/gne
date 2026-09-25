@@ -96,7 +96,7 @@ This is a convenience rule requested for a personal deployment, not strong authe
 
 ## Privacy and roles
 
-`localStorage` holds the selected student profile, group/subgroup, chat history, recent name searches, and parsed timetable only on that browser. KV holds only public GNDEC source metadata plus hashed anonymous AI-limit counters. No student roster is copied into KV or D1.
+`localStorage` holds the selected student profile, group/subgroup, chat history, recent name searches, and parsed timetable only on that browser. KV holds public GNDEC source metadata, hashed anonymous AI-limit counters, and current/previous exam publications containing CRN seating assignments. No full student roster or profile is copied into KV or D1. A same-origin seating lookup sends an exact CRN and exam ID to the Worker; it never sends these to an inference service.
 
 The browser-side Kaushik profile check only controls the interface. The Worker repeats the configured profile check before recording the 30-day admin-AI enrollment, while maintenance APIs require `ADMIN_API_TOKEN`. A visitor can still imitate public profile fields in browser storage, so use Cloudflare Access or verified sign-in before treating the profile rule as security-sensitive.
 
@@ -137,3 +137,7 @@ Known catalogue facts are verified again at the application boundary. A model ca
 - `scripts/stress-probe.mjs`, `scripts/stress-probe-2.mjs` — 113 end-to-end pipeline probes across four languages; run directly with node, not part of `npm test`.
 
 Never share `.env`, `.dev.vars`, `.wrangler/`, or an archive containing API keys.
+
+## Exam publishing and seating
+
+The supplied September theory seating, October workshops and practical notices now share a validated publication. KKJ admins can edit dates/reporting times, import supported seating PDFs or CSV, correct an individual seat, review, publish and restore the previous publication. Published updates feed Ask Compass automatically. See [the exam publishing guide](docs/exam-publishing.md) for sources, student behavior, admin instructions, privacy and limits.

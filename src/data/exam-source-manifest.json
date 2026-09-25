@@ -1,0 +1,16 @@
+[
+  {
+    "kind": "chemistry",
+    "pages": 9,
+    "assignments": 570,
+    "sha256": "0d4f96897b0331c9abf4d93fc8a81f2b5c4b8d27d3f0c64cb0bcc7234c8d037b",
+    "url": "/data/seating-2026-09-25-chemistry.pdf"
+  },
+  {
+    "kind": "physics",
+    "pages": 9,
+    "assignments": 576,
+    "sha256": "0d1c988255309089a07c3da6b07b7cac0bdc3816c8df06ccff0e2897db77878d",
+    "url": "/data/seating-2026-09-25-physics.pdf"
+  }
+]

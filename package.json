@@ -9,7 +9,7 @@
     "start": "wrangler dev --port 3000 --ip 0.0.0.0",
     "deploy": "wrangler deploy",
     "build": "wrangler deploy --dry-run --outdir dist",
-    "lint": "node --check public/app.js && node --check public/exam-schedule.js && node --check public/practical-exams.js && node --check public/academic-calendar.js && node --check public/schedule-analysis.js && node --check public/brain-kernel.js && node --check public/brain-v1-2.js && node --check public/brain-v2-2.js && node --check public/brain-v2.js && node --check src/worker.js && node --check public/room-availability.js",
+    "lint": "node --check public/app.js && node --check public/exam-schedule.js && node --check public/practical-exams.js && node --check public/academic-calendar.js && node --check public/schedule-analysis.js && node --check public/brain-kernel.js && node --check public/brain-v1-2.js && node --check public/brain-v2-2.js && node --check public/brain-v2.js && node --check src/worker.js && node --check public/room-availability.js && node --check public/exam-domain.js && node --check public/exam-desk.js && node --check public/admin-exams.js && node --check src/exam-store.js",
     "test": "node --test --test-concurrency=1",
     "test:models": "node --env-file=.env scripts/nvidia-model-check.mjs",
     "build:syllabus-index": "node scripts/build-syllabus-index.mjs",

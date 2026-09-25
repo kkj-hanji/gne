@@ -748,6 +748,8 @@ async function proxySource(request, ctx, record, source, contentType, cacheSecon
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const examResult = await examResponse(request, env, adminAuthorized(request, env));
+    if (examResult) return examResult;
     if (url.pathname === "/api/admin/sources/refresh") {
       if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
       try { return Response.json({ registry: await refreshSourceRegistry(env) }); } catch (error) { return Response.json({ error: error.message || "Source refresh failed." }, { status: 502 }); }
@@ -942,3 +944,4 @@ export default {
     ctx.waitUntil(refreshSourceRegistry(env).catch(() => {}));
   }
 };
+import { examResponse } from "./exam-store.js";

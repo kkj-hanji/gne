@@ -659,6 +659,9 @@ function renderAdminAiVisibility() {
   if (control) control.hidden = !visible;
   if (htmlImport) htmlImport.hidden = !visible;
   if (dashboard) dashboard.style.display = visible ? "block" : "none";
+  const examAdmin = $("exam-admin-panel");
+  if (examAdmin) examAdmin.hidden = !visible;
+  if (!visible) globalThis.CompassExamAdmin?.clear();
   if (select) select.value = adminAiMode();
 }
 
@@ -1068,6 +1071,7 @@ function nextStudyDayInfo(includeToday = false) {
 }
 
 function renderLive() {
+  globalThis.CompassExamDesk?.render();
   const now = getIndiaNow();
   const timeFormatted = now.time12;
   $("clock").textContent = timeFormatted;
@@ -1946,6 +1950,7 @@ function markTimetableUpdateSeen() {
 function renderEverything() { applySettings(); renderStatus(); renderLive(); renderDaySchedule(); renderWeek(); renderQuestionChips(); renderProfileSummary(); renderReferenceLinks(); renderSettingsPage(); renderTimetableUpdateCenter(); renderAdminAiVisibility(); }
 
 function renderProfileSummary() {
+  globalThis.CompassExamDesk?.render();
   const profile = activeStudentProfile();
   if (!$("profile-name")) return;
   const configured = hasStudentProfile();
@@ -2263,6 +2268,7 @@ function editDistance(left, right) {
 // vocabulary used by the local engine. Subject, teacher, and room names stay
 // untouched, so mixed-language questions still match official data exactly.
 function canonicalTimetableQuestion(question = "") {
+  if (globalThis.CompassExamDomain?.matches(question)) question = globalThis.CompassExamDomain.normalize(question);
   const replacements = [
     // Day-after-tomorrow aliases must be rewritten BEFORE the plain
     // tomorrow/today words, otherwise "ਕਲ੍ਹ ਪਿੱਛੋਂ" collapses to "tomorrow".
@@ -4848,6 +4854,7 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 // engine is always retained as the transparent fallback.
 function prepareCompassQuestion(question) {
   let q = canonicalTimetableQuestion(question);
+  if (globalThis.CompassExamDomain?.matches(q)) return q;
   if (globalThis.CompassPracticals?.matches(q)) return q;
   if (globalThis.CompassRoomAvailability?.matches(q)) return q;
   if (globalThis.CompassAcademicCalendar?.matches(q)) return q;
@@ -4974,7 +4981,14 @@ function academicCalendarAnswer(question) {
   return `<p><strong>${escapeHtml(source.title)}</strong></p>${result.periods.map((period) => `<p><strong>${escapeHtml(period.scope)}</strong><br />Semester starts: ${period.start}<br />Preparatory holidays: ${period.prepStart}–${period.prepEnd}<br />End-semester examinations: ${period.examsStart} onwards</p>`).join("")}<p>${escapeHtml(result.message)}</p><p class="answer-source"><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">Official GNDEC academic calendar · issued ${source.issued}</a> · checked ${source.checked}. <a href="https://gndec.ac.in/?q=node/23" target="_blank" rel="noopener noreferrer">Calendar archive and revisions</a>.</p>`;
 }
 
+function examDeviceContext() {
+  const profile = activeStudentProfile();
+  return { section: state.selectedGroup, subgroup: state.selectedSubgroup, crn: profileMatchesTimetableSelection(profile) ? String(profile.crn || "") : "", today: indiaCalendarDate(0).date.toISOString().slice(0, 10), minutes: getIndiaNow().minutes };
+}
+
 function examQuestionAnswer(question) {
+  const published = globalThis.CompassExamDesk?.answer(question, examDeviceContext());
+  if (published) return published;
   const practical = globalThis.CompassPracticals;
   if (practical?.matches(question)) {
     const today = indiaCalendarDate(0).date.toISOString().slice(0, 10);
@@ -5981,6 +5995,7 @@ function safeStoredChatHtml(value) {
   const allowedTags = new Set(["A", "B", "BR", "BUTTON", "DETAILS", "DIV", "EM", "FIGCAPTION", "FIGURE", "H2", "H3", "HEADER", "IMG", "LI", "OL", "P", "SECTION", "SMALL", "SPAN", "STRONG", "SUMMARY", "U", "UL"]);
   const allowedAttributes = new Set(["alt", "aria-hidden", "aria-label", "aria-selected", "class", "data-faculty-photo-fallback", "data-kb-followup", "decoding", "height", "href", "loading", "open", "referrerpolicy", "rel", "role", "src", "target", "title", "type", "width"]);
   const officialUrl = (raw) => {
+    if (/^\/data\/seating-2026-09-25-(?:physics|chemistry)\.pdf$/.test(String(raw || ""))) return true;
     if (/^\/(?:notices\/mse1-practicals-2026\.html|data\/mse1-sem1-2026-09-14\.pdf)$/.test(String(raw || ""))) return true;
     if (/^\/api\/faculty\/photo\?id=\d{1,8}$/.test(String(raw || ""))) return true;
     try {
@@ -6458,6 +6473,7 @@ function renderReferenceLinks() {
     { label: "Official Timetable Index", note: "Current and archived timetable releases", url: "https://appsc.gndec.ac.in/time_tables" }
   ];
   container.innerHTML = [
+    makeGroup("Seating plans - 25 September 2026", "Supplied documents; assignments apply only to this examination date.", [{label:"Physics Group seating - report 12:30 PM",url:"/data/seating-2026-09-25-physics.pdf"},{label:"Chemistry Group seating - report 9:00 AM",url:"/data/seating-2026-09-25-chemistry.pdf"}]),
     makeGroup("Supplied exam notices", "Transcribed from supplied documents; official web publication has not been verified.", [{ label: "MSE-I practical and workshop notices", note: "5?9 October 2026 ? workshop times confirmed by supplier", url: "/notices/mse1-practicals-2026.html" }, { label: "MSE-I theory date sheet", note: "Supplied PDF ? issued 14 September 2026", url: "/data/mse1-sem1-2026-09-14.pdf" }]),
     makeGroup("Start here", "The most useful official links for this device.", startHere),
     ...(globalThis.CompassExams ? [makeGroup("Exam date sheet", "Supplied GNDEC Applied Sciences document. Official web link pending; later notices may revise these dates.", [{ label: globalThis.CompassExams.source.title, note: `Issued ${globalThis.CompassExams.source.issued} · PDF`, url: globalThis.CompassExams.source.pdfUrl }])] : []),
@@ -6549,6 +6565,7 @@ async function refreshOfficialData({ discover = true } = {}) {
   button.textContent = "Checking official updates...";
   setSourceError();
   try {
+    await globalThis.CompassExamDesk?.refresh(true);
     const registry = await loadSourceRegistry({ refresh: discover });
     const { schedule, subgroupSchedule, sourceInfo } = await loadReadableTimetableRelease(registry);
     saveData(schedule, "Official GNDEC group timetable", sourceInfo, academicOverlayFromSchedule(subgroupSchedule));
@@ -6841,6 +6858,10 @@ function initEvents() {
     }
     const academic = academicCalendarAnswer(question);
     if (academic) { ensureChatBubble("assistant", academic); persistChat(); return; }
+    if (globalThis.CompassExamDomain?.matches(question) && globalThis.CompassExamDesk) {
+      const published = await globalThis.CompassExamDesk.respond(question, examDeviceContext());
+      if (published) { ensureChatBubble("assistant", published); persistChat(); return; }
+    }
     const exams = examQuestionAnswer(question);
     if (exams) {
       ensureChatBubble("assistant", exams);
@@ -7231,6 +7252,8 @@ populateStudentLookupInput();
 initEvents();
 registerOfflineShell();
 restoreChat();
+globalThis.CompassExamDesk?.init({context: examDeviceContext, ask(question) { activatePage("chat"); const input = $("question-input"); input.value = question; $("question-form").dispatchEvent(new Event("submit", {cancelable:true})); }});
+globalThis.CompassExamAdmin?.init({});
 renderStudentHistory();
 const initialHashPage = location.hash.slice(1);
 const savedPage = localStorage.getItem("gndec-compass-last-page") || "";
