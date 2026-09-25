@@ -906,3 +906,43 @@ body.compact-timetable .transposed-cell {
 [hidden].exam-admin-panel, [hidden].exam-today-panel, [hidden].exam-notice-banner { display: none; }
 
 #today-timetable-content[hidden] { display: none; }
+
+.exam-admin-panel .exam-admin-steps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; padding-left: 24px; color: var(--muted); font-size: 13px; }
+.exam-admin-panel .exam-admin-steps strong { color: var(--text); }
+.exam-admin-panel .exam-key-guide { padding: 14px; margin: 12px 0; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; }
+.exam-admin-panel .exam-key-guide summary { cursor: pointer; color: var(--green); font-weight: 750; }
+.exam-admin-panel .exam-import-summary { padding: 16px; margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow-wrap: anywhere; }
+.exam-admin-panel .exam-import-summary h4 { margin: 0 0 10px; }
+.exam-admin-panel button:disabled { opacity: .45; cursor: not-allowed; }
+@media(max-width:600px) { .exam-admin-panel .exam-admin-steps { grid-template-columns: 1fr; } }
+
+/* Exam-only additions: the original timetable layout stays unchanged. */
+#today-exam-card[hidden] { display: none; }
+#today-exam-card .exam-seat-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+#today-exam-card .exam-detail-label { display: block; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px; }
+#today-exam-card .exam-room-value { color: var(--amber); font-size: 18px; }
+#today-exam-card .exam-seat-grid small { display: block; margin-top: 5px; color: var(--muted); }
+#today-exam-card .exam-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 22px; }
+#today-exam-card .exam-card-actions button { width: auto; margin: 0; }
+#today-exam-card .exam-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+#today-exam-card .exam-agenda-item { border-bottom: 1px solid var(--line-soft); }
+#today-exam-card .exam-agenda-item summary { display: grid; grid-template-columns: 190px minmax(0,1fr) auto; align-items: center; gap: 18px; padding: 18px 14px; cursor: pointer; list-style: none; border-radius: 10px; }
+#today-exam-card .exam-agenda-item summary::-webkit-details-marker { display: none; }
+#today-exam-card .exam-agenda-item summary:hover { background: rgba(255,255,255,.025); }
+#today-exam-card .exam-agenda-item summary:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+#today-exam-card .schedule-time span, #today-exam-card .schedule-sub { display: block; margin-top: 5px; }
+#today-exam-card .exam-ended summary { opacity: .62; }
+#today-exam-card .exam-row-action { color: var(--green); font-size: 12px; font-weight: 750; }
+#today-exam-card .exam-agenda-detail { padding: 0 14px 18px; color: var(--muted); font-size: 13px; }
+#today-exam-card .exam-agenda-detail .text-button { margin-right: 16px; }
+@media(max-width:600px) {
+  #today.exam-mode-active .hero-status { width: 100%; justify-content: flex-start; }
+  #today.exam-mode-active .hero-chip { max-width: 100%; white-space: normal; flex-wrap: wrap; }
+  #today.exam-mode-active .hero-chip strong, #today.exam-mode-active .hero-chip-date { min-width: 0; overflow-wrap: anywhere; }
+  #today.exam-mode-active .exam-notice-banner { align-items: stretch; flex-direction: column; gap: 8px; }
+  #today.exam-mode-active .exam-notice-banner p { margin: 0; }
+  #today-exam-card .exam-agenda-item summary { grid-template-columns: 1fr auto; gap: 10px; padding: 16px 8px; }
+  #today-exam-card .exam-agenda-item .schedule-time { grid-column: 1/-1; }
+  #today-exam-card .exam-count { white-space: normal; text-align: right; }
+  #today-exam-card .exam-seat-grid { grid-template-columns: 1fr; gap: 12px; }
+}

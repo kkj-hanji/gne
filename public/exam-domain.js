@@ -7,10 +7,11 @@
     .replace(/\b(?:seeting|sitting|seet|seatting)\b/g, "seating")
     .replace(/\b(?:mera|meri|mere|apna|apni)\b/g, "my")
     .replace(/\b(?:kado|kadon|kab)\b/g, "when")
-    .replace(/\b(?:kithe|kithhe|kithay|kahan|kaha|kahaan)\b/g, "where")
+    .replace(/\b(?:kithe|kithhe|kitthe|kithay|kahan|kaha|kahaan|kidhar|kidhr|kidr)\b/g, "where")
     .replace(/\b(?:phy|physic)\b/g, "physics").replace(/\bchem\b/g, "chemistry")
     .replace(/\b(?:timing|timings|tym)\b/g, "time")
     .replace(/\b(?:roomno|roomnum|kamra|kamre)\b/g, "room")
+    .replace(/\b(?:seatingplan|seatplan)\b/g, "seating plan")
     .replace(/\b(?:konsa|kaunsa|kehda|keda)\b/g, "which")
     .replace(/\bmse\s*[- ]?\s*(?:one|i)\b/g, "mse1")
     .replace(/\s+/g, " ").trim();
