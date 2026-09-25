@@ -181,6 +181,7 @@ test("Today exam cards show reporting, elapsed time, exact seat and preserve exp
   ctx.CompassExamDesk.init({context:()=>own,ask:q=>asked.push(q)});await ctx.CompassExamDesk.refresh();
   const card=document.getElementById("today-exam-card");assert.match(card.textContent,/time to report/);
   assert.equal(card.querySelector(".now-card h2").textContent,"Physics");
+  assert.doesNotMatch(card.textContent,/View settings/);assert.match(card.textContent,/Open source notice/);
   assert.equal(card.querySelectorAll(".next-card").length,2);
   assert.equal(card.querySelector("[data-exam-ask]").getAttribute("data-exam-ask"),"my exam room 2026-09-25");
   const details=card.querySelector("details");details.setAttribute("open","");
@@ -287,6 +288,22 @@ test("Today card and practical banner expire in the DOM at the final slot",async
   assert.equal(document.getElementById("today-timetable-content").hidden,false);
   assert.equal(document.getElementById("exam-notice-banner").hidden,false);
   own.today="2026-10-10";ctx.CompassExamDesk.render();assert.equal(document.getElementById("exam-notice-banner").hidden,true);
+});
+
+test("practical and workshop notice bar stays on Today after theory exams and expires after its dates",async()=>{
+  const {ctx,document}=deskHarness();let own={...context,today:"2026-10-02",minutes:600,todayView:"auto"};
+  ctx.CompassExamDesk.init({context:()=>own,ask(){}});await ctx.CompassExamDesk.refresh();
+  const banner=document.getElementById("exam-notice-banner");
+  assert.equal(document.getElementById("today-exam-card").hidden,true);
+  assert.equal(document.getElementById("today-timetable-content").hidden,false);
+  assert.equal(banner.hidden,false);
+  assert.match(banner.textContent,/Upcoming practical and workshop exams/);
+  assert.match(banner.textContent,/5 Oct, 2026.*9 Oct, 2026/);
+  assert.match(banner.textContent,/9 Oct, 2026/);
+  own.today="2026-10-10";ctx.CompassExamDesk.render();assert.equal(banner.hidden,true);
+  own.section="CSD";own.today="2026-10-02";ctx.CompassExamDesk.render();
+  assert.match(banner.textContent,/Upcoming practical examinations/);
+  assert.doesNotMatch(banner.textContent,/Upcoming workshop exam/);
 });
 
 test("Today view modes override Auto, preserve the timetable, and handle empty exam data",async()=>{
