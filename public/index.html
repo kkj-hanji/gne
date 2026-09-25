@@ -15,7 +15,7 @@
     <link rel="manifest" href="manifest.webmanifest?v=20260821-13" />
     <link rel="icon" type="image/svg+xml" href="icon.svg?v=20260821-13" />
     <link rel="apple-touch-icon" href="icon.svg?v=20260821-13" />
-    <link rel="stylesheet" href="styles.css?v=20260925-1" />
+    <link rel="stylesheet" href="styles.css?v=20260925-2" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -66,6 +66,9 @@
           <div id="exam-notice-banner" class="holiday-banner exam-notice-banner" hidden></div>
           <div id="holiday-banner" class="holiday-banner" hidden></div>
 
+          <section class="panel exam-today-panel" id="today-exam-card" aria-label="Exam schedule" hidden></section>
+          <p class="panel-note" id="exam-update-status" role="status" hidden></p>
+          <div id="today-timetable-content">
           <section class="live-stack" aria-label="Live schedule">
             <article class="live-card now-card">
               <div class="card-kicker"><span class="live-dot" aria-hidden="true"></span><span id="now-label">LIVE STATUS</span><span class="kicker-end" id="data-status">No timetable loaded</span></div>
@@ -99,6 +102,7 @@
 
             <div id="day-schedule" class="schedule-list"><div class="empty-list">Load the official group timetable to see your day here.</div></div>
           </section>
+          </div>
         </section>
 
         <section class="page chat-page" id="chat" data-page="chat">
@@ -186,9 +190,6 @@
             </ol>
           </section>
 
-          <section class="panel exam-profile-panel" id="profile-exam-card" hidden></section>
-          <p class="panel-note" id="profile-regular-schedule"></p>
-          <p class="panel-note" id="exam-update-status" role="status"></p>
           <section class="panel profile-panel">
             <div class="profile-grid">
               <span>CRN <strong id="profile-crn">—</strong></span>
@@ -311,6 +312,15 @@
                 </div>
               </div>
 
+              <div class="field tt-experience-setting">
+                <label for="settings-today-view">Today page</label>
+                <select id="settings-today-view" aria-describedby="settings-today-view-help">
+                  <option value="auto">Auto</option>
+                  <option value="timetable">Timetable</option>
+                  <option value="exam">Exam</option>
+                </select>
+                <p id="settings-today-view-help">Auto shows exams during your section's theory exam period and returns to the timetable after the last exam slot ends. Timetable and Exam keep your chosen view. Saved on this device.</p>
+              </div>
               <div class="settings-preview-card" id="settings-preview-card">
                 <div class="preview-header">
                   <span class="preview-tag">LIVE THEME PREVIEW</span>
@@ -410,9 +420,9 @@
     </nav>
 
     <div class="toast" id="toast" role="status"></div>
-    <script src="exam-domain.js?v=20260925-1"></script>
-    <script src="exam-desk.js?v=20260925-1"></script>
-    <script src="admin-exams.js?v=20260925-1"></script>
+    <script src="exam-domain.js?v=20260925-2"></script>
+    <script src="exam-desk.js?v=20260925-2"></script>
+    <script src="admin-exams.js?v=20260925-2"></script>
     <script src="brain-kernel.js?v=20260918-2"></script>
     <script src="brain-v1-2.js?v=20260905-1"></script>
     <script src="brain-v2-2.js?v=20260905-1"></script>
@@ -422,6 +432,6 @@
     <script src="schedule-analysis.js?v=20260915-1"></script>
     <script src="academic-calendar.js?v=20260915-1"></script>
     <script src="room-availability.js?v=20260918-2"></script>
-    <script src="app.js?v=20260925-1"></script>
+    <script src="app.js?v=20260925-2"></script>
   </body>
 </html>

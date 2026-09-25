@@ -18,7 +18,7 @@ No seating plan was provided for later theory papers. A later paper therefore re
 
 Examples: `my exam room today`, `mera paper kal kithe aa`, `ECB workshop ka paper kab hai`, `CSD2 exam`, `physics group exam`, `my practical exams`, or an exact CRN plus an exam/date. A student's saved CRN is used only when the active section and subsection match that profile. Switching to someone else's timetable never borrows the device owner's CRN.
 
-Profile shows the section's theory exam card during the published theory period, ending at the final sitting's exact end time in IST. It then returns to its regular timetable guidance. Upcoming workshop and practical notices appear in a separate banner and expire at their confirmed end time, or after the final day of an untimed window. An ended date remains queryable explicitly as historical information.
+Today replaces its live class cards and day timetable with the section's theory exam schedule during the published exam period. In Settings ? Today page, Auto (the default) switches back to the timetable at the final sitting's exact end time in IST. Timetable and Exam are persistent manual overrides on this device. Exam mode can show the published dates before the period starts or after it ends, with ended exams labelled. Profile contains no exam card. Upcoming workshop and practical notices appear in a separate banner and expire at their confirmed end time, or after the final day of an untimed window. An ended date remains queryable explicitly as historical information.
 
 ## KKJ admin workflow
 

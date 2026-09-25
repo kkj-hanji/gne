@@ -879,4 +879,6 @@ body.compact-timetable .transposed-cell {
 .exam-table-scroll th, .exam-table-scroll td { padding: .6rem; text-align: left; border-bottom: 1px solid var(--border, #405452); }
 .exam-notice-banner { margin-bottom: 1rem; }
 .exam-notice-banner p { margin: .5rem 0; }
-[hidden].exam-admin-panel, [hidden].exam-profile-panel, [hidden].exam-notice-banner { display: none; }
+[hidden].exam-admin-panel, [hidden].exam-today-panel, [hidden].exam-notice-banner { display: none; }
+
+#today-timetable-content[hidden] { display: none; }

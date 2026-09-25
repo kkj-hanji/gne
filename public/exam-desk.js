@@ -31,14 +31,14 @@
       if(!stale)seats.set(cacheKey,value);return value;
     })().finally(()=>seatPending.delete(cacheKey));seatPending.set(cacheKey,task);return task;
   }
-  function renderProfileSeat(ctx,event){
-    const host=document.getElementById("profile-exam-seat");if(!host||!event)return;
+  function renderTodaySeat(ctx,event){
+    const host=document.getElementById("today-exam-seat");if(!host||!event)return;
     if(!ctx.crn){host.textContent="Save a matching profile with your CRN to see your individual seat.";return;}
     const key=`${data.revision}/${event.id}/${ctx.crn}`;host.dataset.seatKey=key;
-    const paint=value=>{const current=document.getElementById("profile-exam-seat");if(current?.dataset.seatKey!==key)return;const s=value.seat;current.textContent=s?`Your seat: ${s.room} · ${s.row} · S.No. ${s.seat}${s.page?` · PDF page ${s.page}`:""}`:"An individual seat is not confirmed for your next exam. Check the source notice or ask the coordinator.";};
+    const paint=value=>{const current=document.getElementById("today-exam-seat");if(current?.dataset.seatKey!==key)return;const s=value.seat;current.textContent=s?`Your seat: ${s.room} · ${s.row} · S.No. ${s.seat}${s.page?` · PDF page ${s.page}`:""}`:"An individual seat is not confirmed for your next exam. Check the source notice or ask the coordinator.";};
     if(!stale && seats.has(key)){paint(seats.get(key));return;}
     host.textContent="Checking your next exam seat…";
-    seatFor(event,ctx.crn).then(paint).catch(()=>{const current=document.getElementById("profile-exam-seat");if(current?.dataset.seatKey===key)current.textContent="Your seat could not be checked. Use the source seating plan or Check for updates.";});
+    seatFor(event,ctx.crn).then(paint).catch(()=>{const current=document.getElementById("today-exam-seat");if(current?.dataset.seatKey===key)current.textContent="Your seat could not be checked. Use the source seating plan or Check for updates.";});
   }
   function answer(q,ctx){
     if(!data||!domain.matches(q))return "";
@@ -63,13 +63,20 @@
     return result.join("");
   }
   function render(){
-    if(!bridge||!data)return;const ctx=bridge.context(),active=domain.active(data,ctx.section,ctx.today,ctx.minutes);
-    const profile=document.getElementById("profile-exam-card"),banner=document.getElementById("exam-notice-banner");
-    if(profile){profile.hidden=!active.examMode;profile.innerHTML=active.examMode?`<p class="eyebrow">YOUR EXAM SCHEDULE · ${esc(ctx.section)}</p><h2>Exams in progress</h2><p id="profile-exam-seat" role="status"></p>${active.theory.slice(0,6).map(eventMarkup).join("")}<button type="button" class="outline-button" data-exam-ask="my next exam room">Find my next exam seat</button><p class="panel-note">This card returns to the regular timetable after your final theory sitting ends.</p>`:"";}
-    if(active.examMode)renderProfileSeat(ctx,active.theory[0]);
-    const regular=document.getElementById("profile-regular-schedule");if(regular){regular.hidden=active.examMode;regular.textContent="Your regular timetable is available in Today and Timetable. Exam notices appear here during the published examination period.";}
+    if(!bridge)return;const ctx=bridge.context(),publication=data||{events:[]},active=domain.active(publication,ctx.section,ctx.today,ctx.minutes);
+    const mode=["auto","timetable","exam"].includes(ctx.todayView)?ctx.todayView:"auto";
+    const showExams=mode==="exam" || (mode==="auto" && active.examMode);
+    const card=document.getElementById("today-exam-card"),banner=document.getElementById("exam-notice-banner");
+    const allTheory=publication.events.filter(e=>e.kind==="theory" && e.sections.includes(ctx.section)).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start);
+    const upcoming=allTheory.filter(e=>e.date>ctx.today || (e.date===ctx.today && e.end>ctx.minutes));
+    const shown=upcoming.length?upcoming:allTheory;
+    const title=active.examMode?"Your exams":upcoming.length?"Upcoming exams":"Published exams";
+    if(card){card.hidden=!showExams;card.innerHTML=showExams?`<p class="eyebrow">EXAM SCHEDULE · ${esc(ctx.section||"CHOOSE YOUR SECTION")}</p><h2>${title}</h2>${upcoming.length?'<p id="today-exam-seat" role="status"></p>':""}${shown.length?shown.map(eventMarkup).join(""):`<p>${data?"No theory exam schedule is confirmed for your selected section.":"Exam information is unavailable. Check for updates or try again when connected."}</p>`}${upcoming.length?'<button type="button" class="outline-button" data-exam-ask="my next exam room">Find my next exam seat</button>':""}<p class="panel-note">${mode==="auto"?"Today returns to your timetable after your final theory exam slot ends.":"Exam view is selected. Choose Auto or Timetable in Settings to change it."}${!upcoming.length&&allTheory.length?" These published theory exams have ended.":""}</p>`:"";}
+    if(showExams && upcoming.length)renderTodaySeat(ctx,upcoming[0]);
+    const regular=document.getElementById("today-timetable-content");if(regular)regular.hidden=showExams;
+    const intro=document.getElementById("intro-copy");if(intro)intro.textContent=showExams?"Your exam dates, reporting times and confirmed seating.":ctx.section?`${date(ctx.today)} · ${[ctx.section,ctx.subgroup].filter(Boolean).join(" / ")} · Your timetable is live.`:"Set up this device to see your own timetable.";
     if(banner){const notes=active.notices;banner.hidden=!notes.length;banner.innerHTML=notes.length?`<strong>Upcoming practical examinations</strong>${notes.map(e=>`<p>${esc(e.title)} · ${date(e.date)}${e.endDate!==e.date?`–${date(e.endDate)}`:` · ${time(e.start)}–${time(e.end)}`}</p>`).join("")}<button type="button" class="text-button" data-exam-ask="my practical exams">Read practical notices</button>`:"";}
-    const status=document.getElementById("exam-update-status");if(status)status.textContent=stale?"Saved exam publication · live check unavailable":"Exam updates checked on this device. Notices update automatically when published.";
+    const status=document.getElementById("exam-update-status");if(status){status.hidden=!showExams;status.textContent=!data?"Exam data is not available yet.":stale?"Saved exam publication · live check unavailable":"Exam updates checked on this device. Notices update automatically when published.";}
   }
   function init(adapter){bridge=adapter;try{setData(JSON.parse(localStorage.getItem(key)||"null"));}catch{}render();refresh();
     document.addEventListener("click",event=>{const target=event.target.closest?.("[data-exam-ask]");if(target)bridge.ask(target.dataset.examAsk);});

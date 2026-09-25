@@ -100,7 +100,7 @@ test("Worker protects admin routes and KV failures cannot supply old seats or au
 });
 
 function deskHarness(){
-  const {document}=parseHTML('<html><body><div id="profile-exam-card"></div><div id="profile-regular-schedule"></div><div id="exam-notice-banner"></div><div id="exam-update-status"></div><div id="exam-admin-panel"></div></body></html>');
+  const {document}=parseHTML('<html><body><div id="today-exam-card"></div><div id="today-timetable-content"></div><div id="exam-notice-banner"></div><div id="exam-update-status"></div><div id="exam-admin-panel"></div></body></html>');
   const storage=new Map(),env={SOURCE_REGISTRY:new MemoryKv()},ctx={document,console,Intl,Date,Map,Set,JSON,AbortController,URL,Blob,Response,setTimeout,clearTimeout,setInterval(){},confirm:()=>true,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},CompassBrainKernel:globalThis.CompassBrainKernel};
   ctx.fetch=(path,options={})=>examResponse(new Request("https://compass.test"+path,options),env,options.headers?.["X-Compass-Admin-Key"]==="test-key");
   vm.createContext(ctx);for(const text of Object.values(scripts))vm.runInContext(text,ctx);
@@ -127,8 +127,8 @@ test("a delayed profile seating response cannot overwrite a different active pro
   own={...own,crn:""};ctx.CompassExamDesk.render();
   finish(Response.json({revision:seed.revision,seat:seed.seats.find(s=>s.crn==="2617070")}));
   await new Promise(resolve=>setTimeout(resolve,20));
-  assert.match(document.getElementById("profile-exam-seat").textContent,/matching profile/);
-  assert.doesNotMatch(document.getElementById("profile-exam-seat").textContent,/A8/);
+  assert.match(document.getElementById("today-exam-seat").textContent,/matching profile/);
+  assert.doesNotMatch(document.getElementById("today-exam-seat").textContent,/A8/);
 });
 
 test("a delayed seat from an older publication is rejected",async()=>{
@@ -191,16 +191,51 @@ test("existing app answer modes consume the publication with active selection an
   h.api.state.selectedGroup="MEA";assert.match(h.api.answerWithoutAi("my workshop exam"),/8:30 AM/);
 });
 
-test("profile card and practical banner expire in the DOM at the final slot",async()=>{
+test("Today card and practical banner expire in the DOM at the final slot",async()=>{
   const {ctx,document}=deskHarness();let own={...context,today:"2026-10-01",minutes:854};
   ctx.CompassExamDesk.init({context:()=>own,ask(){}});await ctx.CompassExamDesk.refresh();
-  assert.equal(document.getElementById("profile-exam-card").hidden,false);
-  assert.equal(document.getElementById("profile-regular-schedule").hidden,true);
+  assert.equal(document.getElementById("today-exam-card").hidden,false);
+  assert.equal(document.getElementById("today-timetable-content").hidden,true);
   own.minutes=855;ctx.CompassExamDesk.render();
-  assert.equal(document.getElementById("profile-exam-card").hidden,true);
-  assert.equal(document.getElementById("profile-regular-schedule").hidden,false);
+  assert.equal(document.getElementById("today-exam-card").hidden,true);
+  assert.equal(document.getElementById("today-timetable-content").hidden,false);
   assert.equal(document.getElementById("exam-notice-banner").hidden,false);
   own.today="2026-10-10";ctx.CompassExamDesk.render();assert.equal(document.getElementById("exam-notice-banner").hidden,true);
+});
+
+test("Today view modes override Auto, preserve the timetable, and handle empty exam data",async()=>{
+  const {ctx,document}=deskHarness();let own={...context,today:"2026-09-25",minutes:600,todayView:"auto"};
+  const desk=ctx.CompassExamDesk;desk.init({context:()=>own,ask(){}});await desk.refresh();
+  const exam=document.getElementById("today-exam-card"),regular=document.getElementById("today-timetable-content");regular.innerHTML='<p id="preserved-class">Timetable content</p>';
+  assert.equal(exam.hidden,false);assert.equal(regular.hidden,true);
+  own.todayView="timetable";desk.render();assert.equal(exam.hidden,true);assert.equal(regular.hidden,false);
+  own.today="2026-10-02";own.todayView="exam";desk.render();assert.equal(exam.hidden,false);assert.equal(regular.hidden,true);assert.match(exam.textContent,/have ended/);
+  own.todayView="auto";desk.render();assert.equal(exam.hidden,true);assert.equal(regular.hidden,false);assert.ok(document.getElementById("preserved-class"));
+  own.today="2026-09-24";desk.render();assert.equal(exam.hidden,true);
+  own.todayView="exam";desk.render();assert.match(exam.textContent,/Upcoming exams/);
+  own.section="";desk.render();assert.match(exam.textContent,/No theory exam schedule/);
+  own.todayView="invalid";desk.render();assert.equal(exam.hidden,true);assert.equal(regular.hidden,false);
+  own={...own,section:"CSD",today:"2026-10-01",minutes:644,todayView:"auto"};desk.render();assert.equal(exam.hidden,false);
+  own.minutes=645;desk.render();assert.equal(exam.hidden,true);
+});
+
+test("exam UI lives only on Today and the settings control persists the view",async()=>{
+  const html=await readFile(new URL("../public/index.html",import.meta.url),"utf8");
+  const {document,window}=parseHTML(html);
+  assert.equal(document.getElementById("today-exam-card").closest("[data-page]").id,"today");
+  assert.equal(document.getElementById("day-schedule").closest("#today-timetable-content").id,"today-timetable-content");
+  assert.equal(document.getElementById("chat").closest("#today"),null);
+  assert.equal(document.querySelector("#profile #exam-update-status"),null);
+  assert.equal(document.getElementById("profile-exam-card"),null);
+  const h=createAppHarness(),c=h.context;c.document=document;c.location={hash:"",search:"",href:"https://compass.test/"};
+  Object.assign(c.window,{addEventListener(){},matchMedia:()=>({matches:false})});
+  let renders=0;c.CompassExamDesk={render(){renders++;}};
+  // LinkeDOM's select.value lacks the setter implemented by browsers.
+  const prototype=Object.getPrototypeOf(document.createElement("select"));Object.defineProperty(prototype,"value",{configurable:true,get(){return this.querySelector("option[selected]")?.value||this.querySelector("option")?.value||"";},set(v){for(const o of this.querySelectorAll("option")){if(o.value===v)o.setAttribute("selected","");else o.removeAttribute("selected");}}});
+  vm.runInContext("initEvents(); renderSettingsPage();",c);
+  const control=document.getElementById("settings-today-view");assert.equal(control.value,"auto");
+  for(const mode of ["exam","timetable","auto"]){control.value=mode;control.dispatchEvent(new window.Event("change"));assert.equal(h.api.state.settings.todayView,mode);assert.equal(vm.runInContext("loadSettings().todayView",c),mode);}
+  assert.equal(renders,3);
 });
 
 test("actual chat submit uses published seating with Roman language, date changes and profile changes",async()=>{

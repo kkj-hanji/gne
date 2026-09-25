@@ -54,6 +54,7 @@ function defaultSettings() {
     timetableGridView: true,
     timetableSwapAxes: false,
     timetableExperience: "classic",
+    todayView: "auto",
     reduceMotion: false,
     attendanceTarget: 76,
     attendanceAlerts: true,
@@ -1071,7 +1072,6 @@ function nextStudyDayInfo(includeToday = false) {
 }
 
 function renderLive() {
-  globalThis.CompassExamDesk?.render();
   const now = getIndiaNow();
   const timeFormatted = now.time12;
   $("clock").textContent = timeFormatted;
@@ -1090,6 +1090,7 @@ function renderLive() {
   const topbarGroup = $("topbar-group");
   if (topbarGroup) topbarGroup.textContent = profile || "Choose your timetable";
   $("now-label").textContent = "LIVE STATUS";
+  globalThis.CompassExamDesk?.render();
 
   // Holiday Alert Banner rendering (Full-day / Gazetted holidays only, within 5 days before holiday till that specific holiday)
   const holidayBanner = $("holiday-banner");
@@ -4619,6 +4620,7 @@ function saveSettings(patch = {}) {
     renderWeek();
     renderDaySchedule();
   }
+  if (Object.prototype.hasOwnProperty.call(patch, "todayView")) globalThis.CompassExamDesk?.render();
   renderSettingsPage();
 }
 
@@ -4643,6 +4645,8 @@ function applySettings() {
 
 function renderSettingsPage() {
   const s = state.settings || defaultSettings();
+  const todayView = $("settings-today-view");
+  if (todayView) todayView.value = ["auto", "timetable", "exam"].includes(s.todayView) ? s.todayView : "auto";
   const brainModeSelect = $("settings-brain-mode");
   if (brainModeSelect) brainModeSelect.value = s.brainMode || "v22";
   const prefLang = $("settings-preferred-language");
@@ -4983,7 +4987,7 @@ function academicCalendarAnswer(question) {
 
 function examDeviceContext() {
   const profile = activeStudentProfile();
-  return { section: state.selectedGroup, subgroup: state.selectedSubgroup, crn: profileMatchesTimetableSelection(profile) ? String(profile.crn || "") : "", today: indiaCalendarDate(0).date.toISOString().slice(0, 10), minutes: getIndiaNow().minutes };
+  return { section: state.selectedGroup, subgroup: state.selectedSubgroup, todayView: state.settings?.todayView || "auto", crn: profileMatchesTimetableSelection(profile) ? String(profile.crn || "") : "", today: indiaCalendarDate(0).date.toISOString().slice(0, 10), minutes: getIndiaNow().minutes };
 }
 
 function examQuestionAnswer(question) {
@@ -7181,6 +7185,10 @@ function initEvents() {
   $("settings-restricted-holidays")?.addEventListener("change", (e) => {
     saveSettings({ showRestrictedHolidays: e.target.checked });
     showToast(`Restricted holidays: ${e.target.checked ? "Included" : "Excluded"}`);
+  });
+  $("settings-today-view")?.addEventListener("change", (event) => {
+    const todayView = ["auto", "timetable", "exam"].includes(event.target.value) ? event.target.value : "auto";
+    saveSettings({ todayView });
   });
   $("settings-timetable-grid")?.addEventListener("change", (e) => {
     saveSettings({ timetableGridView: e.target.checked });
