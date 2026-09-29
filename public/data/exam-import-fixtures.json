@@ -1,0 +1,2057 @@
+{
+  "fixtures": [
+    {
+      "sha256": "e7097182c1297b2df003de552092bfb01d23e058b0cacd9d2b6ccac9a68afbd1",
+      "rows": [
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617001",
+          "room": "S-201",
+          "row": "Row-I",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617002",
+          "room": "S-201",
+          "row": "Row-I",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617003",
+          "room": "S-201",
+          "row": "Row-I",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617004",
+          "room": "S-201",
+          "row": "Row-I",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617005",
+          "room": "S-201",
+          "row": "Row-I",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617006",
+          "room": "S-201",
+          "row": "Row-I",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617007",
+          "room": "S-201",
+          "row": "Row-II",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617008",
+          "room": "S-201",
+          "row": "Row-II",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617009",
+          "room": "S-201",
+          "row": "Row-II",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617010",
+          "room": "S-201",
+          "row": "Row-II",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617011",
+          "room": "S-201",
+          "row": "Row-II",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617012",
+          "room": "S-201",
+          "row": "Row-II",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617013",
+          "room": "S-201",
+          "row": "Row-III",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617014",
+          "room": "S-201",
+          "row": "Row-III",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617015",
+          "room": "S-201",
+          "row": "Row-III",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617016",
+          "room": "S-201",
+          "row": "Row-III",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617017",
+          "room": "S-201",
+          "row": "Row-III",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617018",
+          "room": "S-201",
+          "row": "Row-III",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617019",
+          "room": "S-201",
+          "row": "Row-IV",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617020",
+          "room": "S-201",
+          "row": "Row-IV",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617021",
+          "room": "S-201",
+          "row": "Row-IV",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617022",
+          "room": "S-201",
+          "row": "Row-IV",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617023",
+          "room": "S-201",
+          "row": "Row-IV",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617024",
+          "room": "S-201",
+          "row": "Row-IV",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617025",
+          "room": "S-201",
+          "row": "Row-IV",
+          "seat": "7",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617026",
+          "room": "S-201",
+          "row": "Row-V",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617027",
+          "room": "S-201",
+          "row": "Row-V",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617028",
+          "room": "S-201",
+          "row": "Row-V",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617029",
+          "room": "S-201",
+          "row": "Row-V",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617030",
+          "room": "S-201",
+          "row": "Row-V",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617031",
+          "room": "S-201",
+          "row": "Row-V",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617032",
+          "room": "S-201",
+          "row": "Row-V",
+          "seat": "7",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617033",
+          "room": "S-202",
+          "row": "Row-I",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617034",
+          "room": "S-202",
+          "row": "Row-I",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617035",
+          "room": "S-202",
+          "row": "Row-I",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617037",
+          "room": "S-202",
+          "row": "Row-I",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617039",
+          "room": "S-202",
+          "row": "Row-I",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617040",
+          "room": "S-202",
+          "row": "Row-I",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617041",
+          "room": "S-202",
+          "row": "Row-II",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617042",
+          "room": "S-202",
+          "row": "Row-II",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617043",
+          "room": "S-202",
+          "row": "Row-II",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617044",
+          "room": "S-202",
+          "row": "Row-II",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617045",
+          "room": "S-202",
+          "row": "Row-II",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617046",
+          "room": "S-202",
+          "row": "Row-II",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617047",
+          "room": "S-202",
+          "row": "Row-III",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617048",
+          "room": "S-202",
+          "row": "Row-III",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617049",
+          "room": "S-202",
+          "row": "Row-III",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617050",
+          "room": "S-202",
+          "row": "Row-III",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617051",
+          "room": "S-202",
+          "row": "Row-III",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617052",
+          "room": "S-202",
+          "row": "Row-III",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617053",
+          "room": "S-202",
+          "row": "Row-IV",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617054",
+          "room": "S-202",
+          "row": "Row-IV",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617055",
+          "room": "S-202",
+          "row": "Row-IV",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617056",
+          "room": "S-202",
+          "row": "Row-IV",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617057",
+          "room": "S-202",
+          "row": "Row-IV",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617058",
+          "room": "S-202",
+          "row": "Row-IV",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617059",
+          "room": "S-202",
+          "row": "Row-IV",
+          "seat": "7",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617060",
+          "room": "S-202",
+          "row": "Row-V",
+          "seat": "1",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617061",
+          "room": "S-202",
+          "row": "Row-V",
+          "seat": "2",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617062",
+          "room": "S-202",
+          "row": "Row-V",
+          "seat": "3",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617063",
+          "room": "S-202",
+          "row": "Row-V",
+          "seat": "4",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617064",
+          "room": "S-202",
+          "row": "Row-V",
+          "seat": "5",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617065",
+          "room": "S-202",
+          "row": "Row-V",
+          "seat": "6",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617066",
+          "room": "S-202",
+          "row": "Row-V",
+          "seat": "7",
+          "page": 1
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617067",
+          "room": "S-203",
+          "row": "Row-I",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617068",
+          "room": "S-203",
+          "row": "Row-I",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617069",
+          "room": "S-203",
+          "row": "Row-I",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617070",
+          "room": "S-203",
+          "row": "Row-I",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617071",
+          "room": "S-203",
+          "row": "Row-I",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617073",
+          "room": "S-203",
+          "row": "Row-I",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617074",
+          "room": "S-203",
+          "row": "Row-II",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617075",
+          "room": "S-203",
+          "row": "Row-II",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617076",
+          "room": "S-203",
+          "row": "Row-II",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617077",
+          "room": "S-203",
+          "row": "Row-II",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617078",
+          "room": "S-203",
+          "row": "Row-II",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617079",
+          "room": "S-203",
+          "row": "Row-II",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617080",
+          "room": "S-203",
+          "row": "Row-III",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617081",
+          "room": "S-203",
+          "row": "Row-III",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617082",
+          "room": "S-203",
+          "row": "Row-III",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617083",
+          "room": "S-203",
+          "row": "Row-III",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617084",
+          "room": "S-203",
+          "row": "Row-III",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617085",
+          "room": "S-203",
+          "row": "Row-III",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617086",
+          "room": "S-203",
+          "row": "Row-IV",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617087",
+          "room": "S-203",
+          "row": "Row-IV",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617088",
+          "room": "S-203",
+          "row": "Row-IV",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617089",
+          "room": "S-203",
+          "row": "Row-IV",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617090",
+          "room": "S-203",
+          "row": "Row-IV",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617091",
+          "room": "S-203",
+          "row": "Row-IV",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617092",
+          "room": "S-203",
+          "row": "Row-IV",
+          "seat": "7",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617093",
+          "room": "S-203",
+          "row": "Row-V",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617095",
+          "room": "S-203",
+          "row": "Row-V",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617096",
+          "room": "S-203",
+          "row": "Row-V",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617097",
+          "room": "S-203",
+          "row": "Row-V",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617098",
+          "room": "S-203",
+          "row": "Row-V",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617099",
+          "room": "S-203",
+          "row": "Row-V",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617100",
+          "room": "S-203",
+          "row": "Row-V",
+          "seat": "7",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617101",
+          "room": "S-204",
+          "row": "Row-I",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617102",
+          "room": "S-204",
+          "row": "Row-I",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617103",
+          "room": "S-204",
+          "row": "Row-I",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617104",
+          "room": "S-204",
+          "row": "Row-I",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617105",
+          "room": "S-204",
+          "row": "Row-I",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617106",
+          "room": "S-204",
+          "row": "Row-I",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617107",
+          "room": "S-204",
+          "row": "Row-II",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617108",
+          "room": "S-204",
+          "row": "Row-II",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617109",
+          "room": "S-204",
+          "row": "Row-II",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617110",
+          "room": "S-204",
+          "row": "Row-II",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617111",
+          "room": "S-204",
+          "row": "Row-II",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617112",
+          "room": "S-204",
+          "row": "Row-II",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617113",
+          "room": "S-204",
+          "row": "Row-III",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617114",
+          "room": "S-204",
+          "row": "Row-III",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617115",
+          "room": "S-204",
+          "row": "Row-III",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617116",
+          "room": "S-204",
+          "row": "Row-III",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617117",
+          "room": "S-204",
+          "row": "Row-III",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617118",
+          "room": "S-204",
+          "row": "Row-III",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617119",
+          "room": "S-204",
+          "row": "Row-IV",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617121",
+          "room": "S-204",
+          "row": "Row-IV",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617122",
+          "room": "S-204",
+          "row": "Row-IV",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617123",
+          "room": "S-204",
+          "row": "Row-IV",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617124",
+          "room": "S-204",
+          "row": "Row-IV",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617125",
+          "room": "S-204",
+          "row": "Row-IV",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617126",
+          "room": "S-204",
+          "row": "Row-IV",
+          "seat": "7",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617127",
+          "room": "S-204",
+          "row": "Row-V",
+          "seat": "1",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617128",
+          "room": "S-204",
+          "row": "Row-V",
+          "seat": "2",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617129",
+          "room": "S-204",
+          "row": "Row-V",
+          "seat": "3",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617130",
+          "room": "S-204",
+          "row": "Row-V",
+          "seat": "4",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617131",
+          "room": "S-204",
+          "row": "Row-V",
+          "seat": "5",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617132",
+          "room": "S-204",
+          "row": "Row-V",
+          "seat": "6",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2617133",
+          "room": "S-204",
+          "row": "Row-V",
+          "seat": "7",
+          "page": 2
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616001",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "1",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616002",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "2",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616003",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "3",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616004",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "4",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616005",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "5",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616006",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "6",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616007",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "7",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616008",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "8",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616009",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "9",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616010",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "10",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616011",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "11",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616012",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "12",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616013",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "13",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616014",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "14",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616015",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "15",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616016",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "16",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616017",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "17",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616018",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "18",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616019",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "19",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616020",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "20",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616021",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "21",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616022",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-I",
+          "seat": "22",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616023",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "1",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616024",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "2",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616025",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "3",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616026",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "4",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616027",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "5",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616028",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "6",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616029",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "7",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616031",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "8",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616032",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "9",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616033",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "10",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616034",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "11",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616035",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "12",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616036",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "13",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616037",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "14",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616038",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "15",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616039",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "16",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616040",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "17",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616041",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "18",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616042",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "19",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616043",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "20",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616044",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "21",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616045",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-II",
+          "seat": "22",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616046",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "1",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616047",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "2",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616048",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "3",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616049",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "4",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616050",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "5",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616051",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "6",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616052",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "7",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616053",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "8",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616054",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "9",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616055",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "10",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616056",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "11",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616057",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "12",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616058",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "13",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616059",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "14",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616060",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "15",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616061",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "16",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616062",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "17",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616063",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "18",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616064",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "19",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616065",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-III",
+          "seat": "20",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616066",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "1",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616067",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "2",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616068",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "3",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616069",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "4",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616070",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "5",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616071",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "6",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616072",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "7",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616073",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "8",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616074",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "9",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616075",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "10",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616076",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "11",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616077",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "12",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616078",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "13",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616079",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "14",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616080",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "15",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616081",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "16",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616082",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "17",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616083",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "18",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616084",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "19",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616085",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "20",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616086",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "21",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616087",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-IV",
+          "seat": "22",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616088",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "1",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616089",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "2",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616090",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "3",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616091",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "4",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616092",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "5",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616093",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "6",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616094",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "7",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616095",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "8",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616096",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "9",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616097",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "10",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616098",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "11",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616099",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "12",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616100",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "13",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616101",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "14",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616102",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "15",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616103",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "16",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616104",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "17",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616105",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "18",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616106",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "19",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616107",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "20",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616108",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "21",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616109",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-V",
+          "seat": "22",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616110",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "1",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616111",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "2",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616112",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "3",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616113",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "4",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616115",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "5",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616116",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "6",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616117",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "7",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616118",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "8",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616119",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "9",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616120",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "10",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616121",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "11",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616122",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "12",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616123",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "13",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616124",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "14",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616125",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "15",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616127",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "16",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616128",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "17",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616129",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "18",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616130",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "19",
+          "page": 3
+        },
+        {
+          "eventId": "mse1-theory-9",
+          "crn": "2616131",
+          "room": "Drawing hall (Diploma building)",
+          "row": "Row-VI",
+          "seat": "20",
+          "page": 3
+        }
+      ]
+    }
+  ]
+}

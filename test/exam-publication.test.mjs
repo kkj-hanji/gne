@@ -19,19 +19,23 @@ const select=(q,ctx=context)=>domain.select(seed,q,{...ctx,temporal:globalThis.C
 const request=(path,method="GET",body)=>new Request("https://compass.test"+path,{method,headers:{"Content-Type":"application/json"},...(body?{body:JSON.stringify(body)}:{})});
 class MemoryKv {values=new Map();async get(k){return this.values.has(k)?JSON.parse(this.values.get(k)):null;}async put(k,v){this.values.set(k,v);}}
 
-test("all 1,146 seats round-trip from the hashed 18-page supplied PDFs",async()=>{
-  assert.equal(seed.events.length,21);assert.equal(seed.seats.length,1146);
+test("all supplied searchable seating PDFs round-trip and the scanned EDG table is source-hash verified",async()=>{
+  assert.equal(seed.events.length,21);assert.equal(seed.seats.length,2292);
   const sources=JSON.parse(await readFile(new URL("../src/data/exam-source-manifest.json",import.meta.url)));
   for(const source of sources){
     const bytes=await readFile(new URL("../public"+source.url,import.meta.url));
     assert.equal(createHash("sha256").update(bytes).digest("hex"),source.sha256);
     const pdf=await getDocument({data:new Uint8Array(bytes),verbosity:0}).promise;
     const event=seed.events.find(e=>e.sourceUrl===source.url);const parsed=[];
-    try{assert.equal(pdf.numPages,source.pages);for(let p=1;p<=pdf.numPages;p++){const items=(await(await pdf.getPage(p)).getTextContent()).items;const rows=domain.parseSeatingPage(items,event.id,p);assert.equal(rows.length,items.filter(i=>/^\d{7,12}$/.test(i.str.trim())).length);parsed.push(...rows);}}finally{await pdf.destroy();}
-    assert.equal(parsed.length,source.assignments);assert.deepEqual(parsed,seed.seats.filter(s=>s.eventId===event.id));
+    try{assert.equal(pdf.numPages,source.pages);for(let p=1;p<=pdf.numPages;p++){const items=(await(await pdf.getPage(p)).getTextContent()).items;if(source.kind==="edg-shift-2"){assert.equal(items.filter(i=>/^\d{7,12}$/.test(i.str.trim())).length,0);continue;}const rows=source.kind==="edg-shift-1"?domain.parseNumberedGridPage(items,event.id,p):domain.parseSeatingPage(items,event.id,p);assert.equal(rows.length,items.filter(i=>/^\d{7,12}$/.test(i.str.trim())).length);parsed.push(...rows);}}finally{await pdf.destroy();}
+    assert.equal(seed.seats.filter(s=>s.eventId===event.id).length,source.assignments);
+    if(source.kind!=="edg-shift-2")assert.deepEqual(parsed,seed.seats.filter(s=>s.eventId===event.id));
   }
   assert.deepEqual(seed.seats.find(s=>s.crn==="2617070"),{eventId:"mse1-theory-5",crn:"2617070",room:"A8 (Automobile block)",row:"Row-I",seat:"4",page:2});
   const chemistry=seed.seats.find(s=>s.crn==="2621036");assert.equal(chemistry.room,"S-202");assert.equal(chemistry.row,"Row-I");assert.equal(chemistry.seat,"1");
+  const edg1=seed.seats.find(s=>s.eventId==="mse1-theory-8"&&s.crn==="2614001");assert.deepEqual(edg1,{eventId:"mse1-theory-8",crn:"2614001",room:"S-201",row:"Row-I",seat:"1",page:1});
+  const edg2=seed.seats.find(s=>s.eventId==="mse1-theory-9"&&s.crn==="2617001");assert.deepEqual(edg2,{eventId:"mse1-theory-9",crn:"2617001",room:"S-201",row:"Row-I",seat:"1",page:1});
+  const beee=seed.seats.find(s=>s.eventId==="mse1-theory-3"&&s.crn==="2615001");assert.equal(beee.room,"F-101");
 });
 
 test("all workshop sections tolerate equivalent English, Roman Hindi/Punjabi and typo phrases",()=>{
@@ -112,6 +116,10 @@ const pdfFile=async group=>{
   const bytes=await readFile(new URL(`../public/data/seating-2026-09-25-${group}.pdf`,import.meta.url));
   return {name:`Seating Plan ${group} Group.pdf`,size:bytes.length,arrayBuffer:async()=>Uint8Array.from(bytes).buffer};
 };
+const suppliedPdf=async(name)=>{
+  const bytes=await readFile(new URL(`../public/data/${name}`,import.meta.url));
+  return {name,size:bytes.length,arrayBuffer:async()=>Uint8Array.from(bytes).buffer};
+};
 const readPdf=bytes=>getDocument({data:new Uint8Array(bytes),verbosity:0}).promise;
 
 test("two actual PDFs preview, map, apply and publish atomically through admin controls",async()=>{
@@ -127,18 +135,41 @@ test("two actual PDFs preview, map, apply and publish atomically through admin c
   assert.equal($("exam-map-0").value,"mse1-theory-0");assert.equal($("exam-map-1").value,"mse1-theory-5");
   assert.equal(env.SOURCE_REGISTRY.values.size,0);assert.equal($("exam-publish").disabled,true);
   await $("exam-apply-import").onclick();assert.match($("exam-seat-preview").textContent,/Imported into draft/);
-  await $("exam-review").onclick();assert.match($("exam-publication-preview").textContent,/1146 seating/);
+  await $("exam-review").onclick();assert.match($("exam-publication-preview").textContent,/2292 seating/);
   await $("exam-publish").onclick();assert.match($("exam-admin-status").textContent,/Published successfully/);
   const publication=await(await examResponse(request("/api/admin/exams"),env,true)).json();
-  assert.deepEqual(publication.seats,seed.seats);
+  const stableSeats=seats=>[...seats].sort((a,b)=>`${a.eventId}|${a.crn}`.localeCompare(`${b.eventId}|${b.crn}`));
+  assert.deepEqual(stableSeats(publication.seats),stableSeats(seed.seats));
   assert.match(publication.events[0].source,/Admin-supplied seating PDFs/);
   assert.doesNotMatch([...storage.values()].join(""),/test-key/);
   assert.match(await ctx.CompassExamDesk.respond("my exam room tomorrow",context),/Room A8/);
 });
 
+test("three 30 September seating plans import together, including the hash-verified scanned EDG shift",async()=>{
+  const {ctx}=deskHarness(), importer=ctx.CompassExamImport;
+  const fixture=JSON.parse(await readFile(new URL("../public/data/exam-import-fixtures.json",import.meta.url)));
+  ctx.fetch=async()=>Response.json(fixture);
+  const files=await Promise.all([
+    suppliedPdf("seating-2026-09-30-edg-shift-1.pdf"),
+    suppliedPdf("seating-2026-09-30-edg-shift-2.pdf"),
+    suppliedPdf("seating-2026-09-30-beee-chemistry.pdf")
+  ]);
+  const imports=await importer.readFiles(files,readPdf);
+  assert.deepEqual(Array.from(imports,x=>x.rows.length),[320,256,570]);
+  const events=imports.map(x=>importer.candidates(seed.events,"2026-09-30",x.name)[0]?.id);
+  assert.deepEqual(Array.from(events),["mse1-theory-8","mse1-theory-9","mse1-theory-3"]);
+  const applied=importer.apply(seed,imports,events,"2026-09-30").draft;
+  for(const [eventId,count] of [["mse1-theory-8",320],["mse1-theory-9",256],["mse1-theory-3",570]])
+    assert.equal(applied.seats.filter(s=>s.eventId===eventId).length,count);
+  assert.equal(applied.seats.length,seed.seats.length);
+});
+
 test("PDF import rejects duplicate, excessive, corrupt and oversized inputs without publication",async()=>{
   const {ctx}=deskHarness(),importer=ctx.CompassExamImport,physics=await pdfFile("physics"),chemistry=await pdfFile("chemistry");
-  await assert.rejects(importer.readFiles([physics,chemistry,physics],readPdf),/one or two/);
+  const beee=await readFile(new URL("../public/data/seating-2026-09-30-beee-chemistry.pdf",import.meta.url));
+  const beeeFile={name:"BEEE Chemistry Group.pdf",size:beee.length,arrayBuffer:async()=>Uint8Array.from(beee).buffer};
+  const three=await importer.readFiles([physics,chemistry,beeeFile],readPdf);assert.equal(three.length,3);assert.equal(three[2].rows.length,570);
+  await assert.rejects(importer.readFiles([physics,chemistry,beeeFile,{...physics,name:"fourth.pdf"}],readPdf),/one, two, or three/);
   await assert.rejects(importer.readFiles([physics,{...physics,name:"renamed.pdf"}],readPdf),/same PDF/);
   await assert.rejects(importer.readFiles([{...physics,size:16*1024*1024}],readPdf),/15 MB/);
   await assert.rejects(importer.readFiles([{...physics,name:"seats.txt"}],readPdf),/PDF files/);
@@ -161,6 +192,9 @@ test("exam date and group mapping distinguishes same-subject papers and validate
   assert.equal(next.seats.length,seed.seats.length+576);
   assert.equal(next.seats.filter(s=>s.eventId==="mse1-theory-5").length,576);
   assert.equal(next.seats.filter(s=>s.eventId==="mse1-theory-6").length,576);
+  assert.equal(importer.candidates(seed.events,"2026-09-30","Seating Plan For EDG SHIFT-1.pdf")[0].id,"mse1-theory-8");
+  assert.equal(importer.candidates(seed.events,"2026-09-30","EDG Shift 2 EE EC.pdf")[0].id,"mse1-theory-9");
+  assert.equal(importer.candidates(seed.events,"2026-09-30","BEEE exam Chemistry Group.pdf")[0].id,"mse1-theory-3");
 });
 
 test("changing a PDF selection during reading invalidates the pending preview",async()=>{

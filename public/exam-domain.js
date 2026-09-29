@@ -63,6 +63,36 @@
       return { eventId, crn: c.text, room: room.text.replace(/^Room\s+No\.\s*/i, ""), row: row.text.replace(/\s+/g, " "), seat: seat.text, page };
     });
   }
+  // Some GNDEC plans use a compact printed table (S.No across the rows and
+  // Row-I/Row-II across columns), rather than the room-grid PDF layout above.
+  // Parse that geometry from selectable PDF text; do not guess when a cell is
+  // missing or too far from its row/column anchor.
+  function parseNumberedGridPage(items, eventId, page) {
+    const tokens = items.filter(i => i.str?.trim()).map(i => ({ text: i.str.trim(), x: i.transform[4], y: i.transform[5] }));
+    const headers = tokens.filter(t => /^S\.?\s*No\.?$/i.test(t.text)).sort((a,b) => b.y-a.y);
+    if (!headers.length) return [];
+    const venues = tokens.filter(t => /^(?:Room\s+No\.?\s+|Drawing\s+hall\b)/i.test(t.text));
+    const output = [];
+    for (let index=0; index<headers.length; index++) {
+      const header=headers[index], lower=headers[index+1]?.y ?? -Infinity;
+      const columns=tokens.filter(t => Math.abs(t.y-header.y)<=4 && t.x>header.x+25 && /^Row\s*[-–]?\s*[IVXL]+$/i.test(t.text))
+        .map(t=>({ ...t, row:`Row-${t.text.replace(/^Row\s*[-–]?\s*/i,"").replace(/l/gi,"I").toUpperCase()}` }))
+        .sort((a,b)=>a.x-b.x);
+      const crns=tokens.filter(t => /^\d{7,12}$/.test(t.text) && t.y<header.y && t.y>lower);
+      if (!crns.length) continue;
+      if (columns.length<2) throw new Error(`Page ${page} has a numbered seating grid without enough row headings.`);
+      const room=venues.filter(t=>t.y>=header.y-6).sort((a,b)=>Math.abs(a.y-header.y)-Math.abs(b.y-header.y))[0];
+      if (!room || room.y-header.y>90) throw new Error(`Page ${page} has no clear room or hall label above the seating grid.`);
+      const serials=tokens.filter(t=>/^\d{1,2}$/.test(t.text) && t.x<=header.x+35);
+      for (const crn of crns) {
+        const serial=serials.sort((a,b)=>Math.abs(a.y-crn.y)-Math.abs(b.y-crn.y))[0];
+        const column=columns.sort((a,b)=>Math.abs(a.x-crn.x)-Math.abs(b.x-crn.x))[0];
+        if (!serial || Math.abs(serial.y-crn.y)>10 || !column || Math.abs(column.x-crn.x)>35) throw new Error(`Page ${page} has a CRN without a clear row and S.No. position.`);
+        output.push({eventId,crn:crn.text,room:room.text.replace(/^Room\s+No\.?\s*/i,""),row:column.row,seat:serial.text,page});
+      }
+    }
+    return output;
+  }
   function scope(question, section, events) {
     const q = normalize(question), available = [...new Set(events.flatMap(e => e.sections))];
     const codes = [...q.matchAll(/\b(cse|cs|ece|ec|ee|ce|me|it)\s*([a-z])(?:\s*(\d+))?\b|\b(rai)(?:\s*(\d+))?\b/g)];
@@ -73,7 +103,10 @@
     const branches = [...q.replace(/\b(?:show|tell|give|for|room|seat|lab)\s+me\b/g, "").matchAll(/\b(cse|cs|ece|ec|ee|ce|me|it|rai)\b/g)].map(m => ({ece:"EC",cse:"CS"})[m[1]] || m[1].toUpperCase());
     if (branches.length) return available.filter(s => branches.includes(s === "RAI" ? s : s.slice(0, -1)));
     const group=q.match(/\b(physics|chemistry)\s+group\b/);
-    if(group) return [...new Set(events.filter(e=>e.kind==="theory" && e.title.toLowerCase()===group[1]).flatMap(e=>e.sections))];
+    if(group){
+      const title=/\bbeee\b/.test(q)?"beee":group[1];
+      return [...new Set(events.filter(e=>e.kind==="theory" && e.title.toLowerCase()===title).flatMap(e=>e.sections))];
+    }
     if (/\b(?:all|every|full)\b/.test(q)) return available;
     return section && available.includes(section) ? [section] : [];
   }
@@ -122,5 +155,5 @@
     const forthcoming=own.filter(e=>e.endDate>today || (e.endDate===today && (e.end??1440)>minutes)).sort((a,b)=>a.date.localeCompare(b.date)||(a.start??0)-(b.start??0));
     return { examMode, theory:examMode?theory.filter(e=>e.date>today || (e.date===today && e.end>minutes)):[], notices:forthcoming.filter(e=>e.kind!=="theory").slice(0,5) };
   }
-  root.CompassExamDomain=Object.freeze({normalize,matches,validDate,validate,parseSeatingPage,scope,select,active});
+  root.CompassExamDomain=Object.freeze({normalize,matches,validDate,validate,parseSeatingPage,parseNumberedGridPage,scope,select,active});
 })(globalThis);

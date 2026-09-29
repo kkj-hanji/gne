@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": "seed-20260924-2",
-  "publishedAt": "2026-09-24T17:53:38.530Z",
+  "revision": "seed-20260929-1",
+  "publishedAt": "2026-09-29T15:46:29.512Z",
   "events": [
     {
       "id": "mse1-theory-0",
@@ -95,9 +95,9 @@
         "ITB",
         "ITC"
       ],
-      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
-      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
-      "note": "Times are IST. Later notices may revise this schedule."
+      "source": "User-supplied GNDEC seating plan for 30 September 2026; official web publication not verified",
+      "sourceUrl": "/data/seating-2026-09-30-beee-chemistry.pdf",
+      "note": "Room, row and S.No. are transcribed from the supplied seating plan. Row-I is from the entrance side where stated. No reporting time was supplied."
     },
     {
       "id": "mse1-theory-4",
@@ -211,9 +211,9 @@
         "CEB",
         "RAI"
       ],
-      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
-      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
-      "note": "Times are IST. Later notices may revise this schedule."
+      "source": "User-supplied GNDEC seating plan for 30 September 2026; official web publication not verified",
+      "sourceUrl": "/data/seating-2026-09-30-edg-shift-1.pdf",
+      "note": "Room, row and S.No. are transcribed from the supplied seating plan. Row-I is from the entrance side where stated. No reporting time was supplied."
     },
     {
       "id": "mse1-theory-9",
@@ -230,9 +230,9 @@
         "ECA",
         "ECB"
       ],
-      "source": "User-supplied GNDEC Applied Sciences date sheet, issued 14 September 2026",
-      "sourceUrl": "/data/mse1-sem1-2026-09-14.pdf",
-      "note": "Times are IST. Later notices may revise this schedule."
+      "source": "User-supplied GNDEC seating plan for 30 September 2026; official web publication not verified",
+      "sourceUrl": "/data/seating-2026-09-30-edg-shift-2.pdf",
+      "note": "Room, row and S.No. are transcribed from the supplied seating plan. Row-I is from the entrance side where stated. No reporting time was supplied."
     },
     {
       "id": "mse1-theory-10",

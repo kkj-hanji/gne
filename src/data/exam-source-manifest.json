@@ -4,13 +4,39 @@
     "pages": 9,
     "assignments": 570,
     "sha256": "0d4f96897b0331c9abf4d93fc8a81f2b5c4b8d27d3f0c64cb0bcc7234c8d037b",
-    "url": "/data/seating-2026-09-25-chemistry.pdf"
+    "url": "/data/seating-2026-09-25-chemistry.pdf",
+    "method": "selectable PDF text parsed and assignment count checked"
   },
   {
     "kind": "physics",
     "pages": 9,
     "assignments": 576,
     "sha256": "0d1c988255309089a07c3da6b07b7cac0bdc3816c8df06ccff0e2897db77878d",
-    "url": "/data/seating-2026-09-25-physics.pdf"
+    "url": "/data/seating-2026-09-25-physics.pdf",
+    "method": "selectable PDF text parsed and assignment count checked"
+  },
+  {
+    "kind": "edg-shift-1",
+    "pages": 4,
+    "assignments": 320,
+    "sha256": "27eebdae1ecccbadbdc2b0249776c796883f52d5d6b289b9687aa03329d12de5",
+    "url": "/data/seating-2026-09-30-edg-shift-1.pdf",
+    "method": "selectable PDF text parsed and assignment count checked"
+  },
+  {
+    "kind": "edg-shift-2",
+    "pages": 3,
+    "assignments": 256,
+    "sha256": "e7097182c1297b2df003de552092bfb01d23e058b0cacd9d2b6ccac9a68afbd1",
+    "url": "/data/seating-2026-09-30-edg-shift-2.pdf",
+    "method": "visually checked image-table transcription; PDF has no text layer"
+  },
+  {
+    "kind": "beee-chemistry",
+    "pages": 10,
+    "assignments": 570,
+    "sha256": "5d2355911d7694c585201bd758b247942c887bec4a61b70b55f0f51a9c33e093",
+    "url": "/data/seating-2026-09-30-beee-chemistry.pdf",
+    "method": "selectable PDF text parsed and assignment count checked"
   }
 ]

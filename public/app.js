@@ -5999,7 +5999,7 @@ function safeStoredChatHtml(value) {
   const allowedTags = new Set(["A", "B", "BR", "BUTTON", "DETAILS", "DIV", "EM", "FIGCAPTION", "FIGURE", "H2", "H3", "HEADER", "IMG", "LI", "OL", "P", "SECTION", "SMALL", "SPAN", "STRONG", "SUMMARY", "U", "UL"]);
   const allowedAttributes = new Set(["alt", "aria-hidden", "aria-label", "aria-selected", "class", "data-faculty-photo-fallback", "data-kb-followup", "decoding", "height", "href", "loading", "open", "referrerpolicy", "rel", "role", "src", "target", "title", "type", "width"]);
   const officialUrl = (raw) => {
-    if (/^\/data\/seating-2026-09-25-(?:physics|chemistry)\.pdf$/.test(String(raw || ""))) return true;
+    if (/^\/data\/seating-2026-09-(?:25-(?:physics|chemistry)|30-(?:edg-shift-[12]|beee-chemistry))\.pdf$/.test(String(raw || ""))) return true;
     if (/^\/(?:notices\/mse1-practicals-2026\.html|data\/mse1-sem1-2026-09-14\.pdf)$/.test(String(raw || ""))) return true;
     if (/^\/api\/faculty\/photo\?id=\d{1,8}$/.test(String(raw || ""))) return true;
     try {
@@ -6478,6 +6478,7 @@ function renderReferenceLinks() {
   ];
   container.innerHTML = [
     makeGroup("Seating plans - 25 September 2026", "Supplied documents; assignments apply only to this examination date.", [{label:"Physics Group seating - report 12:30 PM",url:"/data/seating-2026-09-25-physics.pdf"},{label:"Chemistry Group seating - report 9:00 AM",url:"/data/seating-2026-09-25-chemistry.pdf"}]),
+    makeGroup("Seating plans - 30 September 2026", "Supplied documents; assignments apply only to the matching exam and shift.", [{label:"EDG Shift 1 · ME, CE and RAI · 9:15–10:45 AM",url:"/data/seating-2026-09-30-edg-shift-1.pdf"},{label:"EDG Shift 2 · EE and EC · 11:00 AM–12:30 PM",url:"/data/seating-2026-09-30-edg-shift-2.pdf"},{label:"BEEE · Chemistry Group",url:"/data/seating-2026-09-30-beee-chemistry.pdf"}]),
     makeGroup("Supplied exam notices", "Transcribed from supplied documents; official web publication has not been verified.", [{ label: "MSE-I practical and workshop notices", note: "5?9 October 2026 ? workshop times confirmed by supplier", url: "/notices/mse1-practicals-2026.html" }, { label: "MSE-I theory date sheet", note: "Supplied PDF ? issued 14 September 2026", url: "/data/mse1-sem1-2026-09-14.pdf" }]),
     makeGroup("Start here", "The most useful official links for this device.", startHere),
     ...(globalThis.CompassExams ? [makeGroup("Exam date sheet", "Supplied GNDEC Applied Sciences document. Official web link pending; later notices may revise these dates.", [{ label: globalThis.CompassExams.source.title, note: `Issued ${globalThis.CompassExams.source.issued} · PDF`, url: globalThis.CompassExams.source.pdfUrl }])] : []),
