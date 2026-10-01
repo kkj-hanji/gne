@@ -315,7 +315,11 @@ test("existing app answer modes consume the publication with active selection an
 test("Today card and practical banner expire in the DOM at the final slot",async()=>{
   const {ctx,document}=deskHarness();let own={...context,today:"2026-10-01",minutes:854};
   ctx.CompassExamDesk.init({context:()=>own,ask(){}});await ctx.CompassExamDesk.refresh();
+  own.today="2026-09-24";own.minutes=600;own.todayView="exam";ctx.CompassExamDesk.render();
+  assert.match(document.querySelector(".now-card .card-kicker").textContent,/NEXT EXAM · ECB/);
+  own.today="2026-10-01";own.minutes=854;own.todayView="auto";ctx.CompassExamDesk.render();
   assert.equal(document.getElementById("today-exam-card").hidden,false);
+  assert.match(document.querySelector(".now-card .card-kicker").textContent,/LIVE EXAM · ECB/);
   assert.equal(document.getElementById("today-timetable-content").hidden,true);
   own.minutes=855;ctx.CompassExamDesk.render();
   assert.equal(document.getElementById("today-exam-card").hidden,true);
