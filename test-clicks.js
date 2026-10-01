@@ -90,6 +90,7 @@ test("chat form renders every compound answer and rejects invalid dates", async 
   assert.match(await submit("how many classes in room F113 next week"), /1 scheduled class entries.*60 minutes/s);
   assert.doesNotMatch(await submit("who created this website"), /\bkkj\b|admin|unlock|token/i);
   vm.runInContext('renderReferenceLinks();', context);
-  assert.ok(document.querySelector('#reference-links a[href="/data/mse1-sem1-2026-09-14.pdf"]'));
+  assert.equal(document.querySelector('#reference-links a[href="/data/mse1-sem1-2026-09-14.pdf"]'), null);
+  assert.equal(document.querySelectorAll('#reference-links a[href*="seating-2026-09-"]').length, 0);
   assert.equal(document.querySelectorAll(".thinking").length, 0);
 });

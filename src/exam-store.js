@@ -51,8 +51,14 @@ export async function examResponse(request,env,authorized=false) {
     const next=domain.validate(candidate);
     if(!next.events.length) return json({error:"Keep at least one event in the publication."},400);
     next.revision=crypto.randomUUID();next.publishedAt=new Date().toISOString();
-    await env.SOURCE_REGISTRY.put(KEY+":previous",JSON.stringify(data));
-    await env.SOURCE_REGISTRY.put(KEY,JSON.stringify(next));
-    return json({ok:true,revision:next.revision,publishedAt:next.publishedAt,events:next.events.length,seats:next.seats.length});
+    if(body.purgePrevious===true){
+      await env.SOURCE_REGISTRY.put(KEY,JSON.stringify(next));
+      try { await env.SOURCE_REGISTRY.delete(KEY+":previous"); }
+      catch { return json({ok:true,revision:next.revision,publishedAt:next.publishedAt,events:next.events.length,seats:next.seats.length,warning:"Current publication is clean, but the previous backup could not be deleted. Retry cleanup."}); }
+    } else {
+      await env.SOURCE_REGISTRY.put(KEY+":previous",JSON.stringify(data));
+      await env.SOURCE_REGISTRY.put(KEY,JSON.stringify(next));
+    }
+    return json({ok:true,revision:next.revision,publishedAt:next.publishedAt,events:next.events.length,seats:next.seats.length,cleanedPrevious:body.purgePrevious===true});
   } catch(error) { return json({error:error.message || "Publication failed; reload and verify before retrying."},400); }
 }

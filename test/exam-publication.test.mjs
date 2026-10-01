@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFile} from "node:fs/promises";
+import {readFile,readdir} from "node:fs/promises";
 import {createHash, webcrypto} from "node:crypto";
 import vm from "node:vm";
 import {parseHTML} from "linkedom";
@@ -11,19 +11,19 @@ import {examResponse} from "../src/exam-store.js";
 import worker from "../src/worker.js";
 import {createAppHarness} from "../scripts/stress-probe-harness.mjs";
 
-const seed=JSON.parse(await readFile(new URL("../src/data/exam-seed.json",import.meta.url)));
+const seed=JSON.parse(await readFile(new URL("../test/fixtures/exams/archive/exam-seed-2026-mse1.json",import.meta.url)));
 const domain=globalThis.CompassExamDomain;
-const scripts=Object.fromEntries(await Promise.all(["exam-domain","exam-desk","exam-import","admin-exams"].map(async name=>[name,await readFile(new URL(`../public/${name}.js`,import.meta.url),"utf8")])));
+const scripts=Object.fromEntries(await Promise.all(["exam-domain","exam-desk","exam-import","date-sheet-import","admin-exams"].map(async name=>[name,await readFile(new URL(`../public/${name}.js`,import.meta.url),"utf8")])));
 const context={section:"ECB",crn:"2617070",today:"2026-09-24",minutes:1100};
 const select=(q,ctx=context)=>domain.select(seed,q,{...ctx,temporal:globalThis.CompassBrainKernel.resolveTemporalQuery(q+" date",ctx.today)});
 const request=(path,method="GET",body)=>new Request("https://compass.test"+path,{method,headers:{"Content-Type":"application/json"},...(body?{body:JSON.stringify(body)}:{})});
-class MemoryKv {values=new Map();async get(k){return this.values.has(k)?JSON.parse(this.values.get(k)):null;}async put(k,v){this.values.set(k,v);}}
+class MemoryKv {values=new Map();async get(k){return this.values.has(k)?JSON.parse(this.values.get(k)):null;}async put(k,v){this.values.set(k,v);}async delete(k){this.values.delete(k);}}
 
 test("all supplied searchable seating PDFs round-trip and the scanned EDG table is source-hash verified",async()=>{
   assert.equal(seed.events.length,21);assert.equal(seed.seats.length,2292);
-  const sources=JSON.parse(await readFile(new URL("../src/data/exam-source-manifest.json",import.meta.url)));
+  const sources=JSON.parse(await readFile(new URL("../test/fixtures/exams/archive/source-manifest-2026-mse1.json",import.meta.url)));
   for(const source of sources){
-    const bytes=await readFile(new URL("../public"+source.url,import.meta.url));
+    const bytes=await readFile(new URL("../test/fixtures/exams/archive/"+source.url.split("/").pop(),import.meta.url));
     assert.equal(createHash("sha256").update(bytes).digest("hex"),source.sha256);
     const pdf=await getDocument({data:new Uint8Array(bytes),verbosity:0}).promise;
     const event=seed.events.find(e=>e.sourceUrl===source.url);const parsed=[];
@@ -36,6 +36,19 @@ test("all supplied searchable seating PDFs round-trip and the scanned EDG table 
   const edg1=seed.seats.find(s=>s.eventId==="mse1-theory-8"&&s.crn==="2614001");assert.deepEqual(edg1,{eventId:"mse1-theory-8",crn:"2614001",room:"S-201",row:"Row-I",seat:"1",page:1});
   const edg2=seed.seats.find(s=>s.eventId==="mse1-theory-9"&&s.crn==="2617001");assert.deepEqual(edg2,{eventId:"mse1-theory-9",crn:"2617001",room:"S-201",row:"Row-I",seat:"1",page:1});
   const beee=seed.seats.find(s=>s.eventId==="mse1-theory-3"&&s.crn==="2615001");assert.equal(beee.room,"F-101");
+});
+
+test("deployed fallback and static data contain only practical/workshop records, not expired PDFs or seats",async()=>{
+  const liveSeed=JSON.parse(await readFile(new URL("../src/data/exam-seed.json",import.meta.url)));
+  const summary=JSON.parse(await readFile(new URL("../public/data/exam-summary.json",import.meta.url)));
+  assert.equal(liveSeed.events.some(event=>event.kind==="theory"),false);
+  assert.equal(liveSeed.seats.length,0);
+  assert.equal(liveSeed.events.filter(event=>event.kind==="practical").length,1);
+  assert.equal(liveSeed.events.filter(event=>event.kind==="workshop").length,9);
+  assert.equal(summary.seats.length,0);
+  assert.equal(summary.events.some(event=>event.kind==="theory"),false);
+  assert.equal((await readdir(new URL("../public/data/",import.meta.url))).some(name=>/^(?:seating-|mse1-sem1-).*\.pdf$/i.test(name)),false);
+  assert.equal((await readdir(new URL("../public/data/",import.meta.url))).includes("exam-import-fixtures.json"),false);
 });
 
 test("all workshop sections tolerate equivalent English, Roman Hindi/Punjabi and typo phrases",()=>{
@@ -79,7 +92,7 @@ test("malformed publications, unsafe sources, duplicate identities/positions fai
 });
 
 test("shared publishing requires authorization, detects stale revisions, updates seats and supports rollback",async()=>{
-  const env={SOURCE_REGISTRY:new MemoryKv()};
+  const env={SOURCE_REGISTRY:new MemoryKv()};await env.SOURCE_REGISTRY.put("gndec-compass:exam-publication:v1",JSON.stringify(seed));
   assert.equal((await examResponse(request("/api/admin/exams"),env)).status,401);
   const pub=await(await examResponse(request("/api/exams"),env)).json();assert.equal(pub.seats,undefined);assert.doesNotMatch(JSON.stringify(pub),/2617070/);
   const draft=await(await examResponse(request("/api/admin/exams"),env,true)).json();draft.seats.find(s=>s.crn==="2617070").room="F108";
@@ -95,6 +108,22 @@ test("shared publishing requires authorization, detects stale revisions, updates
   const bad=new Request("https://compass.test/api/exams/seat",{method:"POST",headers:{"Content-Type":"application/json"},body:"{"});assert.equal((await examResponse(bad,env)).status,400);
 });
 
+test("explicit cleanup deletes only ended theory rows and clears the previous KV copy",async()=>{
+  const env={SOURCE_REGISTRY:new MemoryKv()};
+  await env.SOURCE_REGISTRY.put("gndec-compass:exam-publication:v1",JSON.stringify(seed));
+  await env.SOURCE_REGISTRY.put("gndec-compass:exam-publication:v1:previous",JSON.stringify(seed));
+  const draft=await(await examResponse(request("/api/admin/exams"),env,true)).json();
+  const expired=new Set(draft.events.filter(event=>event.kind==="theory"&&(event.endDate<"2026-10-01"||(event.endDate==="2026-10-01"&&event.end<=1200))).map(event=>event.id));
+  const clean={...draft,events:draft.events.filter(event=>!expired.has(event.id)),seats:draft.seats.filter(seat=>!expired.has(seat.eventId))};
+  const response=await examResponse(request("/api/admin/exams","PUT",{...clean,baseRevision:draft.revision,purgePrevious:true}),env,true);
+  const result=await response.json();assert.equal(result.ok,true);assert.equal(result.cleanedPrevious,true);
+  const live=await env.SOURCE_REGISTRY.get("gndec-compass:exam-publication:v1","json");
+  assert.equal(live.events.some(event=>event.kind==="theory"),false);assert.equal(live.seats.length,0);
+  assert.equal(live.events.filter(event=>event.kind==="practical").length,1);
+  assert.equal(live.events.filter(event=>event.kind==="workshop").length,9);
+  assert.equal(env.SOURCE_REGISTRY.values.has("gndec-compass:exam-publication:v1:previous"),false);
+});
+
 test("Worker protects admin routes and KV failures cannot supply old seats or authorize an edit",async()=>{
   const env={SOURCE_REGISTRY:{get(){throw new Error("unavailable");}},ADMIN_API_TOKEN:"test-key"};
   assert.equal((await worker.fetch(request("/api/admin/exams"),env,{})).status,401);
@@ -107,24 +136,25 @@ function deskHarness(){
   const {document}=parseHTML('<html><body><main id="today"><div id="today-exam-card"></div><div id="today-timetable-content"></div><div id="exam-notice-banner"></div><div id="exam-update-status"></div><div id="exam-admin-panel"></div></main></body></html>');
   const prototype=Object.getPrototypeOf(document.createElement("select"));Object.defineProperty(prototype,"value",{configurable:true,get(){return this.querySelector("option[selected]")?.value||this.querySelector("option")?.value||"";},set(v){for(const o of this.querySelectorAll("option")){if(o.value===v)o.setAttribute("selected","");else o.removeAttribute("selected");}}});
   const storage=new Map(),env={SOURCE_REGISTRY:new MemoryKv()},ctx={document,console,crypto:webcrypto,Intl,Date,Map,Set,JSON,AbortController,URL,Blob,Response,setTimeout,clearTimeout,setInterval(){},confirm:()=>true,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},CompassBrainKernel:globalThis.CompassBrainKernel};
+  env.SOURCE_REGISTRY.values.set("gndec-compass:exam-publication:v1",JSON.stringify(seed));
   ctx.fetch=(path,options={})=>examResponse(new Request("https://compass.test"+path,options),env,options.headers?.["X-Compass-Admin-Key"]==="test-key");
   vm.createContext(ctx);for(const text of Object.values(scripts))vm.runInContext(text,ctx);
   ctx.CompassExamDesk.setData(seed);return {ctx,document,env,storage};
 }
 
 const pdfFile=async group=>{
-  const bytes=await readFile(new URL(`../public/data/seating-2026-09-25-${group}.pdf`,import.meta.url));
+  const bytes=await readFile(new URL(`../test/fixtures/exams/archive/seating-2026-09-25-${group}.pdf`,import.meta.url));
   return {name:`Seating Plan ${group} Group.pdf`,size:bytes.length,arrayBuffer:async()=>Uint8Array.from(bytes).buffer};
 };
 const suppliedPdf=async(name)=>{
-  const bytes=await readFile(new URL(`../public/data/${name}`,import.meta.url));
+  const bytes=await readFile(new URL(`../test/fixtures/exams/archive/${name}`,import.meta.url));
   return {name,size:bytes.length,arrayBuffer:async()=>Uint8Array.from(bytes).buffer};
 };
 const readPdf=bytes=>getDocument({data:new Uint8Array(bytes),verbosity:0}).promise;
 
 test("two actual PDFs preview, map, apply and publish atomically through admin controls",async()=>{
   const {ctx,document,env,storage}=deskHarness(),$=id=>document.getElementById(id);
-  ctx.CompassExamAdmin.init({readPdf});$("exam-publishing-key").value="test-key";await $("exam-admin-load").onclick();
+  ctx.CompassExamAdmin.init({readPdf,context:()=>context});$("exam-publishing-key").value="test-key";await $("exam-admin-load").onclick();
   assert.equal($("exam-publishing-key").getAttribute("aria-describedby"),"exam-key-help");
   assert.match($("exam-key-help").textContent,/ADMIN_API_TOKEN/);
   $("exam-import-date").value="2026-09-25";
@@ -133,7 +163,7 @@ test("two actual PDFs preview, map, apply and publish atomically through admin c
   assert.match($("exam-import-preview").textContent,/570 assignments/);
   assert.match($("exam-import-preview").textContent,/576 assignments/);
   assert.equal($("exam-map-0").value,"mse1-theory-0");assert.equal($("exam-map-1").value,"mse1-theory-5");
-  assert.equal(env.SOURCE_REGISTRY.values.size,0);assert.equal($("exam-publish").disabled,true);
+  assert.equal(env.SOURCE_REGISTRY.values.size,1);assert.equal($("exam-publish").disabled,true);
   await $("exam-apply-import").onclick();assert.match($("exam-seat-preview").textContent,/Imported into draft/);
   await $("exam-review").onclick();assert.match($("exam-publication-preview").textContent,/2292 seating/);
   await $("exam-publish").onclick();assert.match($("exam-admin-status").textContent,/Published successfully/);
@@ -147,7 +177,7 @@ test("two actual PDFs preview, map, apply and publish atomically through admin c
 
 test("three 30 September seating plans import together, including the hash-verified scanned EDG shift",async()=>{
   const {ctx}=deskHarness(), importer=ctx.CompassExamImport;
-  const fixture=JSON.parse(await readFile(new URL("../public/data/exam-import-fixtures.json",import.meta.url)));
+  const fixture=JSON.parse(await readFile(new URL("../test/fixtures/exams/archive/exam-import-fixtures.json",import.meta.url)));
   ctx.fetch=async()=>Response.json(fixture);
   const files=await Promise.all([
     suppliedPdf("seating-2026-09-30-edg-shift-1.pdf"),
@@ -166,7 +196,7 @@ test("three 30 September seating plans import together, including the hash-verif
 
 test("PDF import rejects duplicate, excessive, corrupt and oversized inputs without publication",async()=>{
   const {ctx}=deskHarness(),importer=ctx.CompassExamImport,physics=await pdfFile("physics"),chemistry=await pdfFile("chemistry");
-  const beee=await readFile(new URL("../public/data/seating-2026-09-30-beee-chemistry.pdf",import.meta.url));
+  const beee=await readFile(new URL("../test/fixtures/exams/archive/seating-2026-09-30-beee-chemistry.pdf",import.meta.url));
   const beeeFile={name:"BEEE Chemistry Group.pdf",size:beee.length,arrayBuffer:async()=>Uint8Array.from(beee).buffer};
   const three=await importer.readFiles([physics,chemistry,beeeFile],readPdf);assert.equal(three.length,3);assert.equal(three[2].rows.length,570);
   await assert.rejects(importer.readFiles([physics,chemistry,beeeFile,{...physics,name:"fourth.pdf"}],readPdf),/one, two, or three/);
@@ -200,14 +230,14 @@ test("exam date and group mapping distinguishes same-subject papers and validate
 test("changing a PDF selection during reading invalidates the pending preview",async()=>{
   const {ctx,document,env}=deskHarness(),$=id=>document.getElementById(id);
   let finish,started;const pending=new Promise(resolve=>{finish=resolve;}),reading=new Promise(resolve=>{started=resolve;});
-  ctx.CompassExamAdmin.init({readPdf:async bytes=>{started();await pending;return readPdf(bytes);}});
+  ctx.CompassExamAdmin.init({readPdf:async bytes=>{started();await pending;return readPdf(bytes);},context:()=>context});
   $("exam-publishing-key").value="test-key";await $("exam-admin-load").onclick();$("exam-import-date").value="2026-09-25";
   Object.defineProperty($("exam-seating-multi-files"),"files",{value:[await pdfFile("physics")]});
   const preparing=$("exam-import-multi-seats").onclick();await reading;
   $("exam-seating-multi-files").onchange();finish();await preparing;
   assert.match($("exam-admin-status").textContent,/selection changed/);
   assert.equal($("exam-apply-import").disabled,true);assert.equal($("exam-import-preview").innerHTML,"");
-  assert.equal(env.SOURCE_REGISTRY.values.size,0);
+  assert.equal(env.SOURCE_REGISTRY.values.size,1);
 });
 
 test("Today exam cards show reporting, elapsed time, exact seat and preserve expanded details",async()=>{
@@ -269,8 +299,9 @@ test("failed multi-exam seat lookup stops after one failed request",async()=>{
   assert.equal(calls,1);
 });
 
-test("every published CRN lookup returns its own exact exam assignment",async()=>{
-  for(const seat of seed.seats){const response=await examResponse(request("/api/exams/seat","POST",{eventId:seat.eventId,crn:seat.crn}),{});assert.equal(response.status,200);const value=await response.json();assert.deepEqual(value.seat,seat);}
+test("every archived CRN lookup returns its own exact exam assignment",async()=>{
+  const env={SOURCE_REGISTRY:new MemoryKv()};await env.SOURCE_REGISTRY.put("gndec-compass:exam-publication:v1",JSON.stringify(seed));
+  for(const seat of seed.seats){const response=await examResponse(request("/api/exams/seat","POST",{eventId:seat.eventId,crn:seat.crn}),env);assert.equal(response.status,200);const value=await response.json();assert.deepEqual(value.seat,seat);}
   for(const section of [...new Set(seed.events.flatMap(e=>e.sections))]){
     const expected=seed.events.filter(e=>e.kind==="theory" && e.sections.includes(section));
     assert.deepEqual(select(section+" exams").events.map(e=>e.id).sort(),expected.map(e=>e.id).sort());
@@ -291,7 +322,7 @@ test("real admin controls load, validate pasted seats, review and publish a revi
   const {ctx,document}=deskHarness(),$=id=>document.getElementById(id);
   // LinkeDOM models select.value as read-only; browsers implement a setter.
   const prototype=Object.getPrototypeOf(document.createElement("select"));Object.defineProperty(prototype,"value",{configurable:true,get(){return this.querySelector("option[selected]")?.value||this.querySelector("option")?.value||"";},set(v){for(const o of this.querySelectorAll("option")){if(o.value===v)o.setAttribute("selected","");else o.removeAttribute("selected");}}});
-  ctx.CompassExamAdmin.init({});$("exam-publishing-key").value="test-key";await $("exam-admin-load").onclick();
+  ctx.CompassExamAdmin.init({context:()=>context});$("exam-publishing-key").value="test-key";await $("exam-admin-load").onclick();
   assert.equal($("exam-editor").hidden,false);$("exam-edit-select").value="mse1-theory-5";$("exam-edit-select").onchange();
   $("exam-seat-csv").value="crn,room,row,seat\n2617070,F108,Row-II,8";await $("exam-paste-seats").onclick();assert.match($("exam-seat-preview").textContent,/1 assignments/);
   await $("exam-review").onclick();assert.equal($("exam-publish").disabled,false);await $("exam-publish").onclick();assert.match($("exam-admin-status").textContent,/Published successfully/);
@@ -300,6 +331,44 @@ test("real admin controls load, validate pasted seats, review and publish a revi
   $("exam-one-room").value="F109";await $("exam-save-seat").onclick();await $("exam-review").onclick();await $("exam-publish").onclick();
   assert.match(await ctx.CompassExamDesk.respond("my exam room tomorrow",context),/Room F109/);
   ctx.CompassExamAdmin.clear();assert.equal($("exam-publishing-key").value,"");assert.equal($("exam-editor").hidden,true);
+});
+
+test("admin reads a selectable datesheet into editable rows and never publishes before review",async()=>{
+  const {ctx,document,env}=deskHarness(),$=id=>document.getElementById(id);
+  const readPdf=async()=>({numPages:1,getPage:async()=>({getTextContent:async()=>({items:[{str:"30 September 2026 EDG 11:00 AM - 12:30 PM EEA ECB"}]})}),destroy:async()=>{}});
+  ctx.CompassExamAdmin.init({readPdf,context:()=>({...context,today:"2026-10-01",minutes:700})});
+  $("exam-publishing-key").value="test-key";await $("exam-admin-load").onclick();
+  const file={name:"Future MSE datesheet.pdf",type:"application/pdf",size:1,arrayBuffer:async()=>new Uint8Array([1]).buffer};
+  Object.defineProperty($("exam-datesheet-files"),"files",{value:[file]});
+  await $("exam-datesheet-read").onclick();
+  assert.match($("exam-datesheet-preview").textContent,/Recognized event/);
+  assert.equal($("exam-datesheet-apply").disabled,false);
+  assert.equal(env.SOURCE_REGISTRY.values.size,1);
+  await $("exam-datesheet-apply").onclick();
+  assert.match($("exam-datesheet-preview").textContent,/unpublished draft/);
+  assert.equal(env.SOURCE_REGISTRY.values.size,1);
+  await $("exam-review").onclick();assert.match($("exam-publication-preview").textContent,/EDG/);
+  await $("exam-publish").onclick();
+  const publication=await env.SOURCE_REGISTRY.get("gndec-compass:exam-publication:v1","json");
+  assert.equal(publication.events.some(event=>event.title==="EDG"&&event.date==="2026-09-30"&&event.sections.includes("EEA")),true);
+});
+
+test("KKJ cleanup controls download a backup, show exact removals and keep future practical/workshop notices",async()=>{
+  const {ctx,document,env}=deskHarness(),$=id=>document.getElementById(id);
+  env.SOURCE_REGISTRY.values.set("gndec-compass:exam-publication:v1:previous",JSON.stringify(seed));
+  ctx.URL.createObjectURL=()=>"blob:backup";ctx.URL.revokeObjectURL=()=>{};
+  ctx.CompassExamAdmin.init({context:()=>({...context,today:"2026-10-01",minutes:1200})});
+  $("exam-publishing-key").value="test-key";await $("exam-admin-load").onclick();
+  $("exam-cleanup-preview-button").onclick&&await $("exam-cleanup-preview-button").onclick();
+  assert.match($("exam-cleanup-preview").textContent,/11 completed theory events and 2292 linked seat assignments/);
+  assert.equal($("exam-cleanup-confirm").disabled,false);
+  await $("exam-cleanup-confirm").onclick();
+  const live=await env.SOURCE_REGISTRY.get("gndec-compass:exam-publication:v1","json");
+  assert.equal(live.events.some(event=>event.kind==="theory"),false);assert.equal(live.seats.length,0);
+  assert.equal(live.events.filter(event=>event.kind==="practical").length,1);
+  assert.equal(live.events.filter(event=>event.kind==="workshop").length,9);
+  assert.equal(env.SOURCE_REGISTRY.values.has("gndec-compass:exam-publication:v1:previous"),false);
+  assert.match($("exam-admin-status").textContent,/cleaned/);
 });
 
 test("existing app answer modes consume the publication with active selection and safe fallback",()=>{
@@ -387,7 +456,7 @@ test("actual chat submit uses published seating with Roman language, date change
   Object.assign(c,{document,AbortController,Response,location:{hash:"",search:"",href:"https://compass.test/"}});
   Object.assign(c.window,{addEventListener(){},matchMedia:()=>({matches:false})});
   for(const name of ["exam-domain","exam-desk"])vm.runInContext(scripts[name],c);
-  c.CompassExamDesk.setData(seed);const env={SOURCE_REGISTRY:new MemoryKv()};
+  c.CompassExamDesk.setData(seed);const env={SOURCE_REGISTRY:new MemoryKv()};await env.SOURCE_REGISTRY.put("gndec-compass:exam-publication:v1",JSON.stringify(seed));
   c.fetch=(path,options)=>examResponse(new Request("https://compass.test"+path,options),env);
   h.api.state.nowOverride="2026-09-24T10:00:00Z";
   h.api.state.student={name:"KAUSHIK JAIN",crn:"2617070",section:"ECB",subsection:"ECB1"};

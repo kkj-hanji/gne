@@ -93,12 +93,10 @@ for(const cfg of sourceConfigs){
   sources.push({kind:cfg.kind,pages:pdf.numPages,assignments:extracted.length,sha256:createHash("sha256").update(bytes).digest("hex"),url:"/data/"+cfg.name,method:cfg.kind==="edg-shift-2"?"visually checked image-table transcription; PDF has no text layer":"selectable PDF text parsed and assignment count checked"});
 }
 const data=domain.validate({revision:"seed-20260929-1",publishedAt:new Date().toISOString(),events,seats});
-await mkdir(new URL("../src/data/",import.meta.url),{recursive:true});
-await mkdir(new URL("../public/data/",import.meta.url),{recursive:true});
-await writeFile(new URL("../src/data/exam-seed.json",import.meta.url),JSON.stringify(data,null,2)+"\n");
-await writeFile(new URL("../public/data/exam-summary.json",import.meta.url),JSON.stringify({...data,seats:[]},null,2)+"\n");
-await writeFile(new URL("../src/data/exam-source-manifest.json",import.meta.url),JSON.stringify(sources,null,2)+"\n");
+await mkdir(new URL("../test/fixtures/exams/archive/",import.meta.url),{recursive:true});
+await writeFile(new URL("../test/fixtures/exams/archive/exam-seed-2026-mse1.json",import.meta.url),JSON.stringify(data,null,2)+"\n");
+await writeFile(new URL("../test/fixtures/exams/archive/source-manifest-2026-mse1.json",import.meta.url),JSON.stringify(sources,null,2)+"\n");
 const scan=sources.find(s=>s.kind==="edg-shift-2");
-await writeFile(new URL("../public/data/exam-import-fixtures.json",import.meta.url),JSON.stringify({fixtures:[{sha256:scan.sha256,rows:seats.filter(s=>s.eventId==="mse1-theory-9")}]},null,2)+"\n");
-for(const cfg of sourceConfigs) await copyFile(cfg.path,new URL("../public/data/"+cfg.name,import.meta.url));
+await writeFile(new URL("../test/fixtures/exams/archive/exam-import-fixtures.json",import.meta.url),JSON.stringify({fixtures:[{sha256:scan.sha256,rows:seats.filter(s=>s.eventId==="mse1-theory-9")}]},null,2)+"\n");
+for(const cfg of sourceConfigs) await copyFile(cfg.path,new URL("../test/fixtures/exams/archive/"+cfg.name,import.meta.url));
 console.log(JSON.stringify({events:events.length,seats:seats.length,sources},null,2));

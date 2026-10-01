@@ -31,7 +31,7 @@ function harness(mode = "v22") {
 
 test("date sheet bytes, issuer and all printed exam rows are preserved", async () => {
   const { exams } = harness();
-  const bytes = await readFile(new URL("../public/data/mse1-sem1-2026-09-14.pdf", import.meta.url));
+  const bytes = await readFile(new URL("../test/fixtures/exams/archive/mse1-sem1-2026-09-14.pdf", import.meta.url));
   assert.equal(createHash("sha256").update(bytes).digest("hex"), exams.source.sha256);
   const pdf = await getDocument({ data: new Uint8Array(bytes), verbosity: 0 }).promise;
   assert.equal(pdf.numPages, 1);
@@ -151,10 +151,12 @@ test("missing data, unknown sections and unsupported sessions do not invent answ
   assert.doesNotMatch(api.answerWithoutAi("IT exam date sheet"), /Physics<\/strong>/);
 });
 
-test("app loads exam data before the entry point and caches both module and PDF", async () => {
+test("app loads exam data before the entry point and no longer caches expired exam PDFs", async () => {
   const html = await read("../public/index.html");
   const sw = await read("../public/sw.js");
   assert.ok(html.indexOf('src="exam-schedule.js') < html.indexOf('src="app.js'));
   assert.match(sw, /\/exam-schedule\.js\?v=20260915-1/);
-  assert.match(sw, /\/data\/mse1-sem1-2026-09-14\.pdf/);
+  assert.match(html, /src="date-sheet-import\.js/);
+  assert.match(sw, /\/date-sheet-import\.js/);
+  assert.doesNotMatch(sw, /mse1-sem1-2026-09-14\.pdf|seating-2026-09-/);
 });

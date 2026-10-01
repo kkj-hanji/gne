@@ -113,5 +113,5 @@ test("saved chat keeps original dates and labels older messages without inventin
   assert.match(document.querySelector(".chat-timestamp").textContent, /date not recorded/);
   vm.runInContext("state.sourceRegistry = null", context);
   extra.renderReferenceLinks();
-  assert.match(document.getElementById("reference-links").textContent, /Supplied exam notices/);
+  assert.doesNotMatch(document.getElementById("reference-links").textContent, /Supplied exam notices|Seating plans/);
 });
