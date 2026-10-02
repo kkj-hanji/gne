@@ -13,10 +13,10 @@
   "categories": ["education", "productivity", "utilities"],
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/logo.png?v=20261002-1",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
@@ -24,13 +24,13 @@
       "name": "Ask Compass",
       "short_name": "Ask",
       "url": "/#chat",
-      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/logo.png?v=20261002-1", "sizes": "1254x1254", "type": "image/png" }]
     },
     {
       "name": "Open timetable",
       "short_name": "Timetable",
       "url": "/#timetable",
-      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [{ "src": "/logo.png?v=20261002-1", "sizes": "1254x1254", "type": "image/png" }]
     }
   ]
 }

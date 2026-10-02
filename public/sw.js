@@ -1,7 +1,7 @@
 "use strict";
 
 const CACHE_PREFIX = "gndec-compass-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}20261001-2`;
+const CACHE_NAME = `${CACHE_PREFIX}20261002-1`;
 const SHELL = [
   "/",
   "/exam-domain.js?v=20260929-1",
@@ -11,7 +11,7 @@ const SHELL = [
   "/data/exam-summary.json",
   "/admin-exams.js?v=20261001-2",
   "/index.html",
-  "/styles.css?v=20260929-1",
+  "/styles.css?v=20261002-1",
   "/brain-kernel.js?v=20260918-2",
   "/brain-v1-2.js?v=20260905-1",
   "/brain-v2-2.js?v=20260905-1",
@@ -26,8 +26,8 @@ const SHELL = [
   "/data/faculty-directory-index.json",
   "/data/faculty-contacts.json",
   "/app.js?v=20260929-1",
-  "/manifest.webmanifest?v=20260821-13",
-  "/icon.svg?v=20260821-13"
+  "/manifest.webmanifest?v=20261002-1",
+  "/logo.png?v=20261002-1"
 ];
 
 self.addEventListener("install", (event) => {
