@@ -38,17 +38,39 @@ test("all supplied searchable seating PDFs round-trip and the scanned EDG table 
   const beee=seed.seats.find(s=>s.eventId==="mse1-theory-3"&&s.crn==="2615001");assert.equal(beee.room,"F-101");
 });
 
-test("deployed fallback and static data contain only practical/workshop records, not expired PDFs or seats",async()=>{
+test("deployed fallback and static data contain only workshop records, not expired PDFs or seats",async()=>{
   const liveSeed=JSON.parse(await readFile(new URL("../src/data/exam-seed.json",import.meta.url)));
   const summary=JSON.parse(await readFile(new URL("../public/data/exam-summary.json",import.meta.url)));
   assert.equal(liveSeed.events.some(event=>event.kind==="theory"),false);
   assert.equal(liveSeed.seats.length,0);
-  assert.equal(liveSeed.events.filter(event=>event.kind==="practical").length,1);
+  assert.equal(liveSeed.events.filter(event=>event.kind==="practical").length,0);
   assert.equal(liveSeed.events.filter(event=>event.kind==="workshop").length,9);
   assert.equal(summary.seats.length,0);
   assert.equal(summary.events.some(event=>event.kind==="theory"),false);
+  assert.deepEqual(summary.events,liveSeed.events);
   assert.equal((await readdir(new URL("../public/data/",import.meta.url))).some(name=>/^(?:seating-|mse1-sem1-).*\.pdf$/i.test(name)),false);
   assert.equal((await readdir(new URL("../public/data/",import.meta.url))).includes("exam-import-fixtures.json"),false);
+});
+
+test("withdrawn lab notice cannot return from saved data, shared storage or rollback",async()=>{
+  const {ctx,env,storage}=deskHarness();
+  const key="gndec-compass:exam-publication:v1";
+  assert.equal(seed.events.some(e=>e.id==="mse1-practical-window"),true,"historical fixture exercises migration");
+  const publicData=await(await examResponse(request("/api/exams"),env)).json();
+  assert.equal(publicData.events.some(e=>e.id==="mse1-practical-window"),false);
+  assert.equal(publicData.events.filter(e=>e.kind==="workshop").length,9);
+  assert.deepEqual(publicData.events.filter(e=>e.kind==="theory"),seed.events.filter(e=>e.kind==="theory"));
+  storage.set("gndec-compass-exam-summary-v1",JSON.stringify(seed));
+  ctx.fetch=async()=>{throw new Error("offline");};
+  ctx.CompassExamDesk.init({context:()=>context,ask(){}});await ctx.CompassExamDesk.refresh();
+  assert.equal(ctx.CompassExamDesk.getData().events.some(e=>e.id==="mse1-practical-window"),false);
+  assert.doesNotMatch(ctx.CompassExamDesk.answer("physics lab exam",context),/respective lab turns|5 Oct, 2026/);
+  await env.SOURCE_REGISTRY.put(key+":previous",JSON.stringify(seed));
+  const rollback=await examResponse(request("/api/admin/exams","PUT",{baseRevision:publicData.revision,rollback:true}),env,true);
+  assert.equal(rollback.status,200);
+  const restored=await env.SOURCE_REGISTRY.get(key);
+  assert.equal(restored.events.some(e=>e.id==="mse1-practical-window"),false);
+  assert.deepEqual(restored.seats,seed.seats);
 });
 
 test("all workshop sections tolerate equivalent English, Roman Hindi/Punjabi and typo phrases",()=>{
@@ -119,7 +141,7 @@ test("explicit cleanup deletes only ended theory rows and clears the previous KV
   const result=await response.json();assert.equal(result.ok,true);assert.equal(result.cleanedPrevious,true);
   const live=await env.SOURCE_REGISTRY.get("gndec-compass:exam-publication:v1","json");
   assert.equal(live.events.some(event=>event.kind==="theory"),false);assert.equal(live.seats.length,0);
-  assert.equal(live.events.filter(event=>event.kind==="practical").length,1);
+  assert.equal(live.events.filter(event=>event.kind==="practical").length,0);
   assert.equal(live.events.filter(event=>event.kind==="workshop").length,9);
   assert.equal(env.SOURCE_REGISTRY.values.has("gndec-compass:exam-publication:v1:previous"),false);
 });
@@ -133,7 +155,7 @@ test("Worker protects admin routes and KV failures cannot supply old seats or au
 });
 
 function deskHarness(){
-  const {document}=parseHTML('<html><body><main id="today"><div id="today-exam-card"></div><div id="today-timetable-content"></div><div id="exam-notice-banner"></div><div id="exam-update-status"></div><div id="exam-admin-panel"></div></main></body></html>');
+  const {document}=parseHTML('<html><body><main id="today"><div id="today-exam-card"></div><div id="today-timetable-content"></div><div id="exam-update-status"></div><div id="exam-admin-panel"></div></main></body></html>');
   const prototype=Object.getPrototypeOf(document.createElement("select"));Object.defineProperty(prototype,"value",{configurable:true,get(){return this.querySelector("option[selected]")?.value||this.querySelector("option")?.value||"";},set(v){for(const o of this.querySelectorAll("option")){if(o.value===v)o.setAttribute("selected","");else o.removeAttribute("selected");}}});
   const storage=new Map(),env={SOURCE_REGISTRY:new MemoryKv()},ctx={document,console,crypto:webcrypto,Intl,Date,Map,Set,JSON,AbortController,URL,Blob,Response,setTimeout,clearTimeout,setInterval(){},confirm:()=>true,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},CompassBrainKernel:globalThis.CompassBrainKernel};
   env.SOURCE_REGISTRY.values.set("gndec-compass:exam-publication:v1",JSON.stringify(seed));
@@ -365,7 +387,7 @@ test("KKJ cleanup controls download a backup, show exact removals and keep futur
   await $("exam-cleanup-confirm").onclick();
   const live=await env.SOURCE_REGISTRY.get("gndec-compass:exam-publication:v1","json");
   assert.equal(live.events.some(event=>event.kind==="theory"),false);assert.equal(live.seats.length,0);
-  assert.equal(live.events.filter(event=>event.kind==="practical").length,1);
+  assert.equal(live.events.filter(event=>event.kind==="practical").length,0);
   assert.equal(live.events.filter(event=>event.kind==="workshop").length,9);
   assert.equal(env.SOURCE_REGISTRY.values.has("gndec-compass:exam-publication:v1:previous"),false);
   assert.match($("exam-admin-status").textContent,/cleaned/);
@@ -381,7 +403,7 @@ test("existing app answer modes consume the publication with active selection an
   h.api.state.selectedGroup="MEA";assert.match(h.api.answerWithoutAi("my workshop exam"),/8:30 AM/);
 });
 
-test("Today card and practical banner expire in the DOM at the final slot",async()=>{
+test("Today card expires in the DOM at the final theory slot",async()=>{
   const {ctx,document}=deskHarness();let own={...context,today:"2026-10-01",minutes:854};
   ctx.CompassExamDesk.init({context:()=>own,ask(){}});await ctx.CompassExamDesk.refresh();
   own.today="2026-09-24";own.minutes=600;own.todayView="exam";ctx.CompassExamDesk.render();
@@ -393,24 +415,21 @@ test("Today card and practical banner expire in the DOM at the final slot",async
   own.minutes=855;ctx.CompassExamDesk.render();
   assert.equal(document.getElementById("today-exam-card").hidden,true);
   assert.equal(document.getElementById("today-timetable-content").hidden,false);
-  assert.equal(document.getElementById("exam-notice-banner").hidden,false);
-  own.today="2026-10-10";ctx.CompassExamDesk.render();assert.equal(document.getElementById("exam-notice-banner").hidden,true);
+  assert.equal(document.getElementById("exam-notice-banner"),null);
+  own.today="2026-10-10";ctx.CompassExamDesk.render();assert.equal(document.getElementById("exam-notice-banner"),null);
 });
 
-test("practical and workshop notice bar stays on Today after theory exams and expires after its dates",async()=>{
-  const {ctx,document}=deskHarness();let own={...context,today:"2026-10-02",minutes:600,todayView:"auto"};
+test("Today has no practical banner and workshops remain available in Ask Compass",async()=>{
+  const {ctx,document}=deskHarness();
+  const own={...context,today:"2026-10-04",minutes:600,todayView:"auto"};
   ctx.CompassExamDesk.init({context:()=>own,ask(){}});await ctx.CompassExamDesk.refresh();
-  const banner=document.getElementById("exam-notice-banner");
   assert.equal(document.getElementById("today-exam-card").hidden,true);
   assert.equal(document.getElementById("today-timetable-content").hidden,false);
-  assert.equal(banner.hidden,false);
-  assert.match(banner.textContent,/Upcoming practical and workshop exams/);
-  assert.match(banner.textContent,/5 Oct, 2026.*9 Oct, 2026/);
-  assert.match(banner.textContent,/9 Oct, 2026/);
-  own.today="2026-10-10";ctx.CompassExamDesk.render();assert.equal(banner.hidden,true);
-  own.section="CSD";own.today="2026-10-02";ctx.CompassExamDesk.render();
-  assert.match(banner.textContent,/Upcoming practical examinations/);
-  assert.doesNotMatch(banner.textContent,/Upcoming workshop exam/);
+  assert.equal(document.getElementById("exam-notice-banner"),null);
+  assert.match(ctx.CompassExamDesk.answer("my workshop exam",own),/9 Oct, 2026/);
+  assert.doesNotMatch(ctx.CompassExamDesk.answer("physics lab exam",own),/respective lab turns|5 Oct, 2026/);
+  const html=await readFile(new URL("../public/index.html",import.meta.url),"utf8");
+  assert.doesNotMatch(html,/exam-notice-banner/);
 });
 
 test("Today view modes override Auto, preserve the timetable, and handle empty exam data",async()=>{

@@ -63,7 +63,7 @@ test("chat form renders every compound answer and rejects invalid dates", async 
   assert.match(await submit("F 113 timetable"), /ROOM ONLY COURSE/);
   vm.runInContext('state.selectedGroup = "ECB"; state.nowOverride = "2026-09-24T10:00:00Z";', context);
   assert.match(await submit("my workshop MSE1"), /12:30 PM to 2:30 PM/);
-  assert.match(await submit("Physics lab MSE1"), /5?9 October 2026/);
+  assert.match(await submit("Physics lab MSE1"), /No current subject-specific lab examination notice/);
   const teacher = await submit("teacher timetable dr. chahat jain");
   assert.match(teacher, /FACULTY ONLY COURSE/);
   assert.doesNotMatch(teacher, /CSA2|ROOM ONLY COURSE/);

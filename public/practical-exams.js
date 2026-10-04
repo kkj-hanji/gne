@@ -1,11 +1,11 @@
-/* Transcribed from user-supplied notices, 24 September 2026.
+/* Workshop schedule checked against the user-supplied photo, 4 October 2026.
  * Three handwritten AM/PM errors were corrected by the supplying user on 24 September 2026. */
 (function (root) {
   "use strict";
   const source = Object.freeze({
-    title: "MSE-I practical examinations · October 2026",
-    issued: "2026-09-18", url: "/notices/mse1-practicals-2026.html",
-    provenance: "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified."
+    title: "MSE-I Manufacturing Practices (Workshops) · October 2026",
+    issued: null, url: "/notices/mse1-practicals-2026.html",
+    provenance: "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified."
   });
   const workshops = [
     { section: "MEB", date: "2026-10-07", periods: "3–4", printedTime: "10:30 AM to 12:30 PM", start: 630, end: 750 },
@@ -32,9 +32,8 @@
     if (/\b(?:mse\s*-?\s*(?:[23]|ii|iii)|ese|end\s*sem|second\s*semester|sem(?:ester)?\s*[2-8])\b/.test(q) || (q.match(/\b20\d{2}\b/g) || []).some(y => y !== "2026")) return result({ message: "These supplied notices cover MSE-I, Semester I, October 2026 only." });
     const genericPractical = /\bpracticals?\b/.test(q) && !/\b(?:physics|phy|chemistry|chem|english|pps|programming|beee|edg)\b/.test(q);
     const workshop = genericPractical || /\b(?:workshops?|manufacturing|mp|all|both|physics\s+group)\b/.test(q);
-    const labs = !/\b(?:workshops?|manufacturing|mp)\b/.test(q) || /\b(?:labs?|physics|chem(?:istry)?|english|all|both)\b/.test(q);
-    const labMessage = "MSE-I practical examinations: 5–9 October 2026. The supplied message specifies Physics, Chemistry and English labs in your respective lab turns. Keep your files ready and prepare thoroughly for viva. If a scheduled examination day is a holiday, the signed notice says it moves to the corresponding day of the following week. Exact individual lab dates and times are not listed in these notices; confirm your lab turn with the lab in-charge.";
-    if (/\b(?:pps|programming|beee|edg|biology)\b/.test(q) && !workshop) return result({ message: "The accompanying lab message names Physics, Chemistry and English. It does not give a subject-specific examination date or time for the course you requested. Confirm with your lab in-charge." });
+    const labs = !genericPractical && (!/\b(?:workshops?|manufacturing|mp)\b/.test(q) || /\b(?:labs?|physics|chem(?:istry)?|english|all|both)\b/.test(q));
+    const labMessage = "No current subject-specific lab examination notice is available here. Confirm your lab examination date and time with the lab in-charge.";
     if (["invalid", "conflict"].includes(context.temporal?.status)) return result({ message: context.temporal.reason });
     let selected = workshops;
     if (workshop) {

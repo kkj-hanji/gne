@@ -1,22 +1,22 @@
 "use strict";
 
 const CACHE_PREFIX = "gndec-compass-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}20261002-1`;
+const CACHE_NAME = `${CACHE_PREFIX}20261004-1`;
 const SHELL = [
   "/",
-  "/exam-domain.js?v=20260929-1",
-  "/exam-desk.js?v=20261001-2",
+  "/exam-domain.js?v=20261004-1",
+  "/exam-desk.js?v=20261004-1",
   "/exam-import.js?v=20261001-2",
   "/date-sheet-import.js?v=20261001-1",
   "/data/exam-summary.json",
   "/admin-exams.js?v=20261001-2",
   "/index.html",
-  "/styles.css?v=20261002-1",
+  "/styles.css?v=20261004-1",
   "/brain-kernel.js?v=20260918-2",
   "/brain-v1-2.js?v=20260905-1",
   "/brain-v2-2.js?v=20260905-1",
   "/brain-v2.js?v=20260918-2",
-  "/practical-exams.js?v=20260924-1",
+  "/practical-exams.js?v=20261004-1",
   "/notices/mse1-practicals-2026.html",
   "/exam-schedule.js?v=20260915-1",
   "/schedule-analysis.js?v=20260915-1",
@@ -25,7 +25,7 @@ const SHELL = [
   "/data/student-roster-index.json",
   "/data/faculty-directory-index.json",
   "/data/faculty-contacts.json",
-  "/app.js?v=20260929-1",
+  "/app.js?v=20261004-1",
   "/manifest.webmanifest?v=20261002-1",
   "/logo.png?v=20261002-1"
 ];

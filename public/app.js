@@ -6605,6 +6605,8 @@ async function synchronizeOfficialData() {
 
 function activatePage(page, updateHash = true) {
   if (!["today", "chat", "timetable", "profile", "settings"].includes(page)) page = "today";
+  const focusedPage = document.activeElement?.closest?.(".page");
+  if (focusedPage && focusedPage.dataset.page !== page) document.activeElement.blur();
   document.querySelectorAll(".page").forEach((element) => {
     const active = element.dataset.page === page;
     element.classList.toggle("active", active);
@@ -6632,6 +6634,7 @@ function activatePage(page, updateHash = true) {
   if (page === "timetable") renderWeek();
   if (page === "settings") renderSettingsPage();
   if (page === "chat") { const windowEl = $("chat-window"); if (windowEl) windowEl.scrollTop = windowEl.scrollHeight; }
+  syncMobileViewport();
 }
 
 function mobileNavigationEnabled() {
@@ -6669,9 +6672,16 @@ function closeMobileNavigation(returnFocus = false) {
 function syncMobileViewport() {
   const viewport = window.visualViewport;
   const viewportHeight = viewport?.height || window.innerHeight;
-  const keyboardOpen = Boolean(viewport && window.innerHeight - viewportHeight > 150);
+  const editable = document.activeElement?.matches?.('input, textarea, [contenteditable="true"]');
+  const unzoomed = !viewport || Math.abs((viewport.scale || 1) - 1) < 0.05;
+  const keyboardOpen = Boolean(mobileNavigationEnabled() && editable && unzoomed && window.innerHeight - viewportHeight > 150);
+  // Android can resize only the visual viewport. Keep navigation above its
+  // lower edge instead of hiding it, including while the keyboard is closing.
+  const bottomInset = mobileNavigationEnabled() && viewport && unzoomed
+    ? Math.max(0, window.innerHeight - viewportHeight - (viewport.offsetTop || 0)) : 0;
   document.documentElement.classList.toggle("keyboard-open", keyboardOpen);
   document.documentElement.style.setProperty("--compass-visual-viewport-height", `${Math.round(viewportHeight)}px`);
+  document.documentElement.style.setProperty("--compass-viewport-bottom", `${Math.round(bottomInset)}px`);
 }
 
 function registerOfflineShell() {
@@ -7282,6 +7292,10 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener("scroll", syncMobileViewport);
 }
 window.addEventListener("resize", syncMobileViewport);
+document.addEventListener("focusin", syncMobileViewport);
+document.addEventListener("focusout", () => window.setTimeout(syncMobileViewport, 0));
+window.addEventListener("pageshow", syncMobileViewport);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncMobileViewport(); });
 window.addEventListener("resize", syncMobileNavigationAccessibility);
 window.addEventListener("hashchange", () => {
   const page = location.hash.slice(1);

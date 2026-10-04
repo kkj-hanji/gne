@@ -47,6 +47,13 @@
     }) : [];
     return { schemaVersion: 1, revision: clean(input.revision || "", 100), publishedAt: clean(input.publishedAt || "", 60), events, seats };
   }
+  // Withdraw the old combined lab notice from saved devices and publications,
+  // without discarding subsequent admin edits or unrelated exam records.
+  function currentPublication(input, withSeats = true) {
+    const data = validate(input, withSeats);
+    const retiredId = "mse1-practical-window";
+    return { ...data, events: data.events.filter(e => e.id !== retiredId), seats: data.seats.filter(s => s.eventId !== retiredId) };
+  }
   function parseSeatingPage(items, eventId, page) {
     const tokens = items.filter(i => i.str?.trim()).map(i => ({ text: i.str.trim(), x: i.transform[4], y: i.transform[5] }));
     const rooms = tokens.filter(i => /^Room\s+No\./i.test(i.text)).sort((a, b) => b.y - a.y);
@@ -155,5 +162,5 @@
     const forthcoming=own.filter(e=>e.endDate>today || (e.endDate===today && (e.end??1440)>minutes)).sort((a,b)=>a.date.localeCompare(b.date)||(a.start??0)-(b.start??0));
     return { examMode, theory:examMode?theory.filter(e=>e.date>today || (e.date===today && e.end>minutes)):[], notices:forthcoming.filter(e=>e.kind!=="theory").slice(0,5) };
   }
-  root.CompassExamDomain=Object.freeze({normalize,matches,validDate,validate,parseSeatingPage,parseNumberedGridPage,scope,select,active});
+  root.CompassExamDomain=Object.freeze({normalize,matches,validDate,validate,currentPublication,parseSeatingPage,parseNumberedGridPage,scope,select,active});
 })(globalThis);

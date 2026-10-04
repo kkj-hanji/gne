@@ -6,12 +6,12 @@ const json=(body,status=200)=>Response.json(body,{status,headers:{"Cache-Control
 async function current(env, strict = false) {
   try {
     const value=await env.SOURCE_REGISTRY?.get(KEY,"json");
-    if(value) return domain.validate(value);
+    if(value) return domain.currentPublication(value);
   } catch {
     if (strict) throw new Error("The published exam store is unavailable. Retry before editing or checking a seat.");
-    return {...domain.validate(seed), stale:true};
+    return {...domain.currentPublication(seed), stale:true};
   }
-  return domain.validate(seed);
+  return domain.currentPublication(seed);
 }
 export async function examResponse(request,env,authorized=false) {
   const path=new URL(request.url).pathname;
@@ -48,7 +48,7 @@ export async function examResponse(request,env,authorized=false) {
     if(body.baseRevision!==data.revision) return json({error:"The publication changed. Reload the editor before saving."},409);
     const candidate=body.rollback ? await env.SOURCE_REGISTRY.get(KEY+":previous","json") : body;
     if(!candidate) return json({error:"No previous publication is available."},400);
-    const next=domain.validate(candidate);
+    const next=domain.currentPublication(candidate);
     if(!next.events.length) return json({error:"Keep at least one event in the publication."},400);
     next.revision=crypto.randomUUID();next.publishedAt=new Date().toISOString();
     if(body.purgePrevious===true){

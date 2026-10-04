@@ -47,9 +47,9 @@ test("practical questions use device selection, explicit scopes and supplied pro
   assert.match(extra.examQuestionAnswer("CSD2 workshop exam"), /not listed/);
   assert.match(extra.examQuestionAnswer("ECB9 workshop exam"), /not listed/);
   assert.match(extra.examQuestionAnswer("workshop MSE2"), /October 2026 only/);
-  assert.match(extra.examQuestionAnswer("physics lab MSE1"), /5–9 October 2026/);
-  assert.match(extra.examQuestionAnswer("chem lab exam"), /corresponding day of the following week/);
-  assert.match(extra.examQuestionAnswer("English lab MSE1"), /Exact individual lab dates and times are not listed/);
+  assert.match(extra.examQuestionAnswer("physics lab MSE1"), /No current subject-specific lab examination notice/);
+  assert.match(extra.examQuestionAnswer("chem lab exam"), /No current subject-specific lab examination notice/);
+  assert.match(extra.examQuestionAnswer("English lab MSE1"), /No current subject-specific lab examination notice/);
   assert.equal(context.CompassPracticals.resolve("physics syllabus"), null);
   assert.match(extra.examQuestionAnswer("physics exam"), /25 Sept/);
   api.state.selectedGroup = "";

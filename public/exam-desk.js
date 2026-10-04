@@ -6,7 +6,7 @@
   const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const time=m=>m==null?"Your respective lab turn":`${Math.floor(m/60)%12||12}:${String(m%60).padStart(2,"0")} ${m<720?"AM":"PM"}`;
   const date=d=>new Intl.DateTimeFormat("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(d+"T00:00:00Z"));
-  function setData(value){const next=domain.validate(value,false);if(!next.events.length)throw new Error("An empty exam publication cannot replace verified data.");if(data?.publishedAt && next.publishedAt<data.publishedAt)return data;if(data?.revision!==next.revision)seats.clear();data=next;return next;}
+  function setData(value){const next=domain.currentPublication(value,false);if(!next.events.length)throw new Error("An empty exam publication cannot replace verified data.");if(data?.publishedAt && next.publishedAt<data.publishedAt)return data;if(data?.revision!==next.revision)seats.clear();data=next;return next;}
   async function fetchJson(url,options={}){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
     try{const response=await fetch(url,{...options,signal:controller.signal,cache:"no-store",headers:{Accept:"application/json",...options.headers}});const text=await response.text();let body;try{body=JSON.parse(text);}catch{throw new Error("Exam updates returned an unreadable response. Saved data was preserved.");}if(!response.ok)throw new Error(body.error||"Exam request failed.");return body;}finally{clearTimeout(timer);}
@@ -76,7 +76,7 @@
     if(!bridge)return;const ctx=bridge.context(),publication=data||{events:[]},active=domain.active(publication,ctx.section,ctx.today,ctx.minutes);
     const mode=["auto","timetable","exam"].includes(ctx.todayView)?ctx.todayView:"auto";
     const showExams=mode==="exam" || (mode==="auto" && active.examMode);
-    const card=document.getElementById("today-exam-card"),banner=document.getElementById("exam-notice-banner");
+    const card=document.getElementById("today-exam-card");
     const allTheory=publication.events.filter(e=>e.kind==="theory" && e.sections.includes(ctx.section)).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start);
     const upcoming=allTheory.filter(e=>e.date>ctx.today || (e.date===ctx.today && e.end>ctx.minutes));
     if(card){card.hidden=!showExams;const open=[...card.querySelectorAll("details[open]")].map(e=>e.dataset.examEvent);const focused=card.contains(document.activeElement)?document.activeElement:null;const focusKey=focused?.getAttribute("data-exam-ask")||focused?.getAttribute("href");card.innerHTML=showExams?todayMarkup(ctx,allTheory,upcoming,mode):"";for(const details of card.querySelectorAll("details"))if(open.includes(details.dataset.examEvent))details.open=true;if(focusKey){const replacement=[...card.querySelectorAll("button,a")].find(e=>(e.getAttribute("data-exam-ask")||e.getAttribute("href"))===focusKey);replacement?.focus();}}
@@ -84,13 +84,6 @@
     const regular=document.getElementById("today-timetable-content");if(regular)regular.hidden=showExams;
     document.getElementById("today")?.classList.toggle("exam-mode-active",showExams);
     const intro=document.getElementById("intro-copy");if(intro)intro.textContent=showExams?"Your exam dates, reporting times and confirmed seating.":ctx.section?`${date(ctx.today)} · ${[ctx.section,ctx.subgroup].filter(Boolean).join(" / ")} · Your timetable is live.`:"Set up this device to see your own timetable.";
-    if(banner){
-      const notes=active.notices;
-      const hasPractical=notes.some(e=>e.kind==="practical"),hasWorkshop=notes.some(e=>e.kind==="workshop");
-      const heading=hasPractical&&hasWorkshop?"Upcoming practical and workshop exams":hasWorkshop?"Upcoming workshop exam":"Upcoming practical examinations";
-      banner.hidden=!notes.length;
-      banner.innerHTML=notes.length?`<strong>${heading}</strong>${notes.map(e=>`<p>${esc(e.title)} - ${date(e.date)}${e.endDate!==e.date?`-${date(e.endDate)}`:` - ${time(e.start)}-${time(e.end)}`}</p>`).join("")}<button type="button" class="text-button" data-exam-ask="my practical exams">Read exam notices</button>`:"";
-    }
     const status=document.getElementById("exam-update-status");if(status){status.hidden=!showExams;status.textContent=!data?"Exam data is not available yet.":stale?"Saved exam publication · live check unavailable":"Exam updates checked on this device. Notices update automatically when published.";}
   }
   function init(adapter){bridge=adapter;try{setData(JSON.parse(localStorage.getItem(key)||"null"));}catch{}render();refresh();

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": "seed-20261001-clean-1",
-  "publishedAt": "2026-10-01T14:22:15.549Z",
+  "revision": "seed-20261004-workshops-1",
+  "publishedAt": "2026-10-04T00:00:00.000Z",
   "events": [
     {
       "id": "mse1-workshop-meb",
@@ -15,7 +15,7 @@
       "sections": [
         "MEB"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 3–4. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -31,7 +31,7 @@
       "sections": [
         "MEA"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 1–2. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -47,7 +47,7 @@
       "sections": [
         "RAI"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 1–2. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -63,7 +63,7 @@
       "sections": [
         "CEB"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 7–8. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -79,7 +79,7 @@
       "sections": [
         "ECA"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 7–8. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -95,7 +95,7 @@
       "sections": [
         "CEA"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 3–4. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -111,7 +111,7 @@
       "sections": [
         "EEA"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 5–6. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -127,7 +127,7 @@
       "sections": [
         "ECB"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 5–6. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
     },
@@ -143,42 +143,9 @@
       "sections": [
         "EEB"
       ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
+      "source": "User-supplied workshop photo, received 4 October 2026; existing supplier-confirmed PM corrections from 24 September 2026 retained. Official web publication not verified.",
       "sourceUrl": "/notices/mse1-practicals-2026.html",
       "note": "Periods 7–8. Both subsections. Workshop times confirmed by supplier on 24 September 2026."
-    },
-    {
-      "id": "mse1-practical-window",
-      "kind": "practical",
-      "title": "Physics, Chemistry and English lab MSE-I",
-      "date": "2026-10-05",
-      "endDate": "2026-10-09",
-      "start": null,
-      "end": null,
-      "report": null,
-      "sections": [
-        "CSA",
-        "CSB",
-        "CSC",
-        "CSD",
-        "CSE",
-        "CSF",
-        "ITA",
-        "ITB",
-        "ITC",
-        "MEA",
-        "MEB",
-        "CEA",
-        "CEB",
-        "EEA",
-        "EEB",
-        "ECA",
-        "ECB",
-        "RAI"
-      ],
-      "source": "User-supplied notice photographs and message; workshop times confirmed by the supplying user on 24 September 2026. Official web publication not verified.",
-      "sourceUrl": "/notices/mse1-practicals-2026.html",
-      "note": "In your respective lab turns; exact individual lab date/time is not provided. Keep files ready and prepare for viva. If a scheduled examination falls on a holiday, the notice moves it to the corresponding day of the following week. Confirm your lab turn with the lab in-charge."
     }
   ],
   "seats": []
