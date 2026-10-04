@@ -205,6 +205,19 @@ button:disabled,input:disabled,select:disabled{opacity:.62;cursor:not-allowed}
 .ask-send{transform:rotate(0)}
 .chat-disclaimer{margin:10px auto 0;width:100%;max-width:880px;color:var(--faint);font-size:11.5px;text-align:center}
 
+/* Chat owns the visible screen; only the conversation scrolls. Other pages
+   retain normal document scrolling when chat-active is removed. */
+@media screen{
+  html.chat-active,html.chat-active body{height:100%;overflow:hidden;overscroll-behavior:none}
+  html.chat-active .app-shell{position:fixed;left:0;right:0;top:var(--compass-viewport-top,0px);height:var(--compass-visual-viewport-height,100dvh);min-height:0;overflow:hidden}
+  html.chat-active .main-content{height:100%;min-height:0;overflow:hidden}
+  html.chat-active .sidebar{height:100%}
+  html.chat-active .topbar{flex-shrink:0}
+  html.chat-active .chat-page.active{flex:1;min-height:0;height:auto;overflow:hidden}
+  html.chat-active :is(.chat-head,.question-form,.chat-disclaimer){flex-shrink:0}
+  html.chat-active .chat-window{flex:1 1 0;min-height:0}
+}
+
 /* ---------- Timetable week ---------- */
 .timetable-toolbar{display:grid;grid-template-columns:minmax(100px,150px) minmax(150px,190px);gap:12px;padding:18px 0 16px;border-top:1px solid var(--line)}
 .timetable-selection-note{grid-column:1/-1;margin:0;color:var(--muted);font-size:12px;line-height:1.5}
@@ -383,6 +396,14 @@ body.compact-timetable .tt-agenda{gap:10px;padding:8px}
   .page{padding:26px max(16px,env(safe-area-inset-right)) calc(100px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
   .chat-page{padding:20px max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));height:calc(100vh - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));height:calc(100svh - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));height:calc(100dvh - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
   .chat-page.active{height:calc(var(--compass-visual-viewport-height,100dvh) - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding-bottom:12px}
+  html.chat-active .main-content{padding-bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom))}
+  html.compact-chat .chat-page{padding-top:8px;padding-bottom:8px}
+  html.compact-chat .chat-head{flex-direction:row;align-items:center;gap:8px}
+  html.compact-chat .chat-actions{width:auto}
+  html.compact-chat .chat-head h2{font-size:18px}
+  html.compact-chat :is(.chat-head .eyebrow,.chat-sub,.chat-disclaimer){display:none}
+  html.compact-chat .chat-window{margin-top:8px;padding:10px}
+  html.compact-chat .question-form{margin-top:8px}
   .hero{align-items:flex-start;flex-direction:column}
   .topbar-brand strong{max-width:150px}
   .schedule-item{grid-template-columns:86px minmax(0,1fr);gap:8px;padding:13px 10px}

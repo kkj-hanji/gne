@@ -6607,6 +6607,7 @@ function activatePage(page, updateHash = true) {
   if (!["today", "chat", "timetable", "profile", "settings"].includes(page)) page = "today";
   const focusedPage = document.activeElement?.closest?.(".page");
   if (focusedPage && focusedPage.dataset.page !== page) document.activeElement.blur();
+  document.documentElement.classList.toggle("chat-active", page === "chat");
   document.querySelectorAll(".page").forEach((element) => {
     const active = element.dataset.page === page;
     element.classList.toggle("active", active);
@@ -6682,6 +6683,8 @@ function syncMobileViewport() {
   document.documentElement.classList.toggle("keyboard-open", keyboardOpen);
   document.documentElement.style.setProperty("--compass-visual-viewport-height", `${Math.round(viewportHeight)}px`);
   document.documentElement.style.setProperty("--compass-viewport-bottom", `${Math.round(bottomInset)}px`);
+  document.documentElement.style.setProperty("--compass-viewport-top", `${Math.round(unzoomed ? viewport?.offsetTop || 0 : 0)}px`);
+  document.documentElement.classList.toggle("compact-chat", mobileNavigationEnabled() && viewportHeight < 500);
 }
 
 function registerOfflineShell() {

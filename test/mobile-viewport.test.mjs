@@ -29,11 +29,14 @@ test("Android navigation tracks the visible bottom through keyboard open, pan, d
     assert.equal(h.inset(), "320px");
     assert.equal(h.document.documentElement.classList.contains("keyboard-open"), true);
     h.viewport.offsetTop = 40;h.sync();assert.equal(h.inset(), "280px");
+    assert.equal(h.document.documentElement.style.getPropertyValue("--compass-viewport-top"), "40px");
+    assert.equal(h.document.documentElement.classList.contains("compact-chat"), true);
     h.input.blur();h.sync();
     assert.equal(h.document.documentElement.classList.contains("keyboard-open"), false);
     // Keep tabs inside the visible area while the closing animation completes.
     assert.equal(h.inset(), "280px");
     h.viewport.height = 800;h.viewport.offsetTop = 0;h.sync();assert.equal(h.inset(), "0px");
+    assert.equal(h.document.documentElement.classList.contains("compact-chat"), false);
   }
 });
 
@@ -41,11 +44,15 @@ test("switching away from Ask Compass blurs the old input without waiting for a 
   const h = mobileHarness();
   h.input.focus();h.viewport.height = 480;h.sync();
   vm.runInContext('activatePage("today", false)', h.context);
+  assert.equal(h.document.documentElement.classList.contains("chat-active"), false);
   assert.equal(h.document.activeElement, h.document.body);
   assert.equal(h.document.documentElement.classList.contains("keyboard-open"), false);
   h.viewport.height = 800;h.sync();assert.equal(h.inset(), "0px");
   vm.runInContext('activatePage("chat", false)', h.context);
+  assert.equal(h.document.documentElement.classList.contains("chat-active"), true);
   assert.equal(h.inset(), "0px");
+  vm.runInContext('activatePage("today", false)', h.context);
+  assert.equal(h.document.documentElement.classList.contains("chat-active"), false);
 });
 
 test("resized layout, browser chrome, zoom, rotation and missing VisualViewport do not hide navigation", async () => {
