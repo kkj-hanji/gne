@@ -1,7 +1,7 @@
 "use strict";
 
 const CACHE_PREFIX = "gndec-compass-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}20261004-1`;
+const CACHE_NAME = `${CACHE_PREFIX}20261002-1`;
 const SHELL = [
   "/",
   "/exam-domain.js?v=20260929-1",
@@ -11,7 +11,7 @@ const SHELL = [
   "/data/exam-summary.json",
   "/admin-exams.js?v=20261001-2",
   "/index.html",
-  "/styles.css?v=20261004-1",
+  "/styles.css?v=20261002-1",
   "/brain-kernel.js?v=20260918-2",
   "/brain-v1-2.js?v=20260905-1",
   "/brain-v2-2.js?v=20260905-1",

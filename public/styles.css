@@ -376,14 +376,14 @@ body.compact-timetable .tt-agenda{gap:10px;padding:8px}
   .sidebar-close-button:hover{color:var(--green);border-color:var(--green)}
   .menu-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--green);font-size:19px;cursor:pointer}
   .topbar{padding-right:max(16px,env(safe-area-inset-right));padding-left:max(16px,env(safe-area-inset-left))}
-  .bottom-nav{display:grid;position:fixed;z-index:70;left:0;right:0;bottom:0;grid-template-columns:repeat(4,1fr);padding:8px max(6px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));background:rgba(11,16,25,.98);border-top:1px solid var(--line);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);contain:paint;transform:translateZ(0);-webkit-transform:translateZ(0);will-change:transform}
+  .bottom-nav{display:grid;position:fixed;z-index:70;left:0;right:0;bottom:0;grid-template-columns:repeat(4,1fr);padding:8px max(6px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));background:rgba(11,16,25,.98);border-top:1px solid var(--line);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);contain:paint;transform:translateZ(0);-webkit-transform:translateZ(0);will-change:transform,visibility;transition:transform .16s ease,visibility 0s linear .16s}
   .bottom-link{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 2px;border-radius:12px;color:var(--faint);font-size:11px;font-weight:750;text-decoration:none}
   .bottom-link span{font-size:15px}
   .bottom-link.active{color:var(--green)}
   .page{padding:26px max(16px,env(safe-area-inset-right)) calc(100px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
   .chat-page{padding:20px max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));height:calc(100vh - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));height:calc(100svh - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));height:calc(100dvh - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
-  html.keyboard-open .bottom-nav{bottom:var(--compass-visual-viewport-bottom-inset,0px);visibility:visible;pointer-events:auto;transform:translateZ(0);-webkit-transform:translateZ(0)}
-  html.keyboard-open .chat-page{height:calc(var(--compass-visual-viewport-height,100dvh) - var(--topbar-height) - var(--mobile-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding-bottom:8px}
+  html.keyboard-open .bottom-nav{visibility:hidden;pointer-events:none;transform:translateY(calc(100% + env(safe-area-inset-bottom)))}
+  html.keyboard-open .chat-page{height:calc(var(--compass-visual-viewport-height,100dvh) - var(--topbar-height) - env(safe-area-inset-top));padding-bottom:12px}
   .hero{align-items:flex-start;flex-direction:column}
   .topbar-brand strong{max-width:150px}
   .schedule-item{grid-template-columns:86px minmax(0,1fr);gap:8px;padding:13px 10px}

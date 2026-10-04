@@ -6605,7 +6605,6 @@ async function synchronizeOfficialData() {
 
 function activatePage(page, updateHash = true) {
   if (!["today", "chat", "timetable", "profile", "settings"].includes(page)) page = "today";
-  if (page !== "chat" && document.activeElement === $("question-input")) $("question-input")?.blur();
   document.querySelectorAll(".page").forEach((element) => {
     const active = element.dataset.page === page;
     element.classList.toggle("active", active);
@@ -6673,15 +6672,12 @@ function syncMobileViewport() {
   const keyboardOpen = Boolean(viewport && window.innerHeight - viewportHeight > 150);
   document.documentElement.classList.toggle("keyboard-open", keyboardOpen);
   document.documentElement.style.setProperty("--compass-visual-viewport-height", `${Math.round(viewportHeight)}px`);
-  const visibleBottom = viewport ? viewport.offsetTop + viewportHeight : window.innerHeight;
-  const obscuredBottom = Math.max(0, window.innerHeight - visibleBottom);
-  document.documentElement.style.setProperty("--compass-visual-viewport-bottom-inset", `${Math.round(obscuredBottom)}px`);
 }
 
 function registerOfflineShell() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js?v=20261004-1", { scope: "/" }).catch(() => {
+    navigator.serviceWorker.register("/sw.js?v=20260910-1", { scope: "/" }).catch(() => {
       // Service workers are an optional enhancement. The live app and its
       // deterministic fallback continue normally when registration is blocked.
     });
