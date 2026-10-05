@@ -42,7 +42,7 @@ test('app room answer uses full room view, date/time, safe source checks and hon
   assert.match(answer, /S102/); assert.doesNotMatch(answer, /S101/);
   assert.match(answer, /no class listed/); assert.match(answer, /does not confirm access/);
   assert.match(h.context.roomsAnswer('free rooms in S tomorrow'), /What time/);
-  assert.match(h.context.roomsAnswer('free rooms at 25:90'), /check the date|What time/i);
+  assert.match(h.context.roomsAnswer('free rooms at 25:90'), /check the time/i);
   h.api.state.timetableViews.set('rooms', { revision: 'obsolete', schedule: rows });
   assert.match(h.context.roomsAnswer('free rooms in S Monday at 2 PM'), /unavailable/);
   assert.match(h.context.roomsAnswer('free rooms 31 February at 2 PM'), /check the date/i);

@@ -322,6 +322,7 @@
     if (/programming for problem solving/.test(base)) ["pps", "programming", "problem solving"].forEach((value) => aliases.add(value));
     if (/engineering drawing/.test(base)) ["edg", "drawing", "engineering drawing"].forEach((value) => aliases.add(value));
     if (/manufacturing practices/.test(base)) ["workshop", "manufacturing"].forEach((value) => aliases.add(value));
+    if (/basic electrical and electronics engineering/.test(base)) ["beee", "bee", "basic electrical", "electrical electronics"].forEach((value) => aliases.add(value));
     return [...aliases];
   }
 
@@ -369,6 +370,7 @@
     const clauses = normalize(question).split(/\s+(?:and|aur|ate|te|ਅਤੇ|ਤੇ|और)\s+|[,;]+/u).map((clause) => clause.trim()).filter(Boolean).slice(0, 12);
     const plans = new Map(mentionedSubjects.map((subject) => [subject, { teacher: false, location: false, schedule: false }]));
     let activeSubjects = [];
+    let previousRequest = null;
     clauses.forEach((clause) => {
       const explicit = subjectsMentioned(clause, context.classes);
       if (explicit.length) activeSubjects = explicit;
@@ -379,7 +381,11 @@
         location: /\b(?:where|room|rooms|location|locations|place|places|venue|venues|kahan|kahaan|kithe|kithhe)\b/u.test(clause),
         schedule: /\b(?:when|time|times|timing|timings|schedule|timetable|class|classes|lecture|lectures|kab|kadon)\b/u.test(clause)
       };
-      if (!requested.teacher && !requested.location && !requested.schedule) requested.schedule = true;
+      if (!requested.teacher && !requested.location && !requested.schedule) {
+        if (explicit.length && previousRequest) Object.assign(requested, previousRequest);
+        else requested.schedule = true;
+      }
+      previousRequest = { ...requested };
       targets.forEach((subject) => {
         const plan = plans.get(subject);
         if (!plan) return;

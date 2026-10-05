@@ -732,17 +732,17 @@ test("brain-kernel holiday registry and calculations", () => {
   assert.equal(nonHoliday, null);
 
   const cgpaRes = kernel.evaluateCgpa([
-    { credits: 4, grade: "A+" },
-    { credits: 4, grade: "A" },
-    { credits: 3, grade: "B+" }
+    { credits: 4, grade: "9" },
+    { credits: 4, grade: "8" },
+    { credits: 3, grade: "7" }
   ]);
   assert.ok(cgpaRes);
   // (4*9 + 4*8 + 3*7) / 11 = (36 + 32 + 21) / 11 = 89 / 11 = 8.09
   assert.equal(cgpaRes.cgpa, 8.09);
-  assert.equal(cgpaRes.percentage, Math.round(8.09 * 9.5 * 100) / 100);
+  assert.equal(cgpaRes.percentage, 80.9);
 
-  assert.equal(kernel.cgpaToPercentage(8.5), 80.75);
-  assert.equal(kernel.percentageToCgpa(80.75), 8.5);
+  assert.equal(kernel.cgpaToPercentage(8.5), 85);
+  assert.equal(kernel.percentageToCgpa(85), 8.5);
 });
 
 test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and Hindi", () => {
@@ -890,7 +890,7 @@ test("brain 1.2 answers holiday questions across English, Hinglish, Punjabi, and
 test("brain 1.2 answers marking scheme and CGPA calculations", () => {
   const brain = createBrainHarness().CompassBrainV1_2;
 
-  const marking = brain.process("what is the marking scheme for Physics?");
+  const marking = brain.process("what is the marking scheme for Physics?", { syllabus: [{ code: "BSC101", title: "Physics", caMarks: "40", eseMarks: "60", totalMarks: "100" }] });
   assert.equal(marking.handled, true);
   assert.equal(marking.intent, "ACADEMIC_MARKING_SCHEME");
   assert.match(marking.answer, /Continuous Assessment \(CA \/ Internal\)/);
@@ -902,19 +902,19 @@ test("brain 1.2 answers marking scheme and CGPA calculations", () => {
   assert.equal(cgpaFormula.handled, true);
   assert.equal(cgpaFormula.intent, "ACADEMIC_CGPA_CALCULATION");
   assert.match(cgpaFormula.answer, /SGPA Formula/);
-  assert.match(cgpaFormula.answer, /Percentage \(%\) = CGPA × 9.5/);
+  assert.match(cgpaFormula.answer, /Percentage \(%\) = CGPA × 10/);
 
   const cgpaToPct = brain.process("convert 8.5 CGPA to percentage");
   assert.equal(cgpaToPct.handled, true);
   assert.equal(cgpaToPct.intent, "ACADEMIC_CGPA_CALCULATION");
-  assert.match(cgpaToPct.answer, /8.5 CGPA = 80.75%/);
+  assert.match(cgpaToPct.answer, /8.5 CGPA = 85%/);
 
-  const pctToCgpa = brain.process("convert 80.75% to CGPA");
+  const pctToCgpa = brain.process("convert 85% to CGPA");
   assert.equal(pctToCgpa.handled, true);
   assert.equal(pctToCgpa.intent, "ACADEMIC_CGPA_CALCULATION");
-  assert.match(pctToCgpa.answer, /80.75% = 8.5 CGPA/);
+  assert.match(pctToCgpa.answer, /85% = 8.5 CGPA/);
 
-  const calcCgpa = brain.process("calculate CGPA: 4 credits A+, 4 credits A, 3 credits B+");
+  const calcCgpa = brain.process("calculate CGPA: 4 credits 9, 4 credits 8, 3 credits 7");
   assert.equal(calcCgpa.handled, true);
   assert.equal(calcCgpa.intent, "ACADEMIC_CGPA_CALCULATION");
   assert.match(calcCgpa.answer, /Calculated SGPA \/ CGPA: 8.09 \/ 10.0/);
@@ -941,11 +941,11 @@ test("legacyAnswerWithoutAi answers holiday and marking scheme questions reliabl
   assert.match(legacyNamedHoliday, /Friday, September 4, 2026/);
 
   const marking = api.answerWithoutAi("internal marks for theory");
-  assert.match(marking, /Continuous Assessment \(CA \/ Internal\)/);
-  assert.match(marking, /40 Marks/);
+  assert.match(marking, /could not verify/);
+  assert.doesNotMatch(marking, /40 Marks|60 Marks/);
 
   const cgpa = api.answerWithoutAi("8.5 cgpa to percentage");
-  assert.match(cgpa, /8.5 CGPA = 80.75%/);
+  assert.match(cgpa, /8.5 CGPA = 85%/);
 
   const hostel = api.answerWithoutAi("hostel timings");
   assert.match(hostel, /does not have a current verified hostel-rule dataset/i);

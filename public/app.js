@@ -1457,7 +1457,7 @@ const SYLLABUS_COURSE_HINTS = [
   { title: "Chemistry", aliases: ["chemistry", "chemestry", "rasayan"] },
   { title: "Professional English Communication", aliases: ["english", "communication"] },
   { title: "Economics", aliases: ["economics", "economy"] },
-  { title: "Basic Electrical and Electronics Engineering", aliases: ["electrical", "electronics", "bee"] },
+  { title: "Basic Electrical and Electronics Engineering", aliases: ["electrical", "electronics", "bee", "beee", "basic electrical"] },
   { title: "Engineering Drawing and Graphics", aliases: ["drawing", "graphics", "engineering drawing"] },
   { title: "Programming for Problem Solving", aliases: ["programming", "programing", "pps", "problem solving"] },
   { title: "Manufacturing Practices", aliases: ["manufacturing", "workshop"] },
@@ -2652,7 +2652,7 @@ function isPlainCalendarQuestion(question = "") {
   if (!/\b(?:date|day|weekday|time)\b/.test(q)) return false;
   // Calendar vocabulary plus a date is sufficient, independent of word order.
   // Other domain words (exam, holiday, subject...) keep their own intent.
-  const rest = q.replace(/\b(?:what|which|tell|show|me|please|is|are|it|the|s|on|of|for|in|today|tomorrow|yesterday|current|now|day|date|weekday|time|after|before|next|this|previous|last|ka|ki|ke|da|di|de|hai|hain|aa|kya|batao|india|ist)\b/g, " ")
+  const rest = q.replace(/\b(?:what|which|tell|show|me|please|is|are|it|the|s|on|of|for|in|today|tomorrow|yesterday|current|now|day|date|weekday|time|week|month|after|before|next|this|previous|last|ka|ki|ke|da|di|de|hai|hain|aa|kya|batao|india|ist)\b/g, " ")
     .replace(/\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/g, " ")
     .replace(/\d+(?:st|nd|rd|th)?|[^\p{L}]/gu, "");
   return !rest;
@@ -3208,7 +3208,7 @@ function syllabusCoursesForQuestion(question) {
   const aliases = [
     [["math", "maths", "mathematics", "ganit", "gannit"], "mathematics"], [["physics", "phyiscs", "fiziks", "bhautik"], "physics"], [["chemistry", "chemestry", "rasayan"], "chemistry"],
     [["programming", "programing", "pps", "problem", "solving"], "programming"], [["economics", "economy"], "economics"], [["english", "communication"], "english"],
-    [["drawing", "graphics", "engineeringdrawing"], "drawing"], [["manufacturing", "workshop"], "manufacturing"], [["electrical", "electronics", "bee"], "electrical"], [["python"], "python"]
+    [["drawing", "graphics", "engineeringdrawing"], "drawing"], [["manufacturing", "workshop"], "manufacturing"], [["electrical", "electronics", "bee", "beee", "basic electrical"], "electrical"], [["python"], "python"]
   ];
   const questionWords = compact.split(" ").filter((word) => word.length >= 3);
   const codeMatches = state.syllabus.filter((course) => compact.includes(normalizeStudentName(course.code)));
@@ -3245,10 +3245,11 @@ function isSyllabusQuestion(question) {
   // Students naturally put the requested fact before the course name too
   // (for example, "is calculator allowed in Physics?"). Keep course/detail
   // detection order-independent instead of requiring "Physics calculator".
-  const hasNamedCourse = /\b(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|graphics|electrical|manufacturing|workshop|python)\b/.test(q) || syllabusCoursesForQuestion(q).length > 0;
-  const hasSyllabusDetail = /\b(?:syllabus|study\s*scheme|course\s*(?:code|outcomes?|content)|subject\s*code|units?|chapters?|topics?|credits?|marks?|text\s*books?|reference\s*books?|recommended\s*books?|labs?|laboratory|experiments?|practicals?|assessment|exam\s*(?:duration|pattern|scheme|marks?|time|length|hours?)|teaching\s*hours?|prerequisites?|additional\s*material|calculator|course\s*outcomes?)\b/.test(q);
+  const hasNamedCourse = /\b(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|graphics|electrical|beee|manufacturing|workshop|python)\b/.test(q) || syllabusCoursesForQuestion(q).length > 0;
+  const hasSyllabusDetail = /\b(?:syllabus|study\s*scheme|course\s*(?:code|outcomes?|content)|subject\s*code|units?|chapters?|topics?|credits?|marks?|text\s*books?|reference\s*books?|recommended\s*books?|labs?|laboratory|experiments?|practicals?|assessment|exam\s*(?:duration|pattern|scheme|marks?|time|length|hours?)|teaching\s*hours?|prerequisites?|additional\s*material|calculator|course\s*outcomes?)\b/.test(q)
+    || /\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b/.test(q) || /\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/.test(q);
   if (hasNamedCourse && hasSyllabusDetail) return true;
-  if (/syllabus|study\s*scheme|course\s*(?:code|outcomes?|content)|subject\s*code|units?|chapters?|topics?|credits?|marks?|text\s*books?|reference\s*books?|recommended\s*books?|\b(?:co|outcome)\s*#?\s*\d+\b|(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|electrical|manufacturing|python)[\s\S]*(?:books?|labs?|laboratory|experiments?|practicals?|assessment|exam\s*(?:duration|pattern|scheme|marks?)|teaching\s*hours?|prerequisites?|additional\s*material|calculator|course\s*outcomes?|\bco\s*\d+)|(?:total|how\s+many|kitne|kinne|count)\s*(?:subjects?|courses?|papers?)|(?:list|show|name)\s+(?:all\s+)?(?:subjects?|courses?|papers?)|(?:all|which)\s+(?:subjects?|courses?|papers?)\b/u.test(q)) return true;
+  if (/\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b/.test(q) || /\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/.test(q) || /syllabus|study\s*scheme|course\s*(?:code|outcomes?|content)|subject\s*code|units?|chapters?|topics?|credits?|marks?|text\s*books?|reference\s*books?|recommended\s*books?|\b(?:co|outcome)\s*#?\s*\d+\b|(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|electrical|beee|manufacturing|python)[\s\S]*(?:books?|labs?|laboratory|experiments?|practicals?|assessment|exam\s*(?:duration|pattern|scheme|marks?)|teaching\s*hours?|prerequisites?|additional\s*material|calculator|course\s*outcomes?|\bco\s*\d+)|(?:total|how\s+many|kitne|kinne|count)\s*(?:subjects?|courses?|papers?)|(?:list|show|name)\s+(?:all\s+)?(?:subjects?|courses?|papers?)|(?:all|which)\s+(?:subjects?|courses?|papers?)\b/u.test(q)) return true;
   const words = normalizeStudentName(q).split(" ");
   const syllabusTerm = words.some((word) => word.length >= 4 && ["syllabus", "chapter", "credits", "outcomes", "content", "units"].some((intent) => editDistance(word, intent) <= (intent.length >= 7 ? 2 : 1)));
   if (syllabusTerm) return true;
@@ -3382,10 +3383,15 @@ function syllabusBooksAnswer(course, references = false) {
 
 function syllabusSpecificUnitAnswer(course, question) {
   const q = canonicalTimetableQuestion(question);
-  const match = q.match(/\bunit\s*(?:-|number|no\.?\s*)?(\d{1,2})\b/);
-  if (!match || !course) return "";
-  const unit = course.units.find((item) => Number(item.number) === Number(match[1]));
-  if (!unit) return `<p><strong><u>${escapeHtml(course.title)}</u></strong></p><p>Unit ${escapeHtml(match[1])} is not listed for this course in the official syllabus.</p><p class="answer-source">Official GNDEC syllabus.</p>`;
+  const UNIT_WORDS = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, ek:1, do:2, teen:3, char:4, paanch:5, chhe:6, ik:1, tinn:3 };
+  let unitNumber = q.match(/\bunit\s*(?:-|number|no\.?\s*)?(\d{1,2})\b/)?.[1];
+  if (!unitNumber) {
+    const wordMatch = q.match(/\bunit\s+(one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/);
+    if (wordMatch) unitNumber = String(UNIT_WORDS[wordMatch[1]]);
+  }
+  if (!unitNumber || !course) return "";
+  const unit = course.units.find((item) => Number(item.number) === Number(unitNumber));
+  if (!unit) return `<p><strong><u>${escapeHtml(course.title)}</u></strong></p><p>Unit ${escapeHtml(unitNumber)} is not listed for this course in the official syllabus.</p><p class="answer-source">Official GNDEC syllabus.</p>`;
   const hours = unit.hours ? ` · ${escapeHtml(unit.hours)}` : "";
   const details = unit.details ? `<p>${escapeHtml(unit.details)}</p>` : "<p>No additional unit description is listed in the extracted official source.</p>";
   return `<p><strong><u>${escapeHtml(course.title)} · Unit ${escapeHtml(unit.number)}</u></strong></p><p><strong>${escapeHtml(unit.title)}</strong>${hours}</p>${details}<p class="answer-source">Official GNDEC syllabus.</p>`;
@@ -3491,16 +3497,19 @@ function answerAcademicScopeQuestion(question) {
 
 function answerSyllabusFollowup(question) {
   const q = canonicalTimetableQuestion(question);
+  if (syllabusCoursesForQuestion(question).length) return "";
   const context = state.syllabusConversation;
   if (!context || !state.syllabus.length) return "";
   const asksList = /^(?:list|show|name|tell)\s*(?:them|all|subjects?|courses?)\b|(?:list|show|name)\s+(?:them|all)|which\s+(?:subjects?|courses?)\b/.test(q);
   const explicitlyListsSubjects = /(?:list|show|name)\s+(?:all\s+)?(?:official\s+)?(?:subjects?|courses?)\b|which\s+(?:subjects?|courses?)\b/.test(q);
-  const asksUnits = /(?:its?|the)\s*(?:units?|chapters?|topics?)\b|^(?:units?|chapters?|topics?)\b/.test(q);
+  const asksUnits = /\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b|\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b|(?:its?|the)\s*(?:units?|chapters?|topics?)\b|^(?:units?|chapters?|topics?)\b/.test(q);
   const asksOutcomes = /(?:its?|the)\s*(?:course\s*)?outcomes?\b|^(?:course\s*)?outcomes?\b|\bco\b/.test(q);
   const asksDetails = /(?:its?|the)\s*(?:code|credits?|semester|marks?|duration|prerequisites?)\b|^(?:code|credits?|semester|marks?|duration|prerequisites?)\b|additional\s*material|calculator/.test(q);
   const asksBooks = /(?:its?|the)\s*(?:text\s*books?|books?|references?)\b|^(?:text\s*books?|books?|references?)\b/.test(q);
   const asksLaboratory = /\b(?:labs?|laboratory|experiments?|practicals?)\b/.test(q);
 
+  const latestBrainIntent = state.brainConversation?.recentTurns?.at(-1)?.intent || "";
+  if (asksList && /^(?:COUNT_TEACHERS|COUNT_ROOMS|COUNT_SUBJECTS)$/.test(latestBrainIntent)) return "";
   if (explicitlyListsSubjects) return syllabusCourseListAnswer();
   if (context.kind === "course" && context.courseCodes?.length && (asksList || asksUnits || asksOutcomes || asksDetails || asksBooks || asksLaboratory)) {
     const course = state.syllabus.find((item) => context.courseCodes.includes(item.code));
@@ -4498,22 +4507,23 @@ function legacyHolidayAnswer(question) {
 function legacyAcademicMarkingAnswer(question) {
   const raw = String(question || "").trim();
   const q = raw.toLowerCase();
-  const cgpaMatch = q.match(/(\d+(?:\.\d+)?)\s*(?:cgpa|sgpa)\s*(?:to|in)?\s*(?:percentage|%)/i);
-  if (cgpaMatch) {
-    const val = Number(cgpaMatch[1]);
-    const pct = Math.round(val * 9.5 * 100) / 100;
-    return `<p><strong>${val} CGPA = ${pct}%</strong></p><p>Formula: <strong>Percentage = CGPA × 9.5</strong></p><p class="answer-source">Official IKGPTU / GNDEC Autonomous Regulations.</p>`;
+  const source = '<p class="answer-source">GNDEC batches from 2016 onward. <a href="https://gndec.ac.in/sites/default/files/cgpac.pdf" target="_blank" rel="noopener noreferrer">Official CGPA conversion notice</a>.</p>';
+  if (/\b(?:cgpa|sgpa)\b/.test(q)) {
+    if (/\b(?:19\d{2}|200\d|201[0-5])\b/.test(q)) return "<p>I cannot verify the conversion for a batch before 2016. Please check its applicable academic regulations.</p>" + source;
+    if (/\bsgpa\b/.test(q) && /percentage|percent|%/.test(q)) return "<p>The verified notice specifies CGPA conversion. I cannot confirm that it applies directly to a single semester's SGPA.</p>" + source;
+    const cgpaMatch = q.match(/(-?\d+(?:\.\d+)?)\s*cgpa\s*(?:to|in|into)?\s*(?:percentage|%)/i);
+    const pctMatch = q.match(/(-?\d+(?:\.\d+)?)\s*(?:%|percent|percentage)\s*(?:to|in|into)?\s*cgpa/i);
+    if (cgpaMatch || pctMatch) {
+      const value = Number((cgpaMatch || pctMatch)[1]);
+      if (value < 0 || value > (cgpaMatch ? 10 : 100)) return "<p>Please use a CGPA from 0 to 10 or a percentage from 0 to 100.</p>";
+      const converted = Math.round((cgpaMatch ? value * 10 : value / 10) * 100) / 100;
+      return `<p><strong>${value}${cgpaMatch ? " CGPA" : "%"} = ${converted}${cgpaMatch ? "%" : " CGPA"}</strong></p><p>${cgpaMatch ? "Percentage = CGPA × 10" : "Reverse conversion: CGPA = Percentage ÷ 10"}.</p>` + source;
+    }
   }
-
-  const pctMatch = q.match(/(\d+(?:\.\d+)?)\s*(?:%|percent|percentage)\s*(?:to|in)?\s*(?:cgpa|sgpa)/i);
-  if (pctMatch) {
-    const val = Number(pctMatch[1]);
-    const cgpa = Math.round((val / 9.5) * 100) / 100;
-    return `<p><strong>${val}% = ${cgpa} CGPA</strong></p><p>Formula: <strong>CGPA = Percentage ÷ 9.5</strong></p><p class="answer-source">Official IKGPTU / GNDEC Autonomous Regulations.</p>`;
-  }
-
   if (/\b(?:marking\s*scheme|internal\s*marks?|external\s*marks?|ca\s*marks?|ese\s*marks?)\b/.test(q)) {
-    return `<p><strong><u>Official GNDEC B.Tech Autonomous Marking Scheme</u></strong></p><p>• <strong>Theory:</strong> Total 100 Marks (CA/Internal = 40, ESE/External = 60). Passing: Min 40% in ESE (24/60) and 40% aggregate.<br />• <strong>Practical/Labs:</strong> CA = 30/60 Marks, ESE = 20/40 Marks.<br />• <strong>Credits:</strong> 1 Lecture/hr = 1, 1 Tutorial/hr = 1, 2 Lab/hrs = 1.</p><p class="answer-source">Official GNDEC Autonomous Study Scheme.</p>`;
+    const courses = syllabusCoursesForQuestion(q);
+    if (courses.length && state.syllabus.length) return answerSyllabusQuestion(q);
+    return "<p>I could not verify that course's assessment marks. Load the current official syllabus and specify a course code; theory and practical schemes may differ.</p>";
   }
 
   const kernel = globalThis.CompassBrainKernel;
@@ -4796,6 +4806,7 @@ function compassBrainContext(overrides = {}) {
     collegeEvents: Array.isArray(state.collegeEventsCache) ? state.collegeEventsCache : [],
     notices: Array.isArray(state.noticesCache) ? state.noticesCache : [],
     timetables: state.timetablesCache || {},
+    attendanceTarget: state.settings?.attendanceTarget || 76,
     syllabus: Array.isArray(state.syllabus) ? state.syllabus : [],
     ...overrides
   };
@@ -4842,9 +4853,9 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
         state.lastBrainDiagnostic = { fallback: true, reason: validation.reason || result?.fallbackReason || "INVALID_RESULT", processingMs: result?.processingMs || 0 };
         continue;
       }
-      state.syllabusConversation = null;
-      try { localStorage.removeItem(SYLLABUS_CONVERSATION_KEY); } catch { /* optional context reset */ }
       saveBrainConversation(result.context);
+      const syllabusCourses = isSyllabusQuestion(question) ? syllabusCoursesForQuestion(question) : [];
+      if (syllabusCourses.length) rememberSyllabusConversation("course", syllabusCourses);
       state.lastBrainDiagnostic = { fallback: false, intent: result.intent || "", confidence: result.confidence, processingMs: result.processingMs || 0, version: result.version || "" };
       return result;
     } catch {
@@ -4858,6 +4869,7 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 // engine is always retained as the transparent fallback.
 function prepareCompassQuestion(question) {
   let q = canonicalTimetableQuestion(question);
+  if (calendarDurationAnswer(q) || /^(?:hi|hello|hey|namaste|namaskar|sat\s*sri\s*akal|good (?:morning|afternoon|evening))$/.test(q)) return q;
   if (globalThis.CompassExamDomain?.matches(q)) return q;
   if (globalThis.CompassPracticals?.matches(q)) return q;
   if (globalThis.CompassRoomAvailability?.matches(q)) return q;
@@ -4873,7 +4885,7 @@ function prepareCompassQuestion(question) {
   // Date + conversational question words, without another named entity, is
   // a personal day query. Do not send its filler words to person lookup.
   if (!calendarQuestion && temporal?.status === "resolved") {
-    const remainder = q.replace(temporal.text, " ").replace(/\b(?:what|which|show|tell|me|my|do|i|have|is|are|the|a|on|for|please|kya|hai|hain|aa|ka|ki|ke|da|di|de|bhi|nu|kehdi|kehra)\b/g, " ").replace(/[^\p{L}\p{N}]/gu, "");
+    const remainder = q.replace(temporal.text, " ").replace(/\b(?:what|which|where|class|classes|timetable|schedule|show|tell|me|my|do|i|have|is|are|the|a|on|for|please|kya|hai|hain|aa|ka|ki|ke|da|di|de|bhi|nu|kehdi|kehra)\b/g, " ").replace(/[^\p{L}\p{N}]/gu, "");
     if (!remainder) return `my timetable on ${temporal.iso}`;
   }
   const selection = requestedTimetableSelection(q);
@@ -4934,6 +4946,10 @@ function temporalClarification(question) {
   const resolved = globalThis.CompassBrainKernel?.resolveTemporalQuery?.(question, indiaCalendarDate(0).date.toISOString().slice(0, 10));
   if (["invalid", "conflict", "limited"].includes(resolved?.status)) return `<p><strong>Please check the date.</strong></p><p>${escapeHtml(resolved.reason)}</p>`;
   const q = canonicalTimetableQuestion(question);
+  if (/\b(?:timetable|schedule|class|classes|room|free|teacher|exam)\b/.test(q)) {
+    const clocks = [...q.matchAll(/\b\d{1,3}:\d{1,3}\s*(?:am|pm)?\b|\b\d{1,3}\s*(?:am|pm)\b/g)].map(match => match[0]);
+    if (clocks.some(clock => requestedTime(clock) === null)) return "<p><strong>Please check the time.</strong></p><p>Use a valid time such as 10:30 AM or 14:30. Hours and minutes must be within the clock's range.</p>";
+  }
   if (globalThis.CompassExams?.matches(q)) return "";
   if (/\b(?:timetable|schedule)\b/.test(q) && !/\b(?:syllabus|credits|course code)\b/.test(q)) {
     const version = String(state.metadata?.version || "").match(/^(\d{2})-(\d{2})-(20\d{2})/);
@@ -4961,6 +4977,88 @@ function datedPersonalTimetableAnswer(question) {
   const holiday = globalThis.CompassBrainKernel?.checkDateHoliday?.(date.iso);
   if (holiday?.closed) return `<p><strong>${escapeHtml(date.iso)} · ${escapeHtml(holiday.name)}</strong></p><p>This is listed as an official GNDEC holiday. Check current notices for exceptions.</p>`;
   return `${dayScheduleAnswer(classFor(state.selectedGroup, date.day), date.day, `${date.day} · ${date.iso}`)}<p class="answer-source">Date-specific timetable not verified. This is the weekly pattern from ${escapeHtml(state.metadata?.version || "the loaded timetable")}; I will not guess a special-day lecture. Current notices can override this pattern.</p>`;
+}
+
+function calendarDurationAnswer(question) {
+  const q = canonicalTimetableQuestion(question);
+  if (!/\b(?:how many|number of|count|difference in)\s+days?\b/.test(q) || !/\b(?:between|from|until|till)\b/.test(q)) return "";
+  const kernel = globalThis.CompassBrainKernel;
+  const today = indiaCalendarDate(0).date.toISOString().slice(0, 10);
+  const resolved = kernel?.resolveTemporalQuery?.(q, today);
+  if (["invalid", "conflict", "limited"].includes(resolved?.status)) return `<p>${escapeHtml(resolved.reason)}</p>`;
+  const dates = resolved?.dates || [];
+  const start = dates.length === 1 && /\b(?:until|till)\b/.test(q) ? today : dates[0];
+  const end = dates.at(-1);
+  if (!start || !end || (dates.length < 2 && !/\b(?:until|till)\b/.test(q))) return "<p>Give two complete dates, such as “how many days from 5 October to 7 October”.</p>";
+  const elapsed = (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000;
+  if (elapsed < 0) return "<p>The end date is before the start date. Please check the order of the dates.</p>";
+  const inclusive = /\b(?:inclusive|including both|count both)\b/.test(q);
+  return `<p><strong>${elapsed + (inclusive ? 1 : 0)} days</strong> ${inclusive ? "including both endpoints" : "between the dates"}: ${escapeHtml(start)} to ${escapeHtml(end)}.</p><p class="answer-source">Calendar-day calculation. ${inclusive ? "" : `Counting both dates inclusively gives ${elapsed + 1} days. `}This is not a count of working or teaching days.</p>`;
+}
+
+// Unknown qualifiers must not silently widen a scoped timetable request.
+function unresolvedTimetableWords(remainder) {
+  const grammar = new Set("what which who when how many much long count total number of do does i we you me my mine our have has is are the a an as in on at for by per to from through between and compare comparison different difference vs versus timetable schedule class classes lecture lectures period periods time hours duration teacher teachers teaches faculty room rooms subject course programme program year section subsection subgroup group visit use used most least busiest lightest heaviest fewest day days this next last previous whole entire week month show tell give please am pm will be get can about no today tomorrow yesterday after before ka ki ke da di de hai hain aa kya nu".split(" "));
+  for (const word of [...DAY_NAMES, "Saturday", "Sunday", ...globalThis.CompassBrainKernel.MONTH_NAMES]) { grammar.add(word.toLowerCase()); grammar.add(word.toLowerCase().slice(0, 3)); }
+  grammar.add("sept");
+  return remainder.split(/[^a-z0-9]+/).filter((word) => word && !grammar.has(word) && !/^\d+(?:st|nd|rd|th)?$/.test(word));
+}
+
+// Apply date and clock qualifiers before a generic next-class or day handler.
+// The same operation is used by chat submission and the local-answer API.
+function qualifiedTimetableAnswer(question) {
+  const q = canonicalTimetableQuestion(question);
+  if (!/\b(?:timetable|schedule|class|classes)\b/.test(q) || /\b(?:compare|vs|syllabus|exam|holiday|credits|count|how many)\b/.test(q)) return "";
+  const temporal = globalThis.CompassBrainKernel?.resolveTemporalQuery?.(q, indiaCalendarDate(0).date.toISOString().slice(0, 10));
+  if (temporal && !["none", "resolved"].includes(temporal.status)) return "";
+  const date = requestedTimetableDate(q);
+  const time = requestedTime(q);
+  const clocks = [...q.matchAll(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b|\b\d{1,2}\s*(?:am|pm)\b/g)].map(match => requestedTime(match[0]));
+  const range = clocks.length === 2 && /\b(?:between|from)\b/.test(q) ? clocks : null;
+  if (clocks.length > 1 && (!range || range[0] >= range[1])) return "<p>Please specify one time or a time range with the end after the start, such as “classes tomorrow between 10 AM and 12 PM”.</p>";
+  const upcoming = /\bnext\b(?!\s+(?:week|month|year)\b)/.test(q);
+  if (time === null && !(date && upcoming)) return "";
+  if (namedPersonTimetableRequest(q)) return "";
+  const view = requestedOfficialTimetableView(q);
+  const selection = requestedTimetableSelection(q);
+  let entries, label;
+  if (view) {
+    const loaded = state.timetableViews.get(view)?.schedule || [];
+    const caption = viewCaptionForQuestion(q, loaded, view);
+    if (!caption) return "";
+    entries = loaded.filter(row => row.group === caption);
+    label = caption;
+  } else {
+    if (!selection && !/\b(?:my|i|me|our|do|next|current|today|tomorrow|yesterday)\b/.test(q)) return "";
+    const group = selection?.group || state.selectedGroup;
+    if (!group || !state.schedule.length) return "<p>Load your official timetable and select your section first.</p>";
+    entries = DAY_NAMES.flatMap(day => classFor(group, day, selection ? selection.subgroup : state.selectedSubgroup));
+    label = selection?.code || activeTimetableLabel();
+    // A subject constraint must not become an arbitrary class at that time.
+    const subjects = [...new Set(entries.map(row => row.subject))].filter(subject => {
+      const tokens = canonicalTimetableQuestion(subject).split(/\W+/).filter(word => word.length >= 4 && !["class", "engineering", "professional", "development"].includes(word));
+      return tokens.some(word => new RegExp(`\\b${word}\\b`).test(q));
+    });
+    if (subjects.length) entries = entries.filter(row => subjects.includes(row.subject));
+    let remainder = q;
+    for (const value of [selection?.code || "", ...subjects]) {
+      for (const word of canonicalTimetableQuestion(value).split(/\W+/).filter(Boolean))
+        remainder = remainder.replace(new RegExp(`\\b${word}\\b`, "g"), " ");
+    }
+    if (unresolvedTimetableWords(remainder).length) return "<p>I could not verify every subject or qualifier in that request. Specify its published subject name or course code; I will not substitute another class.</p>";
+  }
+  const target = date || { iso: indiaCalendarDate(0).date.toISOString().slice(0, 10), day: getIndiaNow().day };
+  const holiday = globalThis.CompassBrainKernel?.checkDateHoliday?.(target.iso);
+  if (holiday?.closed) return `<p><strong>${escapeHtml(target.iso)} · ${escapeHtml(holiday.name)}</strong></p><p>This is listed as an official GNDEC holiday. Check current notices for exceptions.</p>`;
+  const cutoff = time ?? (target.iso === indiaCalendarDate(0).date.toISOString().slice(0, 10) ? getIndiaNow().minutes : -1);
+  let matches = entries.filter(row => row.day === target.day).sort((a, b) => a.start - b.start || a.end - b.end);
+  if (range) matches = matches.filter(row => row.start < range[1] && row.end > range[0]);
+  else if (upcoming) matches = matches.filter(row => row.start > cutoff).slice(requestedUpcomingClassPosition(q) - 1, requestedUpcomingClassPosition(q));
+  else if (/\bafter\b/.test(q)) matches = matches.filter(row => row.start >= cutoff);
+  else if (/\bbefore\b/.test(q)) matches = matches.filter(row => row.end <= cutoff);
+  else matches = matches.filter(row => row.start <= cutoff && row.end > cutoff);
+  const heading = `${label} · ${target.day} · ${target.iso}${range ? ` · ${humanTime(range[0])}–${humanTime(range[1])}` : time !== null ? ` · ${humanTime(time)}` : ""}`;
+  return `${matches.length ? scheduleAnswer(matches, heading) : `<p><strong>${escapeHtml(heading)}</strong></p><p>No ${upcoming ? "further" : "matching"} class is listed for this time on that day.</p>`}<p class="answer-source">Weekly timetable pattern for the requested date; date-specific notices can override it.</p>`;
 }
 
 function answerWithoutAi(question, engine = null, contextOverrides = {}) {
@@ -5080,10 +5178,7 @@ function timetableAnalysisAnswer(question) {
     for (const { normalized } of subjects) for (const word of normalized.split(/\s+/)) remainder = remainder.replace(new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g"), " ");
   }
   if (/\b(?:after|before|at|between)\s+\d{1,2}(?::\d{2}|\s*(?:am|pm))\b/.test(remainder)) return "<p>I could not verify that time filter for the whole date range. Ask for one day's timetable with the requested time, or remove the time filter.</p>";
-  const grammar = new Set("what which who when how many much long count total number of do does i we you me my mine our have has is are the a an as in on at for by per to from through between and compare comparison different difference vs versus timetable schedule class classes lecture lectures period periods time hours duration teacher teachers teaches faculty room rooms subject course programme program year section subsection subgroup group visit use used most least busiest lightest heaviest fewest day days this next last previous whole entire week show tell give please today tomorrow yesterday after before ka ki ke da di de hai hain aa kya nu".split(" "));
-  for (const word of [...DAY_NAMES, "Saturday", "Sunday", ...globalThis.CompassBrainKernel.MONTH_NAMES]) { grammar.add(word.toLowerCase()); grammar.add(word.toLowerCase().slice(0, 3)); }
-  grammar.add("sept");
-  const unresolved = remainder.split(/[^a-z0-9]+/).filter((word) => word && !grammar.has(word) && !/^\d+(?:st|nd|rd|th)?$/.test(word));
+  const unresolved = unresolvedTimetableWords(remainder);
   if (unresolved.length) return "<p>I could not resolve every timetable detail in that request. Specify a section/subsection or an official teacher, room or subject timetable, together with the calculation or dates you want.</p>";
   const version = String(sourceInfo?.version || state.sourceRegistry?.version || state.metadata?.version || "");
   const effective = version.match(/^(\d{2})-(\d{2})-(20\d{2})/);
@@ -5100,6 +5195,8 @@ function timetableAnalysisAnswer(question) {
 }
 
 function answerSingleCompassQuestion(question, engine = null, contextOverrides = {}) {
+  const duration = calendarDurationAnswer(question);
+  if (duration) return duration;
   const rooms = roomAvailabilityAnswer(question);
   if (rooms) return rooms;
   const role = facultyRoleRequest(question);
@@ -5108,6 +5205,8 @@ function answerSingleCompassQuestion(question, engine = null, contextOverrides =
   if (academic) return academic;
   const exams = examQuestionAnswer(question);
   if (exams) return exams;
+  const qualified = qualifiedTimetableAnswer(question);
+  if (qualified) return qualified;
   const analysis = timetableAnalysisAnswer(question);
   if (analysis) return analysis;
   const requestedView = requestedOfficialTimetableView(question);
@@ -6853,6 +6952,8 @@ function initEvents() {
         persistChat();
         return;
       }
+      const duration = calendarDurationAnswer(question);
+      if (duration) { ensureChatBubble("assistant", duration); persistChat(); return; }
       const adminCommand = question.match(/^kkj$/i);
     if (adminCommand) {
       await unlockAdminAi();
@@ -6880,6 +6981,10 @@ function initEvents() {
       ensureChatBubble("assistant", exams);
       persistChat();
       return;
+    }
+    if (!requestedOfficialTimetableView(question)) {
+      const qualified = qualifiedTimetableAnswer(question) || datedPersonalTimetableAnswer(question);
+      if (qualified) { ensureChatBubble("assistant", qualified); persistChat(); return; }
     }
     if (scheduleAnalysisRequest(question)) {
       const view = requestedOfficialTimetableView(question);
@@ -6935,7 +7040,7 @@ function initEvents() {
       const viewBubble = ensureChatBubble("assistant thinking", "<p><strong>Checking the verified official timetable…</strong></p>");
       try {
         await loadOfficialTimetableView(requestedView);
-        const officialViewAnswer = officialTimetableViewAnswer(question);
+        const officialViewAnswer = qualifiedTimetableAnswer(question) || officialTimetableViewAnswer(question);
         viewBubble.className = "chat-bubble assistant";
         viewBubble.innerHTML = officialViewAnswer || "<p><strong><u>Choose a timetable entry.</u></strong></p><p>Name the faculty member, room, subject, programme, section, or subsection you want to check.</p>";
       } catch (error) {
@@ -7395,11 +7500,11 @@ function kbSyllabusUnitAnswer(question) {
 }
 
 const KB_OOB = [
-  {id:"creator",test:/who\s+(?:created|built|made|developed)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|site|tool|system)|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|\b(?:creator|author|developer)\s+of\s+(?:this|compass|the\s+app)\b|who\s+are\s+you|built\s+this\s+web/i,reply:()=>`<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p class="answer-source">Compass project information.</p>`},
+  {id:"creator",test:/who\s+(?:created|built|made|developed)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|site|tool|system)|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|\b(?:creator|author|developer)\s+of\s+(?:this|compass|the\s+app)\b|who\s+are\s+you|built\s+this\s+web|kisne\s+(?:banaya|banayi|banaye|likha|bnaya)|creator\s+kaun\s+hai|kaun\s+ne\s+banaya|app\s+kisne|compass\s+kisne/i,reply:()=>`<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p class="answer-source">Compass project information.</p>`},
   {id:"college-timing",test:/college\s*(timing|time|opens?|closes?|hours)|college\s*kitne\s*baje|college\s*khulta|college\s*khulda|class\s*(timing|time)|what\s*time\s*(?:does\s*\w+|\w+\s*open|does\s*the\s*college)|kitne\s*baje\s*(college|class)/,reply:()=>{const classes=state.selectedGroup?DAY_NAMES.flatMap((day)=>classFor(state.selectedGroup,day)):[];if(!classes.length)return`<p><strong><u>College hours</u></strong></p><p>Office hours are not present in the currently loaded official timetable. Check the latest GNDEC notice or office page.</p>`;const first=Math.min(...classes.map((item)=>item.start)),last=Math.max(...classes.map((item)=>item.end));return`<p><strong><u>College hours · verified timetable span</u></strong></p><p>Your active official timetable runs from as early as <strong>${humanTime(first)}</strong> to as late as <strong>${humanTime(last)}</strong>, depending on the day.</p><p>This describes your classes, not administrative office hours.</p><p class="kb-tip">Ask “today ka timetable” for today’s exact span.</p>`;}},
   {id:"uniform",test:/uniform|dress\s*code|what\s*to\s*wear|wear\s*in\s*college|dress|ਵਰਦੀ|ड्रेस/,reply:()=>`<p><strong><u>Dress code</u></strong></p><p>The loaded timetable and syllabus do not contain a verified dress-code rule. Check the current student notice or ask your mentor before relying on informal advice.</p>`},
   {id:"attendance",test:/attend|attendance|75%?|75\s*percent|bunk|skip\s*class|miss\s*class|haziri|hazri|hajri|ਗੈਰ-ਹਾਜ਼ਰੀ|ऐटेंडेंस/,reply:()=>`<p><strong><u>GNDEC Attendance Rule</u></strong></p><p>A minimum of <strong>75% attendance</strong> is mandatory in all theory and practical courses under official autonomous regulations to sit in End-Semester Examinations (ESE). Compass provides a default target of <strong>76%</strong> (1% safety cushion) in Settings.</p><p class="answer-source">Official GNDEC Autonomous Academic Regulations.</p>`},
-  {id:"cgpa",test:/cgpa|sgpa|gpa|percentage|marks\s*(calculation|formula)|grade\s*point|pointer|sgpi|cgpi/,reply:()=>`<p><strong><u>GNDEC CGPA &amp; Percentage Calculation</u></strong></p><p>• <strong>GNDEC Autonomous Rule:</strong> Percentage = CGPA × 9.5<br />• <strong>IKGPTU Standard Scale:</strong> Percentage = CGPA × 10.0</p><p>For example, a CGPA of <strong>8.4</strong> converts to <strong>79.8%</strong> under Autonomous regulations (or 84.0% standard).</p><p class="answer-source">Official GNDEC Examination Guidelines.</p>`},
+  {id:"cgpa",test:/cgpa|sgpa|gpa|percentage|marks\s*(calculation|formula)|grade\s*point|pointer|sgpi|cgpi/,reply:(q)=>legacyAcademicMarkingAnswer(q) || `<p><strong>CGPA and percentage</strong></p><p>For GNDEC batches from 2016 onward, Percentage = CGPA × 10. For example, 8.4 CGPA converts to 84%.</p><p>Calculate a weighted average from each course's credits and numeric grade points. A letter grade needs its applicable programme scale.</p><p class="answer-source"><a href="https://gndec.ac.in/sites/default/files/cgpac.pdf" target="_blank" rel="noopener noreferrer">Official GNDEC CGPA conversion notice</a>.</p>`},
   {id:"exam-pattern",test:/exam\s*(pattern|scheme|marks?|format)|internal\s*(exam|marks?)|sessional|mid\s*term|end\s*sem|external|how\s*many\s*marks|exam\s*kitne\s*marks|ਇमਤਿਹਾਨ|परीक्षा/,reply:()=>`<p><strong><u>Exam scheme</u></strong></p><p>Assessment varies by course. Ask for a subject—for example, <strong>“Physics assessment marks”</strong>—and Compass will read the exact continuous-assessment, end-semester, and total marks from the official syllabus.</p>`},
   {id:"holidays",test:/holiday|holidays|vacation|break\s*when|leave\s*when|when\s*is\s*(the\s*)?(next|any)\s*holiday|chutti|छुट्टी|ਛੁੱਟੀ/,reply:()=>`<p><strong><u>GNDEC Official Holidays 2026</u></strong></p><p>Compass includes the complete verified 2026 Gazetted and Restricted holiday calendar from the official GNDEC list (<code>LoH26.pdf</code>). Ask <strong>“How many holidays in August?”</strong>, <strong>“Is on 15 August holiday?”</strong>, or <strong>“When is the next holiday?”</strong> for exact dates.</p><p class="answer-source">Official GNDEC List of Holidays 2026.</p>`},
   {id:"hostel",test:/hostel|mess|room\s*(in\s*)?(hostel|pg)|accommodation|stay\s*where|pg\s*near|हॉस्टल|ਹੋਸਟਲ/,reply:()=>`<p><strong><u>GNDEC Campus Facilities &amp; Hostel Guidelines</u></strong></p><p>GNDEC provides on-campus residential hostels for boys (Hostel 1, 2, 5) and girls (Hostel 4). Key guidelines under autonomous regulations:<br />• <strong>Study Hours:</strong> 9:00 PM – 11:00 PM (strict silence mandatory)<br />• <strong>Curfew Timings:</strong> 8:30 PM (Girls Hostel) / 10:00 PM (Boys Hostel)<br />• <strong>Mess &amp; Amenities:</strong> Cooperative student-managed mess, Wi-Fi, indoor recreation, 24×7 power backup.<br />• <strong>Compliance:</strong> Strict anti-ragging code and biometric attendance.</p><p class="answer-source"><a href="https://gndec.ac.in/?q=node/34" target="_blank" rel="noopener">GNDEC Facilities &amp; Hostels Portal</a> · <a href="https://gndec.ac.in/sites/default/files/information_brochure_2026.pdf" target="_blank" rel="noopener">Information Brochure 2026</a></p>`},

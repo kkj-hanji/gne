@@ -26,7 +26,7 @@
     // Split on any non-alphanumeric separator ("ECB1, ECB2", "ECB-1/ECB-2").
     // Fragments without a letter ("ECB-1" → "1") are separator debris, never
     // real selections, so they are dropped instead of polluting the catalog.
-    return String(value || "").toUpperCase().split(/[^A-Z0-9]+/)
+    return String(value || "").toUpperCase().replace(/\b([A-Z]{2,})[- ](\d+)\b/g, "$1$2").split(/[^A-Z0-9]+/)
       .filter((token) => /[A-Z]/.test(token));
   }
 
@@ -166,7 +166,8 @@
     const q = kernel.normalize(question);
     const hasExplicitCue = /\bcompare\b|\bcomparison\b|\bvs\b|\bversus\b|\bdifference\b|\bdifferent\b|\bfarak\b|\bfarq\b|\b(?:common|shared|same|both)\s+(?:teacher|teachers|faculty|subject|subjects|slot|slots|free)\b|\bwhen are\b.*\bboth free\b|\bboth free\b/.test(q);
     if (!hasExplicitCue) {
-      const extracted = [...new Set(codesIn(q))];
+      const known = new Set(selectionCatalog(context).map(entry => entry.code));
+      const extracted = [...new Set(codesIn(q))].filter(code => known.has(code));
       const hasDay = Boolean(kernel.extractDaySymbol(q) || kernel.CALENDAR_DAYS.some((d) => new RegExp(`\\b${d.toLowerCase()}\\b`).test(q)));
       const hasFree = /\b(?:free|khali|break|periods?|slots?)\b/.test(q);
       if (!(extracted.length === 2 && (hasDay || hasFree))) return null;
@@ -271,10 +272,22 @@
     return codes.length ? codes[0] : "";
   }
 
+  const personKey = (value) => kernel.stripTitles(value).toLowerCase().replace(/\bteacher\b/g, "").replace(/[^a-z]+/g, " ").trim();
+
+  function verifiedClasses(pool) {
+    if (!Array.isArray(pool) || pool.length > 10000 || pool.some(row => !kernel.validClass(row))) throw new Error("Unverified timetable rows");
+    return kernel.chronological(pool);
+  }
+
   function classesFor(selection, context) {
-    if (selection.kind === "faculty") return kernel.chronological((context.facultyTimetables || []).filter((item) => item.group === selection.code));
+    if (selection.kind === "faculty") {
+      const dedicated = (context.facultyTimetables || []).filter((item) => item.group === selection.code);
+      const pool = dedicated.length ? dedicated : (context.allClasses || context.classes || [])
+        .filter((item) => kernel.teacherNames(item.teacher).some((name) => personKey(name) === personKey(selection.code)));
+      return verifiedClasses(pool);
+    }
     const wanted = String(selection.code || "").toUpperCase();
-    const all = kernel.chronological((Array.isArray(context.allClasses) && context.allClasses.length ? context.allClasses : (Array.isArray(context.classes) ? context.classes : [])));
+    const all = verifiedClasses(Array.isArray(context.allClasses) && context.allClasses.length ? context.allClasses : (Array.isArray(context.classes) ? context.classes : []));
     if (selection.kind !== "subgroup") {
       return all.filter((item) => String(item.group || "").toUpperCase() === wanted);
     }
@@ -980,8 +993,11 @@
       ["resolve campus location inquiry", "lookup verified building/facility entry"]);
   }
 
-  function cleanCandidateName(input) {
-    return kernel.stripTitles(input)
+  function cleanFacultyCandidate(input, context = {}) {
+    const temporal = kernel.resolveTemporalQuery(input, context.calendarDate);
+    let text = kernel.normalize(input);
+    if (temporal.status === "resolved") text = text.replace(temporal.text, " ");
+    return kernel.stripTitles(text)
       .replace(/\b(?:teacher|faculty|time\s*table|timetable|schedule|class(?:es)?|periods?|lectures?|da|di|de|ka|ki|ke|ko|mein|in|on|at|show|batao|tell|check|today|tomorrow|aaj|kal|parso)\b/gi, " ")
       .replace(/[^a-z0-9\s]/gi, " ")
       .trim();
@@ -989,7 +1005,7 @@
 
   function findTeacherClasses(teacherQuery, context) {
     const personKey = (value) => kernel.stripTitles(value).toLowerCase().replace(/\bteacher\b/g, "").replace(/[^a-z]+/g, " ").trim();
-    const candidate = cleanCandidateName(teacherQuery);
+    const candidate = cleanFacultyCandidate(teacherQuery, context);
     const queryKey = personKey(candidate);
     if (!queryKey || queryKey.length < 2) return null;
     const queryWords = queryKey.split(/\s+/).filter(Boolean);
@@ -998,11 +1014,13 @@
     const facultyList = Array.isArray(context.facultyTimetables) ? context.facultyTimetables : [];
     if (facultyList.length) {
       const groups = kernel.unique(facultyList.map((item) => item.group));
-      const exact = groups.find((name) => personKey(name) === queryKey);
-      const match = exact || groups.find((name) => {
+      const exact = groups.filter((name) => personKey(name) === queryKey);
+      const matches = exact.length ? exact : groups.filter((name) => {
         const words = personKey(name).split(/\s+/);
         return queryWords.length && queryWords.every((word) => word.length >= 3 && words.some((part) => part.startsWith(word) || kernel.editDistance(part, word) <= (word.length >= 7 ? 2 : 1)));
       });
+      if (matches.length > 1) return { ambiguous: matches };
+      const match = matches[0];
       if (match) {
         const classes = facultyList.filter((item) => item.group === match);
         return { teacher: match, classes, source: "facultyTimetables" };
@@ -1031,6 +1049,7 @@
     });
 
     if (!teacherMap.size) return null;
+    if (teacherMap.size > 1) return { ambiguous: [...teacherMap.keys()] };
     const [teacher, classes] = [...teacherMap.entries()][0];
     return { teacher, classes, source: "allClasses" };
   }
@@ -1044,9 +1063,14 @@
 
     const teacherResult = findTeacherClasses(input, context);
     if (teacherResult) {
+      if (teacherResult.ambiguous) return kernel.result("TEACHER_CLARIFY", 1,
+        `<p>More than one faculty member matches. Please give the full name: ${teacherResult.ambiguous.slice(0, 6).map(kernel.escapeHtml).join(", ")}.</p>`,
+        {}, ["preserve ambiguous faculty identities"]);
       const { teacher, classes } = teacherResult;
+      const temporal = kernel.resolveTemporalQuery(q, context.calendarDate);
+      if (!["none", "resolved"].includes(temporal.status)) return null;
       const days = kernel.CALENDAR_DAYS.filter((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(q));
-      const targetDay = days.length === 1 ? days[0] : "";
+      const targetDay = temporal.day || (days.length === 1 ? days[0] : "");
       const filtered = targetDay ? classes.filter((c) => c.day.toLowerCase() === targetDay.toLowerCase()) : classes;
       const sorted = [...filtered].sort((a, b) => kernel.CALENDAR_DAYS.indexOf(a.day) - kernel.CALENDAR_DAYS.indexOf(b.day) || a.start - b.start);
 
@@ -1064,7 +1088,7 @@
         const timeStr = c.time || (c.start ? `${Math.floor(c.start / 60)}:${String(c.start % 60).padStart(2, "0")}` : "");
         const room = c.room ? ` · ${kernel.escapeHtml(c.room)}` : "";
         const grp = c.group ? ` (${kernel.escapeHtml(c.group)}${c.cohorts ? ` · ${kernel.escapeHtml(c.cohorts)}` : ""})` : "";
-        return `<li><strong>${kernel.escapeHtml(c.day)}${timeStr ? ` ${escapeHtml(timeStr)}` : ""}:</strong> ${kernel.escapeHtml(c.subject)}${room}<span>${grp}</span></li>`;
+        return `<li><strong>${kernel.escapeHtml(c.day)}${timeStr ? ` ${kernel.escapeHtml(timeStr)}` : ""}:</strong> ${kernel.escapeHtml(c.subject)}${room}<span>${grp}</span></li>`;
       }).join("");
 
       return kernel.result(
@@ -1077,7 +1101,7 @@
     }
 
     if (hasTeacherCue && asksTimetable) {
-      const candidate = cleanCandidateName(input);
+      const candidate = cleanFacultyCandidate(input, context);
       if (candidate && candidate.length >= 3) {
         return kernel.result(
           "TEACHER_NOT_FOUND",
@@ -1094,7 +1118,9 @@
 
   function findRoomClasses(roomQuery, context) {
     const norm = (s) => String(s || "").trim().toLowerCase().replace(/[-_]/g, " ");
-    const cleaned = norm(roomQuery)
+    const temporal = kernel.resolveTemporalQuery(roomQuery, context.calendarDate);
+    const query = kernel.normalize(roomQuery);
+    const cleaned = norm(temporal.status === "resolved" ? query.replace(temporal.text, " ") : query)
       .replace(/\b(?:timetable|schedule|class(?:es)?|periods?|lectures?|ka|ki|ke|da|di|de|mein|in|on|at|show|batao|tell|check)\b/g, " ")
       .replace(/\broom\b/g, " ")
       .replace(/[^a-z0-9\s]/g, " ")
@@ -1124,6 +1150,7 @@
     if (!roomMap.size) return null;
     const exactKey = [...roomMap.keys()].find((k) => norm(k) === target);
     if (exactKey) return { room: exactKey, classes: roomMap.get(exactKey) };
+    if (roomMap.size > 1) return { ambiguous: [...roomMap.keys()] };
     const [room, classes] = [...roomMap.entries()][0];
     return { room, classes };
   }
@@ -1136,10 +1163,14 @@
 
     const roomResult = findRoomClasses(input, context);
     if (!roomResult) return null;
+    if (roomResult.ambiguous) return kernel.result("ROOM_CLARIFY", 1,
+      `<p>More than one room matches. Please specify ${roomResult.ambiguous.slice(0, 6).map(kernel.escapeHtml).join(", ")}.</p>`, {}, ["preserve ambiguous room identities"]);
 
     const { room, classes } = roomResult;
+    const temporal = kernel.resolveTemporalQuery(q, context.calendarDate);
+    if (!["none", "resolved"].includes(temporal.status)) return null;
     const days = kernel.CALENDAR_DAYS.filter((day) => new RegExp(`\\b${day.toLowerCase()}\\b`).test(q));
-    const targetDay = days.length === 1 ? days[0] : "";
+    const targetDay = temporal.day || (days.length === 1 ? days[0] : "");
     const filtered = targetDay ? classes.filter((c) => c.day.toLowerCase() === targetDay.toLowerCase()) : classes;
     const sorted = [...filtered].sort((a, b) => kernel.CALENDAR_DAYS.indexOf(a.day) - kernel.CALENDAR_DAYS.indexOf(b.day) || a.start - b.start);
 
@@ -1157,7 +1188,7 @@
       const timeStr = c.time || (c.start ? `${Math.floor(c.start / 60)}:${String(c.start % 60).padStart(2, "0")}` : "");
       const teacher = c.teacher ? ` · ${kernel.escapeHtml(c.teacher)}` : "";
       const grp = c.group ? ` (${kernel.escapeHtml(c.group)}${c.cohorts ? ` · ${kernel.escapeHtml(c.cohorts)}` : ""})` : "";
-      return `<li><strong>${kernel.escapeHtml(c.day)}${timeStr ? ` ${escapeHtml(timeStr)}` : ""}:</strong> ${kernel.escapeHtml(c.subject)}${teacher}<span>${grp}</span></li>`;
+      return `<li><strong>${kernel.escapeHtml(c.day)}${timeStr ? ` ${kernel.escapeHtml(timeStr)}` : ""}:</strong> ${kernel.escapeHtml(c.subject)}${teacher}<span>${grp}</span></li>`;
     }).join("");
 
     return kernel.result(

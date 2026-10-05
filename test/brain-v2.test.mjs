@@ -386,6 +386,22 @@ test("specific syllabus units answer concisely with official unit details and co
   assert.doesNotMatch(labs, /Labs & practicals|Profile → Find my group/i);
 });
 
+test("PPS syllabus context survives unrelated questions and resolves compact unit queries", () => {
+  const { api } = createHarness();
+  const pps = api.syllabusCoursesForQuestion("PPS syllabus")[0];
+  assert.ok(pps);
+
+  const syllabus = api.answerWithoutAi("PPS syllabus");
+  for (const unit of pps.units) assert.match(syllabus, new RegExp(`Unit ${unit.number}:`));
+  assert.equal(api.state.syllabusConversation?.courseCodes?.[0], pps.code);
+
+  api.answerWithoutAi("hi");
+  assert.equal(api.state.syllabusConversation?.courseCodes?.[0], pps.code);
+  assert.match(api.answerWithoutAi("unit1"), /Programming for Problem Solving · Unit 1/i);
+  assert.match(api.answerWithoutAi("unit 2 pps"), /Programming for Problem Solving · Unit 2/i);
+  assert.match(api.answerWithoutAi("pps unit3"), /Programming for Problem Solving · Unit 3/i);
+});
+
 test("co-teachers are distinct people and verified catalogue follow-ups beat stale syllabus context", () => {
   const { api } = createHarness();
   api.state.syllabusPages = syllabusIndex.pages;
@@ -669,6 +685,10 @@ test("all official syllabus subjects answer units locally and never become timet
     ["chemistry units", /Unit 4/],
     ["mathematics 2 units", /Unit 4/],
     ["basic electrical units", /Unit 6/],
+    ["beee units", /Unit 6/],
+    ["beee syllabus", /Basic Electrical/i],
+    ["beee unit 3", /Unit 3/i],
+    ["unit 2 beee", /Basic Electrical/i],
     ["engineering drawing units", /Unit 6/],
     ["PPS units", /Unit 6/],
     ["python syllabus units", /Unit 5/],

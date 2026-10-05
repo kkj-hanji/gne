@@ -74,7 +74,8 @@
     [/\b(?:stu)\b/g, "students"],
     [/\b(?:cnt)\b/g, "count"],
     [/\b(?:cred)\b/g, "credits"],
-    [/\b(?:krdo|kardo|kro)\b/g, "compare"],
+    // These are request verbs ("do it"), not comparison operators.
+    [/\b(?:krdo|kardo|kro)\b/g, "show"],
     [/\b(?:eco|econ)\b/g, "economics"],
     [/\b((?:ec|cs|ce|ee|it|me|rai)[a-z]?)[- ]([a-z]?\d)\b/gi, "$1$2"],
     [/\b(?:clas+|cls|lectur+|lecture|lec|lect|period|periods|ghanta|ghante)\b/g, "class"],
@@ -88,6 +89,7 @@
     [/\u0915\u092c|\u0a15\u0a26\u0a4b\u0a02/gu, " when "],
     [/\b(?:kaha|kahaan|kidhar|kithe|kithhe|kamra|kamre)\b/g, "where"],
     [/\b(?:kaun|kon|keda|kedi|kehra|kehri|kaunsa|kaunsi)\b/g, "who"],
+    [/\b(?:kehda|kehdi|kehde|konsa|konsi)\b/g, "which"],
     [/\b(?:baad|bad)\b/g, "after"],
     [/\b(?:pehla|pehli)\b/g, "first"],
     [/\b(?:akhri|aakhri)\b/g, "last"],
@@ -106,13 +108,13 @@
     [/\b(?:kitna|kinna)\s+(?:lamba|long)\b/g, "how long"],
     [/\b(?:plus|jod|jodo)\b/g, " + "],
     [/\b(?:minus|ghata|ghatao)\b/g, " - "],
-    [/\b(?:times|multiply|multiplied by|guna)\b/g, " * "],
+    [/\b(?:multiply|multiplied by|guna)\b/g, " * "],
     [/\b(?:divided by|divide|bhaag)\b/g, " / "],
     [/\b(?:hafte|hafta|haftey)\b/g, "week"],
     [/\b(?:somvar|somvaar|sombar)\b/g, "monday"],
     [/\b(?:mangalvar|mangalvaar)\b/g, "tuesday"],
     [/\b(?:budhvar|budhvaar|budhwar)\b/g, "wednesday"],
-    [/\b(?:guruvar|guruvaar|guruwar|veerwar|virvar)\b/g, "thursday"],
+    [/\b(?:guruvar|guruvaar|guruwar|veerwar|veervaar|virvar)\b/g, "thursday"],
     [/\b(?:shukravar|shukravaar|shukarvar|shukarvaar)\b/g, "friday"],
     [/\b(?:shanivar|shanivaar)\b/g, "saturday"],
     [/\b(?:ravivar|ravivaar|aitvar|aitvaar|etwar)\b/g, "sunday"],
@@ -161,13 +163,21 @@
   }
 
   function normalize(input) {
-    let normalized = clean(String(input || "").slice(0, LIMITS.input))
+    // Resolve past-tense kal/parso inside its own clause before punctuation is
+    // cleaned. A past tense in a different question must not change tomorrow.
+    const scoped = String(input || "").slice(0, LIMITS.input)
+      .split(/([;?!\n]|\b(?:and|aur|atte|naale|askcompassquestionboundary|askcompasscommaboundary)\b)/i)
+      .map((part) => /\b(?:tha|thi|si|was|were|had)\b|\bthe\s*$/i.test(part)
+        ? part.replace(/\b(?:kal|kl)\b/gi, "yesterday").replace(/\b(?:parso|parson)\b/gi, "day before yesterday")
+        : part).join("");
+    let normalized = clean(scoped)
       // Split a digit-bearing identifier from a known temporal suffix only.
       // Never run spelling correction over arbitrary college identifiers.
       .replace(/\b([a-z]{1,6}\d{1,3})(tmro|tmrw|tomorrow|today|kal|tue|mon|wed|thu|fri)\b/g, "$1 $2")
-      .replace(/\b(?:kal|kl)\b(?=[^;?]*\b(?:tha|thi|the|si|was|were|had)\b)/g, "yesterday")
-      .replace(/\b(?:parso|parson)\b(?=[^;?]*\b(?:tha|thi|si|was|were|had)\b)/g, "day before yesterday");
+      // Preserve "exam times" while still accepting spoken multiplication.
+      .replace(/\b(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s+times\s+(?=\d|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|\()/g, "$1 * ");
     PHRASES.forEach(([pattern, replacement]) => { normalized = normalized.replace(pattern, replacement); });
+    if (/^(?:sat\s*sri\s*akal|satsriakal)$/.test(normalized.trim())) return "hello";
     return normalized.replace(/\btime\s*table\b/g, "timetable").replace(/\s+/g, " ").trim();
   }
 
@@ -178,6 +188,8 @@
     const normalized = normalize(String(input || "").slice(0, LIMITS.input));
     const scores = new Map();
     const add = (intent, score) => scores.set(intent, Math.max(score, scores.get(intent) || 0));
+    if (/\b(?:how many|number of|count|difference in)\s+days?\b/.test(normalized) && /\b(?:between|from|until|till)\b/.test(normalized)) add("date_calculation", 110);
+    if (/^(?:hi|hello|hey|namaste|namaskar|good (?:morning|afternoon|evening))$/.test(normalized)) add("greeting", 110);
     const holidayMatches = typeof searchHolidays === "function" ? searchHolidays(normalized) : [];
 
     if (/\b(?:holiday|holidays|vacation|gazetted|restricted|half day)\b/.test(normalized) || holidayMatches.length) add("holiday", 100);
@@ -262,36 +274,41 @@
     if (/\b(?:calculate|solve|credits?|percent(?:age)?)\b/.test(q) || (!numericDate && /^[\d\s+*/^().%=-]+$/.test(q))) return none;
     if (!isValidIsoDate(baseIso)) return none;
     const found = [];
-    const add = (text, year, month, day) => found.push({ text, iso: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` });
+    const add = (text, year, month, day, index) => found.push({ text, index, iso: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` });
     const occupied = [];
     for (const m of q.matchAll(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g)) {
-      add(m[0], Number(m[1]), Number(m[2]), Number(m[3]));
+      add(m[0], Number(m[1]), Number(m[2]), Number(m[3]), m.index);
       occupied.push([m.index, m.index + m[0].length]);
     }
     for (const m of q.matchAll(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](20\d{2}|\d{2}))?\b/g)) {
       if (occupied.some(([start, end]) => m.index >= start && m.index < end)) continue;
       // A bare subtraction is arithmetic, not a date.
       if (!m[3] && m[0].includes("-") && !/\b(?:date|on|holiday|timetable|schedule|class)\b/.test(q)) continue;
-      add(m[0], m[3] ? Number(m[3]) + (m[3].length === 2 ? 2000 : 0) : Number(baseIso.slice(0, 4)), Number(m[2]), Number(m[1]));
+      add(m[0], m[3] ? Number(m[3]) + (m[3].length === 2 ? 2000 : 0) : Number(baseIso.slice(0, 4)), Number(m[2]), Number(m[1]), m.index);
     }
     const monthWords = Object.keys(MONTHS).join("|");
     for (const m of q.matchAll(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${monthWords})(?:\\s+(20\\d{2}))?\\b`, "g"))) {
-      add(m[0], Number(m[3] || baseIso.slice(0, 4)), MONTHS[m[2]] + 1, Number(m[1]));
+      add(m[0], Number(m[3] || baseIso.slice(0, 4)), MONTHS[m[2]] + 1, Number(m[1]), m.index);
+      occupied.push([m.index, m.index + m[0].length]);
     }
-    if (!found.length) for (const m of q.matchAll(new RegExp(`\\b(${monthWords})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+(20\\d{2}))?\\b`, "g"))) {
-      add(m[0], Number(m[3] || baseIso.slice(0, 4)), MONTHS[m[1]] + 1, Number(m[2]));
+    for (const m of q.matchAll(new RegExp(`\\b(${monthWords})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+(20\\d{2}))?\\b`, "g"))) {
+      if (occupied.some(([start, end]) => m.index < end && m.index + m[0].length > start)) continue;
+      add(m[0], Number(m[3] || baseIso.slice(0, 4)), MONTHS[m[1]] + 1, Number(m[2]), m.index);
     }
     const relative = /\b(day before yesterday|day after tomorrow|yesterday|tomorrow|today)\b/g;
     const offsets = { "day before yesterday": -2, yesterday: -1, today: 0, tomorrow: 1, "day after tomorrow": 2 };
-    for (const m of q.matchAll(relative)) found.push({ text: m[0], iso: shiftIsoDate(baseIso, offsets[m[0]]) });
+    for (const m of q.matchAll(relative)) found.push({ text: m[0], index: m.index, iso: shiftIsoDate(baseIso, offsets[m[0]]) });
+    found.sort((a, b) => a.index - b.index);
     const weekdays = [...q.matchAll(/\b(?:(this|next|coming|previous|last)\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|thurs|fri|sat|sun)\b/g)];
     if (found.some((entry) => !isValidIsoDate(entry.iso))) return { status: "invalid", dates: [], reason: "That calendar date does not exist." };
     if (found.length) {
       const dates = [...new Set(found.map((entry) => entry.iso))];
+      const listCue = /\b(?:and|or|to|through|between|compare|comparison|difference|different|vs|versus)\b/.test(q);
+      if (dates.length > 1 && !listCue) return { status: "conflict", dates, reason: "The supplied date references disagree. Please choose one date or explicitly request both." };
       if (dates.length === 1 && weekdays.length === 1 && !weekdayOfIso(dates[0]).toLowerCase().startsWith(weekdays[0][2].slice(0, 3))) {
         return { status: "conflict", dates, reason: `That date is ${formatIsoFull(dates[0])}; the supplied weekday does not match.` };
       }
-      if (dates.length === 2 && /\b(?:from|between)\b.*\b(?:to|through|and)\b/.test(q) && !/\b(?:compare|comparison|difference|different|vs|versus)\b/.test(q)) {
+      if (dates.length === 2 && /\b(?:from|between)\b.*\b(?:to|through|and)\b/.test(q) && !/\b(?:compare|comparison|difference|different|vs|versus|how many days|number of days|count days)\b/.test(q)) {
         if (dates[1] < dates[0]) return { status: "invalid", dates: [], reason: "The end date is before the start date." };
         const length = Math.round((Date.parse(dates[1]) - Date.parse(dates[0])) / 86400000) + 1;
         if (length > 31) return { status: "limited", dates: [], reason: "Please request a date range of at most 31 days." };
@@ -299,6 +316,7 @@
       }
       return { status: dates.length === 1 ? "resolved" : "multiple", dates, iso: dates[0], day: weekdayOfIso(dates[0]), text: found.map((entry) => entry.text).join(" and ") };
     }
+    const week = q.match(/\b(this|next|last|previous)\s+week\b/);
     if (weekdays.length) {
       const dates = weekdays.map((m) => {
         const target = CALENDAR_DAYS.findIndex((day) => day.toLowerCase().startsWith(m[2].slice(0, 3)));
@@ -307,16 +325,26 @@
         if (m[1] === "previous" || m[1] === "last") delta = -((current - target + 7) % 7 || 7);
         if (m[1] === "next") delta = delta || 7;
         if (m[1] === "this") delta = target - current;
+        if (week) delta = target - current + (week[1] === "next" ? 7 : /last|previous/.test(week[1]) ? -7 : 0);
         return shiftIsoDate(baseIso, delta);
       });
-      return { status: dates.length === 1 ? "resolved" : "multiple", dates, iso: dates[0], day: weekdayOfIso(dates[0]), text: weekdays.map((m) => m[0]).join(" and ") };
+      return { status: dates.length === 1 ? "resolved" : "multiple", dates, iso: dates[0], day: weekdayOfIso(dates[0]), text: week ? q.slice(Math.min(week.index, weekdays[0].index), Math.max(week.index + week[0].length, weekdays.at(-1).index + weekdays.at(-1)[0].length)) : weekdays.map((m) => m[0]).join(" and ") };
     }
-    const week = q.match(/\b(this|next|last|previous)\s+week\b/);
     if (week) {
       const offset = week[1] === "next" ? 7 : /last|previous/.test(week[1]) ? -7 : 0;
       const monday = shiftIsoDate(baseIso, offset - CALENDAR_DAYS.indexOf(weekdayOfIso(baseIso)));
       return { status: "range", dates: CALENDAR_DAYS.map((_, i) => shiftIsoDate(monday, i)), text: week[0] };
     }
+    const month = q.match(/\b(this|next|last|previous)\s+month\b/);
+    if (month) {
+      const offset = month[1] === "next" ? 1 : /last|previous/.test(month[1]) ? -1 : 0;
+      const first = new Date(`${baseIso.slice(0, 7)}-01T00:00:00Z`);
+      first.setUTCMonth(first.getUTCMonth() + offset);
+      const next = new Date(first); next.setUTCMonth(next.getUTCMonth() + 1);
+      const length = (next - first) / 86400000;
+      return { status: "range", dates: Array.from({ length }, (_, i) => shiftIsoDate(first.toISOString().slice(0, 10), i)), text: month[0] };
+    }
+    if (/\b(?:timetable|schedule|classes?)\b/.test(q) && !/\b(?:exams?|mse|date sheet)\b/.test(q) && /\b(?:20\d{2}|this year|next year|last year)\b/.test(q)) return { status: "limited", dates: [], reason: "Please specify a date or a range of at most 31 days. An annual timetable cannot be verified from one weekly release." };
     return none;
   }
 
@@ -642,6 +670,7 @@
   // Symbolic day extraction from an already-normalized question.
   function extractDaySymbol(normalizedQuestion) {
     const q = String(normalizedQuestion || "");
+    if (/\bday before yesterday\b/i.test(q)) return "day_before_yesterday";
     if (/\b(?:day after tomorrow|kal chhod(?: ke)?|parson?|parso)\b/i.test(q)) return "day_after_tomorrow";
     if (/\byesterday\b/.test(q)) return "yesterday";
     if (/\b(?:tomorrow|kal|agle din)\b/.test(q)) return "tomorrow";
@@ -657,6 +686,7 @@
     if (symbol === "tomorrow") return CALENDAR_DAYS[(todayIndex + 1) % 7];
     if (symbol === "day_after_tomorrow") return CALENDAR_DAYS[(todayIndex + 2) % 7];
     if (symbol === "yesterday") return CALENDAR_DAYS[(todayIndex + 6) % 7];
+    if (symbol === "day_before_yesterday") return CALENDAR_DAYS[(todayIndex + 5) % 7];
     return CALENDAR_DAYS.includes(symbol) ? symbol : "";
   }
 
@@ -881,40 +911,41 @@
       .map((item) => item.holiday);
   }
 
-  // ---- GNDEC Autonomous / IKGPTU Grading & CGPA Engine ----
+  // Numeric points must come from the marksheet. Letter scales vary by programme.
   const GRADE_POINTS = Object.freeze({
-    "O": 10, "A+": 9, "A": 8, "B+": 7, "B": 6, "C": 5, "P": 4, "F": 0,
-    "10": 10, "9": 9, "8": 8, "7": 7, "6": 6, "5": 5, "4": 4, "0": 0
+    "10": 10, "9": 9, "8": 8, "7": 7, "6": 6, "5": 5, "4": 4, "3": 3, "2": 2, "1": 1, "0": 0
   });
 
   function evaluateCgpa(entries) {
-    if (!Array.isArray(entries) || !entries.length) return null;
+    if (!Array.isArray(entries) || !entries.length || entries.length > 100) return null;
     let totalCreditPoints = 0;
     let totalCredits = 0;
     for (const item of entries) {
-      const credits = Number(item.credits || item.c || 0);
-      const gradeStr = String(item.grade || item.g || "").trim().toUpperCase();
-      const point = GRADE_POINTS[gradeStr];
-      if (!Number.isFinite(credits) || credits <= 0 || point === undefined) return null;
+      if (!item || typeof item !== "object") return null;
+      const credits = Number(item.credits ?? item.c ?? 0);
+      const gradeStr = String(item.grade ?? item.g ?? "").trim();
+      const point = Number(gradeStr);
+      if (!Number.isFinite(credits) || credits <= 0 || credits > 100 || !/^\d+(?:\.\d+)?$/.test(gradeStr) || point < 0 || point > 10) return null;
       totalCreditPoints += credits * point;
       totalCredits += credits;
     }
     if (totalCredits <= 0) return null;
     const cgpa = Math.round((totalCreditPoints / totalCredits) * 100) / 100;
-    const percentage = Math.round(cgpa * 9.5 * 100) / 100;
+    const percentage = cgpaToPercentage(cgpa);
     return { cgpa, totalCredits, totalCreditPoints, percentage };
   }
 
   function cgpaToPercentage(cgpa) {
     const val = Number(cgpa);
     if (!Number.isFinite(val) || val < 0 || val > 10) return null;
-    return Math.round(val * 9.5 * 100) / 100;
+    // GNDEC notice cgpac.pdf: batches from 2016 onward use a factor of 10.
+    return Math.round(val * 10 * 100) / 100;
   }
 
   function percentageToCgpa(percentage) {
     const val = Number(percentage);
     if (!Number.isFinite(val) || val < 0 || val > 100) return null;
-    return Math.round((val / 9.5) * 100) / 100;
+    return Math.round((val / 10) * 100) / 100;
   }
 
   // ---- Bounded dialogue memory ----

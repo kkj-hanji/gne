@@ -171,9 +171,9 @@ test("NLU: Attendance and CGPA math calculation questions", () => {
 
   const cgpaAns = api.answerWithoutAi("8.4 cgpa in percentage");
   assert.ok(cgpaAns, "CGPA to percentage should resolve");
-  assert.match(cgpaAns, /79\.8%/);
+  assert.match(cgpaAns, /84%/);
 
-  const pctAns = api.answerWithoutAi("79.8 percentage to cgpa");
+  const pctAns = api.answerWithoutAi("84 percentage to cgpa");
   assert.ok(pctAns, "Percentage to CGPA should resolve");
   assert.match(pctAns, /8\.4 CGPA/);
 

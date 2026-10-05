@@ -93,4 +93,27 @@ test("chat form renders every compound answer and rejects invalid dates", async 
   assert.equal(document.querySelector('#reference-links a[href="/data/mse1-sem1-2026-09-14.pdf"]'), null);
   assert.equal(document.querySelectorAll('#reference-links a[href*="seating-2026-09-"]').length, 0);
   assert.equal(document.querySelectorAll(".thinking").length, 0);
+  vm.runInContext(`
+    state.nowOverride = "2026-10-05T04:30:00Z";
+    state.selectedGroup = "ECB"; state.selectedSubgroup = "ECB1";
+    state.schedule = [
+      { id: "monday", group: "ECB", cohorts: "ECB1", day: "Monday", start: 630, end: 690, subject: "MONDAY COURSE", teacher: "MONDAY TEACHER", room: "A9" },
+      { id: "tuesday", group: "ECB", cohorts: "ECB1", day: "Tuesday", start: 570, end: 630, subject: "TUESDAY COURSE", teacher: "TUESDAY TEACHER", room: "A10" }
+    ];
+    buildScheduleIndex(); resetBrainConversation();
+  `, context);
+  const nextTomorrow = await submit("next class tomorrow");
+  assert.match(nextTomorrow, /TUESDAY COURSE/);
+  assert.match(nextTomorrow, /2026-10-06/);
+  assert.doesNotMatch(nextTomorrow, /MONDAY COURSE/);
+  assert.match(await submit("my timetable tomorrow at 10 AM"), /TUESDAY COURSE/);
+  assert.match(await submit("my timetable tomorrow at 10:30 AM"), /No matching class/);
+  assert.match(await submit("my timetable at 10:99"), /check the time/i);
+  assert.match(await submit("how many days from October 5 to 7 October"), /2 days/);
+  assert.match(await submit("sat sri akal"), /Hello/);
+  assert.match(await submit("8.4 CGPA to percentage"), /84%/);
+  const compoundDates = await submit("what date is Tuesday next week and holidays this month");
+  assert.match(compoundDates, /13 October 2026/);
+  assert.match(compoundDates, /Holidays in October 2026/);
+  assert.equal(document.querySelectorAll(".thinking").length, 0);
 });

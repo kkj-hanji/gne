@@ -53,55 +53,13 @@
     // richer timetable engines ("Friday timetable" must not become a date).
     const asksDate = /\b(?:what|which|tell)\b/.test(q) && /\b(?:date|day)\b/.test(q);
     if (!asksDate) return null;
-    // ISO form first: "2026-08-17" (never read as day/month/year).
-    const isoMatch = q.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    const numeric = q.match(/(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?/) || [];
-    const monthNameMatch = q.match(/(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?/);
-    let iso = "";
-    if (isoMatch) {
-      iso = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-    } else if (monthNameMatch && kernel.MONTHS[monthNameMatch[2]] !== undefined) {
-      const year = monthNameMatch[3] ? Number(monthNameMatch[3]) : Number(baseIso.slice(0, 4));
-      iso = `${year}-${String(kernel.MONTHS[monthNameMatch[2]] + 1).padStart(2, "0")}-${String(Number(monthNameMatch[1])).padStart(2, "0")}`;
-    } else if (numeric.length >= 3 && !/\d{4}-\d{2}-\d{2}/.test(q)) {
-      const day = Number(numeric[1]);
-      const month = Number(numeric[2]);
-      let year = numeric[3] ? Number(numeric[3]) : Number(baseIso.slice(0, 4));
-      if (year < 100) year += 2000;
-      iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    }
-    if (iso) {
-      if (!kernel.isValidIsoDate(iso)) {
-        return kernel.result("CALENDAR_INVALID_DATE", 0.97,
-          `<p><strong>${kernel.escapeHtml(q.match(/(?:what day is|what date is)[^]*/)?.[0] || "That date")} is not a valid calendar date.</strong></p><p class="answer-source">Verified against the real calendar; no guessing.</p>`,
-          { valid: false }, ["extract explicit date", "validate against the calendar", "refuse invalid dates"]);
-      }
-      return kernel.result("CALENDAR_EXACT_DATE", 0.99,
-        `<p><strong>${kernel.escapeHtml(kernel.formatIsoFull(iso))}</strong></p><p class="answer-source">Computed from the real calendar.</p>`,
-        { iso }, ["extract explicit date", "validate", "resolve weekday"]);
-    }
-    // Relative dates anchored to the India calendar date supplied by the app.
-    const symbol = kernel.extractDaySymbol(q);
-    if (!symbol) return null;
-    const offsets = { yesterday: -1, today: 0, tomorrow: 1, day_after_tomorrow: 2 };
-    if (symbol in offsets) {
-      const target = kernel.shiftIsoDate(baseIso, offsets[symbol]);
-      return kernel.result("CALENDAR_RELATIVE_DATE", 0.99,
-        `<p><strong>${kernel.escapeHtml(kernel.formatIsoFull(target))}</strong></p><p class="answer-source">Computed on the India calendar (${kernel.escapeHtml(baseIso)}).</p>`,
-        { symbol, iso: target }, ["read India calendar date", `apply "${symbol}" offset`, "format verified date"]);
-    }
-    // Next occurrence of a named weekday ("what date is Monday?").
-    if (kernel.CALENDAR_DAYS.includes(symbol)) {
-      const todayWeekday = kernel.weekdayOfIso(baseIso);
-      const todayIndex = kernel.CALENDAR_DAYS.indexOf(todayWeekday);
-      const targetIndex = kernel.CALENDAR_DAYS.indexOf(symbol);
-      const shift = ((targetIndex - todayIndex) % 7 + 7) % 7 || 7;
-      const target = kernel.shiftIsoDate(baseIso, shift);
-      return kernel.result("CALENDAR_NEXT_WEEKDAY", 0.98,
-        `<p><strong>${kernel.escapeHtml(kernel.formatIsoFull(target))}</strong></p><p>The next ${kernel.escapeHtml(symbol)} from today.</p><p class="answer-source">Computed on the India calendar (${kernel.escapeHtml(baseIso)}).</p>`,
-        { symbol, iso: target }, ["read India calendar date", "roll forward to the named weekday", "format verified date"]);
-    }
-    return null;
+    const resolved = kernel.resolveTemporalQuery(q, baseIso);
+    if (["invalid", "conflict", "limited"].includes(resolved.status)) return kernel.result("CALENDAR_INVALID_DATE", 1,
+      `<p>${kernel.escapeHtml(resolved.reason)}</p>`, {}, ["validate calendar references"]);
+    if (resolved.status !== "resolved") return null;
+    return kernel.result("CALENDAR_EXACT_DATE", 0.99,
+      `<p><strong>${kernel.escapeHtml(kernel.formatIsoFull(resolved.iso))}</strong></p><p class="answer-source">Computed on the India calendar (${kernel.escapeHtml(baseIso)}).</p>`,
+      { iso: resolved.iso }, ["resolve shared temporal query", "verify absolute calendar date"]);
   }
 
   // ---- Holidays & Academic Calendar ----
@@ -111,7 +69,15 @@
     const baseIso = String(context?.calendarDate || "");
     const baseYear = Number(baseIso.slice(0, 4)) || 2026;
     const requestedYearMatch = q.match(/\b(?:in|for|of|year)?\s*(20\d{2})\b/);
-    const requestedYear = requestedYearMatch ? Number(requestedYearMatch[1]) : baseYear;
+    let requestedYear = requestedYearMatch ? Number(requestedYearMatch[1]) : baseYear;
+    const relativeMonth = q.match(/\b(this|next|last|previous)\s+month\b/);
+    let relativeMonthIndex = null;
+    if (relativeMonth && kernel.isValidIsoDate(baseIso)) {
+      const anchor = new Date(`${baseIso.slice(0, 7)}-01T00:00:00Z`);
+      anchor.setUTCMonth(anchor.getUTCMonth() + (relativeMonth[1] === "next" ? 1 : /last|previous/.test(relativeMonth[1]) ? -1 : 0));
+      relativeMonthIndex = anchor.getUTCMonth();
+      if (!requestedYearMatch) requestedYear = anchor.getUTCFullYear();
+    }
     const holidaySearchResults = kernel.searchHolidays(raw);
     const normalizedHolidayQuery = kernel.normalizeHolidayLookup?.(raw) || q;
     const exactRegistryName = holidaySearchResults.some((holiday) => [holiday.name, holiday.nameHi, holiday.namePa]
@@ -188,7 +154,7 @@
     // Check today / tomorrow / day after tomorrow for holiday
     const symbol = kernel.extractDaySymbol(q);
     if (!checkIso && symbol && kernel.isValidIsoDate(baseIso)) {
-      const offsets = { today: 0, tomorrow: 1, day_after_tomorrow: 2, yesterday: -1 };
+      const offsets = { today: 0, tomorrow: 1, day_after_tomorrow: 2, yesterday: -1, day_before_yesterday: -2 };
       if (symbol in offsets) {
         checkIso = kernel.shiftIsoDate(baseIso, offsets[symbol]);
       }
@@ -218,7 +184,7 @@
         const weekday = kernel.weekdayOfIso(checkIso);
         const isWeekend = weekday === "Saturday" || weekday === "Sunday";
         return kernel.result("HOLIDAY_DATE_CHECK", 0.98,
-          `<p><strong>No. ${kernel.escapeHtml(formattedDate)} is not an official gazetted festival holiday.</strong></p><p>${isWeekend ? `It falls on a <strong>${kernel.escapeHtml(weekday)}</strong> (regular weekend).` : "It is a regular college working day unless a date-specific circular is issued."}</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
+          `<p><strong>No. ${kernel.escapeHtml(formattedDate)} is not an official gazetted festival holiday.</strong></p><p>${isWeekend ? `It falls on a <strong>${kernel.escapeHtml(weekday)}</strong> (regular weekend).` : "No gazetted holiday is listed for this date. This does not verify whether classes are running; check the academic calendar and current notices."}</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
           { iso: checkIso, isHoliday: false, isWeekend },
           ["resolve target date", "check gazetted calendar", "confirm regular day status"]);
       }
@@ -226,16 +192,16 @@
 
     // 2. Month-specific holidays: "how many holidays in august", "august mein kitni chuttiyan hain", "list august holidays"
     const mentionedMonth = Object.keys(kernel.MONTHS).find((m) => new RegExp(`\\b${m}\\b`, "i").test(q) && m.length >= 3);
-    const asksMonthHolidays = mentionedMonth !== undefined && (/\b(?:how many|count|kitne|kitni|kinne|kinni|list|show|batao|tell|dasso|what|which)\b/.test(q) || /\b(?:holidays?|chutti|chuttiyan)\b/.test(q));
+    const asksMonthHolidays = (mentionedMonth !== undefined || relativeMonthIndex !== null) && (/\b(?:how many|count|kitne|kitni|kinne|kinni|list|show|batao|tell|dasso|what|which)\b/.test(q) || /\b(?:holidays?|chutti|chuttiyan)\b/.test(q));
 
     if (asksMonthHolidays) {
-      const monthIndex = kernel.MONTHS[mentionedMonth];
+      const monthIndex = relativeMonthIndex ?? kernel.MONTHS[mentionedMonth];
       const monthName = kernel.MONTH_NAMES[monthIndex];
       const list = kernel.getHolidaysForMonth(monthIndex, requestedYear);
       const notices = kernel.getHolidayNoticesForMonth?.(monthIndex, requestedYear) || [];
       if (!list.length) {
         return kernel.result("HOLIDAY_COUNT_MONTH", 0.98,
-          `<p><strong>There are no gazetted holidays listed in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(requestedYear))}.</strong></p><p>Regular classes and academic sessions run as scheduled.</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
+          `<p><strong>There are no gazetted holidays listed in ${kernel.escapeHtml(monthName)} ${kernel.escapeHtml(String(requestedYear))}.</strong></p><p>This list does not establish whether classes are running; check the academic calendar and current notices.</p><p class="answer-source">Official GNDEC & Punjab Government Academic Calendar.</p>`,
           { month: monthName, count: 0, holidays: [] },
           ["identify requested month", "query GNDEC calendar", "format zero-holiday result"]);
       }
@@ -310,70 +276,61 @@
     const raw = String(question || "").trim();
     const q = kernel.normalize(raw);
 
-    // 1. CGPA / SGPA Calculation: "calculate CGPA: 4 credits A+, 4 credits A, 3 credits B+", "calculate sgpa 4 10, 3 9, 3 8"
+    if (/\b(?:cgpa|sgpa)\b/.test(q) && (/\b(?:19\d{2}|200\d|201[0-5])\b/.test(q) || (/\bsgpa\b/.test(q) && /percent|%/.test(q)))) return kernel.result("ACADEMIC_CONVERSION_SCOPE", 1,
+      '<p>The verified GNDEC notice covers CGPA conversion for batches from 2016 onward. I cannot verify this other batch or SGPA conversion.</p><p><a href="https://gndec.ac.in/sites/default/files/cgpac.pdf" target="_blank" rel="noopener noreferrer">Official conversion notice</a></p>', {}, ["validate conversion scope"]);
+
+    // Parse bounded numeric credit/point pairs; never guess a letter-grade scale.
     const asksCgpaCalc = /\b(?:calculate|find|compute|nikalo|batao)\s+(?:my\s+)?(?:cgpa|sgpa|gpa)\b/.test(q)
       || /\b(?:cgpa|sgpa)\s*(?:calculation|calculator|eval|nikalo)\b/.test(q);
     if (asksCgpaCalc) {
+      const payload = raw.replace(/^.*?\b(?:cgpa|sgpa|gpa)\b\s*(?:calculation|calculator|eval|nikalo)?\s*:?/i, "");
       const entries = [];
-      const pairRegex = /(\d+(?:\.\d+)?)\s*(?:credits?|cred|cr)?\s*[:=-]?\s*([OAoapbcPfF0-9+]+)/gi;
-      for (const match of raw.matchAll(pairRegex)) {
-        const credits = Number(match[1]);
-        const grade = match[2].trim().toUpperCase();
-        if (credits > 0 && credits <= 10 && kernel.GRADE_POINTS[grade] !== undefined) {
-          entries.push({ credits, grade });
-        }
-      }
-      if (entries.length >= 2) {
-        const res = kernel.evaluateCgpa(entries);
-        if (res) {
-          const breakdown = entries.map((e, idx) => `Course ${idx + 1}: ${e.credits} credits × Grade ${e.grade} (${kernel.GRADE_POINTS[e.grade]} pts) = ${e.credits * kernel.GRADE_POINTS[e.grade]}`).join("<br />");
-          return kernel.result("ACADEMIC_CGPA_CALCULATION", 0.99,
-            `<p><strong><u>Calculated SGPA / CGPA: ${kernel.escapeHtml(String(res.cgpa))} / 10.0</u></strong></p><p><strong>Equivalent Percentage: ${kernel.escapeHtml(String(res.percentage))}%</strong> (Formula: CGPA × 9.5)</p><p><strong>Total Credits:</strong> ${kernel.escapeHtml(String(res.totalCredits))} · <strong>Total Credit Points:</strong> ${kernel.escapeHtml(String(res.totalCreditPoints))}</p><p class="kb-tip"><u>Calculation Breakdown:</u><br />${breakdown}</p><p class="answer-source">IKGPTU / GNDEC Autonomous 10-Point Grading System.</p>`,
-            { cgpa: res.cgpa, percentage: res.percentage, totalCredits: res.totalCredits },
-            ["parse credit-grade pairs", "evaluate weighted average", "calculate percentage conversion"]);
-        }
-      }
+      const pairRegex = /(-?\d+(?:\.\d+)?)(?:\s*(?:credits?|cred|cr)\s*|\s*[:=]\s*|\s+)(-?\d+(?:\.\d+)?)/gi;
+      const remainder = payload.replace(pairRegex, (_, credits, grade) => {
+        entries.push({ credits: Number(credits), grade });
+        return " ";
+      }).replace(/\b(?:and|aur)\b|[,;\s]/gi, "");
+      const res = !remainder && kernel.evaluateCgpa(entries);
+      if (!res) return kernel.result("ACADEMIC_CGPA_CLARIFY", 1,
+        "<p>Please supply each course's credits and numeric grade points from your marksheet, such as 4 credits 9, 3 credits 8. Points must be from 0 to 10; a letter-grade scale cannot be assumed.</p>", {}, ["validate every numeric credit/point pair"]);
+      const breakdown = entries.map((e, idx) => `Course ${idx + 1}: ${e.credits} credits multiplied by ${e.grade} points = ${Number((e.credits * Number(e.grade)).toFixed(4))}`).join("<br />");
+      const percentage = /\bsgpa\b/.test(q) ? "" : `<p><strong>Equivalent Percentage: ${res.percentage}%</strong> (CGPA multiplied by 10; GNDEC batches from 2016 onward).</p>`;
+      return kernel.result("ACADEMIC_CGPA_CALCULATION", 0.99,
+        `<p><strong>Calculated SGPA / CGPA: ${res.cgpa} / 10.0</strong></p>${percentage}<p><strong>Total Credits:</strong> ${res.totalCredits}</p><p>${breakdown}</p><p class="answer-source">Weighted average of supplied numeric points. This does not verify a marksheet or programme grading scale. <a href="https://gndec.ac.in/sites/default/files/cgpac.pdf" target="_blank" rel="noopener noreferrer">GNDEC CGPA conversion notice</a>.</p>`,
+        { cgpa: res.cgpa, totalCredits: res.totalCredits }, ["validate numeric pairs", "compute weighted average"]);
     }
 
     // 2. CGPA to Percentage / Percentage to CGPA conversions
-    const cgpaToPctMatch = q.match(/(?:convert\s+)?(\d+(?:\.\d+)?)\s*(?:cgpa|sgpa|gpa)\s*(?:to|in|into|percentage|%|marks|\?)/i)
+    const cgpaToPctMatch = q.match(/(?:convert\s+)?(-?\d+(?:\.\d+)?)\s*(?:cgpa|sgpa|gpa)\s*(?:to|in|into|percentage|%|marks|\?)/i)
       || q.match(/(?:percentage|%)\s*(?:of|for|from)?\s*(\d+(?:\.\d+)?)\s*(?:cgpa|sgpa)/i);
     if (cgpaToPctMatch) {
       const cgpa = Number(cgpaToPctMatch[1]);
       const pct = kernel.cgpaToPercentage(cgpa);
+      if (pct === null) return kernel.result("ACADEMIC_CGPA_INVALID", 1, "<p>Please use a CGPA from 0 to 10.</p>", {}, ["validate CGPA bounds"]);
       if (pct !== null) {
         return kernel.result("ACADEMIC_CGPA_CALCULATION", 0.99,
-          `<p><strong>${kernel.escapeHtml(String(cgpa))} CGPA = ${kernel.escapeHtml(String(pct))}%</strong></p><p>Official IKGPTU / GNDEC Conversion Formula:<br /><strong>Percentage (%) = CGPA × 9.5</strong><br />(${kernel.escapeHtml(String(cgpa))} × 9.5 = ${kernel.escapeHtml(String(pct))}%)</p><p class="answer-source">Official IKGPTU / GNDEC Autonomous Examination Regulations.</p>`,
+          `<p><strong>${kernel.escapeHtml(String(cgpa))} CGPA = ${kernel.escapeHtml(String(pct))}%</strong></p><p>Official GNDEC Conversion Formula:<br /><strong>Percentage (%) = CGPA × 10</strong><br />(${kernel.escapeHtml(String(cgpa))} × 10 = ${kernel.escapeHtml(String(pct))}%)</p><p class="answer-source">GNDEC batches from 2016 onward. <a href="https://gndec.ac.in/sites/default/files/cgpac.pdf" target="_blank" rel="noopener noreferrer">Official CGPA conversion notice</a>.</p>`,
           { cgpa, percentage: pct },
-          ["extract CGPA value", "apply 9.5 multiplier", "format verified conversion"]);
+          ["extract CGPA value", "apply 10 multiplier", "format verified conversion"]);
       }
     }
 
-    const pctToCgpaMatch = q.match(/(?:convert\s+)?(\d+(?:\.\d+)?)\s*(?:%|percent|percentage)\s*(?:to|in|into|cgpa|sgpa|gpa|\?)/i)
+    const pctToCgpaMatch = q.match(/(?:convert\s+)?(-?\d+(?:\.\d+)?)\s*(?:%|percent|percentage)\s*(?:to|in|into|cgpa|sgpa|gpa|\?)/i)
       || q.match(/(?:cgpa|sgpa)\s*(?:for|of|from|kya|hoga)?\s*(\d+(?:\.\d+)?)\s*(?:%|percent|percentage)/i);
     if (pctToCgpaMatch) {
       const pct = Number(pctToCgpaMatch[1]);
       const cgpa = kernel.percentageToCgpa(pct);
+      if (cgpa === null) return kernel.result("ACADEMIC_CGPA_INVALID", 1, "<p>Please use a percentage from 0 to 100.</p>", {}, ["validate percentage bounds"]);
       if (cgpa !== null) {
         return kernel.result("ACADEMIC_CGPA_CALCULATION", 0.99,
-          `<p><strong>${kernel.escapeHtml(String(pct))}% = ${kernel.escapeHtml(String(cgpa))} CGPA</strong></p><p>Official IKGPTU / GNDEC Conversion Formula:<br /><strong>CGPA = Percentage ÷ 9.5</strong><br />(${kernel.escapeHtml(String(pct))} ÷ 9.5 = ${kernel.escapeHtml(String(cgpa))})</p><p class="answer-source">Official IKGPTU / GNDEC Autonomous Examination Regulations.</p>`,
+          `<p><strong>${kernel.escapeHtml(String(pct))}% = ${kernel.escapeHtml(String(cgpa))} CGPA</strong></p><p>Official GNDEC Conversion Formula:<br /><strong>CGPA = Percentage ÷ 10</strong><br />(${kernel.escapeHtml(String(pct))} ÷ 10 = ${kernel.escapeHtml(String(cgpa))})</p><p class="answer-source">GNDEC batches from 2016 onward. <a href="https://gndec.ac.in/sites/default/files/cgpac.pdf" target="_blank" rel="noopener noreferrer">Official CGPA conversion notice</a>.</p>`,
           { percentage: pct, cgpa },
-          ["extract percentage value", "divide by 9.5", "format verified conversion"]);
+          ["extract percentage value", "divide by 10", "format verified conversion"]);
       }
     }
 
-    // 3. Single Letter Grade Point Lookup: e.g. "Physics A+ grade CGPA", "A grade points in GNDEC"
-    const singleGradeMatch = q.match(/\b([oOaAbBcCpPfF]\+?)\s*(?:grade|points?|pointer)\b/) || q.match(/\bgrade\s+([oOaAbBcCpPfF]\+?)\b/);
-    if (singleGradeMatch) {
-      const g = singleGradeMatch[1].toUpperCase();
-      if (kernel.GRADE_POINTS[g] !== undefined) {
-        const pts = kernel.GRADE_POINTS[g];
-        return kernel.result("ACADEMIC_GRADE_POINTS", 0.99,
-          `<p><strong>Grade ${kernel.escapeHtml(g)} = ${pts} Grade Points (out of 10)</strong></p><p>In GNDEC Autonomous grading, Grade <strong>${kernel.escapeHtml(g)}</strong> corresponds to <strong>${pts} grade points</strong> in SGPA/CGPA evaluation.</p><p class="answer-source">Official GNDEC Autonomous 10-Point Grading Scale.</p>`,
-          { grade: g, points: pts },
-          ["lookup letter grade point value", "format grading rule"]);
-      }
-    }
+    if (/\b(?:grade\s+[a-z][+]?|[a-z][+]?\s+grade|letter grade)\b/.test(q)) return kernel.result("ACADEMIC_GRADE_CLARIFY", 1,
+      "<p>I could not verify the letter-grade scale for your programme. Use the numeric grade points printed on your marksheet or the applicable academic regulations.</p>", {}, ["require programme-specific grade scale"]);
 
     // Credits must come from the loaded, applicable official syllabus. The
     // old 2018 course map and approximate first-year total are not evidence.
@@ -408,22 +365,26 @@
         ["resolve applicable syllabus courses", "read published credits"]);
     }
 
-    // 5. General CGPA Formula explanation
+    // The conversion notice applies to CGPA for GNDEC batches from 2016 onward.
     if (/\b(?:cgpa|sgpa)\s*(?:formula|rule|grading|system|scale|pointer)\b/.test(q) || /\bhow\s+(?:is|to\s+calculate)\s+(?:cgpa|sgpa)\b/.test(q)) {
       return kernel.result("ACADEMIC_CGPA_CALCULATION", 0.99,
-        `<p><strong><u>GNDEC / IKGPTU 10-Point Grading System & Formula</u></strong></p><p><strong>1. SGPA Formula:</strong><br />\\[ \\text{SGPA} = \\frac{\\sum (\\text{Credits}_i \\times \\text{Grade Point}_i)}{\\sum \\text{Credits}_i} \\]</p><p><strong>2. CGPA to Percentage:</strong><br /><strong>Percentage (%) = CGPA × 9.5</strong></p><p><strong>3. Letter Grade Scale:</strong><br />• <strong>O</strong> (Outstanding): 10 pts (90–100%)<br />• <strong>A+</strong> (Excellent): 9 pts (80–89%)<br />• <strong>A</strong> (Very Good): 8 pts (70–79%)<br />• <strong>B+</strong> (Good): 7 pts (60–69%)<br />• <strong>B</strong> (Above Average): 6 pts (50–59%)<br />• <strong>C</strong> (Average): 5 pts (40–49%)<br />• <strong>P</strong> (Pass): 4 pts (40% minimum)<br />• <strong>F</strong> (Fail): 0 pts (&lt;40%)</p><p class="answer-source">Official GNDEC Autonomous Academic Regulations.</p>`,
-        { scale: "10-point", multiplier: 9.5 },
-        ["retrieve autonomous grading scheme", "format formula and grade point table"]);
+        `<p><strong>SGPA Formula</strong>: sum of (course credits × numeric grade points), divided by total course credits.</p><p><strong>Percentage (%) = CGPA × 10</strong>, for GNDEC batches from 2016 onward. Do not infer grade points from a letter without the applicable grading scale.</p><p class="answer-source"><a href="https://gndec.ac.in/sites/default/files/cgpac.pdf" target="_blank" rel="noopener noreferrer">Official GNDEC CGPA conversion notice</a>.</p>`,
+        { multiplier: 10 }, ["state numeric weighted average", "cite scoped CGPA conversion"]);
     }
 
     // 6. Marking Scheme, Internal / External Marks Breakdown
     const asksMarking = /\b(?:marking\s*scheme|internal\s*marks?|external\s*marks?|ca\s*marks?|ese\s*marks?|continuous\s*assessment|end\s*semester\s*exam|passing\s*marks?|mst\s*marks?|total\s*marks)\b/.test(q)
       || (/\bmarks?\b/.test(q) && /\b(?:internal|external|theory|practical|lab|physics|math|pps|chemistry|economics)\b/.test(q));
     if (asksMarking) {
+      const courses = (context.syllabus || []).filter(course => course.code && course.title);
+      const matches = courses.filter(course => q.includes(String(course.code).toLowerCase()) || String(course.title).toLowerCase().split(/\W+/).some(word => word.length >= 5 && q.split(/\W+/).includes(word)));
+      const available = matches.filter(course => [course.caMarks, course.eseMarks, course.totalMarks].some(value => String(value ?? "").trim() !== "" && Number.isFinite(Number(value))));
+      if (!available.length) return kernel.result("ACADEMIC_MARKING_SCHEME", 1,
+        "<p>I could not verify that course's assessment marks from the loaded official syllabus. Specify its course code and load the current syllabus; theory and practical schemes may differ.</p>", {}, ["require course-specific assessment data"]);
+      const mark = value => String(value ?? "").trim() !== "" && Number.isFinite(Number(value)) ? `${Number(value)} Marks` : "Not listed";
       return kernel.result("ACADEMIC_MARKING_SCHEME", 0.99,
-        `<p><strong><u>Official GNDEC B.Tech Autonomous Marking Scheme</u></strong></p><p><strong>1. Theory Courses (Total: 100 Marks):</strong><br />• <strong>Continuous Assessment (CA / Internal):</strong> 40 Marks<br />&nbsp;&nbsp;– Mid-Semester Tests (MST-1 & MST-2): 24–30 Marks<br />&nbsp;&nbsp;– Assignments, Quizzes & Attendance: 10–16 Marks<br />• <strong>End Semester Examination (ESE / External):</strong> 60 Marks<br />• <strong>Passing Rule:</strong> Minimum 40% in ESE (24/60) and 40% in aggregate (40/100).</p><p><strong>2. Laboratory / Practical Courses:</strong><br />• 50-Mark Labs: CA = 30 Marks, ESE = 20 Marks.<br />• 100-Mark Practicals / Workshop: CA = 60 Marks, ESE = 40 Marks.<br />• <strong>Passing Rule:</strong> Minimum 40% in internal and external components.</p><p><strong>3. Credit Allocation:</strong><br />• 1 Lecture hour/week = 1 Credit<br />• 1 Tutorial hour/week = 1 Credit<br />• 2 Practical/Lab hours/week = 1 Credit</p><p class="answer-source">Official GNDEC Autonomous Study Scheme & Examination Regulations.</p>`,
-        { theory: { total: 100, ca: 40, ese: 60, pass: 40 }, lab50: { ca: 30, ese: 20 }, lab100: { ca: 60, ese: 40 } },
-        ["retrieve official autonomous marking structure", "format theory and laboratory components", "state passing thresholds"]);
+        `<p><strong>Published course assessment</strong></p>${available.map(course => `<p><strong>${kernel.escapeHtml(course.title)} (${kernel.escapeHtml(course.code)})</strong><br />Continuous Assessment (CA / Internal): ${mark(course.caMarks)}<br />End Semester Examination (ESE / External): ${mark(course.eseMarks)}<br />Total: ${mark(course.totalMarks)}</p>`).join("")}<p class="answer-source">Loaded official GNDEC syllabus. Passing thresholds require the applicable regulations.</p>`,
+        { codes: available.map(course => course.code) }, ["resolve named courses", "read published assessment fields"]);
     }
 
     return null;
@@ -443,7 +404,7 @@
 
     let attended = null;
     let total = null;
-    let target = 76;
+    let target = Number(context.attendanceTarget) || 76;
 
     const targetMatch = raw.match(/\b(\d{2})%(?!\d)/) || raw.match(/\bfor\s*(\d{2})\s*(?:percent|%|target)\b/i);
     if (targetMatch) target = Number(targetMatch[1]);
@@ -460,8 +421,8 @@
         attended = n1;
         total = n2;
       } else {
-        total = n1;
-        attended = n2;
+        attended = n1;
+        total = n2;
       }
     } else {
       const numbers = raw.match(/\b\d+\b/g);
