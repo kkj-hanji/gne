@@ -1,7 +1,7 @@
 (function installCompassBrain(globalScope) {
   "use strict";
 
-  const VERSION = "2.12.0";
+  const VERSION = "2.13.0";
   const MIN_CONFIDENCE = 0.82;
   const MAX_RECENT_TURNS = 6;
   const MAX_PLAN_STEPS = 8;
@@ -40,6 +40,16 @@
   });
 
   const PHRASES = Object.freeze([
+    [/\b(?:free rooms?|empty rooms?|vacant rooms?|khaali rooms?|khaali kamre?)\b/g, "free rooms"],
+    [/\b(?:shukriya|shukariya|dhanyawad|dhanyavaad|bahut shukriya)\b/g, "thanks"],
+    [/\b(?:kya haal|kya hal|kya haal chal|sab theek|sab thik)\b/g, "how are you"],
+    [/\b(?:pata nahi|pta nahi|malum nahi|nahin pata|nahi pata)\b/g, "i don't know"],
+    [/\b(?:bata|batao|bata do|bata de|bata dena)\b/g, "tell"],
+    [/\b(?:dikhao|dikha|dikha do|dikha de|show karo)\b/g, "show"],
+    [/\b(?:khoj|search karo|dhundho|dhoondh|find karo)\b/g, "find"],
+    [/\b(?:mentor wale|mentor ke|mentor ka|mentor ki)\b/g, "mentor"],
+    [/\b(?:room kaunsa|room kaun sa|kaun sa room|konsa room)\b/g, "which room"],
+    [/\b(?:class kab|lecture kab|period kab|ghanta kab)\b/g, "when is class"],
     [/\b(?:day\s+after\s+tomorrow|day-after-tomorrow|parso|parson)\b/g, " day after tomorrow "],
     [/\b(?:timetabel|timetble|timetabl|time tabel)\b/g, "timetable"],
     [/\b(?:loacation|locaton|locatoin|palce|plcae)\b/g, "location"],
@@ -323,6 +333,12 @@
     if (/engineering drawing/.test(base)) ["edg", "drawing", "engineering drawing"].forEach((value) => aliases.add(value));
     if (/manufacturing practices/.test(base)) ["workshop", "manufacturing"].forEach((value) => aliases.add(value));
     if (/basic electrical and electronics engineering/.test(base)) ["beee", "bee", "basic electrical", "electrical electronics"].forEach((value) => aliases.add(value));
+    if (/mathematics.*2|math.*2|mathematics.*ii/.test(base)) ["math2", "maths2", "math ii", "mathematics 2"].forEach((value) => aliases.add(value));
+    if (/programming fundamentals.*python|python/.test(base)) ["python", "pfp", "py", "prog fund python"].forEach((value) => aliases.add(value));
+    if (/economics/.test(base)) ["eco", "econ", "economy"].forEach((value) => aliases.add(value));
+    if (/chemistry/.test(base)) ["chem", "rasayan"].forEach((value) => aliases.add(value));
+    if (/physics/.test(base)) ["phy", "phys", "bhautik", "fiziks"].forEach((value) => aliases.add(value));
+    if (/professional english/.test(base)) ["pec", "english", "communication", "eng comm"].forEach((value) => aliases.add(value));
     return [...aliases];
   }
 
@@ -1495,7 +1511,24 @@
     const subjects = unique(classes.map((item) => item.subject));
     const rooms = unique(classes.map((item) => item.room).filter((room) => !/not listed/i.test(room)));
     const teachers = unique(classes.flatMap((item) => teacherNames(item.teacher)));
+
+    const c = suppliedContext.conversation || {};
+    const lastIntent = c.lastIntent || "";
+    const activeSubject = c.activeSubject || "";
+
+    const contextualSuggestions = [];
+    if (lastIntent.includes("GREETING")) {
+      contextualSuggestions.push("my next class", "today's timetable", "pps syllabus");
+    } else if (lastIntent.includes("FREE")) {
+      contextualSuggestions.push("next class", "lightest day");
+    } else if (lastIntent.includes("SYLLABUS")) {
+      contextualSuggestions.push("unit 1", "unit 2", "course outcomes", "textbooks");
+    } else if (activeSubject && !lastIntent.includes("SYLLABUS")) {
+      contextualSuggestions.push("unit 1", `${activeSubject} outcomes`, `who teaches ${activeSubject}`);
+    }
+
     const pool = [
+      ...contextualSuggestions,
       "What is my next class?",
       "2nd next class",
       "Aaj ka timetable batao",

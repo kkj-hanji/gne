@@ -1140,3 +1140,33 @@ test("Brain v2 answers against the complete checked-in official FET timetable, n
     assert.match(api.answerWithoutAi("same room?"), /Yes|No|can’t verify/i);
   }
 });
+
+
+test("NLU: Extended subject aliases, Hinglish fuzzy, and multi-format coverage", () => {
+  const { api } = createHarness();
+  api.state.syllabusPages = syllabusIndex.pages;
+  api.state.syllabus = api.parseSyllabusText(syllabusIndex.pages.map((page) => page.text).join("\f"));
+
+  // Test BEEE in all formats
+  const beeeSyllabus = api.answerWithoutAi("beee syllabus");
+  assert.match(beeeSyllabus, /Basic Electrical and Electronics Engineering/i);
+  assert.match(beeeSyllabus, /Unit 1:/i);
+
+  const beeeUnit3 = api.answerWithoutAi("beee unit 3");
+  assert.match(beeeUnit3, /Basic Electrical and Electronics Engineering · Unit 3/i);
+
+  const unit2Beee = api.answerWithoutAi("unit 2 beee");
+  assert.match(unit2Beee, /Basic Electrical and Electronics Engineering · Unit 2/i);
+
+  const beeeUnit1 = api.answerWithoutAi("beee u1");
+  assert.match(beeeUnit1, /Basic Electrical and Electronics Engineering · Unit 1/i);
+
+  const ecoSyllabus = api.answerWithoutAi("eco syllabus");
+  assert.match(ecoSyllabus, /Economics/i);
+
+  const phySyllabus = api.answerWithoutAi("phy syllabus");
+  assert.match(phySyllabus, /Physics/i);
+
+  const chemSyllabus = api.answerWithoutAi("chem syllabus");
+  assert.match(chemSyllabus, /Chemistry/i);
+});

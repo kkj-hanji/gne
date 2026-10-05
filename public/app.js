@@ -1451,17 +1451,17 @@ function renderWeek() {
 // new device.  The full official 33-page index is still the source used for
 // answers; this only avoids making students wait for its background preload.
 const SYLLABUS_COURSE_HINTS = [
-  { title: "Physics", aliases: ["physics", "phyiscs", "fiziks", "bhautik"] },
+  { title: "Physics", aliases: ["physics", "phyiscs", "fiziks", "bhautik", "phy", "phys"] },
   { title: "Mathematics - I", aliases: ["math", "maths", "mathematics", "ganit"] },
   { title: "Mathematics - II", aliases: ["math 2", "math ii", "mathematics 2", "mathematics ii"] },
-  { title: "Chemistry", aliases: ["chemistry", "chemestry", "rasayan"] },
-  { title: "Professional English Communication", aliases: ["english", "communication"] },
-  { title: "Economics", aliases: ["economics", "economy"] },
+  { title: "Chemistry", aliases: ["chemistry", "chemestry", "rasayan", "chem"] },
+  { title: "Professional English Communication", aliases: ["english", "communication", "pec", "eng comm"] },
+  { title: "Economics", aliases: ["economics", "economy", "eco", "econ"] },
   { title: "Basic Electrical and Electronics Engineering", aliases: ["electrical", "electronics", "bee", "beee", "basic electrical"] },
-  { title: "Engineering Drawing and Graphics", aliases: ["drawing", "graphics", "engineering drawing"] },
-  { title: "Programming for Problem Solving", aliases: ["programming", "programing", "pps", "problem solving"] },
-  { title: "Manufacturing Practices", aliases: ["manufacturing", "workshop"] },
-  { title: "Programming Fundamentals using Python", aliases: ["python", "programming fundamentals"] }
+  { title: "Engineering Drawing and Graphics", aliases: ["drawing", "graphics", "engineering drawing", "edg", "eng draw", "esc102"] },
+  { title: "Programming for Problem Solving", aliases: ["programming", "programing", "pps", "problem solving", "esc103"] },
+  { title: "Manufacturing Practices", aliases: ["manufacturing", "workshop", "mp", "lesc104"] },
+  { title: "Programming Fundamentals using Python", aliases: ["python", "programming fundamentals", "pfp", "py", "prog fund python"] }
 ];
 
 function syllabusHintTitles(question) {
@@ -3206,14 +3206,14 @@ function syllabusCoursesForQuestion(question) {
   const q = canonicalTimetableQuestion(question);
   const compact = normalizeStudentName(q);
   const aliases = [
-    [["math", "maths", "mathematics", "ganit", "gannit"], "mathematics"], [["physics", "phyiscs", "fiziks", "bhautik"], "physics"], [["chemistry", "chemestry", "rasayan"], "chemistry"],
-    [["programming", "programing", "pps", "problem", "solving"], "programming"], [["economics", "economy"], "economics"], [["english", "communication"], "english"],
-    [["drawing", "graphics", "engineeringdrawing"], "drawing"], [["manufacturing", "workshop"], "manufacturing"], [["electrical", "electronics", "bee", "beee", "basic electrical"], "electrical"], [["python"], "python"]
+    [["math", "maths", "mathematics", "ganit", "gannit"], "mathematics"], [["physics", "phyiscs", "fiziks", "bhautik", "phy", "phys"], "physics"], [["chemistry", "chemestry", "rasayan", "chem"], "chemistry"],
+    [["programming", "programing", "pps", "problem", "solving"], "programming"], [["economics", "economy", "eco", "econ"], "economics"], [["english", "communication", "pec", "eng comm"], "english"],
+    [["drawing", "graphics", "engineeringdrawing", "edg"], "drawing"], [["manufacturing", "workshop", "mp"], "manufacturing"], [["electrical", "electronics", "bee", "beee", "basic electrical"], "electrical"], [["python", "pfp", "py", "prog fund python"], "python"]
   ];
   const questionWords = compact.split(" ").filter((word) => word.length >= 3);
   const codeMatches = state.syllabus.filter((course) => compact.includes(normalizeStudentName(course.code)));
   if (codeMatches.length) return codeMatches;
-  const requestedAliases = aliases.filter(([terms]) => terms.some((term) => questionWords.some((word) => word === term || (word.length >= 4 && editDistance(word, term) <= (term.length >= 8 ? 2 : 1))))).map(([, alias]) => alias);
+  const requestedAliases = aliases.filter(([terms]) => terms.some((term) => questionWords.some((word) => word === term || (term.length > 4 && word.length >= 4 && editDistance(word, term) <= (term.length >= 8 ? 2 : 1))))).map(([, alias]) => alias);
   let matches = state.syllabus.filter((course) => {
     const title = normalizeStudentName(course.title);
     return requestedAliases.some((alias) => title.includes(alias)) || title.split(" ").filter((word) => word.length >= 5).some((word) => questionWords.some((queryWord) => queryWord === word || (queryWord.length >= 4 && editDistance(queryWord, word) <= (word.length >= 8 ? 2 : 1))));
@@ -3245,11 +3245,11 @@ function isSyllabusQuestion(question) {
   // Students naturally put the requested fact before the course name too
   // (for example, "is calculator allowed in Physics?"). Keep course/detail
   // detection order-independent instead of requiring "Physics calculator".
-  const hasNamedCourse = /\b(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|graphics|electrical|beee|manufacturing|workshop|python)\b/.test(q) || syllabusCoursesForQuestion(q).length > 0;
+  const hasNamedCourse = /\b(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|graphics|electrical|beee|manufacturing|workshop|python|eco|econ|phy|phys|chem|pec|py)\b/.test(q) || syllabusCoursesForQuestion(q).length > 0;
   const hasSyllabusDetail = /\b(?:syllabus|study\s*scheme|course\s*(?:code|outcomes?|content)|subject\s*code|units?|chapters?|topics?|credits?|marks?|text\s*books?|reference\s*books?|recommended\s*books?|labs?|laboratory|experiments?|practicals?|assessment|exam\s*(?:duration|pattern|scheme|marks?|time|length|hours?)|teaching\s*hours?|prerequisites?|additional\s*material|calculator|course\s*outcomes?)\b/.test(q)
-    || /\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b/.test(q) || /\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/.test(q);
+    || /\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b/.test(q) || /\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/.test(q) || /\bu[1-9]\b/.test(q);
   if (hasNamedCourse && hasSyllabusDetail) return true;
-  if (/\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b/.test(q) || /\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/.test(q) || /syllabus|study\s*scheme|course\s*(?:code|outcomes?|content)|subject\s*code|units?|chapters?|topics?|credits?|marks?|text\s*books?|reference\s*books?|recommended\s*books?|\b(?:co|outcome)\s*#?\s*\d+\b|(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|electrical|beee|manufacturing|python)[\s\S]*(?:books?|labs?|laboratory|experiments?|practicals?|assessment|exam\s*(?:duration|pattern|scheme|marks?)|teaching\s*hours?|prerequisites?|additional\s*material|calculator|course\s*outcomes?|\bco\s*\d+)|(?:total|how\s+many|kitne|kinne|count)\s*(?:subjects?|courses?|papers?)|(?:list|show|name)\s+(?:all\s+)?(?:subjects?|courses?|papers?)|(?:all|which)\s+(?:subjects?|courses?|papers?)\b/u.test(q)) return true;
+  if (/\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b/.test(q) || /\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/.test(q) || /syllabus|study\s*scheme|course\s*(?:code|outcomes?|content)|subject\s*code|units?|chapters?|topics?|credits?|marks?|text\s*books?|reference\s*books?|recommended\s*books?|\b(?:co|outcome)\s*#?\s*\d+\b|(?:physics|maths?|mathematics|chemistry|economics|english|pps|programming|drawing|electrical|beee|manufacturing|python|eco|econ|phy|phys|chem|pec|py)[\s\S]*(?:books?|labs?|laboratory|experiments?|practicals?|assessment|exam\s*(?:duration|pattern|scheme|marks?)|teaching\s*hours?|prerequisites?|additional\s*material|calculator|course\s*outcomes?|\bco\s*\d+)|(?:total|how\s+many|kitne|kinne|count)\s*(?:subjects?|courses?|papers?)|(?:list|show|name)\s+(?:all\s+)?(?:subjects?|courses?|papers?)|(?:all|which)\s+(?:subjects?|courses?|papers?)\b/u.test(q)) return true;
   const words = normalizeStudentName(q).split(" ");
   const syllabusTerm = words.some((word) => word.length >= 4 && ["syllabus", "chapter", "credits", "outcomes", "content", "units"].some((intent) => editDistance(word, intent) <= (intent.length >= 7 ? 2 : 1)));
   if (syllabusTerm) return true;
@@ -3384,7 +3384,7 @@ function syllabusBooksAnswer(course, references = false) {
 function syllabusSpecificUnitAnswer(course, question) {
   const q = canonicalTimetableQuestion(question);
   const UNIT_WORDS = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, ek:1, do:2, teen:3, char:4, paanch:5, chhe:6, ik:1, tinn:3 };
-  let unitNumber = q.match(/\bunit\s*(?:-|number|no\.?\s*)?(\d{1,2})\b/)?.[1];
+  let unitNumber = q.match(/\bunit\s*(?:-|number|no\.?\s*)?(\d{1,2})\b/)?.[1] ?? q.match(/\bu([1-9])\b/)?.[1];
   if (!unitNumber) {
     const wordMatch = q.match(/\bunit\s+(one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b/);
     if (wordMatch) unitNumber = String(UNIT_WORDS[wordMatch[1]]);
@@ -3502,7 +3502,7 @@ function answerSyllabusFollowup(question) {
   if (!context || !state.syllabus.length) return "";
   const asksList = /^(?:list|show|name|tell)\s*(?:them|all|subjects?|courses?)\b|(?:list|show|name)\s+(?:them|all)|which\s+(?:subjects?|courses?)\b/.test(q);
   const explicitlyListsSubjects = /(?:list|show|name)\s+(?:all\s+)?(?:official\s+)?(?:subjects?|courses?)\b|which\s+(?:subjects?|courses?)\b/.test(q);
-  const asksUnits = /\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b|\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b|(?:its?|the)\s*(?:units?|chapters?|topics?)\b|^(?:units?|chapters?|topics?)\b/.test(q);
+  const asksUnits = /\bunit\s*(?:-|number|no\.?\s*)?\d{1,2}\b|\bu[1-9]\b|\bunit\s+(?:one|two|three|four|five|six|seven|ek|do|teen|char|paanch|chhe|ik|tinn)\b|(?:its?|the)\s*(?:units?|chapters?|topics?)\b|^(?:units?|chapters?|topics?)\b/.test(q);
   const asksOutcomes = /(?:its?|the)\s*(?:course\s*)?outcomes?\b|^(?:course\s*)?outcomes?\b|\bco\b/.test(q);
   const asksDetails = /(?:its?|the)\s*(?:code|credits?|semester|marks?|duration|prerequisites?)\b|^(?:code|credits?|semester|marks?|duration|prerequisites?)\b|additional\s*material|calculator/.test(q);
   const asksBooks = /(?:its?|the)\s*(?:text\s*books?|books?|references?)\b|^(?:text\s*books?|books?|references?)\b/.test(q);
@@ -5517,6 +5517,15 @@ function rosterCountAnswer(question = "", rosterData = {}) {
   [...new Set(records.map((record) => record.subsection).filter(Boolean))].forEach((code) => addChoice(code, "subsection", (record) => record.subsection === code));
   [...new Set(records.map((record) => record.section).filter(Boolean))].forEach((code) => addChoice(code, "section", (record) => record.section === code));
   [...new Set(records.map((record) => record.branch).filter(Boolean))].forEach((code) => addChoice(code, "branch", (record) => String(record.branch).toUpperCase() === code));
+
+  [...new Set(records.map((record) => record.mentor).filter(Boolean))].forEach((mentor) => {
+    const mNorm = normalizeStudentName(mentor);
+    const qWords = normalizeStudentName(q).split(" ").filter(w => w.length >= 3 && !/^(?:how|many|students?|count|total|kitne|kinne|sir|mam|maam|madam|prof|professor|dr|doctor|mentor|ke|ki|ka|wale)$/.test(w));
+    if (qWords.length && qWords.some(w => mNorm.includes(w) || (w.length >= 4 && editDistance(w, mNorm) <= 1))) {
+      addChoice(mentor, "mentor", (record) => record.mentor === mentor);
+    }
+  });
+
   const unique = [...new Map(choices.map((choice) => [`${choice.type}:${choice.code}`, choice])).values()];
   if (!unique.length) return `<p><strong><u>Which branch, section, or subsection should I count?</u></strong></p><p>For example: “How many students are in CSD2?” or “How many EC branch students?”</p>`;
   if (unique.length > 1) return `<p><strong><u>I found more than one roster target:</u></strong></p><p>${escapeHtml(unique.map((choice) => `${choice.code} (${choice.type})`).join(", "))}. Ask for one target at a time so Compass does not combine counts.</p>`;
@@ -7500,6 +7509,11 @@ function kbSyllabusUnitAnswer(question) {
 }
 
 const KB_OOB = [
+
+  {id:"about-creator",test:/who\s+is\s+kaushik(?:\s+jain)?|kaushik\s+jain\s+kaun(?:\s+hai)?|about\s+kaushik|kaushik\s+ne\s+banaya|kaushik\s+jain\s+ke\s+bare/i,reply:()=>`<p><strong><u>About Kaushik Jain — Creator</u></strong></p><p>Kaushik Jain is a first-year <strong>ECE – B1</strong> student (2026 batch) at GNDEC Ludhiana. He built GNDEC Compass as a free tool for all GNDEC first-year students.</p><p class="answer-source">Compass project information.</p>`},
+  {id:"free-rooms",test:/free\s*rooms?|empty\s*rooms?|vacant\s*rooms?|available\s*rooms?|khaali\s*(?:kamre?|room)|kaun\s*(?:sa|si)\s*room\s*(?:free|khali|available)|room.*available.*(?:today|now|ab)/i,reply:()=>`<p><strong><u>Finding free rooms</u></strong></p><p>Ask: <strong>"Which rooms are free Monday at 10 AM?"</strong> — Compass reads the official room timetable to find empty rooms at any slot.</p><p class="kb-tip">Load the full timetable in Settings first for live answers.</p>`},
+  {id:"branch-count",test:/how\s+many\s+students\s+(?:in|are\s+in|hain|hai)\s+(?:the\s+)?(?:ce|cs|ec|ee|it|me|rai)\b|\b(?:ce|cs|ec|ee|it|me|rai)\s+(?:branch|mein|me)\s+(?:kitne|how\s+many)/i,reply:(q)=>{const b=(q.match(/\b(ce|cs|ec|ee|it|me|rai)\b/i)||[])[1]?.toUpperCase();return b?`<p><strong><u>${b} branch — student count</u></strong></p><p>Ask: <strong>"How many students are in ${b}?"</strong> — Compass searches the official ${b} roster.</p>`:`<p>Ask: <strong>"How many students in CE?"</strong> to get the count for any branch.</p>`;}},
+
   {id:"creator",test:/who\s+(?:created|built|made|developed)\s+(?:this|the)?\s*(?:web|website|web\s*app|app|compass|site|tool|system)|who\s+is\s+(?:the\s+)?(?:creator|author|developer|maker)|\b(?:creator|author|developer)\s+of\s+(?:this|compass|the\s+app)\b|who\s+are\s+you|built\s+this\s+web|kisne\s+(?:banaya|banayi|banaye|likha|bnaya)|creator\s+kaun\s+hai|kaun\s+ne\s+banaya|app\s+kisne|compass\s+kisne/i,reply:()=>`<p><strong><u>Kaushik Jain from ECE - B1 (2026 Batch) — Creator</u></strong></p><p>Kaushik Jain built this web app (GNDEC Compass).</p><p class="answer-source">Compass project information.</p>`},
   {id:"college-timing",test:/college\s*(timing|time|opens?|closes?|hours)|college\s*kitne\s*baje|college\s*khulta|college\s*khulda|class\s*(timing|time)|what\s*time\s*(?:does\s*\w+|\w+\s*open|does\s*the\s*college)|kitne\s*baje\s*(college|class)/,reply:()=>{const classes=state.selectedGroup?DAY_NAMES.flatMap((day)=>classFor(state.selectedGroup,day)):[];if(!classes.length)return`<p><strong><u>College hours</u></strong></p><p>Office hours are not present in the currently loaded official timetable. Check the latest GNDEC notice or office page.</p>`;const first=Math.min(...classes.map((item)=>item.start)),last=Math.max(...classes.map((item)=>item.end));return`<p><strong><u>College hours · verified timetable span</u></strong></p><p>Your active official timetable runs from as early as <strong>${humanTime(first)}</strong> to as late as <strong>${humanTime(last)}</strong>, depending on the day.</p><p>This describes your classes, not administrative office hours.</p><p class="kb-tip">Ask “today ka timetable” for today’s exact span.</p>`;}},
   {id:"uniform",test:/uniform|dress\s*code|what\s*to\s*wear|wear\s*in\s*college|dress|ਵਰਦੀ|ड्रेस/,reply:()=>`<p><strong><u>Dress code</u></strong></p><p>The loaded timetable and syllabus do not contain a verified dress-code rule. Check the current student notice or ask your mentor before relying on informal advice.</p>`},
