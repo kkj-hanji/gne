@@ -725,24 +725,6 @@ body.theme-night { --glass-tint: rgba(10, 10, 20, 0.85); --accent: #818cf8; }
 .diff-cell.common { border-left: 3px solid var(--green); }
 .diff-cell.unique { border-left: 3px solid var(--amber); }
 
-/* --- Ghost Text --- */
-.chat-input-wrap {
-  position: relative;
-  flex: 1;
-  display: flex;
-}
-.ghost-text {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--faint);
-  pointer-events: none;
-  font-size: 15px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
 /* --- Admin Dashboard --- */
 .admin-dashboard {
   padding: 24px;
@@ -789,14 +771,6 @@ body.theme-night { --glass-tint: rgba(10, 10, 20, 0.85); --accent: #818cf8; }
 }
 .chat-window {
   scroll-behavior: smooth;
-}
-
-/* Fix chat ghost text overlapping */
-#question-input {
-  color: var(--text) !important;
-}
-#question-input::placeholder {
-  color: var(--faint);
 }
 
 /* --- Transposed Timetable Grid (Days as Rows, Time as Columns) --- */

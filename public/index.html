@@ -19,7 +19,7 @@
     <link rel="manifest" href="manifest.webmanifest?v=20261002-1" />
     <link rel="icon" type="image/png" href="logo.png?v=20261002-1" />
     <link rel="apple-touch-icon" href="logo.png?v=20261002-1" />
-    <link rel="stylesheet" href="styles.css?v=20261010-1" />
+    <link rel="stylesheet" href="styles.css?v=20261010-2" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -141,10 +141,7 @@
           </div>
           <form id="question-form" class="question-form">
             <label class="visually-hidden" for="question-input">Ask about your timetable</label>
-            <div class="chat-input-wrap">
-              <input id="question-input" role="combobox" list="compass-question-suggestions" autocomplete="off" autocapitalize="sentences" enterkeyhint="send" spellcheck="true" maxlength="1200" aria-autocomplete="list" aria-controls="question-live-suggestions" aria-expanded="false" aria-haspopup="listbox" placeholder="Ask here" style="background:transparent; position:relative; z-index:2; width:100%;" />
-              <div id="ghost-text-wrap" class="ghost-text"></div>
-            </div>
+            <input id="question-input" role="combobox" list="compass-question-suggestions" autocomplete="off" autocapitalize="sentences" enterkeyhint="send" spellcheck="true" maxlength="1200" aria-autocomplete="list" aria-controls="question-live-suggestions" aria-expanded="false" aria-haspopup="listbox" placeholder="Ask here" />
             <div class="question-live-suggestions" id="question-live-suggestions" role="listbox" aria-label="Suggested Compass questions" hidden></div>
             <datalist id="compass-question-suggestions">
               <option value="What is my next class?"></option><option value="Aaj ka timetable batao"></option><option value="Free lectures today"></option><option value="Physics kahan hai?"></option><option value="Physics syllabus"></option><option value="Math units"></option><option value="PPS course outcomes"></option><option value="Who is my mentor?"></option><option value="Find a student by name or CRN"></option><option value="who am i?"></option><option value="What can you do?"></option>
@@ -437,6 +434,6 @@
     <script src="schedule-analysis.js?v=20260915-1"></script>
     <script src="academic-calendar.js?v=20260915-1"></script>
     <script src="room-availability.js?v=20260918-2"></script>
-    <script src="app.js?v=20261010-1"></script>
+    <script src="app.js?v=20261010-2"></script>
   </body>
 </html>

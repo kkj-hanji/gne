@@ -1685,22 +1685,7 @@ function questionSuggestionKind(suggestion) {
 function updateQuestionSuggestions() {
   const input = $("question-input");
   const list = $("question-live-suggestions");
-  const ghostWrap = $("ghost-text-wrap");
   if (!input || !list) return;
-  
-  if (ghostWrap) {
-    if (input.value.trim() === "") {
-      const now = getIndiaNow();
-      const h = Number(now.time24.split(":")[0]);
-      let ghostMsg = "Where is my first class?";
-      if (h >= 10 && h < 14) ghostMsg = "Where is my next class?";
-      else if (h >= 14 && h < 17) ghostMsg = "When is my last class?";
-      else if (h >= 17) ghostMsg = "What classes do I have tomorrow?";
-      ghostWrap.textContent = ghostMsg;
-    } else {
-      ghostWrap.textContent = "";
-    }
-  }
 
   let brainSuggestions = [];
   try { brainSuggestions = globalThis.CompassBrainV2?.suggest?.(input.value, compassBrainContext()) || []; } catch { /* suggestions are optional */ }
