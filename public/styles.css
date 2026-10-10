@@ -205,17 +205,25 @@ button:disabled,input:disabled,select:disabled{opacity:.62;cursor:not-allowed}
 .ask-send{transform:rotate(0)}
 .chat-disclaimer{margin:10px auto 0;width:100%;max-width:880px;color:var(--faint);font-size:11.5px;text-align:center}
 
-/* Chat owns the visible screen; only the conversation scrolls. Other pages
-   retain normal document scrolling when chat-active is removed. */
+/* Keep chat bounded with a scrolling conversation. The desktop shell stays
+   in document flow so native zoom can pan the whole page. Short viewports
+   can scroll the document to reach the composer. */
 @media screen{
-  html.chat-active,html.chat-active body{height:100%;overflow:hidden;overscroll-behavior:none}
-  html.chat-active .app-shell{position:fixed;left:0;right:0;top:var(--compass-viewport-top,0px);height:var(--compass-visual-viewport-height,100dvh);min-height:0;overflow:hidden}
+  html.chat-active .app-shell{height:var(--compass-visual-viewport-height,100dvh);min-height:360px}
   html.chat-active .main-content{height:100%;min-height:0;overflow:hidden}
   html.chat-active .sidebar{height:100%}
   html.chat-active .topbar{flex-shrink:0}
   html.chat-active .chat-page.active{flex:1;min-height:0;height:auto;overflow:hidden}
   html.chat-active :is(.chat-head,.question-form,.chat-disclaimer){flex-shrink:0}
   html.chat-active .chat-window{flex:1 1 0;min-height:0}
+  html.chat-active .chat-window > *{flex-shrink:0}
+}
+
+/* Only unzoomed mobile chat follows the visual viewport, including Android
+   keyboard panning. Pinch zoom uses normal document flow on every device. */
+@media screen and (max-width:860px){
+  html.chat-active:not(.pinch-zoomed),html.chat-active:not(.pinch-zoomed) body{height:100%;overflow:hidden;overscroll-behavior:none}
+  html.chat-active:not(.pinch-zoomed) .app-shell{position:fixed;left:0;right:0;top:var(--compass-viewport-top,0px);min-height:0;overflow:hidden}
 }
 
 /* ---------- Timetable week ---------- */

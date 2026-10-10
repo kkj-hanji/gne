@@ -6780,19 +6780,25 @@ function closeMobileNavigation(returnFocus = false) {
 
 function syncMobileViewport() {
   const viewport = window.visualViewport;
-  const viewportHeight = viewport?.height || window.innerHeight;
+  const mobile = mobileNavigationEnabled();
+  const unzoomed = !viewport || Math.abs((viewport.scale || 1) - 1) < 0.01;
+  const fitVisualViewport = mobile && unzoomed;
+  // Pinch zoom magnifies and pans the existing layout. Its smaller visual
+  // viewport must not resize the chat shell or trigger keyboard styling.
+  // Percentage zoom instead resizes innerHeight and follows normal reflow.
+  const viewportHeight = fitVisualViewport ? viewport?.height || window.innerHeight : window.innerHeight;
   const editable = document.activeElement?.matches?.('input, textarea, [contenteditable="true"]');
-  const unzoomed = !viewport || Math.abs((viewport.scale || 1) - 1) < 0.05;
-  const keyboardOpen = Boolean(mobileNavigationEnabled() && editable && unzoomed && window.innerHeight - viewportHeight > 150);
+  const keyboardOpen = Boolean(fitVisualViewport && editable && window.innerHeight - viewportHeight > 150);
   // Android can resize only the visual viewport. Keep navigation above its
   // lower edge instead of hiding it, including while the keyboard is closing.
-  const bottomInset = mobileNavigationEnabled() && viewport && unzoomed
+  const bottomInset = fitVisualViewport && viewport
     ? Math.max(0, window.innerHeight - viewportHeight - (viewport.offsetTop || 0)) : 0;
+  document.documentElement.classList.toggle("pinch-zoomed", !unzoomed);
   document.documentElement.classList.toggle("keyboard-open", keyboardOpen);
   document.documentElement.style.setProperty("--compass-visual-viewport-height", `${Math.round(viewportHeight)}px`);
   document.documentElement.style.setProperty("--compass-viewport-bottom", `${Math.round(bottomInset)}px`);
-  document.documentElement.style.setProperty("--compass-viewport-top", `${Math.round(unzoomed ? viewport?.offsetTop || 0 : 0)}px`);
-  document.documentElement.classList.toggle("compact-chat", mobileNavigationEnabled() && viewportHeight < 500);
+  document.documentElement.style.setProperty("--compass-viewport-top", `${Math.round(fitVisualViewport ? viewport?.offsetTop || 0 : 0)}px`);
+  document.documentElement.classList.toggle("compact-chat", mobile && viewportHeight < 500);
 }
 
 function registerOfflineShell() {
