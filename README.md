@@ -2,6 +2,8 @@
 
 A public, per-device GNDEC timetable companion. Each student chooses or finds their own section and subsection; that choice, chat history, and parsed timetable stay in that browser. One student's setup never changes another student's Compass.
 
+For an AI-agent-ready project overview, feature and chat reference, current data inventory, privacy and architecture notes, and guidance for copying or integrating Compass into another project, see [PROJECT_REFERENCE_FOR_AI_AGENTS.md](PROJECT_REFERENCE_FOR_AI_AGENTS.md).
+
 ## What it does
 
 - Begins as a neutral device setup instead of pretending every visitor is one student.
@@ -115,7 +117,7 @@ The tests cover FET subgroup parsing, Permanent Sections/CRN parsing, identifier
 
 The local chat answers factual questions through a chain of deterministic engines that share one kernel: Brain 2.2 (timetable comparisons with scoped follow-ups), Brain 1.2 (privacy-gated student roster lookup, faculty directory search, safe arithmetic including word numbers, modulo, and percent-of), and Brain 2 engine 2.11.0 (conversation, exact and relative dates, timetable catalogues, multi-subject compound questions, teacher/subject mappings, verified profile facts, progressive cached faculty lookup, free periods, internal breaks, next-subject occurrences, weekly load/building comparisons, multilingual contextual follow-ups, and bounded timetable reasoning). All of it runs locally with no model or external AI call. Uncertain, ambiguous, oversized, malformed, unsafe, or failed results automatically use the preserved legacy engine.
 
-Room-schedule views (`G6 timetable`), misspelled weekdays (`thusday`), day-after-tomorrow aliases in Hindi and Punjabi, and roster enumeration attempts (which fail closed) are all handled deterministically. Duplicate student matches reveal only name and section until an exact identifier is given.
+Room-schedule views (`G6 timetable`), misspelled weekdays (`thusday`), day-after-tomorrow aliases in Hindi and Punjabi, and bounded section/subsection-scoped public student lists are handled deterministically. Those lists show names and sections only; broad, unscoped roster extraction is not a supported operation. Duplicate student matches use the privacy-safe disambiguation flow.
 
 See [docs/compass-brain.md](docs/compass-brain.md) for the result contract, fallback behavior, kill switch, context rules, privacy contracts, and tests.
 
@@ -140,4 +142,4 @@ Never share `.env`, `.dev.vars`, `.wrangler/`, or an archive containing API keys
 
 ## Exam publishing and seating
 
-The supplied September theory seating, October workshops and practical notices now share a validated publication. KKJ admins can edit dates/reporting times, import supported seating PDFs or CSV, correct an individual seat, review, publish and restore the previous publication. Published updates feed Ask Compass automatically. See [the exam publishing guide](docs/exam-publishing.md) for sources, student behavior, admin instructions, privacy and limits.
+Exam notices and seating use a validated publication with an owner editing workflow for dates, reporting times, supported seating PDFs/CSV, individual corrections, review, publishing and rollback. The checked-in publication currently contains nine workshop events and zero seating assignments; it is not proof of the live Cloudflare KV publication. See [the exam publishing guide](docs/exam-publishing.md) for source provenance, student behavior, admin instructions, privacy and limits.
