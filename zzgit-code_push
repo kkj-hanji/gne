@@ -34,14 +34,17 @@ if ($changes) {
 }
 
 git push origin $branch
-if ($LASTEXITCODE -ne 0) {
-  throw "git push failed. Check that your GitHub account can write to origin; deployment was skipped."
+$pushSucceeded = ($LASTEXITCODE -eq 0)
+if (-not $pushSucceeded) {
+  Write-Host "git push failed. Check that your GitHub account can write to origin; deployment was skipped." -ForegroundColor Red
 }
 
-Write-Host "Pushed all changes to origin/$branch"
+if ($pushSucceeded) {
+  Write-Host "Pushed all changes to origin/$branch"
 
-npm run deploy
-if ($LASTEXITCODE -ne 0) {
-  throw "Cloudflare deployment failed. The Git push succeeded, but the deployment did not."
+  npm run deploy
+  if ($LASTEXITCODE -ne 0) {
+    throw "Cloudflare deployment failed. The Git push succeeded, but the deployment did not."
+  }
 }
                 
