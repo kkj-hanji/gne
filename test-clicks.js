@@ -62,8 +62,8 @@ test("chat form renders every compound answer and rejects invalid dates", async 
   assert.doesNotMatch(syllabus, /No verified faculty match|directory record matched/);
   assert.match(await submit("F 113 timetable"), /ROOM ONLY COURSE/);
   vm.runInContext('state.selectedGroup = "ECB"; state.nowOverride = "2026-09-24T10:00:00Z";', context);
-  assert.match(await submit("my workshop MSE1"), /12:30 PM to 2:30 PM/);
-  assert.match(await submit("Physics lab MSE1"), /No current subject-specific lab examination notice/);
+  assert.match(await submit("my workshop MSE2"), /2026-11-20/);
+  assert.match(await submit("Physics lab MSE1"), /date-sheet data have been removed/);
   const teacher = await submit("teacher timetable dr. chahat jain");
   assert.match(teacher, /FACULTY ONLY COURSE/);
   assert.doesNotMatch(teacher, /CSA2|ROOM ONLY COURSE/);
@@ -77,13 +77,11 @@ test("chat form renders every compound answer and rejects invalid dates", async 
   vm.runInContext('state.selectedGroup = "ECB"; state.nowOverride = "2026-09-15T10:00:00Z";', context);
   for (const question of ["my exam timetable", "mera next paper kab hai", "EC B EDG exam time"]) {
     const answer = await submit(question);
-    assert.match(answer, /MSE-I/);
-    assert.match(answer, /User-supplied/);
-    assert.match(answer, question.includes("EDG") ? /11:00 AM–12:30 PM/ : /12:45 PM/);
+    assert.match(answer, /No current verified exam date sheet|date-sheet data have been removed/);
     assert.doesNotMatch(answer, /FACULTY ONLY COURSE|ROOM ONLY COURSE|Checking.*roster/);
   }
   const examsAndDate = await submit("my exam date sheet and what is today date");
-  assert.match(examsAndDate, /MSE-I/);
+  assert.match(examsAndDate, /No current verified exam date sheet/);
   assert.match(examsAndDate, /India calendar date/);
   assert.match(await submit("first year final exams"), /2026-12-02 onwards/);
   assert.match(await submit("room F113 timetable next week"), /2026-09-21.*ROOM ONLY COURSE/s);

@@ -6,3 +6,6 @@ dist
 .dev.vars
 .dev.vars.*
 preview-*.png
+/android/.gradle/
+/android/local.properties
+/android/app/build/

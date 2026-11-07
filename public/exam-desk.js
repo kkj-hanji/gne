@@ -6,15 +6,20 @@
   const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const time=m=>m==null?"Your respective lab turn":`${Math.floor(m/60)%12||12}:${String(m%60).padStart(2,"0")} ${m<720?"AM":"PM"}`;
   const date=d=>new Intl.DateTimeFormat("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(d+"T00:00:00Z"));
-  function setData(value){const next=domain.currentPublication(value,false);if(!next.events.length)throw new Error("An empty exam publication cannot replace verified data.");if(data?.publishedAt && next.publishedAt<data.publishedAt)return data;if(data?.revision!==next.revision)seats.clear();data=next;return next;}
+  function setData(value){const next=domain.currentPublication(value,false);if(data?.publishedAt && next.publishedAt<data.publishedAt)return data;if(data?.revision!==next.revision)seats.clear();data=next;return next;}
+  function setLiveData(value){
+    const events=(value?.events||[]).filter(event=>!/^mse1(?:-|$)/i.test(event.id||"")&&!/\bmse\s*[- ]?\s*i\b/i.test(`${event.title||""} ${event.sourceUrl||""}`));
+    const ids=new Set(events.map(event=>event.id));
+    return setData({...value,events,seats:(value?.seats||[]).filter(seat=>ids.has(seat.eventId))});
+  }
   async function fetchJson(url,options={}){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
     try{const response=await fetch(url,{...options,signal:controller.signal,cache:"no-store",headers:{Accept:"application/json",...options.headers}});const text=await response.text();let body;try{body=JSON.parse(text);}catch{throw new Error("Exam updates returned an unreadable response. Saved data was preserved.");}if(!response.ok)throw new Error(body.error||"Exam request failed.");return body;}finally{clearTimeout(timer);}
   }
   async function refresh(force=false){
     if(pending)return pending;if(!force&&data&&Date.now()-checked<60000)return data;
-    pending=(async()=>{try{const value=await fetchJson("/api/exams");setData(value);checked=Date.now();stale=Boolean(value.stale) || value.revision!==data.revision;if(stale)seats.clear();try{localStorage.setItem(key,JSON.stringify(data));}catch{}}catch{
-      stale=true;seats.clear();if(!data){try{setData(JSON.parse(localStorage.getItem(key)||"null"));}catch{try{setData(await fetchJson("/data/exam-summary.json"));}catch{}}}
+    pending=(async()=>{try{const value=await fetchJson("/api/exams");setLiveData(value);checked=Date.now();stale=Boolean(value.stale) || value.revision!==data.revision;if(stale)seats.clear();try{localStorage.setItem(key,JSON.stringify(data));}catch{}}catch{
+      stale=true;seats.clear();if(!data){try{setLiveData(JSON.parse(localStorage.getItem(key)||"null"));}catch{try{setLiveData(await fetchJson("/data/exam-summary.json"));}catch{}}}
     }render();return data;})().finally(()=>{pending=null;});return pending;
   }
   function examGroup(e){const title=String(e.title||"").toLowerCase();return title.includes("chemistry")?"chemistry":title.includes("physics")?"physics":"general";}
@@ -44,7 +49,7 @@
   function answer(q,ctx){
     if(!data||!domain.matches(q))return "";
     const selected=domain.select(data,q,context(q,ctx));if(!selected)return "";
-    return `<p><strong>MSE-I · Published exam information</strong></p>${selected.message?`<p>${esc(selected.message)}</p>`:""}${selected.events.map(eventMarkup).join("")}${selected.seating?'<p>Seating is specific to a student and one exam date. Use “my exam room tomorrow” with a matching saved profile, or include your exact CRN.</p>':""}${stale?'<p class="answer-warning">Saved exam publication: live updates could not be checked. Check the source notice for later revisions.</p>':""}`;
+    return `<p><strong>Published exam information</strong></p>${selected.message?`<p>${esc(selected.message)}</p>`:""}${selected.events.map(eventMarkup).join("")}${selected.seating?'<p>Seating is specific to a student and one exam date. Use “my exam room tomorrow” with a matching saved profile, or include your exact CRN.</p>':""}${stale?'<p class="answer-warning">Saved exam publication: live updates could not be checked. Check the source notice for later revisions.</p>':""}`;
   }
   async function respond(q,ctx){
     await refresh();
@@ -86,7 +91,7 @@
     const intro=document.getElementById("intro-copy");if(intro)intro.textContent=showExams?"Your exam dates, reporting times and confirmed seating.":ctx.section?`${date(ctx.today)} · ${[ctx.section,ctx.subgroup].filter(Boolean).join(" / ")} · Your timetable is live.`:"Set up this device to see your own timetable.";
     const status=document.getElementById("exam-update-status");if(status){status.hidden=!showExams;status.textContent=!data?"Exam data is not available yet.":stale?"Saved exam publication · live check unavailable":"Exam updates checked on this device. Notices update automatically when published.";}
   }
-  function init(adapter){bridge=adapter;try{setData(JSON.parse(localStorage.getItem(key)||"null"));}catch{}render();refresh();
+  function init(adapter){bridge=adapter;try{setLiveData(JSON.parse(localStorage.getItem(key)||"null"));}catch{}render();refresh();
     document.addEventListener("click",event=>{const target=event.target.closest?.("[data-exam-ask]");if(target)bridge.ask(target.dataset.examAsk);});
     document.addEventListener("visibilitychange",()=>{if(!document.hidden){render();refresh();}});
     setInterval(()=>{if(!document.hidden)refresh();},60000);

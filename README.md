@@ -48,6 +48,19 @@ npm run dev
 
 Open the local URL printed by Wrangler, normally `http://localhost:8787`.
 
+## Android APK
+
+The Kotlin project in `android/` is a small native Android shell around the existing Cloudflare-hosted Compass site. It uses a WebView, so the site remains the frontend and Cloudflare Worker remains the online backend. The profile and preferences continue to use persistent on-device web storage. The PWA service worker can cache the app shell after its first successful online load; the first launch therefore needs internet. Web content updates from Cloudflare without installing another APK; changes to the Kotlin shell need a new APK build.
+
+To build locally, install JDK 17, Android SDK Platform 35 and Build Tools 35.0.0, and Gradle 8.13, then run:
+
+```powershell
+cd android
+gradle assembleDebug
+```
+
+The installable debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions builds the same APK when Android project files change and uploads it as the `gndec-compass-debug-apk` workflow artifact. This initial shell does not add native Room storage, alarms, or push notifications.
+
 Local development works without KV, but it uses the checked-in verified bootstrap URLs and cannot persist source discovery or shared AI limits. Add a KV binding before public deployment.
 
 ## Deploy for friends

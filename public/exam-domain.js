@@ -47,8 +47,7 @@
     }) : [];
     return { schemaVersion: 1, revision: clean(input.revision || "", 100), publishedAt: clean(input.publishedAt || "", 60), events, seats };
   }
-  // Withdraw the old combined lab notice from saved devices and publications,
-  // without discarding subsequent admin edits or unrelated exam records.
+  // Withdraw the legacy combined lab notice from saved publications.
   function currentPublication(input, withSeats = true) {
     const data = validate(input, withSeats);
     const retiredId = "mse1-practical-window";

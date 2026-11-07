@@ -2,20 +2,13 @@
 
 Compass uses a validated exam publication, not model training. The Worker serves the current publication; the browser checks it when opened, when returning to the tab, once a minute while visible, and when Profile's update action is used. New published dates and seats feed the same deterministic answer path in every Brain mode.
 
-## Included source data
+## Active dataset
 
-- Theory date sheet: MSE-I, Semester I, 25 September–1 October 2026, covering all 18 sections in the supplied date sheet.
-- Chemistry seating: 570 exact CRNs across nine PDF pages, for **25 September only**, 9:15–10:45 AM; report by 9:00 AM.
-- Physics seating: 576 exact CRNs across nine PDF pages, for **25 September only**, 12:45–2:15 PM; report by 12:30 PM.
-- EDG Shift 1 seating: 320 assignments across four pages for ME, CE and RAI, on **30 September**, 9:15–10:45 AM.
-- EDG Shift 2 seating: 256 assignments across three pages for EE and EC, on **30 September**, 11:00 AM–12:30 PM. This supplied PDF is image-only; its seating grid was transcribed and checked against the printed room/section totals. Its SHA-256 is recorded so the admin importer can recognize this exact scan.
-- BEEE Chemistry Group seating: 570 assignments across ten pages, on **30 September**. The source does not supply an additional reporting time.
-- Nine Physics Group workshop rows for MEA, MEB, CEA, CEB, EEA, EEB, ECA, ECB and RAI. Both subsections are covered. The three handwritten AM/PM errors use the supplier's confirmed PM corrections.
-- Physics, Chemistry and English practical window: 5–9 October, in respective lab turns. Exact individual lab slots are not inferred. The notice's holiday rule moves an affected examination to the corresponding weekday of the following week; an admin must publish the confirmed revised date.
+MSE-I date-sheet, workshop and seating records have been withdrawn from the active app. The bundled `src/data/exam-seed.json` and `public/data/exam-summary.json` are empty. Archived source PDFs and parsed historical records remain only under `test/fixtures/exams/archive/` for source-integrity tests; they are not served.
 
-Source PDFs are linked from answers and Profile references. `src/data/exam-source-manifest.json` records PDF hashes, page counts, assignment counts and extraction method. `scripts/build-exam-seed.mjs` rebuilds the bundled seed from the five original PDFs (including the visually verified scan transcription). Supplied documents are labelled as user-supplied; an official website publication is not claimed. The updated publication contains 2,292 seat assignments.
+The MSE-II workshop transcription is handled separately by the local deterministic notice module. It is not stored in the exam publication KV.
 
-No seating plan was provided for the other theory papers. A student without a matching assignment therefore sees no confirmed seat for that paper. The workshop photo does not establish a workshop date for Chemistry Group sections.
+The Worker filters MSE-I event rows and linked seating from both the current and previous KV publication on read, then writes the cleaned records back. The browser also removes MSE-I events from saved exam data before displaying or caching it.
 
 ## Student experience
 
@@ -39,7 +32,7 @@ Imported PDF files are parsed on the admin's device; only structured records are
 
 ## Storage and operational limits
 
-The existing `SOURCE_REGISTRY` KV binding stores the current and previous exam publications at `gndec-compass:exam-publication:v1` and `:previous`. Records contain exact CRN seating assignments, but not student names, registration numbers or whole profiles. The public summary API omits assignments; a seating request sends one exact CRN and event ID to this same-origin Worker. This does not contact an inference API. The supplied reference PDFs themselves contain the source CRNs.
+The `SOURCE_REGISTRY` KV binding uses `gndec-compass:exam-publication:v1` and `:previous`. MSE-I event rows and linked seating are purged from both records by the Worker after the cleanup code is deployed. The bundled fallback is empty. Future exam data should be source-verified and should not include student names in a public dataset.
 
 KV propagation is eventually consistent; changes can take 60 seconds or more to reach another location. The revision check prevents ordinary stale edits but is not a transaction or a concurrent-editor lock. See [Cloudflare's KV consistency documentation](https://developers.cloudflare.com/kv/concepts/how-kv-works/). Use one editor at a time.
 

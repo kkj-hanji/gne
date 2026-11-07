@@ -16,16 +16,16 @@ function harness() {
   return h;
 }
 
-test("supplied workshop schedule preserves all nine rows and confirmed times", () => {
+test("only MSE-II workshop schedule remains in active code", () => {
   const { context } = harness();
   const p = context.CompassPracticals;
   assert.equal(p.workshops.length, 9);
   assert.deepEqual(Array.from(p.workshops, r => [r.section, r.date, r.start, r.end]), [
-    ["MEB", "2026-10-07", 630, 750], ["MEA", "2026-10-08", 510, 630], ["RAI", "2026-10-08", 510, 630],
-    ["CEB", "2026-10-08", 870, 990], ["ECA", "2026-10-08", 870, 990], ["CEA", "2026-10-09", 630, 750],
-    ["EEA", "2026-10-09", 750, 870], ["ECB", "2026-10-09", 750, 870], ["EEB", "2026-10-09", 870, 990]
+    ["MEB", "2026-11-18", 630, 750], ["MEA", "2026-11-19", 510, 630], ["RAI", "2026-11-19", 510, 630],
+    ["CEB", "2026-11-19", 870, 990], ["ECA", "2026-11-19", 870, 990], ["CEA", "2026-11-20", 630, 750],
+    ["EEA", "2026-11-20", 750, 870], ["ECB", "2026-11-20", 750, 870], ["EEB", "2026-11-20", 870, 990]
   ]);
-  assert.equal(p.workshops.filter(r => r.correctedTime).length, 3);
+  assert.equal(p.isMse1Question("MSE-I workshop exam"), true);
   assert.ok(Object.isFrozen(p.workshops[0]));
 });
 
@@ -34,11 +34,8 @@ test("practical questions use device selection, explicit scopes and supplied pro
   for (const mode of ["legacy", "v2", "v12", "v22"]) {
     api.state.settings.brainMode = mode;
     const answer = api.answerWithoutAi("my workshop MSE1");
-    assert.match(answer, /ECB1 \/ ECB2|ECB1.*ECB2/);
-    assert.match(answer, /2026-10-09/);
-    assert.match(answer, /12:30 PM to 2:30 PM/);
-    assert.match(answer, /supplying user|User-supplied/);
-    assert.doesNotMatch(answer, /AM to 2:30 AM|End time unconfirmed/);
+    assert.match(answer, /date-sheet data have been removed/);
+    assert.doesNotMatch(answer, /2026-10-0[789]/);
   }
   api.state.selectedGroup = "MEA";
   assert.match(extra.examQuestionAnswer("my workshop exam"), /8:30 AM to 10:30 AM/);
@@ -46,14 +43,55 @@ test("practical questions use device selection, explicit scopes and supplied pro
   assert.equal(api.state.selectedGroup, "MEA");
   assert.match(extra.examQuestionAnswer("CSD2 workshop exam"), /not listed/);
   assert.match(extra.examQuestionAnswer("ECB9 workshop exam"), /not listed/);
-  assert.match(extra.examQuestionAnswer("workshop MSE2"), /October 2026 only/);
-  assert.match(extra.examQuestionAnswer("physics lab MSE1"), /No current subject-specific lab examination notice/);
+  assert.match(extra.examQuestionAnswer("workshop MSE2"), /MSE-II.*November 2026/);
+  assert.match(extra.examQuestionAnswer("workshop MSE2"), /2026-11-19/);
+  assert.match(extra.examQuestionAnswer("all MSE2 workshop exams"), /2026-11-18/);
+  assert.match(extra.examQuestionAnswer("all MSE2 workshop exams"), /2026-11-19/);
+  assert.match(extra.examQuestionAnswer("all MSE2 workshop exams"), /2026-11-20/);
+  assert.match(extra.examQuestionAnswer("physics lab MSE1"), /date-sheet data have been removed/);
   assert.match(extra.examQuestionAnswer("chem lab exam"), /No current subject-specific lab examination notice/);
-  assert.match(extra.examQuestionAnswer("English lab MSE1"), /No current subject-specific lab examination notice/);
+  assert.match(extra.examQuestionAnswer("English lab MSE1"), /date-sheet data have been removed/);
   assert.equal(context.CompassPracticals.resolve("physics syllabus"), null);
-  assert.match(extra.examQuestionAnswer("physics exam"), /25 Sept/);
+  assert.match(extra.examQuestionAnswer("physics exam"), /No current verified exam date sheet/);
   api.state.selectedGroup = "";
   assert.match(extra.examQuestionAnswer("my workshop exam"), /Choose your timetable section/);
+});
+
+test("MSE-II workshops are searchable in every Brain mode and the supplied notice keeps its limits", () => {
+  const { api } = harness();
+  for (const mode of ["legacy", "v2", "v12", "v22"]) {
+    api.state.settings.brainMode = mode;
+    const answer = api.answerWithoutAi("my MSE2 workshop date");
+    assert.match(answer, /2026-11-20/);
+    assert.match(answer, /12:30 PM to 2:30 PM/);
+    assert.match(answer, /user-supplied/i);
+    assert.doesNotMatch(answer, /room [A-Z0-9-]+/i);
+  }
+});
+
+test("generic workshop date-sheet query selects the upcoming MSE-II notice instead of stale MSE-I publication", () => {
+  const { api } = harness();
+  api.state.nowOverride = "2026-11-04T18:14:00Z";
+  api.state.selectedGroup = "";
+  for (const mode of ["legacy", "v2", "v12", "v22"]) {
+    api.state.settings.brainMode = mode;
+    const answer = api.answerWithoutAi("workshop datesheet");
+    assert.match(answer, /MSE-II.*November 2026/);
+    for (const date of ["2026-11-18", "2026-11-19", "2026-11-20"]) assert.match(answer, new RegExp(date));
+    assert.doesNotMatch(answer, /MSE-I · Published exam information/);
+  }
+});
+
+test("HOD meeting decisions are answered from the supplied minutes through Brain and legacy fallback", () => {
+  const { api, context } = harness();
+  for (const mode of ["legacy", "v2", "v12", "v22"]) {
+    api.state.settings.brainMode = mode;
+    assert.match(api.answerWithoutAi("When does MST-2 start?"), /21 November 2026/);
+    assert.match(api.answerWithoutAi("what do the HOD meeting minutes say about end-semester exams"), /4 December 2026/);
+    assert.match(api.answerWithoutAi("is November 10 a holiday?"), /10 November 2026 is declared a holiday in lieu of 21 November/);
+  }
+  assert.match(context.CompassAcademicNotices.resolve("full HOD meeting minutes").decisions.map(item => item.text).join(" "), /Professor of Practice/);
+  assert.match(vm.runInContext("legacyAnswerWithoutAi('faculty industry training')", context), /December 2026 or January 2027/);
 });
 
 test("syllabus details never become faculty searches, and spaced rooms use full room view", () => {

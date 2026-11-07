@@ -111,7 +111,7 @@ test("broken day-only questions and four independent tasks preserve all answers"
   }
   const combined = api.answerWithoutAi("my timetable next week; how many classes this week; who created this website; my exam date sheet");
   assert.equal((combined.match(/<section>/g) || []).length, 4);
-  for (const expected of [/2026-09-21/, /8 scheduled class entries/, /Kaushik Jain/, /MSE-I/]) assert.match(combined, expected);
+  for (const expected of [/2026-09-21/, /8 scheduled class entries/, /Kaushik Jain/, /No current verified exam date sheet/]) assert.match(combined, expected);
   assert.doesNotMatch(combined, /\bkkj\b|admin|unlock|token/i);
 });
 
@@ -123,7 +123,7 @@ test("academic calendar separates cohorts, MSE sittings and revised or missing p
   const continuing = api.answerWithoutAi("second year end semester exams");
   assert.match(continuing, /2026-11-27 onwards/);
   assert.match(api.answerWithoutAi("when are my final exams"), /First year.*Second year/s);
-  assert.match(api.answerWithoutAi("my MSE-I date sheet"), /2026-09-14/);
+  assert.match(api.answerWithoutAi("my MSE-I date sheet"), /date-sheet data have been removed/);
   assert.match(api.answerWithoutAi("winter vacation dates"), /does not publish vacation dates/);
   assert.match(api.answerWithoutAi("academic calendar 2027"), /another session/);
   api.state.sourceRegistry = { academicCalendarSource: { ...context.CompassAcademicCalendar.source, verified: true, contentHash: "new-revision" } };

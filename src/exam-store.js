@@ -3,15 +3,39 @@ import "../public/exam-domain.js";
 const domain=globalThis.CompassExamDomain;
 const KEY="gndec-compass:exam-publication:v1";
 const json=(body,status=200)=>Response.json(body,{status,headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
+function withoutMse1(input) {
+  const data=domain.currentPublication(input);
+  const events=data.events.filter(event=>!/^mse1(?:-|$)/i.test(event.id) && !/\bmse\s*[- ]?\s*i\b/i.test(`${event.title} ${event.sourceUrl || ""} ${event.source || ""} ${event.note || ""}`));
+  const ids=new Set(events.map(event=>event.id));
+  return {...data,events,seats:data.seats.filter(seat=>ids.has(seat.eventId))};
+}
 async function current(env, strict = false) {
   try {
     const value=await env.SOURCE_REGISTRY?.get(KEY,"json");
-    if(value) return domain.currentPublication(value);
+    if(value) {
+      const clean=withoutMse1(value);
+      if(clean.events.length!==value.events?.length || clean.seats.length!==(value.seats || []).length) {
+        try { await env.SOURCE_REGISTRY.put(KEY,JSON.stringify(clean)); }
+        catch { /* The API still withholds MSE-I data; retry KV cleanup on the next read. */ }
+      }
+      await cleanPreviousPublication(env);
+      return clean;
+    }
+    await cleanPreviousPublication(env);
   } catch {
     if (strict) throw new Error("The published exam store is unavailable. Retry before editing or checking a seat.");
     return {...domain.currentPublication(seed), stale:true};
   }
   return domain.currentPublication(seed);
+}
+async function cleanPreviousPublication(env) {
+  try {
+    const previous=await env.SOURCE_REGISTRY?.get(KEY+":previous","json");
+    if(!previous) return;
+    const clean=withoutMse1(previous);
+    if(clean.events.length!==previous.events?.length || clean.seats.length!==(previous.seats || []).length)
+      await env.SOURCE_REGISTRY.put(KEY+":previous",JSON.stringify(clean));
+  } catch { /* The previous publication is not returned by public routes. */ }
 }
 export async function examResponse(request,env,authorized=false) {
   const path=new URL(request.url).pathname;
@@ -48,7 +72,7 @@ export async function examResponse(request,env,authorized=false) {
     if(body.baseRevision!==data.revision) return json({error:"The publication changed. Reload the editor before saving."},409);
     const candidate=body.rollback ? await env.SOURCE_REGISTRY.get(KEY+":previous","json") : body;
     if(!candidate) return json({error:"No previous publication is available."},400);
-    const next=domain.currentPublication(candidate);
+    const next=withoutMse1(candidate);
     if(!next.events.length) return json({error:"Keep at least one event in the publication."},400);
     next.revision=crypto.randomUUID();next.publishedAt=new Date().toISOString();
     if(body.purgePrevious===true){
