@@ -945,3 +945,14 @@ body.compact-timetable .transposed-cell {
   #today-exam-card .exam-count { white-space: normal; text-align: right; }
   #today-exam-card .exam-seat-grid { grid-template-columns: 1fr; gap: 12px; }
 }
+
+/* Free rooms (official college-wide room timetable) */
+.free-rooms-panel { margin-top: 18px; }
+.free-rooms-controls { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.free-rooms-controls .field { flex: 1 1 160px; }
+.free-rooms-group { border-top: 1px solid var(--line, rgba(0,0,0,.08)); padding: 10px 0; }
+.free-rooms-group:first-child { border-top: 0; }
+.free-rooms-group h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font-size: 14px; }
+.free-rooms-group h3 span { color: var(--muted); font-size: 12px; font-weight: 600; }
+.free-rooms-group p { margin: 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+@media(max-width:600px) { .free-rooms-controls .field { flex: 1 1 100%; } }

@@ -99,8 +99,15 @@ test('administrative roles use active branch and preserve source conflicts', asy
   assert.match(h.dir.legacyFacultyLookupAnswer(ambiguous), /Which dean/);
 });
 
-test('tutorial badges depend only on published type, never subject wording', () => {
-  const { dir } = harness();
+test('an administration role is never answered with a section timetable', () => {
+  const { api } = createAppHarness();
+  // "CSE" is also a published section code, so this guards the collision.
+  const answer = api.answerWithoutAi('who is HOD CSE');
+  assert.doesNotMatch(answer, /timetable|Monday 9:30|Official GNDEC weekly/i);
+  assert.match(answer, /directory/i);
+});
+
+test('tutorial badges depend only on published type, never subject wording', () => {  const { dir } = harness();
   assert.match(dir.timetableTypeTag({ type: 't' }), /aria-label="Tutorial"/);
   for (const type of ['L','P','',undefined]) assert.equal(dir.timetableTypeTag({ type, subject: 'tutorial' }), '');
 });

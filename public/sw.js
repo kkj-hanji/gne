@@ -1,7 +1,7 @@
-"use strict";
+﻿"use strict";
 
 const CACHE_PREFIX = "gndec-compass-shell-";
-const CACHE_NAME = `${CACHE_PREFIX}20261010-2`;
+const CACHE_NAME = `${CACHE_PREFIX}20261107-1`;
 const SHELL = [
   "/",
   "/exam-domain.js?v=20261004-1",
@@ -11,21 +11,26 @@ const SHELL = [
   "/data/exam-summary.json",
   "/admin-exams.js?v=20261001-2",
   "/index.html",
-  "/styles.css?v=20261010-2",
+  "/styles.css?v=20261106-1",
   "/brain-kernel.js?v=20260918-2",
   "/brain-v1-2.js?v=20260905-1",
   "/brain-v2-2.js?v=20260905-1",
   "/brain-v2.js?v=20260918-2",
-  "/practical-exams.js?v=20261004-1",
-  "/notices/mse1-practicals-2026.html",
+  "/academic-notices.js?v=20261104-2",
+  "/mse2-theory.js?v=20261106-1",
+  "/practical-exams.js?v=20261105-1",
+  "/notices/mse2-theory-2026.html",
+  "/notices/mse2-workshops-2026.html",
+  "/notices/hod-meeting-2026-11-03.html",
   "/exam-schedule.js?v=20260915-1",
   "/schedule-analysis.js?v=20260915-1",
   "/academic-calendar.js?v=20260915-1",
   "/room-availability.js?v=20260918-2",
+  "/free-rooms.js?v=20261106-1",
   "/data/student-roster-index.json",
   "/data/faculty-directory-index.json",
   "/data/faculty-contacts.json",
-  "/app.js?v=20261010-2",
+  "/app.js?v=20261107-1",
   "/manifest.webmanifest?v=20261002-1",
   "/logo.png?v=20261002-1"
 ];

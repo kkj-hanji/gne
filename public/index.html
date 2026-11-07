@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,18 +8,18 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="description" content="GNDEC Compass — verified timetable, student profile lookup, syllabus help, and a private college-day assistant." />
+    <meta name="description" content="GNDEC Compass â€” verified timetable, student profile lookup, syllabus help, and a private college-day assistant." />
     <meta property="og:title" content="GNDEC Compass | Your college day, schedule, and assistant" />
-    <meta property="og:description" content="GNDEC Compass — verified timetable, student profile lookup, syllabus help, and a private college-day assistant." />
+    <meta property="og:description" content="GNDEC Compass â€” verified timetable, student profile lookup, syllabus help, and a private college-day assistant." />
     <title>GNDEC Compass | Your college day, schedule, and assistant</title>
     <meta property="og:image" content="https://gndec-compass.koush3069.workers.dev/logo.png?v=20261002-1" />
-    <meta property="og:image:alt" content="GNDEC Compass — verified timetable and campus assistant" />
+    <meta property="og:image:alt" content="GNDEC Compass â€” verified timetable and campus assistant" />
     <meta property="og:image:width" content="1254" />
     <meta property="og:image:height" content="1254" />
     <link rel="manifest" href="manifest.webmanifest?v=20261002-1" />
     <link rel="icon" type="image/png" href="logo.png?v=20261002-1" />
     <link rel="apple-touch-icon" href="logo.png?v=20261002-1" />
-    <link rel="stylesheet" href="styles.css?v=20261010-2" />
+    <link rel="stylesheet" href="styles.css?v=20261106-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -117,7 +117,7 @@
             </div>
             <div class="chat-actions">
               <button class="text-button" type="button" id="clear-chat">Clear chat</button>
-              <label class="admin-ai-control" id="admin-ai-control" hidden><span>Admin mode</span><select id="admin-ai-mode"><option value="local-first">Local-first</option><option value="local-only">Local only</option><option value="muse">Fast · Muse</option><option value="gpt-oss">Deep · GPT-OSS</option></select></label>
+              <label class="admin-ai-control" id="admin-ai-control" hidden><span>Admin mode</span><select id="admin-ai-mode"><option value="local-first">Local-first</option><option value="local-only">Local only</option><option value="muse">Fast Â· Muse</option><option value="gpt-oss">Deep Â· GPT-OSS</option></select></label>
               <div class="chat-model-badge" id="chat-model-badge" title="Admin model diagnostics" hidden><span class="live-dot" aria-hidden="true"></span><span id="chat-model-name">AI model</span></div>
             </div>
           </div>
@@ -125,16 +125,18 @@
             <div class="chat-welcome" id="chat-welcome">
               <div class="compass-icon" aria-hidden="true">&#10022;</div>
               <h2>What do you need to know?</h2>
-              <p>Ask about your timetable, syllabus, teacher, room, profile, or a student in the current verified roster. Student searches in chat are read-only and never change your profile. It understands English, Hindi, Punjabi, and Hinglish — even a mix of all four.</p>
+              <p>Ask about your timetable, syllabus, teacher, room, profile, or a student in the current verified roster. Student searches in chat are read-only and never change your profile. It understands English, Hindi, Punjabi, and Hinglish â€” even a mix of all four.</p>
               <div class="question-chips">
                 <button type="button" data-quick="What is my next class?">What is my next class?</button>
                 <button type="button" data-quick="Aaj ka timetable batao">Aaj ka timetable</button>
                 <button type="button" data-quick="Physics kahan hai?">Physics kahan hai?</button>
-                <button type="button" data-quick="ਅਗਲੀ ਕਲਾਸ ਕਿੱਥੇ ਹੈ?">ਅਗਲੀ ਕਲਾਸ ਕਿੱਥੇ ਹੈ?</button>
+                <button type="button" data-quick="à¨…à¨—à¨²à©€ à¨•à¨²à¨¾à¨¸ à¨•à¨¿à©±à¨¥à©‡ à¨¹à©ˆ?">à¨…à¨—à¨²à©€ à¨•à¨²à¨¾à¨¸ à¨•à¨¿à©±à¨¥à©‡ à¨¹à©ˆ?</button>
               <button type="button" data-quick="Who is my mentor?">Who is my mentor?</button>
               <button type="button" data-quick="Tomorrow next to next class?">Tomorrow next to next?</button>
               <button type="button" data-quick="Physics syllabus">Physics syllabus</button>
               <button type="button" data-quick="Math units">Math units</button>
+              <button type="button" data-quick="MSE-2 theory datesheet">MSE-2 datesheet</button>
+              <button type="button" data-quick="Free rooms right now">Free rooms now</button>
               <button type="button" data-quick="who am i?">who am i?</button>
               </div>
             </div>
@@ -166,11 +168,23 @@
               <button type="button" data-timetable-view="week" aria-pressed="false">Week</button>
             </div>
             <div id="timetable-view-day-field" class="field"><label for="timetable-view-day">Day</label><select id="timetable-view-day"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
-            <p class="tt-legend">L · Lecture &nbsp; T · Tutorial &nbsp; P · Practical / Lab</p>
-            <p id="timetable-scroll-hint" class="tt-scroll-hint" hidden>↔ Scroll sideways for all days. Day and time headers stay visible.</p>
+            <p class="tt-legend">L Â· Lecture &nbsp; T Â· Tutorial &nbsp; P Â· Practical / Lab</p>
+            <p id="timetable-scroll-hint" class="tt-scroll-hint" hidden>â†” Scroll sideways for all days. Day and time headers stay visible.</p>
           </div>
           <div id="week-table" class="week-table" role="region" aria-label="Weekly timetable" aria-describedby="timetable-result-status" tabindex="0"><div class="empty-list">No timetable data loaded yet.</div></div>
           <div id="week-grid-view" class="week-grid-view" role="region" aria-label="Weekly timetable grid" hidden></div>
+          <section class="panel free-rooms-panel" id="free-rooms-panel" aria-labelledby="free-rooms-title">
+            <p class="eyebrow">ALL BRANCHES Â· ALL YEARS</p>
+            <h2 id="free-rooms-title">Free rooms</h2>
+            <p class="muted">Read from the official college-wide room timetable. A room is listed only when that timetable prints no class in it.</p>
+            <div class="free-rooms-controls">
+              <div class="field"><label for="free-rooms-day">Day</label><select id="free-rooms-day"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
+              <div class="field"><label for="free-rooms-time">Time</label><select id="free-rooms-time"></select></div>
+              <div class="field"><label for="free-rooms-zone">Area</label><select id="free-rooms-zone"><option value="">All areas</option><option>F block</option><option>G block</option><option>S block</option><option>A block</option><option>Labs and named rooms</option><option>Other published rooms</option></select></div>
+            </div>
+            <p id="free-rooms-status" role="status" aria-live="polite">Load the room timetable to see free rooms.</p>
+            <div id="free-rooms-result" class="free-rooms-result"></div>
+          </section>
         </section>
 
         <section class="page" id="profile" data-page="profile">
@@ -192,15 +206,15 @@
 
           <section class="panel profile-panel">
             <div class="profile-grid">
-              <span>CRN <strong id="profile-crn">—</strong></span>
-              <span>Current serial <strong id="profile-serial">—</strong></span>
-              <span>Previous serial history <strong id="profile-old-serials">—</strong></span>
-              <span>Registration <strong id="profile-registration">—</strong></span>
+              <span>CRN <strong id="profile-crn">â€”</strong></span>
+              <span>Current serial <strong id="profile-serial">â€”</strong></span>
+              <span>Previous serial history <strong id="profile-old-serials">â€”</strong></span>
+              <span>Registration <strong id="profile-registration">â€”</strong></span>
               <span>Section <strong id="profile-section">Not selected</strong></span>
               <span>Academic group <strong id="profile-academic-group">Choose a group below</strong></span>
-              <span>Mentor <strong id="profile-mentor">—</strong></span>
-              <span>Mentor phone <strong id="profile-mentor-phone">—</strong></span>
-              <span>Mentor venue <strong id="profile-venue">—</strong></span>
+              <span>Mentor <strong id="profile-mentor">â€”</strong></span>
+              <span>Mentor phone <strong id="profile-mentor-phone">â€”</strong></span>
+              <span>Mentor venue <strong id="profile-venue">â€”</strong></span>
             </div>
             <p class="profile-sync-status" id="profile-sync-status" role="status"></p>
             <p class="profile-data-note">Registration and previous serial history appear only when a verified source publishes them or this device has saved a verified serial change. Compass never guesses missing identifiers.</p>
@@ -250,7 +264,7 @@
             <div class="section-header"><div><p class="eyebrow">OFFICIAL REFERENCES</p><h2>College links</h2></div></div>
             <p class="panel-note">Current verified GNDEC sources, organised for quick access. Official sources open in a new tab. Supplied exam notices are listed separately with their source and any uncertainties.</p>
             <div class="reference-links" id="reference-links">
-              <div class="empty-list">Loading current official references…</div>
+              <div class="empty-list">Loading current official referencesâ€¦</div>
             </div>
           </section>
         </section>
@@ -335,7 +349,7 @@
               <div class="settings-row">
                 <div class="settings-row-text">
                   <strong>Week-grid timetable view</strong>
-                  <p>Display Monday–Friday in a visual weekly matrix instead of separate cards.</p>
+                  <p>Display Mondayâ€“Friday in a visual weekly matrix instead of separate cards.</p>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="settings-timetable-grid" checked />
@@ -347,9 +361,9 @@
                 <label for="settings-timetable-experience">Optional timetable experience</label>
                 <select id="settings-timetable-experience" aria-describedby="timetable-experience-help">
                   <option value="classic">Current layout (existing settings)</option>
-                  <option value="day">Day — one day at a time</option>
-                  <option value="list">List — readable weekly agenda</option>
-                  <option value="week">Week — grid with pinned headers</option>
+                  <option value="day">Day â€” one day at a time</option>
+                  <option value="list">List â€” readable weekly agenda</option>
+                  <option value="week">Week â€” grid with pinned headers</option>
                 </select>
                 <p id="timetable-experience-help">New views add quick Day / List / Week buttons and expandable class details. Your existing grid and axis choices are kept; choose Current layout to use them again. Compact spacing keeps text the same size in new views.</p>
               </div>
@@ -403,6 +417,18 @@
                 </div>
               </div>
 
+              <section class="panel settings-card" id="android-app-plan">
+                <div class="section-header"><div><p class="eyebrow">ANDROID APP</p><h2>Kotlin + Cloudflare + GitHub</h2></div></div>
+                <p class="panel-note">The Kotlin Android shell connects to the existing GNDEC Compass service.</p>
+                <ul>
+                  <li><strong>Kotlin Android app:</strong> opens Compass in an Android WebView and keeps its profile and preferences in app-local web storage.</li>
+                  <li><strong>Cloudflare Worker:</strong> serves the live Compass website and online APIs.</li>
+                  <li><strong>Offline use:</strong> the existing PWA cache can reopen previously loaded app files after a successful online visit.</li>
+                  <li><strong>GitHub Actions:</strong> builds a debug APK artifact when Android project files change.</li>
+                </ul>
+                <p class="panel-note">The first launch needs internet access. Android-only features such as Room synchronization, alarms and push notifications are not part of this initial APK.</p>
+              </section>
+
               <div class="settings-actions" style="margin-top: 16px;">
                 <button class="outline-button" id="reset-conversation-btn" type="button"><span aria-hidden="true">&#8635;</span> Clear conversation memory</button>
               </div>
@@ -429,11 +455,14 @@
     <script src="brain-v1-2.js?v=20260905-1"></script>
     <script src="brain-v2-2.js?v=20260905-1"></script>
     <script src="brain-v2.js?v=20260918-2"></script>
-    <script src="practical-exams.js?v=20261004-1"></script>
+    <script src="academic-notices.js?v=20261104-2"></script>
+    <script src="mse2-theory.js?v=20261106-1"></script>
+    <script src="practical-exams.js?v=20261105-1"></script>
     <script src="exam-schedule.js?v=20260915-1"></script>
     <script src="schedule-analysis.js?v=20260915-1"></script>
     <script src="academic-calendar.js?v=20260915-1"></script>
     <script src="room-availability.js?v=20260918-2"></script>
-    <script src="app.js?v=20261010-2"></script>
+    <script src="free-rooms.js?v=20261106-1"></script>
+    <script src="app.js?v=20261107-1"></script>
   </body>
 </html>

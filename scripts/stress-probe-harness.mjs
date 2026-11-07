@@ -12,13 +12,18 @@ const appSource = await readFile(new URL("../public/app.js", import.meta.url), "
 const analysisSource = await readFile(new URL("../public/schedule-analysis.js", import.meta.url), "utf8");
 const examSource = await readFile(new URL("../public/exam-schedule.js", import.meta.url), "utf8");
 const calendarSource = await readFile(new URL("../public/academic-calendar.js", import.meta.url), "utf8");
+const noticeSource = await readFile(new URL("../public/academic-notices.js", import.meta.url), "utf8");
+const practicalSource = await readFile(new URL("../public/practical-exams.js", import.meta.url), "utf8");
+const theorySource = await readFile(new URL("../public/mse2-theory.js", import.meta.url), "utf8");
+const freeRoomsSource = await readFile(new URL("../public/free-rooms.js", import.meta.url), "utf8");
+const roomAvailabilitySource = await readFile(new URL("../public/room-availability.js", import.meta.url), "utf8");
 
 const sourceUnderTest = appSource.replace(
   /restoreData\(\);[\s\S]*?(?=function kbClean)/,
   ""
 ).replace(
   /function kbClean/,
-  "globalThis.__brainIntegrationTest = { state, answerWithoutAi, runCompassBrain, setCompassBrainV2Enabled, resetBrainConversation, buildScheduleIndex, sanitizeSchedule, parseFetTimetable, parseSyllabusText, parseStudentSectionText, pdfTextFromItems, compassQueryPlan, requestedTime, requestedTimetableDate, requestedOfficialTimetableView, namedPersonTimetableRequest };\nfunction kbClean"
+  "globalThis.__brainIntegrationTest = { state, answerWithoutAi, runCompassBrain, setCompassBrainV2Enabled, resetBrainConversation, buildScheduleIndex, sanitizeSchedule, parseFetTimetable, parseSyllabusText, parseStudentSectionText, pdfTextFromItems, compassQueryPlan, requestedTime, requestedTimetableDate, requestedOfficialTimetableView, namedPersonTimetableRequest, roomAvailabilityAnswer };\nfunction kbClean"
 );
 
 export function createAppHarness() {
@@ -47,6 +52,11 @@ export function createAppHarness() {
   vm.runInContext(analysisSource, context);
   vm.runInContext(examSource, context);
   vm.runInContext(calendarSource, context);
+  vm.runInContext(noticeSource, context);
+  vm.runInContext(theorySource, context);
+  vm.runInContext(freeRoomsSource, context);
+  vm.runInContext(roomAvailabilitySource, context);
+  vm.runInContext(practicalSource, context);
   vm.runInContext(sourceUnderTest, context);
   const api = context.__brainIntegrationTest;
   // Sunday 2026-08-16 10:00 IST -> weekend edge; next study day = Monday.

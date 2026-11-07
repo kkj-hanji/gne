@@ -4330,10 +4330,12 @@ function followupSuggestions(question, brainResult = null) {
 }
 
 function answerFromKnowledgeBase(question) {
+  const meetingNotice = academicNoticeAnswer(question);
+  if (meetingNotice) return { reply: meetingNotice, source: "User-supplied HOD meeting-minutes photo" };
   const academic = academicCalendarAnswer(question);
   if (academic) return { reply: academic, source: "Official GNDEC Academic Section" };
   const exams = examQuestionAnswer(question);
-  if (exams) return { reply: exams, source: `Supplied GNDEC date sheet · ${globalThis.CompassPracticals?.matches(question) ? globalThis.CompassPracticals.source.issued : globalThis.CompassExams.source.issued}` };
+  if (exams) return { reply: exams, source: "Compass exam schedule status" };
   const hasExplicitSyllabusCourse = state.syllabus.length && syllabusCoursesForQuestion(question).length > 0;
   const syllabusFollowup = hasExplicitSyllabusCourse ? "" : answerSyllabusFollowup(question);
   if (syllabusFollowup) return { reply: `${syllabusFollowup}${followupSuggestions(question)}`, source: "Official GNDEC syllabus" };
@@ -4531,6 +4533,8 @@ function legacyAcademicMarkingAnswer(question) {
 // Brain v2 may answer first, but every unsupported, uncertain, malformed, or
 // failing Brain result returns here without changing existing factual logic.
 function legacyAnswerWithoutAi(question, studentLookup = null, facultyLookup = null) {
+  const meetingNotice = academicNoticeAnswer(question);
+  if (meetingNotice) return meetingNotice;
   const academic = academicCalendarAnswer(question);
   if (academic) return academic;
   const exams = examQuestionAnswer(question);
@@ -4855,7 +4859,11 @@ function runCompassBrain(question, engine = null, contextOverrides = {}) {
 function prepareCompassQuestion(question) {
   let q = canonicalTimetableQuestion(question);
   if (calendarDurationAnswer(q) || /^(?:hi|hello|hey|namaste|namaskar|sat\s*sri\s*akal|good (?:morning|afternoon|evening))$/.test(q)) return q;
+  // Administration roles resolve through the verified faculty directory. They
+  // must not gain a "timetable" suffix and be read as a section timetable.
+  if (facultyRoleRequest(q)) return q;
   if (globalThis.CompassExamDomain?.matches(q)) return q;
+  if (globalThis.CompassMse2Theory?.matches(q)) return q;
   if (globalThis.CompassPracticals?.matches(q)) return q;
   if (globalThis.CompassRoomAvailability?.matches(q)) return q;
   if (globalThis.CompassAcademicCalendar?.matches(q)) return q;
@@ -5047,12 +5055,14 @@ function qualifiedTimetableAnswer(question) {
 }
 
 function answerWithoutAi(question, engine = null, contextOverrides = {}) {
+  const directNotice = academicNoticeAnswer(question);
+  if (directNotice) return directNotice;
   const plan = compassQueryPlan(question);
   if (plan.status !== "ready") return `<p>${escapeHtml(plan.reason)}</p>`;
   if (!plan.clauses.length) return localClarificationAnswer();
   return plan.clauses.map((clause) => {
     let answer;
-    try { answer = temporalClarification(clause.question) || answerSingleCompassQuestion(clause.question, engine, contextOverrides); }
+    try { answer = academicNoticeAnswer(clause.question) || temporalClarification(clause.question) || answerSingleCompassQuestion(clause.question, engine, contextOverrides); }
     catch {
       try { answer = legacyAnswerWithoutAi(clause.question); } catch { /* Malformed source data must still produce a useful response. */ }
     }
@@ -5061,10 +5071,25 @@ function answerWithoutAi(question, engine = null, contextOverrides = {}) {
   }).join("");
 }
 
+function academicNoticeAnswer(question) {
+  const noticeQuestion = canonicalTimetableQuestion(question);
+  // An explicit date-sheet request belongs to the transcribed Applied Sciences
+  // MSE-II table, not to the HOD minutes (which do not list subject sittings).
+  if (globalThis.CompassMse2Theory?.matches(noticeQuestion)
+    && /\b(?:date\s*-?\s*sheet|datesheet|sitting|paper|schedule)\b/.test(noticeQuestion)) return "";
+  const result = globalThis.CompassAcademicNotices?.resolve(noticeQuestion);
+  if (!result) return "";
+  const rows = result.decisions.map(item => `<li><strong>${escapeHtml(item.title)}.</strong> ${escapeHtml(item.text)}</li>`).join("");
+  return `<p><strong>${escapeHtml(result.source.title)}</strong></p>${result.message ? `<p>${escapeHtml(result.message)}</p>` : ""}<ol>${rows}</ol><p class="answer-source"><a href="${escapeHtml(result.source.url)}" target="_blank" rel="noopener noreferrer">Read the transcribed minutes</a>. ${escapeHtml(result.source.provenance)}</p>`;
+}
+
 function academicCalendarAnswer(question) {
   const result = globalThis.CompassAcademicCalendar?.resolve(canonicalTimetableQuestion(question), state.sourceRegistry?.academicCalendarSource);
   if (!result) return "";
   const source = result.source;
+  if (/\b(?:end\s*[- ]?\s*sem(?:ester)?|ese|final\s+exams?)\b/i.test(question) && !/different academic calendar/i.test(result.message)) {
+    result.message += " A separate user-supplied HOD meeting-minutes photo dated 3 November says end-semester exams will start on 4 December 2026, which conflicts with the cohort dates above. The photo does not include the subject-wise date sheet; confirm the applicable date with the COE. Its transcription is at /notices/hod-meeting-2026-11-03.html; this photo has not been independently web-verified.";
+  }
   return `<p><strong>${escapeHtml(source.title)}</strong></p>${result.periods.map((period) => `<p><strong>${escapeHtml(period.scope)}</strong><br />Semester starts: ${period.start}<br />Preparatory holidays: ${period.prepStart}–${period.prepEnd}<br />End-semester examinations: ${period.examsStart} onwards</p>`).join("")}<p>${escapeHtml(result.message)}</p><p class="answer-source"><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">Official GNDEC academic calendar · issued ${source.issued}</a> · checked ${source.checked}. <a href="https://gndec.ac.in/?q=node/23" target="_blank" rel="noopener noreferrer">Calendar archive and revisions</a>.</p>`;
 }
 
@@ -5074,18 +5099,45 @@ function examDeviceContext() {
 }
 
 function examQuestionAnswer(question) {
-  const published = globalThis.CompassExamDesk?.answer(question, examDeviceContext());
-  if (published) return published;
   const practical = globalThis.CompassPracticals;
+  if (practical?.matches(question) && practical.isMse1Question(question)) return "<p>MSE-I workshop date-sheet data have been removed from Compass. No MSE-I workshop schedule is available here.</p>";
+  let suppliedWorkshop = null;
   if (practical?.matches(question)) {
     const today = indiaCalendarDate(0).date.toISOString().slice(0, 10);
     const q = canonicalTimetableQuestion(question);
-    const result = practical.resolve(q, { section: state.selectedGroup, today, minutes: getIndiaNow().minutes,
+    suppliedWorkshop = practical.resolve(q, { section: state.selectedGroup, today, minutes: getIndiaNow().minutes,
       temporal: globalThis.CompassBrainKernel?.resolveTemporalQuery?.(`${q} date`, today) });
-    if (!result) return "";
-    const rows = result.workshops.map(row => `<p><strong>${escapeHtml(row.section)}1 / ${escapeHtml(row.section)}2 · ${escapeHtml(row.date)} · Manufacturing Practices (Workshops)</strong><br />Periods ${escapeHtml(row.periods)} · ${escapeHtml(row.correctedTime || row.printedTime)}${row.end === null ? '<br /><strong>End time unconfirmed:</strong> the handwritten AM/PM conflicts with the printed period numbers. Confirm with the workshop in-charge.' : ""}</p>`).join("");
-    return `<p><strong>${escapeHtml(result.source.title)}</strong></p>${result.message ? `<p>${escapeHtml(result.message)}</p>` : ""}${rows}<p class="answer-source"><a href="${result.source.url}" target="_blank" rel="noopener noreferrer">Read the transcribed notices</a><br />${escapeHtml(result.source.provenance)} Times are IST. Later notices may revise this schedule.</p>`;
   }
+  const renderWorkshop = result => {
+    if (!result) return "";
+    const rows = result.workshops.map(row => `<p><strong>${escapeHtml(row.section)}1 / ${escapeHtml(row.section)}2 · ${escapeHtml(row.date)} · ${escapeHtml(result.source.courseTitle)}</strong><br />Periods ${escapeHtml(row.periods)} · ${escapeHtml(row.correctedTime || row.printedTime)}${row.end === null ? '<br /><strong>End time unconfirmed:</strong> the handwritten AM/PM conflicts with the printed period numbers. Confirm with the workshop in-charge.' : ""}</p>`).join("");
+    return `<p><strong>${escapeHtml(result.source.title)}</strong></p>${result.message ? `<p>${escapeHtml(result.message)}</p>` : ""}${rows}<p class="answer-source"><a href="${result.source.url}" target="_blank" rel="noopener noreferrer">Read the transcribed notices</a><br />${escapeHtml(result.source.provenance)} Times are IST. Later notices may revise this schedule.</p>`;
+  };
+  if (suppliedWorkshop && practical && suppliedWorkshop.source === practical.source) return renderWorkshop(suppliedWorkshop);
+  if (globalThis.CompassMse2Theory?.matches(question)) {
+    const today = indiaCalendarDate(0).date.toISOString().slice(0, 10);
+    const q = canonicalTimetableQuestion(question);
+    const theoryResult = globalThis.CompassMse2Theory.resolve(q, {
+      section: state.selectedGroup,
+      today,
+      minutes: getIndiaNow().minutes,
+      temporal: globalThis.CompassBrainKernel?.resolveTemporalQuery?.(`${q} date`, today)
+    });
+    if (theoryResult) {
+      const labelFor = (id) => theoryResult.groups.find((group) => group.id === id)?.label || "MSE-II";
+      const rows = theoryResult.entries.map((row) => {
+        const date = new Date(`${row.date}T00:00:00Z`);
+        const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getUTCDay()];
+        const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][date.getUTCMonth()];
+        const label = `${day}, ${date.getUTCDate()} ${month} ${date.getUTCFullYear()}`;
+        return `<p><strong>${escapeHtml(label)} \u00b7 ${escapeHtml(labelFor(row.group))} \u00b7 ${escapeHtml(row.label)}</strong><br />${humanTime(row.start)}\u2013${humanTime(row.end)} \u00b7 ${escapeHtml(row.sectionsLabel)}</p>`;
+      }).join("");
+      return `<p><strong>${escapeHtml(theoryResult.source.title)}</strong></p><p>${escapeHtml(theoryResult.message)}</p>${rows}<p class="answer-source"><a href="${escapeHtml(theoryResult.source.url)}" target="_blank" rel="noopener noreferrer">Read the transcribed date sheet</a> \u00b7 ${escapeHtml(theoryResult.source.reference)} \u00b7 issued ${escapeHtml(theoryResult.source.issued)}. ${escapeHtml(theoryResult.source.provenance)} Times are IST.</p>`;
+    }
+  }
+  const published = globalThis.CompassExamDesk?.answer(question, examDeviceContext());
+  if (published) return published;
+  if (suppliedWorkshop) return renderWorkshop(suppliedWorkshop);
   const exams = globalThis.CompassExams;
   if (!exams?.matches(question)) return "";
   const today = indiaCalendarDate(0).date.toISOString().slice(0, 10);
@@ -5100,6 +5152,7 @@ function examQuestionAnswer(question) {
   const resolved = exams.resolve(q, { section: state.selectedGroup, subsections, today, minutes: now.minutes,
     temporal: globalThis.CompassBrainKernel?.resolveTemporalQuery?.(`${q} date`, today) });
   if (!resolved) return "";
+  if (!resolved.entries.length && resolved.message) return `<p><strong>${escapeHtml(resolved.source.title)}</strong></p><p>${escapeHtml(resolved.message)}</p>`;
   const source = resolved.source;
   const sourceHtml = '<p class="answer-source">' + escapeHtml(source.title) + ' - issued ' + escapeHtml(source.issued) + '.<br />User-supplied GNDEC Applied Sciences source; its expired PDF is no longer hosted here. Times are IST. Later notices may revise this schedule.</p>';
   const rows = resolved.entries.map((entry) => {
@@ -5180,12 +5233,18 @@ function timetableAnalysisAnswer(question) {
 }
 
 function answerSingleCompassQuestion(question, engine = null, contextOverrides = {}) {
+  const meetingNotice = academicNoticeAnswer(question);
+  if (meetingNotice) return meetingNotice;
   const duration = calendarDurationAnswer(question);
   if (duration) return duration;
   const rooms = roomAvailabilityAnswer(question);
   if (rooms) return rooms;
   const role = facultyRoleRequest(question);
-  if (role && facultyContacts) return facultyRoleAnswer(facultyRoleLookup(role, facultyContacts));
+  if (role) {
+    if (facultyContacts) return facultyRoleAnswer(facultyRoleLookup(role, facultyContacts));
+    // Never answer an administration role with someone's timetable.
+    return "<p><strong>Official directory not loaded.</strong></p><p>Open Compass with a connection once so the official GNDEC faculty directory can load, then ask again.</p>";
+  }
   const academic = academicCalendarAnswer(question);
   if (academic) return academic;
   const exams = examQuestionAnswer(question);
@@ -5770,6 +5829,82 @@ function facultyDepartmentForQuestion(question) {
   return FACULTY_DEPARTMENT_ALIASES.find(([, pattern]) => pattern.test(q))?.[0] || "";
 }
 
+function freeRoomsPanelState() {
+  const view = state.timetableViews.get("rooms");
+  const schedule = Array.isArray(view?.schedule) ? view.schedule : [];
+  const rooms = [...new Set(schedule.map((row) => String(row.group || "").trim()).filter(Boolean))];
+  return { schedule, rooms };
+}
+
+function renderFreeRoomsPanel() {
+  const status = $("free-rooms-status");
+  const result = $("free-rooms-result");
+  if (!status || !result) return;
+  const daySelect = $("free-rooms-day");
+  const timeSelect = $("free-rooms-time");
+  const zoneSelect = $("free-rooms-zone");
+  const { schedule, rooms } = freeRoomsPanelState();
+  if (!schedule.length) {
+    status.textContent = state.timetableViews.get("rooms") === null
+      ? "The official room timetable could not be loaded. Free rooms stay unknown rather than guessed."
+      : "Load the room timetable to see free rooms.";
+    result.innerHTML = "";
+    return;
+  }
+  const day = daySelect?.value || getIndiaNow().day || "Monday";
+  const time = Number(timeSelect?.value || getIndiaNow().minutes);
+  const zone = zoneSelect?.value || "";
+  const free = rooms.filter((room) => !schedule.some((row) => row.group === room && row.day === day && row.start <= time && time < row.end));
+  const grouped = globalThis.CompassFreeRooms?.groupRooms(free);
+  const groups = (grouped?.groups || []).filter((group) => !zone || group.label === zone);
+  const shown = groups.reduce((sum, group) => sum + group.count, 0);
+  status.textContent = `${day} · ${humanTime(time)} · ${shown} of ${rooms.length} published rooms have no class listed`;
+  result.innerHTML = groups.length
+    ? groups.map((group) => `<div class="free-rooms-group"><h3>${escapeHtml(group.label)} <span>${group.count}</span></h3><p>${group.rooms.map(escapeHtml).join(", ")}</p></div>`).join("")
+    : "<p class=\"empty-list\">No published room in that area is free at this time.</p>";
+}
+
+function wireFreeRoomsPanel() {
+  const panel = $("free-rooms-panel");
+  if (!panel) return;
+  const timeSelect = $("free-rooms-time");
+  if (timeSelect && !timeSelect.options.length) {
+    for (let minutes = 8 * 60; minutes <= 17 * 60 + 30; minutes += 30) {
+      const option = document.createElement("option");
+      option.value = String(minutes);
+      option.textContent = humanTime(minutes);
+      timeSelect.append(option);
+    }
+    const now = getIndiaNow().minutes;
+    const nearest = Math.min(17 * 60 + 30, Math.max(8 * 60, Math.round(now / 30) * 30));
+    timeSelect.value = String(nearest);
+  }
+  const daySelect = $("free-rooms-day");
+  if (daySelect) {
+    const today = getIndiaNow().day;
+    if (today && [...daySelect.options].some((option) => option.textContent === today)) daySelect.value = today;
+  }
+  ["free-rooms-day", "free-rooms-time", "free-rooms-zone"].forEach((id) => {
+    $(id)?.addEventListener("change", () => renderFreeRoomsPanel());
+  });
+  const load = async (attempt = 0) => {
+    try {
+      await loadOfficialTimetableView("rooms");
+      renderFreeRoomsPanel();
+    } catch {
+      // The source registry arrives after first paint; retry briefly, then
+      // report the missing source instead of showing an empty list as "free".
+      if (attempt < 12) {
+        window.setTimeout(() => load(attempt + 1), 700);
+        return;
+      }
+      const status = $("free-rooms-status");
+      if (status && !freeRoomsPanelState().schedule.length) status.textContent = "The official room timetable is unavailable right now. Free rooms stay unknown rather than guessed.";
+    }
+  };
+  load();
+}
+
 function roomAvailabilityAnswer(question) {
   const engine = globalThis.CompassRoomAvailability;
   const q = canonicalTimetableQuestion(question);
@@ -5788,7 +5923,13 @@ function roomAvailabilityAnswer(question) {
   const result = engine.resolve(q, stored.schedule, day, time);
   if (result.error) return `<p>${escapeHtml(result.error)}</p>`;
   const label = `${day}${date ? ` · ${date.iso}` : ""} · ${humanTime(time)}`;
-  return `<p><strong>${escapeHtml(label)}: ${result.rooms.length} rooms with no class listed</strong></p>${result.rooms.length ? `<p>${result.rooms.slice(0, 40).map(escapeHtml).join(", ")}</p>` : "<p>All matching rooms have a class listed at this time.</p>"}${result.rooms.length > 40 ? "<p>Showing the first 40 rooms; specify an area to narrow the list.</p>" : ""}<p class="answer-source">Checked ${result.checked} published room labels against the official weekly room timetable. This does not confirm access, permission, unscheduled bookings or date-specific changes. S/F/G/A filters refer to published code prefixes.</p>`;
+  // Group by the block or lab name printed in the official room label. Every
+  // published room is listed; nothing is assigned to a department here.
+  const grouped = globalThis.CompassFreeRooms?.groupRooms(result.rooms);
+  const body = grouped?.total
+    ? grouped.groups.map((group) => `<p><strong>${escapeHtml(group.label)} \u00b7 ${group.count}</strong><br />${group.rooms.map(escapeHtml).join(", ")}</p>`).join("")
+    : "<p>All matching rooms have a class listed at this time.</p>";
+  return `<p><strong>${escapeHtml(label)}: ${result.rooms.length} of ${result.checked} published rooms have no class listed</strong></p>${body}<p class="answer-source">Checked every published room label in the official college-wide room timetable, across all branches and years. This does not confirm access, permission, unscheduled bookings or date-specific changes. Block names come from the published room codes.</p>`;
 }
 
 function facultyDetailFlags(question = "") {
@@ -6092,7 +6233,7 @@ function safeStoredChatHtml(value) {
   const allowedTags = new Set(["A", "B", "BR", "BUTTON", "DETAILS", "DIV", "EM", "FIGCAPTION", "FIGURE", "H2", "H3", "HEADER", "IMG", "LI", "OL", "P", "SECTION", "SMALL", "SPAN", "STRONG", "SUMMARY", "U", "UL"]);
   const allowedAttributes = new Set(["alt", "aria-hidden", "aria-label", "aria-selected", "class", "data-faculty-photo-fallback", "data-kb-followup", "decoding", "height", "href", "loading", "open", "referrerpolicy", "rel", "role", "src", "target", "title", "type", "width"]);
   const officialUrl = (raw) => {
-    if (/^\/notices\/mse1-practicals-2026\.html$/.test(String(raw || ""))) return true;
+    if (/^\/notices\/(?:mse2-theory-2026|mse2-workshops-2026|hod-meeting-2026-11-03)\.html$/.test(String(raw || ""))) return true;
     if (/^\/api\/faculty\/photo\?id=\d{1,8}$/.test(String(raw || ""))) return true;
     try {
       const url = new URL(raw, location.origin);
@@ -6568,11 +6709,17 @@ function renderReferenceLinks() {
     { label: "GNDEC Faculty Directory", note: "Current public faculty and staff profiles", url: "https://gndec.ac.in/faculty/" },
     { label: "Official Timetable Index", note: "Current and archived timetable releases", url: "https://appsc.gndec.ac.in/time_tables" }
   ];
+  const suppliedNotices = [
+    { label: "MSE-II theory date sheet · November 2026", note: "Applied Sciences APS/11/2368 · user-supplied photo", url: "/notices/mse2-theory-2026.html" },
+    { label: "MSE-II MP workshops · 18–20 November 2026", note: "Handwritten schedule · user-supplied photo", url: "/notices/mse2-workshops-2026.html" },
+    { label: "HOD meeting minutes · 3 November 2026", note: "Meeting held 30 October · user-supplied photo", url: "/notices/hod-meeting-2026-11-03.html" }
+  ];
   container.innerHTML = [
     makeGroup("Start here", "The most useful official links for this device.", startHere),
     makeGroup("Current timetable", "Verified views from the latest official release, in student-first order.", timetable, true),
     makeGroup(personalList ? "Other current student rosters" : "Current student rosters", "Current branch rosters only; historical semester files are intentionally hidden.", otherStudentLists),
     ...(timetableNotices.length ? [makeGroup("Latest timetable notices", "Date-specific schedules and notices published alongside the weekly timetable.", timetableNotices)] : []),
+    makeGroup("Supplied notices", "Transcribed from photographs. An official web publication has not been independently verified; check with the department.", suppliedNotices),
     makeGroup("Academic resources & syllabus", "Current official syllabus and Applied Sciences resources.", academicLinks),
     makeGroup("Academic calendar & holidays", "Official holiday schedules, examination calendars, and autonomous notices.", calendarLinks),
     makeGroup("College services & autonomous portals", "Official GNDEC entry points, regulations, and campus facilities.", collegeLinks)
@@ -6923,6 +7070,7 @@ function initEvents() {
     renderDaySchedule();
   });
   $("admin-ai-mode")?.addEventListener("change", (event) => { if (!hasAdminAiView()) return; localStorage.setItem(ADMIN_AI_MODE_STORAGE_KEY, event.target.value); renderAdminAiVisibility(); showToast(`Admin answer mode: ${event.target.options[event.target.selectedIndex].text}`); });
+  wireFreeRoomsPanel();
   $("question-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const rawQuestion = $("question-input").value.trim();
@@ -6972,6 +7120,13 @@ function initEvents() {
     }
     const academic = academicCalendarAnswer(question);
     if (academic) { ensureChatBubble("assistant", academic); persistChat(); return; }
+    // A transcribed MSE-II theory date sheet is the only verified source for its
+    // sittings. The exam domain has no published sitting for that session, so it
+    // must not answer "no schedule" ahead of the transcribed table.
+    if (globalThis.CompassMse2Theory?.matches(question)) {
+      const theory = examQuestionAnswer(question);
+      if (theory) { ensureChatBubble("assistant", `${theory}${followupSuggestions(question)}`); persistChat(); return; }
+    }
     if (globalThis.CompassExamDomain?.matches(question) && globalThis.CompassExamDesk) {
       const published = await globalThis.CompassExamDesk.respond(question, examDeviceContext());
       if (published) { ensureChatBubble("assistant", published); persistChat(); return; }
@@ -6982,7 +7137,9 @@ function initEvents() {
       persistChat();
       return;
     }
-    if (!requestedOfficialTimetableView(question)) {
+    // A directory role question ("who is HOD CSE") must not be read as the
+    // CSE section's timetable. Roles resolve through the faculty directory.
+    if (!requestedOfficialTimetableView(question) && !facultyRoleRequest(question)) {
       const qualified = qualifiedTimetableAnswer(question) || datedPersonalTimetableAnswer(question);
       if (qualified) { ensureChatBubble("assistant", qualified); persistChat(); return; }
     }
@@ -7168,16 +7325,27 @@ function initEvents() {
       persistChat();
       return;
     }
+    const suppliedMeetingNotice = academicNoticeAnswer(question);
+    const suppliedWorkshopNotice = globalThis.CompassPracticals?.matches(question)
+      ? examQuestionAnswer(question) : "";
+    if (suppliedMeetingNotice || suppliedWorkshopNotice) {
+      ensureChatBubble("assistant", `${suppliedMeetingNotice || suppliedWorkshopNotice}${followupSuggestions(question)}`);
+      persistChat();
+      return;
+    }
     // Brain 2.0 handles only verified deterministic results here. Unsupported,
     // uncertain, malformed, or failed results continue into the legacy route.
-    const brainResult = runCompassBrain(question);
+    // Directory roles (HOD, dean, principal) belong to the verified faculty
+    // directory and must never be answered with a timetable.
+    const directoryRole = Boolean(facultyRoleRequest(question));
+    const brainResult = directoryRole ? null : runCompassBrain(question);
     if (brainResult?.answer) {
       ensureChatBubble("assistant", `${brainResult.answer}${followupSuggestions(question, brainResult)}`);
       persistChat();
       return;
     }
     // ── Knowledge base: answers instantly with zero AI ──
-    const kbResult = answerFromKnowledgeBase(question);
+    const kbResult = directoryRole ? null : answerFromKnowledgeBase(question);
     if (kbResult && kbResult.reply) {
       // Show a brief "thinking" bubble for that AI feel, then show the answer
       ensureChatBubble("assistant", kbResult.reply);
