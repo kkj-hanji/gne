@@ -1,50 +1,35 @@
 Set-Location "D:\testings\gndec"
 
-$ErrorActionPreference = "Stop"
+$branch = git branch --show-current
+$changes = git status --porcelain
+
+if (-not $changes) {
+  Write-Host "No Git changes to push."
+
+}
+
+git add -A
+git commit -m "chore: sync project changes $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+git push origin $branch
+
+Write-Host "Pushed all changes to origin/$branch"
+
+npm run deploy                                
+                Set-Location "D:\testings\gndec"
 
 $branch = git branch --show-current
-if ($LASTEXITCODE -ne 0 -or -not $branch) {
-  throw "Could not determine the current Git branch."
-}
-
 $changes = git status --porcelain
-if ($LASTEXITCODE -ne 0) {
-  throw "Could not read Git status."
+
+if (-not $changes) {
+  Write-Host "No Git changes to push."
+
 }
 
-if ($changes) {
-  git add -A
-  if ($LASTEXITCODE -ne 0) {
-    throw "git add failed; nothing was committed or pushed."
-  }
-
-  git diff --cached --quiet
-  if ($LASTEXITCODE -eq 1) {
-    git commit -m "chore: sync project changes $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
-    if ($LASTEXITCODE -ne 0) {
-      throw "git commit failed; nothing was pushed."
-    }
-  } elseif ($LASTEXITCODE -ne 0) {
-    throw "Could not check staged Git changes."
-  } else {
-    Write-Host "No staged changes to commit."
-  }
-} else {
-  Write-Host "No uncommitted Git changes. Checking for commits to push."
-}
-
+git add -A
+git commit -m "chore: sync project changes $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 git push origin $branch
-$pushSucceeded = ($LASTEXITCODE -eq 0)
-if (-not $pushSucceeded) {
-  Write-Host "git push failed. Check that your GitHub account can write to origin; deployment was skipped." -ForegroundColor Red
-}
 
-if ($pushSucceeded) {
-  Write-Host "Pushed all changes to origin/$branch"
+Write-Host "Pushed all changes to origin/$branch"
 
-  npm run deploy
-  if ($LASTEXITCODE -ne 0) {
-    throw "Cloudflare deployment failed. The Git push succeeded, but the deployment did not."
-  }
-}
+npm run deploy                                
                 
