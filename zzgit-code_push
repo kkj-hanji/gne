@@ -1,18 +1,47 @@
 Set-Location "D:\testings\gndec"
 
+$ErrorActionPreference = "Stop"
+
 $branch = git branch --show-current
-$changes = git status --porcelain
-
-if (-not $changes) {
-  Write-Host "No Git changes to push."
-
+if ($LASTEXITCODE -ne 0 -or -not $branch) {
+  throw "Could not determine the current Git branch."
 }
 
-git add -A
-git commit -m "chore: sync project changes $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+$changes = git status --porcelain
+if ($LASTEXITCODE -ne 0) {
+  throw "Could not read Git status."
+}
+
+if ($changes) {
+  git add -A
+  if ($LASTEXITCODE -ne 0) {
+    throw "git add failed; nothing was committed or pushed."
+  }
+
+  git diff --cached --quiet
+  if ($LASTEXITCODE -eq 1) {
+    git commit -m "chore: sync project changes $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    if ($LASTEXITCODE -ne 0) {
+      throw "git commit failed; nothing was pushed."
+    }
+  } elseif ($LASTEXITCODE -ne 0) {
+    throw "Could not check staged Git changes."
+  } else {
+    Write-Host "No staged changes to commit."
+  }
+} else {
+  Write-Host "No uncommitted Git changes. Checking for commits to push."
+}
+
 git push origin $branch
+if ($LASTEXITCODE -ne 0) {
+  throw "git push failed. Check that your GitHub account can write to origin; deployment was skipped."
+}
 
 Write-Host "Pushed all changes to origin/$branch"
 
-npm run deploy                                
+npm run deploy
+if ($LASTEXITCODE -ne 0) {
+  throw "Cloudflare deployment failed. The Git push succeeded, but the deployment did not."
+}
                 
