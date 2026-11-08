@@ -71,3 +71,19 @@ test("Ask Compass lists every free room grouped by its published block", () => {
   assert.doesNotMatch(answer, /Showing the first 40/);
   assert.match(answer, /official college-wide room timetable/);
 });
+
+test("free-room answers include the next published class time when one exists", () => {
+  const { api } = createAppHarness();
+  api.state.timetableViews.set("rooms", {
+    revision: "test",
+    schedule: [
+      { group: "F101", day: "Monday", start: 600, end: 660, subject: "MATH", teacher: "T", room: "F101", type: "L", cohorts: "CSA" },
+      { group: "F101", day: "Monday", start: 780, end: 840, subject: "PHYSICS", teacher: "T", room: "F101", type: "L", cohorts: "CSB" },
+      { group: "F102", day: "Monday", start: 600, end: 720, subject: "PPS", teacher: "T", room: "F102", type: "P", cohorts: "CSC" }
+    ]
+  });
+  const answer = api.roomAvailabilityAnswer("free rooms on Monday at 11 AM");
+  assert.match(answer, /F101/);
+  assert.match(answer, /free until 1:00 PM/);
+  assert.doesNotMatch(answer, /F102/);
+});

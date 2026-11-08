@@ -19,7 +19,7 @@
     <link rel="manifest" href="manifest.webmanifest?v=20261002-1" />
     <link rel="icon" type="image/png" href="logo.png?v=20261002-1" />
     <link rel="apple-touch-icon" href="logo.png?v=20261002-1" />
-    <link rel="stylesheet" href="styles.css?v=20261106-1" />
+    <link rel="stylesheet" href="styles.css?v=20261107-3" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -37,6 +37,7 @@
           <a class="nav-link active" href="#today" data-page-link="today"><span aria-hidden="true">&#9678;</span> Today</a>
           <a class="nav-link" href="#chat" data-page-link="chat"><span aria-hidden="true">&#9993;</span> Ask Compass</a>
           <a class="nav-link" href="#timetable" data-page-link="timetable"><span aria-hidden="true">&#9638;</span> Timetable</a>
+          <a class="nav-link" href="#campus" data-page-link="campus"><span aria-hidden="true">&#127891;</span> Campus</a>
           <a class="nav-link" href="#profile" data-page-link="profile"><span aria-hidden="true">&#9787;</span> Profile</a>
           <a class="nav-link" href="#settings" data-page-link="settings"><span aria-hidden="true">&#9881;</span> Settings</a>
         </nav>
@@ -181,9 +182,59 @@
               <div class="field"><label for="free-rooms-day">Day</label><select id="free-rooms-day"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
               <div class="field"><label for="free-rooms-time">Time</label><select id="free-rooms-time"></select></div>
               <div class="field"><label for="free-rooms-zone">Area</label><select id="free-rooms-zone"><option value="">All areas</option><option>F block</option><option>G block</option><option>S block</option><option>A block</option><option>Labs and named rooms</option><option>Other published rooms</option></select></div>
+              <button class="outline-button" id="free-rooms-now" type="button">Now</button>
             </div>
             <p id="free-rooms-status" role="status" aria-live="polite">Load the room timetable to see free rooms.</p>
             <div id="free-rooms-result" class="free-rooms-result"></div>
+          </section>
+          <section class="panel ese-panel" id="ese-panel" aria-labelledby="ese-title">
+            <p class="eyebrow">OFFICIAL TENTATIVE DATESHEET</p>
+            <h2 id="ese-title">End-semester examinations</h2>
+            <p class="muted">Published by the GNDEC Controller of Examination as a public Google Sheet. This is tentative: clashes and revisions can change it. Compass does not invent rooms, seats, or reporting times.</p>
+            <div class="free-rooms-controls">
+              <div class="field"><label for="ese-department">Department / programme</label><select id="ese-department"><option value="">All departments / programmes</option></select></div>
+              <div class="field"><label for="ese-search">Find a subject</label><input id="ese-search" type="search" placeholder="e.g. Physics, Data Structures" autocomplete="off" /></div>
+              <button class="outline-button" id="ese-refresh" type="button">Refresh datesheet ↻</button>
+            </div>
+            <p id="ese-status" role="status" aria-live="polite">Loading the official tentative datesheet…</p>
+            <div id="ese-result" class="ese-result"></div>
+          </section>
+        </section>
+
+        <section class="page" id="campus-page" data-page="campus">
+          <div class="page-intro page-intro-flex">
+            <div>
+              <p class="eyebrow">OFFICIAL CAMPUS DIRECTORY</p>
+              <h1>Campus</h1>
+              <p>Heads of Department, contact details, the latest ERP notices, and published study schemes. Every entry links back to its official GNDEC page.</p>
+            </div>
+            <button class="outline-button" id="campus-refresh" type="button">Check official pages ↻</button>
+          </div>
+          <p id="campus-status" role="status" aria-live="polite">Loading the official campus directory…</p>
+
+          <section class="panel" aria-labelledby="campus-departments-title">
+            <div class="section-header"><div><p class="eyebrow">DEPARTMENTS</p><h2 id="campus-departments-title">Heads and contacts</h2></div></div>
+            <p class="panel-note">Read from each department's official homepage. A missing name or phone number is shown as missing, never guessed.</p>
+            <div id="campus-departments" class="campus-grid"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="campus-notices-title">
+            <div class="section-header"><div><p class="eyebrow">ERP NOTICEBOARD</p><h2 id="campus-notices-title">Official notices</h2></div></div>
+            <div class="campus-controls">
+              <div class="field"><label for="campus-notice-search">Search notices</label><input id="campus-notice-search" type="search" placeholder="exam, admission, training…" autocomplete="off" /></div>
+              <div class="field"><label for="campus-notice-category">Category</label><select id="campus-notice-category"><option value="">All categories</option></select></div>
+            </div>
+            <div id="campus-notices" class="campus-list"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="campus-syllabus-title">
+            <div class="section-header"><div><p class="eyebrow">SYLLABUS LIBRARY</p><h2 id="campus-syllabus-title">Study schemes and syllabi</h2></div></div>
+            <p class="panel-note">Documents are linked exactly as published by the department. The list includes current and archived batches where the official page publishes them.</p>
+            <div class="campus-controls">
+              <div class="field"><label for="campus-syllabus-search">Search documents</label><input id="campus-syllabus-search" type="search" placeholder="batch, semester, scheme…" autocomplete="off" /></div>
+              <div class="field"><label for="campus-syllabus-department">Department</label><select id="campus-syllabus-department"><option value="">All departments</option></select></div>
+            </div>
+            <div id="campus-syllabus" class="campus-list"></div>
           </section>
         </section>
 
@@ -233,6 +284,13 @@
           <section class="panel">
             <div class="section-header"><div><p class="eyebrow">VERIFIED PROFILE LOOKUP</p><h2>Find or update my profile</h2></div></div>
             <p class="panel-note">Search current official rosters using your name, CRN, registration number, current serial, or a previously published serial when that history is available. Duplicate matches are never selected silently.</p>
+            <div class="field lookup-batch">
+              <label for="student-batch-select">Admission batch</label>
+              <select id="student-batch-select">
+                <option value="2026">2026 batch · current first year</option>
+                <option value="2025">2025 batch · second year</option>
+              </select>
+            </div>
             <form class="lookup-form" id="student-lookup-form">
               <label class="visually-hidden" for="student-name-input">Name, CRN, registration number, or serial number</label>
               <input id="student-name-input" autocomplete="off" list="student-history" placeholder="Name, CRN, registration, or serial" />
@@ -463,6 +521,8 @@
     <script src="academic-calendar.js?v=20260915-1"></script>
     <script src="room-availability.js?v=20260918-2"></script>
     <script src="free-rooms.js?v=20261106-1"></script>
-    <script src="app.js?v=20261107-1"></script>
+    <script src="end-sem-datesheet.js?v=20261107-1"></script>
+    <script src="campus.js?v=20261107-1"></script>
+    <script src="app.js?v=20261107-3"></script>
   </body>
 </html>

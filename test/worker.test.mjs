@@ -109,7 +109,7 @@ test("scheduled discovery validates and promotes a complete new GNDEC source reg
     if (url === "https://appsc.gndec.ac.in/time_tables") return new Response(index(), { status: 200 });
     if (url === "https://www.gndec.ac.in/?q=node/23") return new Response('<a href="/sites/default/files/acjul-dec26.pdf">Academic Calendar for Jul 2026 - Dec 2026</a><a href="/sites/default/files/acjan-jun26.pdf">Academic Calendar Jan-Jun 2026</a>', { status: 200 });
     if (url === "https://www.gndec.ac.in/sites/default/files/acjul-dec26.pdf") return new Response(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, ...Array(300).fill(0)]), { status: 200 });
-    if (url.endsWith("CS%20Students.pdf") || url.includes("Permanent%20Sections%202026") || url.includes("Branch%20Temporary%20Sections%202026_0.pdf")) return new Response(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, ...Array(300).fill(0)]), { status: 200 });
+    if (url.endsWith("CS%20Students.pdf") || url.includes("Permanent%20Sections%202026") || url.includes("Branch%20Temporary%20Sections%202026_0.pdf") || url.includes("Sections%20sem-2%202025")) return new Response(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, ...Array(300).fill(0)]), { status: 200 });
     if (ids.some((id) => url === sourceUrl(id))) return new Response(fet(marker), { status: 200 });
     throw new Error(`Unexpected fetch ${url}`);
   };
@@ -157,7 +157,7 @@ test("discovery selects the newest complete dated timetable bundle instead of pa
   globalThis.fetch = async (input) => {
     const url = String(input);
     if (url === "https://appsc.gndec.ac.in/time_tables") return new Response(bundledIndex(), { status: 200 });
-    if (url.includes("Permanent%20Sections%202026") || url.includes("Branch%20Temporary%20Sections%202026_0.pdf")) return new Response(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, ...Array(300).fill(0)]), { status: 200 });
+    if (url.includes("Permanent%20Sections%202026") || url.includes("Branch%20Temporary%20Sections%202026_0.pdf") || url.includes("Sections%20sem-2%202025")) return new Response(new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, ...Array(300).fill(0)]), { status: 200 });
     if (ids.some((id) => url === bundledSourceUrl("09_08_2026", id))) return new Response(fet("old"), { status: 200 });
     if (ids.some((id) => url === bundledSourceUrl("23_08_2026", id))) return new Response(fet("new"), { status: 200 });
     throw new Error(`Unexpected fetch ${url}`);

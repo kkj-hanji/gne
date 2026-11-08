@@ -109,6 +109,7 @@ const state = {
   timetableViewLoading: new Map(),
   rosterCache: null,
   rosterLookupConversation: null,
+  studentBatch: "2026",
   facultyCache: null,
   collegeEventsCache: null,
   noticesCache: null,
@@ -567,6 +568,11 @@ function populateStudentLookupInput(force = false) {
   const input = $("student-name-input");
   const value = savedProfileLookupValue();
   if (input && value && (force || !input.value.trim())) input.value = value;
+  const batchSelect = $("student-batch-select");
+  if (batchSelect) {
+    const batch = cleanText(state.student?.batch || state.studentBatch || "");
+    if (batch) batchSelect.value = batch;
+  }
 }
 
 function profileMatchesTimetableSelection(profile = activeStudentProfile(), group = state.selectedGroup, subgroup = state.selectedSubgroup) {
@@ -2874,7 +2880,7 @@ function normalizeStudentRecord(record = {}) {
     ...(Array.isArray(record.serialHistory) ? record.serialHistory : []),
     record.oldSerialNo || ""
   ].map((value) => cleanText(String(value))).filter((value) => value && value !== currentSerialNo))];
-  return {
+  const normalized = {
     serialNo: currentSerialNo,
     currentSerialNo,
     newSerialNo: cleanText(String(record.newSerialNo || "")),
@@ -2894,6 +2900,10 @@ function normalizeStudentRecord(record = {}) {
     rosterRevision: cleanText(String(record.rosterRevision || "")),
     rosterSchemaVersion: Number(record.rosterSchemaVersion || 0)
   };
+  // Only carry a batch when the caller actually resolved one. Legacy rows and
+  // manually typed profiles keep their historical shape.
+  const batch = cleanText(String(record.batch || ""));
+  return batch ? { ...normalized, batch } : normalized;
 }
 
 function studentIdentifierValues(record = {}) {
@@ -2959,12 +2969,13 @@ function renderStudentHistory() {
   datalist.innerHTML = history.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
 }
 
-function parseStudentSectionText(text, fallbackBranch = "") {
+function parseStudentSectionText(text, fallbackBranch = "", batch = "") {
   // Verified layouts differ in field order. Select a complete schema using
   // identifiers and branch/cohort constraints, never a name-shaped column.
   const schemas = [
     { crn: 2, registrationNo: 1, branch: 3, name: 4, section: 7, subsection: 8, academicGroup: 9, mentor: 10, mentorPhone: 11, mentorVenue: 12 },
     { crn: 1, registrationNo: 2, name: 3, branch: 6, section: 7, subsection: 8, academicGroup: 9, mentor: 10, mentorPhone: 11, mentorVenue: 12 },
+    { crn: 2, registrationNo: 3, name: 4, branch: 7, section: 8, subsection: 9, academicGroup: 10, mentor: 11, mentorVenue: 12 },
     { crn: 1, name: 2, branch: 5, section: 6, subsection: 7, academicGroup: 8, mentor: 9, mentorPhone: 10, mentorVenue: 11 }
   ];
   let rejectedRows = 0;
@@ -2972,35 +2983,39 @@ function parseStudentSectionText(text, fallbackBranch = "") {
     const rawColumns = rawLine.split("\t").map(cleanText);
     const columns = rawColumns.filter(Boolean);
     if (rawColumns.length >= 10) {
-      const matches = [rawColumns, columns].flatMap((cells) => schemas.flatMap((schema) => {
-        const columns = cells;
-        const branch = columns[schema.branch]?.toUpperCase();
-        const section = columns[schema.section]?.toUpperCase();
-        const subsection = columns[schema.subsection]?.toUpperCase();
-        const valid = /^\d{1,4}$/.test(columns[0]) && /^[A-Z0-9-]{4,20}$/i.test(columns[schema.crn] || "")
-          && (schema.registrationNo == null || /^\d{8,12}$/.test(columns[schema.registrationNo] || ""))
+      const candidateMatches = (cells) => schemas.flatMap((schema) => {
+        const branch = cells[schema.branch]?.toUpperCase();
+        const section = cells[schema.section]?.toUpperCase();
+        const subsection = cells[schema.subsection]?.toUpperCase();
+        const valid = /^\d{1,4}$/.test(cells[0]) && /^[A-Z0-9-]{4,20}$/i.test(cells[schema.crn] || "")
+          && (schema.registrationNo == null || /^\d{7,12}$/.test(cells[schema.registrationNo] || ""))
           && /^(?:CE|CS|EC|EE|IT|ME|RAI)$/.test(branch || "") && (!fallbackBranch || branch === fallbackBranch.toUpperCase())
-          && /^[A-Z0-9]{2,12}$/.test(section || "") && section.startsWith(branch)
-          && /^[A-Z0-9]{2,16}$/.test(subsection || "") && subsection.startsWith(section)
-          && /[a-z]{2}/i.test(columns[schema.name] || "") && !/\d/.test(columns[schema.name] || "");
-        return valid ? [Object.fromEntries(Object.entries(schema).map(([field, index]) => [field, columns[index] || ""]))] : [];
-      }));
+          && /^[A-Z0-9]{2,12}$/.test(section || "")
+          && /^[A-Z0-9]{2,16}$/.test(subsection || "")
+          && /[a-z]{2}/i.test(cells[schema.name] || "") && !/\d/.test(cells[schema.name] || "");
+        return valid ? [Object.fromEntries(Object.entries(schema).map(([field, index]) => [field, cells[index] || ""]))] : [];
+      });
+      // Preserve the physical column positions first. A filtered copy is only a
+      // fallback for layouts that genuinely omit an empty middle column; trying
+      // both unconditionally can shift a row and create a false second schema.
+      let matches = candidateMatches(rawColumns);
+      if (!matches.length) matches = candidateMatches(columns);
       const unique = [...new Map(matches.map((record) => [JSON.stringify(record), record])).values()];
       if (unique.length !== 1) {
         if (/^\d{1,4}$/.test(columns[0])) rejectedRows++;
         return [];
       }
-      return [normalizeStudentRecord({ ...unique[0], serialNo: columns[0], rosterSchemaVersion: ROSTER_SCHEMA_VERSION })];
+      return [normalizeStudentRecord({ ...unique[0], serialNo: columns[0], rosterSchemaVersion: ROSTER_SCHEMA_VERSION, batch })];
     }
     const line = cleanText(rawLine);
     const serialMatch = line.match(/^(\d+)\s+/);
     const serialStripped = line.replace(/^\d+\s+/, "");
-    const registrationMatch = serialStripped.match(/\b(26\d{6})\b/);
+    const registrationMatch = serialStripped.match(/\b((?:25|26)\d{5,6})\b/);
     if (!registrationMatch) return [];
     const name = cleanText(serialStripped.slice(0, registrationMatch.index));
     const fields = cleanText(serialStripped.slice((registrationMatch.index || 0) + registrationMatch[0].length)).match(/^([A-Z]+)\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+(.+)$/i);
     if (!name || !fields) return [];
-    return [normalizeStudentRecord({ serialNo: serialMatch?.[1] || "", name, registrationNo: registrationMatch[1], branch: fields[1].toUpperCase() || fallbackBranch, section: fields[2].toUpperCase(), subsection: fields[3].toUpperCase(), mentor: cleanText(fields[4]) })];
+    return [normalizeStudentRecord({ serialNo: serialMatch?.[1] || "", name, registrationNo: registrationMatch[1], branch: fields[1].toUpperCase() || fallbackBranch, section: fields[2].toUpperCase(), subsection: fields[3].toUpperCase(), mentor: cleanText(fields[4]), batch })];
   });
   // A partially understood branch must not produce an apparently complete
   // count or silently hide students. Callers preserve the previous profile.
@@ -4535,6 +4550,10 @@ function legacyAcademicMarkingAnswer(question) {
 function legacyAnswerWithoutAi(question, studentLookup = null, facultyLookup = null) {
   const meetingNotice = academicNoticeAnswer(question);
   if (meetingNotice) return meetingNotice;
+  const datesheet = globalThis.CompassEseDatesheet?.answer(question);
+  if (datesheet) return datesheet;
+  const campus = globalThis.CompassCampus?.answer(question);
+  if (campus) return campus;
   const academic = academicCalendarAnswer(question);
   if (academic) return academic;
   const exams = examQuestionAnswer(question);
@@ -4863,6 +4882,8 @@ function prepareCompassQuestion(question) {
   // must not gain a "timetable" suffix and be read as a section timetable.
   if (facultyRoleRequest(q)) return q;
   if (globalThis.CompassExamDomain?.matches(q)) return q;
+  if (globalThis.CompassEseDatesheet?.matches(q)) return q;
+  if (globalThis.CompassCampus?.matches(q)) return q;
   if (globalThis.CompassMse2Theory?.matches(q)) return q;
   if (globalThis.CompassPracticals?.matches(q)) return q;
   if (globalThis.CompassRoomAvailability?.matches(q)) return q;
@@ -5235,6 +5256,10 @@ function timetableAnalysisAnswer(question) {
 function answerSingleCompassQuestion(question, engine = null, contextOverrides = {}) {
   const meetingNotice = academicNoticeAnswer(question);
   if (meetingNotice) return meetingNotice;
+  const datesheet = globalThis.CompassEseDatesheet?.answer(question);
+  if (datesheet) return datesheet;
+  const campus = globalThis.CompassCampus?.answer(question);
+  if (campus) return campus;
   const duration = calendarDurationAnswer(question);
   if (duration) return duration;
   const rooms = roomAvailabilityAnswer(question);
@@ -5300,22 +5325,23 @@ function renderStudentMatches(matches, message) {
   }
   result.innerHTML = `<strong>${escapeHtml(message)}</strong>${matches.map((record, index) => {
     const identifiers = [record.crn ? `CRN ${record.crn}` : "", record.registrationNo ? `Registration ${record.registrationNo}` : "", (record.currentSerialNo || record.serialNo) ? `Serial ${record.currentSerialNo || record.serialNo}` : ""].filter(Boolean).join(" · ");
-    return `<button class="lookup-choice" type="button" data-student-index="${index}"><span>${escapeHtml(record.name)}</span>${identifiers ? ` · ${escapeHtml(identifiers)}` : ""}<small>${escapeHtml(record.branch)} · ${escapeHtml(record.section)} / ${escapeHtml(record.subsection)} · Mentor: ${escapeHtml(record.mentor || "Not listed")}</small></button>`;
+    return `<button class="lookup-choice" type="button" data-student-index="${index}"><span>${escapeHtml(record.name)}</span>${identifiers ? ` · ${escapeHtml(identifiers)}` : ""}<small>${escapeHtml(record.batch || "2026")} batch · ${escapeHtml(record.branch)} · ${escapeHtml(record.section)} / ${escapeHtml(record.subsection)} · Mentor: ${escapeHtml(record.mentor || "Not listed")}</small></button>`;
   }).join("")}`;
   result.querySelectorAll("[data-student-index]").forEach((button) => button.addEventListener("click", () => applyStudentRecord(pendingStudentMatches[Number(button.dataset.studentIndex)])));
 }
 
-function rosterSourceForBranch(branch) {
-  return (state.sourceRegistry?.studentSectionSources || []).find((source) => source.branch === String(branch || "").toUpperCase()) || null;
+function rosterSourceForBranch(branch, batch = "2026") {
+  const sources = rosterBatchSources()[batch] || (batch === "2026" ? state.sourceRegistry?.studentSectionSources || [] : []);
+  return sources.find((source) => source.branch === String(branch || "").toUpperCase()) || null;
 }
 
 function rosterHistorySourcesForBranch(branch) {
   return (state.sourceRegistry?.studentHistorySources || []).filter((source) => source.branch === String(branch || "").toUpperCase() && source.verified !== false);
 }
 
-function rosterRevisionForBranch(branch) {
-  const current = rosterSourceForBranch(branch)?.contentHash || "";
-  const history = rosterHistorySourcesForBranch(branch).map((source) => source.contentHash || source.url || "").sort();
+function rosterRevisionForBranch(branch, batch = "2026") {
+  const current = rosterSourceForBranch(branch, batch)?.contentHash || "";
+  const history = batch === "2026" ? rosterHistorySourcesForBranch(branch).map((source) => source.contentHash || source.url || "").sort() : [];
   return [current, ...history].filter(Boolean).join(":");
 }
 
@@ -5346,10 +5372,15 @@ function applyStudentRecord(record, { silent = false } = {}) {
   if (!record) return;
   resetBrainConversation();
   const next = mergeStudentRecord(record, state.student);
-  const rosterSource = rosterSourceForBranch(branchCodeForProfile(next));
+  const batch = next.batch || "2026";
+  const branchCode = branchCodeForProfile(next);
+  const rosterSource = rosterSourceForBranch(branchCode, batch);
   next.rosterVersion = next.rosterVersion || state.sourceRegistry?.version || "";
-  next.rosterRevision = next.rosterRevision || rosterRevisionForBranch(branchCodeForProfile(next)) || rosterSource?.contentHash || "";
+  next.rosterRevision = next.rosterRevision || rosterRevisionForBranch(branchCode, batch) || rosterSource?.contentHash || "";
   state.student = next;
+  state.studentBatch = batch;
+  const batchSelect = $("student-batch-select");
+  if (batchSelect) batchSelect.value = batch;
   state.selectedGroup = next.section;
   state.selectedSubgroup = next.subsection;
   state.profileSyncStatus = next.rosterVersion ? "Verified current roster" : "Profile saved on this device";
@@ -5412,19 +5443,96 @@ function saveManualProfile() {
   activatePage("today");
 }
 
+function rosterBatchSources() {
+  const configured = state.sourceRegistry?.studentBatchSources;
+  if (configured && typeof configured === "object") {
+    const entries = Object.entries(configured).filter(([, sources]) => Array.isArray(sources) && sources.length);
+    if (entries.length) return Object.fromEntries(entries);
+  }
+  return { "2026": state.sourceRegistry?.studentSectionSources || [] };
+}
+
+function rosterIndexPath(batch) {
+  return batch === "2026" ? "/data/student-roster-index.json" : `/data/student-roster-index-${encodeURIComponent(batch)}.json`;
+}
+
 function currentRosterCacheKey() {
-  const sources = state.sourceRegistry?.studentSectionSources || [];
+  const batches = rosterBatchSources();
   const historySources = state.sourceRegistry?.studentHistorySources || [];
-  return `schema:${ROSTER_SCHEMA_VERSION}|` + ([...sources.map((source) => `current:${source.branch}:${source.url}:${source.contentHash || ""}`), ...historySources.map((source) => `history:${source.branch}:${source.id || ""}:${source.url}:${source.contentHash || ""}`)].sort().join("|") || "fallback-rosters");
+  const current = Object.entries(batches).flatMap(([batch, sources]) => sources.map((source) => `current:${batch}:${source.branch}:${source.url}:${source.contentHash || ""}`));
+  return `schema:${ROSTER_SCHEMA_VERSION}|` + ([...current, ...historySources.map((source) => `history:2026:${source.branch}:${source.id || ""}:${source.url}:${source.contentHash || ""}`)].sort().join("|") || "fallback-rosters");
+}
+
+function rosterIndexUsableForBatch(index, batch) {
+  if (index?.schemaVersion !== ROSTER_SCHEMA_VERSION || !Array.isArray(index.records) || !index.records.length || !Array.isArray(index.sources)) return false;
+  const age = Date.now() - Date.parse(index.generatedAt);
+  if (!Number.isFinite(age) || age < -60000 || age > DIRECTORY_INDEX_MAX_AGE_MS) return false;
+  const current = rosterBatchSources()[batch] || [];
+  const sources = index.sources.map((source) => ({ ...source, batch: source.batch || batch }));
+  if (current.length && (sources.length !== current.length || current.some((source) => !sources.some((saved) => saved.branch === source.branch && saved.url === source.url && saved.contentHash === source.contentHash)))) return false;
+  return SECTION_LIST_BRANCHES.every((branch) => sources.some((source) => source.branch === branch && source.verified && source.count === index.records.filter((record) => (record.batch || batch) === batch && record.branch === branch && record.name && record.section && record.crn).length));
 }
 
 function rosterIndexUsable(index) {
   if (index?.schemaVersion !== ROSTER_SCHEMA_VERSION || !Array.isArray(index.records) || !index.records.length || !Array.isArray(index.sources)) return false;
   const age = Date.now() - Date.parse(index.generatedAt);
   if (!Number.isFinite(age) || age < -60000 || age > DIRECTORY_INDEX_MAX_AGE_MS) return false;
-  const current = state.sourceRegistry?.studentSectionSources || [];
-  if (current.length && (current.length !== index.sources.length || current.some(source => !index.sources.some(saved => saved.branch === source.branch && saved.url === source.url && saved.contentHash === source.contentHash)))) return false;
-  return SECTION_LIST_BRANCHES.every(branch => index.sources.some(source => source.branch === branch && source.verified && source.count === index.records.filter(record => record.branch === branch && record.name && record.section && record.crn).length));
+  const expected = Object.entries(rosterBatchSources()).flatMap(([batch, sources]) => sources.map((source) => ({ ...source, batch })));
+  if (expected.length && (expected.length !== index.sources.length || expected.some((source) => !index.sources.some((saved) => (saved.batch || "2026") === source.batch && saved.branch === source.branch && saved.url === source.url && saved.contentHash === source.contentHash)))) return false;
+  return expected.every((source) => index.sources.some((saved) => (saved.batch || "2026") === source.batch && saved.branch === source.branch && saved.verified && saved.count === index.records.filter((record) => (record.batch || "2026") === source.batch && record.branch === source.branch && record.name && record.section && record.crn).length));
+}
+
+function installRosterIndex(key, index) {
+  const dates = [...new Set(index.sources.map((source) => source.url.match(/(\d{2})[_-](\d{2})[_-](20\d{2})(?:_\d+)?\.pdf/i)?.slice(1).join("-")))].filter(Boolean);
+  const loaded = {
+    key,
+    records: index.records.map((record) => normalizeStudentRecord({ ...record, batch: record.batch || "2026" })),
+    loadedBranches: index.sources.map((source) => `${source.batch || "2026"}:${source.branch}`),
+    unavailableBranches: [],
+    unavailableBatches: [],
+    version: `files dated ${dates.join(", ") || index.generatedAt.slice(0, 10)}`,
+    loadedAt: Date.parse(index.generatedAt) || Date.now(),
+    indexed: true
+  };
+  if (currentRosterCacheKey() !== key) return loadCurrentRosterRecords();
+  state.rosterCache = loaded;
+  try { localStorage.setItem(ROSTER_INDEX_STORAGE_KEY, JSON.stringify(index)); } catch { /* quota or private mode */ }
+  return loaded;
+}
+
+async function loadCurrentRosterRecords(options = {}) {
+  const key = currentRosterCacheKey();
+  if (!options.force && state.rosterCache?.key === key && Date.now() - state.rosterCache.loadedAt < DIRECTORY_INDEX_MAX_AGE_MS) return state.rosterCache;
+  if (rosterLoading?.key === key && (!options.force || rosterLoading.force)) return rosterLoading.promise;
+  const pending = { key, force: Boolean(options.force) };
+  pending.promise = (async () => {
+    if (!options.force) {
+      let index;
+      try { index = JSON.parse(localStorage.getItem(ROSTER_INDEX_STORAGE_KEY) || "null"); } catch { /* optional device cache */ }
+      if (rosterIndexUsable(index)) return installRosterIndex(key, index);
+      const batches = Object.entries(rosterBatchSources());
+      const loadedIndexes = [];
+      for (const [batch] of batches) {
+        try {
+          const batchIndex = await directoryJson(rosterIndexPath(batch));
+          if (rosterIndexUsableForBatch(batchIndex, batch)) loadedIndexes.push({ batch, index: batchIndex });
+        } catch { /* fall back to the live official PDFs below */ }
+      }
+      if (loadedIndexes.length && loadedIndexes.length === batches.length) {
+        const merged = {
+          schemaVersion: ROSTER_SCHEMA_VERSION,
+          generatedAt: new Date(Math.min(...loadedIndexes.map(({ index: batchIndex }) => Date.parse(batchIndex.generatedAt) || Date.now()))).toISOString(),
+          sources: loadedIndexes.flatMap(({ batch, index: batchIndex }) => batchIndex.sources.map((source) => ({ ...source, batch: source.batch || batch }))),
+          records: loadedIndexes.flatMap(({ batch, index: batchIndex }) => batchIndex.records.map((record) => normalizeStudentRecord({ ...record, batch: record.batch || batch })))
+        };
+        return installRosterIndex(key, merged);
+      }
+    }
+    return fetchCurrentRosterRecords();
+  })();
+  rosterLoading = pending;
+  try { return await pending.promise; }
+  finally { if (rosterLoading === pending) rosterLoading = null; }
 }
 
 async function directoryJson(url, timeoutMs = 8000) {
@@ -5442,78 +5550,64 @@ async function directoryJson(url, timeoutMs = 8000) {
   } finally { window.clearTimeout(timer); }
 }
 
-async function loadCurrentRosterRecords(options = {}) {
-  const key = currentRosterCacheKey();
-  if (!options.force && state.rosterCache?.key === key && Date.now() - state.rosterCache.loadedAt < DIRECTORY_INDEX_MAX_AGE_MS) return state.rosterCache;
-  if (rosterLoading?.key === key && (!options.force || rosterLoading.force)) return rosterLoading.promise;
-  const pending = { key, force: Boolean(options.force) };
-  pending.promise = (async () => {
-    if (!options.force) {
-      let index;
-      try { index = JSON.parse(localStorage.getItem(ROSTER_INDEX_STORAGE_KEY) || "null"); } catch { /* optional device cache */ }
-      if (!rosterIndexUsable(index)) {
-        try {
-          index = await directoryJson("/data/student-roster-index.json");
-        } catch { index = null; }
-      }
-      if (rosterIndexUsable(index)) {
-        const dates = [...new Set(index.sources.map(source => source.url.match(/(\d{2})[_-](\d{2})[_-](20\d{2})(?:_\d+)?\.pdf/i)?.slice(1).join("-")))].filter(Boolean);
-        const loaded = { key, records: index.records.map(normalizeStudentRecord), loadedBranches: index.sources.map(source => source.branch), unavailableBranches: [], version: `files dated ${dates.join(", ") || index.generatedAt.slice(0, 10)}`, loadedAt: Date.parse(index.generatedAt), indexed: true };
-        if (currentRosterCacheKey() !== key) return loadCurrentRosterRecords();
-        state.rosterCache = loaded;
-        try { localStorage.setItem(ROSTER_INDEX_STORAGE_KEY, JSON.stringify(index)); } catch { /* quota or private mode */ }
-        return loaded;
-      }
-    }
-    const loaded = await fetchCurrentRosterRecords();
-    return loaded;
-  })();
-  rosterLoading = pending;
-  try { return await pending.promise; }
-  finally { if (rosterLoading === pending) rosterLoading = null; }
-}
-
 async function fetchCurrentRosterRecords() {
   const cacheKey = currentRosterCacheKey();
-  const discoveredBranches = state.sourceRegistry?.studentSectionSources?.map((source) => source.branch).filter(Boolean) || [];
-  const branches = discoveredBranches.length ? discoveredBranches : SECTION_LIST_BRANCHES;
-  const readRoster = async (branch, history = "") => {
+  const batches = rosterBatchSources();
+  const readRoster = async (branch, batch, history = "") => {
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     let timer;
     try {
       const records = await Promise.race([
         (async () => {
-          const response = await fetch(`/api/section-list?branch=${branch}${history ? `&history=${encodeURIComponent(history)}` : ""}`, controller ? { signal: controller.signal } : {});
+          const query = `branch=${encodeURIComponent(branch)}&batch=${encodeURIComponent(batch)}${history ? `&history=${encodeURIComponent(history)}` : ""}`;
+          const response = await fetch(`/api/section-list?${query}`, controller ? { signal: controller.signal } : {});
           if (!response.ok) throw new Error("Roster unavailable");
-          return parseStudentSectionText(await pdfTextFromResponse(response), branch);
+          return parseStudentSectionText(await pdfTextFromResponse(response), branch, batch);
         })(),
         new Promise((_, reject) => { timer = window.setTimeout(() => { controller?.abort(); reject(new Error("Roster request timed out")); }, 45000); })
       ]);
-      return { branch, records, error: "" };
-    } catch (error) { return { branch, records: [], error: error.message || "Roster unavailable" }; }
+      return { branch, batch, records, error: "" };
+    } catch (error) { return { branch, batch, records: [], error: error.message || "Roster unavailable" }; }
     finally { window.clearTimeout?.(timer); }
   };
-  const rosterLoads = await Promise.all(branches.map(branch => readRoster(branch)));
-  const successfulLoads = rosterLoads.filter((entry) => entry.records.length);
+  const currentLoads = (await Promise.all(Object.entries(batches).map(([batch, sources]) => {
+    const branches = sources.map((source) => source.branch).filter(Boolean);
+    const list = branches.length ? branches : SECTION_LIST_BRANCHES;
+    return Promise.all(list.map((branch) => readRoster(branch, batch)));
+  }))).flat();
+  const successfulLoads = currentLoads.filter((entry) => entry.records.length);
   if (!successfulLoads.length) throw new Error("Current official student rosters could not be read.");
-  const historicalLoads = await Promise.all(branches.flatMap(branch => rosterHistorySourcesForBranch(branch).map(source => readRoster(branch, source.id || "1"))));
+  // Only the 2026 cohort has a verified historical serial trail; older batches
+  // keep their own current rows without inheriting another cohort's history.
+  const historyBranches = [...new Set(successfulLoads.filter((entry) => entry.batch === "2026").map((entry) => entry.branch))];
+  const historicalLoads = (await Promise.all(historyBranches.flatMap((branch) => rosterHistorySourcesForBranch(branch).map((source) => readRoster(branch, "2026", source.id || "1"))))).flat();
   const historyByBranch = new Map();
   historicalLoads.forEach((entry) => historyByBranch.set(entry.branch, [...(historyByBranch.get(entry.branch) || []), ...entry.records]));
-  const sourceDates = (state.sourceRegistry?.studentSectionSources || []).map((source) => source.url?.match(/(\d{2})[_-](\d{2})[_-](20\d{2})(?:_\d+)?\.pdf/i)?.slice(1).join("-"));
+  const sourceDates = Object.values(batches).flat().map((source) => source.url?.match(/(\d{2})[_-](\d{2})[_-](20\d{2})(?:_\d+)?\.pdf/i)?.slice(1).join("-"));
   const rosterVersion = sourceDates.length && sourceDates.every(Boolean) ? `files dated ${[...new Set(sourceDates)].join(", ")}` : "current official roster files";
   const loaded = {
     key: cacheKey,
-    records: successfulLoads.flatMap((entry) => mergeStudentRosterHistory(entry.records, historyByBranch.get(entry.branch) || [])),
-    loadedBranches: successfulLoads.map((entry) => entry.branch),
-    unavailableBranches: rosterLoads.filter((entry) => !entry.records.length).map((entry) => entry.branch),
+    records: successfulLoads.flatMap((entry) => entry.batch === "2026"
+      ? mergeStudentRosterHistory(entry.records, historyByBranch.get(entry.branch) || [])
+      : entry.records),
+    loadedBranches: successfulLoads.map((entry) => `${entry.batch}:${entry.branch}`),
+    unavailableBranches: currentLoads.filter((entry) => !entry.records.length).map((entry) => entry.branch),
+    unavailableBatches: Object.keys(batches).filter((batch) => !successfulLoads.some((entry) => entry.batch === batch)),
     version: rosterVersion,
     loadedAt: Date.now()
   };
   if (currentRosterCacheKey() !== cacheKey) return loadCurrentRosterRecords();
   state.rosterCache = loaded;
-  const sources = state.sourceRegistry?.studentSectionSources || [];
-  if (!loaded.unavailableBranches.length && sources.length === SECTION_LIST_BRANCHES.length) {
-    try { localStorage.setItem(ROSTER_INDEX_STORAGE_KEY, JSON.stringify({ schemaVersion: ROSTER_SCHEMA_VERSION, generatedAt: new Date().toISOString(), sources: sources.map(source => ({ ...source, count: loaded.records.filter(record => record.branch === source.branch).length })), records: loaded.records })); } catch { /* optional cache */ }
+  const expected = Object.entries(batches).flatMap(([batch, sources]) => sources.map((source) => ({ ...source, batch })));
+  if (!loaded.unavailableBranches.length && expected.length) {
+    try {
+      localStorage.setItem(ROSTER_INDEX_STORAGE_KEY, JSON.stringify({
+        schemaVersion: ROSTER_SCHEMA_VERSION,
+        generatedAt: new Date().toISOString(),
+        sources: expected.map((source) => ({ ...source, count: loaded.records.filter((record) => record.batch === source.batch && record.branch === source.branch).length })),
+        records: loaded.records
+      }));
+    } catch { /* optional cache */ }
   }
   return loaded;
 }
@@ -5543,8 +5637,8 @@ function scopedRosterListAnswer(request, rosterData) {
   if (!records.length || unavailable.includes(branch)) return `<p>The current ${escapeHtml(branch || request.code)} roster is unavailable. Refresh the official roster before listing students.</p>`;
   const matches = records.filter((record) => String(record[request.type] || "").toUpperCase() === request.code);
   if (!matches.length) return `<p>No ${escapeHtml(request.code)} students could be verified in the loaded roster.</p>`;
-  const names = matches.slice(0, 20).map((record) => `<li>${escapeHtml(record.name)} · ${escapeHtml(record.subsection || record.section)}</li>`).join("");
-  return `<p><strong>${escapeHtml(request.code)}: ${matches.length} students in the loaded official roster</strong></p><ul>${names}</ul>${matches.length > 20 ? `<p>Showing the first 20 names. Search a name to narrow the list.</p>` : ""}<p class="answer-source">Current official GNDEC ${escapeHtml(branch || "branch")} roster. Only names and timetable sections are shown.</p>`;
+  const names = matches.slice(0, 20).map((record) => `<li>${escapeHtml(record.name)} · ${escapeHtml(record.subsection || record.section)}${record.batch ? ` · ${escapeHtml(record.batch)} batch` : ""}</li>`).join("");
+  return `<p><strong>${escapeHtml(request.code)}: ${matches.length} students in the loaded official roster</strong></p><ul>${names}</ul>${matches.length > 20 ? `<p>Showing the first 20 names. Search a name to narrow the list.</p>` : ""}<p class="answer-source">Current official GNDEC ${escapeHtml(branch || "branch")} roster (2025 and 2026 batches when published). Only names and timetable sections are shown.</p>`;
 }
 
 function rosterCountAnswer(question = "", rosterData = {}) {
@@ -5589,9 +5683,14 @@ async function lookupStudent(name, refreshed = false) {
   try { rosterData = await loadCurrentRosterRecords({ force: refreshed }); }
   catch (error) { throw new Error(`${error.message || "Current official student rosters could not be read."} Your saved profile was not changed.`); }
   const allStudents = rosterData.records;
-  const identifierMatches = looksLikeIdentifier ? resolveStudentIdentifierMatches(allStudents, identifierQuery, state.student) : [];
-  const exactNameMatches = allStudents.filter((record) => normalizeStudentName(record.name) === query);
-  const ranked = query.length >= 3 ? allStudents.map((record) => ({ record, score: studentMatchScore(record, query) })).filter((match) => match.score > 0).sort((a, b) => b.score - a.score || a.record.name.localeCompare(b.record.name)).map((match) => match.record) : [];
+  const selectedBatch = cleanText($("student-batch-select")?.value || state.studentBatch || "");
+  const batchesInRoster = new Set(allStudents.map((record) => record.batch).filter(Boolean));
+  const scopedStudents = selectedBatch && batchesInRoster.size > 1
+    ? allStudents.filter((record) => (record.batch || "2026") === selectedBatch)
+    : allStudents;
+  const identifierMatches = looksLikeIdentifier ? resolveStudentIdentifierMatches(scopedStudents, identifierQuery, state.student) : [];
+  const exactNameMatches = scopedStudents.filter((record) => normalizeStudentName(record.name) === query);
+  const ranked = query.length >= 3 ? scopedStudents.map((record) => ({ record, score: studentMatchScore(record, query) })).filter((match) => match.score > 0).sort((a, b) => b.score - a.score || a.record.name.localeCompare(b.record.name)).map((match) => match.record) : [];
   const matches = (identifierMatches.length ? identifierMatches : exactNameMatches.length ? exactNameMatches : ranked).slice(0, 8);
   if (!matches.length && rosterData.indexed && !refreshed) return lookupStudent(name, true);
   const automaticallySafe = identifierMatches.length === 1 || exactNameMatches.length === 1;
@@ -5601,7 +5700,7 @@ async function lookupStudent(name, refreshed = false) {
     return;
   }
   const partialWarning = rosterData.unavailableBranches.length ? ` ${rosterData.unavailableBranches.length} branch roster${rosterData.unavailableBranches.length === 1 ? " was" : "s were"} unavailable.` : "";
-  const label = identifierMatches.length ? `Identifier matches — choose using section and mentor.${partialWarning}` : exactNameMatches.length ? `More than one exact name match — choose using CRN, section, and mentor.${partialWarning}` : matches.length ? `Closest official name matches — choose carefully.${partialWarning}` : `No current official student match was found. Check the value or try another verified identifier.${partialWarning}`;
+  const label = identifierMatches.length ? `Identifier matches — choose using section and mentor.${partialWarning}` : exactNameMatches.length ? `More than one exact name match — choose using CRN, section, and mentor.${partialWarning}` : matches.length ? `Closest official name matches — choose carefully.${partialWarning}` : `No match in the ${selectedBatch || "selected"} batch. Switch the admission batch or check the value.${partialWarning}`;
   renderStudentMatches(matches, label);
 }
 
@@ -5836,6 +5935,13 @@ function freeRoomsPanelState() {
   return { schedule, rooms };
 }
 
+function freeRoomNextStart(schedule, room, day, time) {
+  const upcoming = (Array.isArray(schedule) ? schedule : [])
+    .filter((row) => row.group === room && row.day === day && row.start > time)
+    .sort((left, right) => left.start - right.start);
+  return upcoming[0]?.start ?? null;
+}
+
 function renderFreeRoomsPanel() {
   const status = $("free-rooms-status");
   const result = $("free-rooms-result");
@@ -5858,9 +5964,12 @@ function renderFreeRoomsPanel() {
   const grouped = globalThis.CompassFreeRooms?.groupRooms(free);
   const groups = (grouped?.groups || []).filter((group) => !zone || group.label === zone);
   const shown = groups.reduce((sum, group) => sum + group.count, 0);
-  status.textContent = `${day} · ${humanTime(time)} · ${shown} of ${rooms.length} published rooms have no class listed`;
+  status.textContent = `${day} · ${humanTime(time)} · ${shown} of ${rooms.length} published rooms free · all departments and years`;
   result.innerHTML = groups.length
-    ? groups.map((group) => `<div class="free-rooms-group"><h3>${escapeHtml(group.label)} <span>${group.count}</span></h3><p>${group.rooms.map(escapeHtml).join(", ")}</p></div>`).join("")
+    ? groups.map((group) => `<div class="free-rooms-group"><h3>${escapeHtml(group.label)} <span>${group.count}</span></h3><ul class="free-rooms-list">${group.rooms.map((room) => {
+      const next = freeRoomNextStart(schedule, room, day, time);
+      return `<li><strong>${escapeHtml(room)}</strong><small>${next === null ? "no class listed later today" : `free until ${escapeHtml(humanTime(next))}`}</small></li>`;
+    }).join("")}</ul></div>`).join("")
     : "<p class=\"empty-list\">No published room in that area is free at this time.</p>";
 }
 
@@ -5886,6 +5995,15 @@ function wireFreeRoomsPanel() {
   }
   ["free-rooms-day", "free-rooms-time", "free-rooms-zone"].forEach((id) => {
     $(id)?.addEventListener("change", () => renderFreeRoomsPanel());
+  });
+  $("free-rooms-now")?.addEventListener("click", () => {
+    const now = getIndiaNow();
+    if (daySelect && now.day && [...daySelect.options].some((option) => option.textContent === now.day)) daySelect.value = now.day;
+    if (timeSelect) {
+      const nearest = Math.min(17 * 60 + 30, Math.max(8 * 60, Math.round(now.minutes / 30) * 30));
+      timeSelect.value = String(nearest);
+    }
+    renderFreeRoomsPanel();
   });
   const load = async (attempt = 0) => {
     try {
@@ -5927,7 +6045,10 @@ function roomAvailabilityAnswer(question) {
   // published room is listed; nothing is assigned to a department here.
   const grouped = globalThis.CompassFreeRooms?.groupRooms(result.rooms);
   const body = grouped?.total
-    ? grouped.groups.map((group) => `<p><strong>${escapeHtml(group.label)} \u00b7 ${group.count}</strong><br />${group.rooms.map(escapeHtml).join(", ")}</p>`).join("")
+    ? grouped.groups.map((group) => `<p><strong>${escapeHtml(group.label)} \u00b7 ${group.count}</strong><br />${group.rooms.map((room) => {
+      const next = freeRoomNextStart(stored.schedule, room, day, time);
+      return `${escapeHtml(room)}${next === null ? "" : ` <small>(free until ${escapeHtml(humanTime(next))})</small>`}`;
+    }).join(", ")}</p>`).join("")
     : "<p>All matching rooms have a class listed at this time.</p>";
   return `<p><strong>${escapeHtml(label)}: ${result.rooms.length} of ${result.checked} published rooms have no class listed</strong></p>${body}<p class="answer-source">Checked every published room label in the official college-wide room timetable, across all branches and years. This does not confirm access, permission, unscheduled bookings or date-specific changes. Block names come from the published room codes.</p>`;
 }
@@ -6730,8 +6851,9 @@ async function synchronizeStudentProfile() {
   if (state.profileSyncing || !hasStudentProfile() || !state.sourceRegistry) return;
   const profile = activeStudentProfile();
   const branch = branchCodeForProfile(profile);
-  const source = rosterSourceForBranch(branch);
-  const rosterRevision = rosterRevisionForBranch(branch);
+  const batch = cleanText(profile.batch || state.studentBatch || "2026");
+  const source = rosterSourceForBranch(branch, batch);
+  const rosterRevision = rosterRevisionForBranch(branch, batch);
   const stableIdentifiers = [profile.crn, profile.registrationNo].map(normalizeStudentIdentifier).filter(Boolean);
   if (!branch || !source || !stableIdentifiers.length) {
     state.profileSyncStatus = profile.rosterVersion ? "Verified roster" : "Manual profile · search the current roster to verify identifiers";
@@ -6747,17 +6869,17 @@ async function synchronizeStudentProfile() {
   state.profileSyncStatus = "Checking this profile against the current official roster…";
   renderProfileSummary();
   try {
-    const response = await fetch(`/api/section-list?branch=${branch}`, { cache: "no-cache" });
+    const response = await fetch(`/api/section-list?branch=${branch}&batch=${encodeURIComponent(batch)}`, { cache: "no-cache" });
     if (!response.ok) throw new Error("Current branch roster is unavailable");
-    let records = parseStudentSectionText(await pdfTextFromResponse(response), branch);
+    let records = parseStudentSectionText(await pdfTextFromResponse(response), branch, batch);
     if (!records.length) throw new Error("Current branch roster format could not be verified");
-    const historicalRecords = (await Promise.all(rosterHistorySourcesForBranch(branch).map(async (historySource) => {
+    const historicalRecords = batch === "2026" ? (await Promise.all(rosterHistorySourcesForBranch(branch).map(async (historySource) => {
       try {
-        const historyResponse = await fetch(`/api/section-list?branch=${branch}&history=${encodeURIComponent(historySource.id || "1")}`, { cache: "no-cache" });
+        const historyResponse = await fetch(`/api/section-list?branch=${branch}&batch=2026&history=${encodeURIComponent(historySource.id || "1")}`, { cache: "no-cache" });
         if (!historyResponse.ok) return [];
-        return parseStudentSectionText(await pdfTextFromResponse(historyResponse), branch);
+        return parseStudentSectionText(await pdfTextFromResponse(historyResponse), branch, "2026");
       } catch { return []; }
-    }))).flat();
+    }))).flat() : [];
     records = mergeStudentRosterHistory(records, historicalRecords);
     const matches = records.filter((record) => stableIdentifiers.some((identifier) => studentIdentifierValues(record).includes(identifier)));
     if (matches.length !== 1) {
@@ -6844,7 +6966,7 @@ async function synchronizeOfficialData() {
 }
 
 function activatePage(page, updateHash = true) {
-  if (!["today", "chat", "timetable", "profile", "settings"].includes(page)) page = "today";
+  if (!["today", "chat", "timetable", "campus", "profile", "settings"].includes(page)) page = "today";
   const focusedPage = document.activeElement?.closest?.(".page");
   if (focusedPage && focusedPage.dataset.page !== page) document.activeElement.blur();
   document.documentElement.classList.toggle("chat-active", page === "chat");
@@ -6870,9 +6992,13 @@ function activatePage(page, updateHash = true) {
   }
   if (updateHash && location.hash !== `#${page}`) history.pushState(null, "", `#${page}`);
   localStorage.setItem("gndec-compass-last-page", page);
-  const pageTitles = { today: "Today", chat: "Ask Compass", timetable: "Timetable", profile: "Profile", settings: "Settings" };
+  const pageTitles = { today: "Today", chat: "Ask Compass", timetable: "Timetable", campus: "Campus", profile: "Profile", settings: "Settings" };
   document.title = `${pageTitles[page] || "Today"} | GNDEC Compass`;
-  if (page === "timetable") renderWeek();
+  if (page === "timetable") {
+    renderWeek();
+    globalThis.CompassEseDatesheet?.show();
+  }
+  if (page === "campus") globalThis.CompassCampus?.show();
   if (page === "settings") renderSettingsPage();
   if (page === "chat") { const windowEl = $("chat-window"); if (windowEl) windowEl.scrollTop = windowEl.scrollHeight; }
   syncMobileViewport();
@@ -7044,6 +7170,11 @@ function initEvents() {
     event.target.value = "";
   });
   $("student-lookup-form").addEventListener("submit", async (event) => { event.preventDefault(); const name = $("student-name-input").value; recordStudentSearch(name); try { await lookupStudent(name); } catch (error) { $("student-lookup-result").textContent = error.message || "Student lookup could not be completed."; } });
+  $("student-batch-select")?.addEventListener("change", (event) => {
+    const batch = cleanText(event.target.value || "2026");
+    state.studentBatch = batch;
+    $("student-lookup-result").textContent = `Searching ${batch} batch roster. Enter a name or identifier to continue.`;
+  });
   $("save-manual-profile")?.addEventListener("click", saveManualProfile);
   $("day-nav-prev")?.addEventListener("click", () => {
     if (state.userDayOffset === null) {
@@ -7544,10 +7675,12 @@ registerOfflineShell();
 restoreChat();
 globalThis.CompassExamDesk?.init({context: examDeviceContext, ask(question) { activatePage("chat"); const input = $("question-input"); input.value = question; $("question-form").dispatchEvent(new Event("submit", {cancelable:true})); }});
 globalThis.CompassExamAdmin?.init({context:examDeviceContext});
+globalThis.CompassEseDatesheet?.init();
+globalThis.CompassCampus?.init();
 renderStudentHistory();
 const initialHashPage = location.hash.slice(1);
 const savedPage = localStorage.getItem("gndec-compass-last-page") || "";
-const validPages = ["today", "chat", "timetable", "profile", "settings"];
+const validPages = ["today", "chat", "timetable", "campus", "profile", "settings"];
 let pageToActivate = validPages.includes(initialHashPage) ? initialHashPage : null;
 if (!pageToActivate) {
   pageToActivate = validPages.includes(savedPage) ? savedPage : (hasStudentProfile() ? "today" : "profile");
@@ -7575,7 +7708,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) sync
 window.addEventListener("resize", syncMobileNavigationAccessibility);
 window.addEventListener("hashchange", () => {
   const page = location.hash.slice(1);
-  if (["today", "chat", "timetable", "profile", "settings"].includes(page)) activatePage(page, false);
+  if (["today", "chat", "timetable", "campus", "profile", "settings"].includes(page)) activatePage(page, false);
 });
 // Keep long-open tabs current without interrupting students who are away.
 window.setInterval(() => { if (!document.hidden) synchronizeOfficialData(); }, 15 * 60 * 1000);

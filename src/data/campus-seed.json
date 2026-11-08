@@ -1,0 +1,1257 @@
+{
+  "title": "GNDEC campus directory",
+  "source": {
+    "noticeboard": "https://erp.gndec.ac.in/noticeboard",
+    "facultyDirectory": "https://gndec.ac.in/faculty/",
+    "provenance": "Department names, Heads of Department, contact details, notices, and syllabus documents are read from public GNDEC pages. A missing value stays missing; Compass does not infer an appointment or a document."
+  },
+  "checkedAt": "2026-11-07T13:47:37.212Z",
+  "departments": [
+    {
+      "id": "ce",
+      "name": "Civil Engineering",
+      "short": "CE",
+      "homepage": "https://ce.gndec.ac.in/",
+      "academics": [
+        "https://ce.gndec.ac.in/?q=node/2"
+      ],
+      "hod": {
+        "name": "Dr. Harvinder Singh",
+        "email": "civil@gndec.ac.in",
+        "phone": "0161-5064536",
+        "sourceUrl": "https://ce.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:24.934Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "cse",
+      "name": "Computer Science & Engineering",
+      "short": "CSE",
+      "homepage": "https://cse.gndec.ac.in/",
+      "academics": [
+        "https://cse.gndec.ac.in/?q=node/14",
+        "https://cse.gndec.ac.in/?q=node/2"
+      ],
+      "hod": {
+        "name": "Dr. Kiran Jyoti",
+        "email": "cse@gndec.ac.in",
+        "phone": "0161-5064551",
+        "sourceUrl": "https://cse.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.111Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "ece",
+      "name": "Electronics & Communication Engineering",
+      "short": "ECE",
+      "homepage": "https://ece.gndec.ac.in/",
+      "academics": [
+        "https://ece.gndec.ac.in/?q=node/2",
+        "https://ece.gndec.ac.in/?q=node/9"
+      ],
+      "hod": {
+        "name": "Dr. Munish Rattan",
+        "email": "rattanmunish@gndec.ac.in",
+        "phone": "",
+        "sourceUrl": "https://ece.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.135Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "ee",
+      "name": "Electrical Engineering",
+      "short": "EE",
+      "homepage": "https://ee.gndec.ac.in/",
+      "academics": [
+        "https://ee.gndec.ac.in/?q=node/2"
+      ],
+      "hod": {
+        "name": "Dr. Kanwardeep Singh",
+        "email": "kds@gndec.ac.in",
+        "phone": "",
+        "sourceUrl": "https://ee.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:24.951Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "it",
+      "name": "Information Technology",
+      "short": "IT",
+      "homepage": "https://it.gndec.ac.in/",
+      "academics": [
+        "https://it.gndec.ac.in/?q=node/2"
+      ],
+      "hod": {
+        "name": "Dr. Kulvinder Singh Mann",
+        "email": "it@gndec.ac.in",
+        "phone": "",
+        "sourceUrl": "https://it.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.310Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "me",
+      "name": "Mechanical & Production Engineering",
+      "short": "ME",
+      "homepage": "https://me.gndec.ac.in/",
+      "academics": [
+        "https://me.gndec.ac.in/?q=node/2",
+        "https://me.gndec.ac.in/?q=node/21"
+      ],
+      "hod": {
+        "name": "Dr. Harmeet Singh",
+        "email": "hms@gndec.ac.in",
+        "phone": "",
+        "sourceUrl": "https://me.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.004Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "mba",
+      "name": "Business Administration",
+      "short": "MBA",
+      "homepage": "https://mba.gndec.ac.in/",
+      "academics": [
+        "https://mba.gndec.ac.in/?q=node/11",
+        "https://mba.gndec.ac.in/?q=node/2"
+      ],
+      "hod": {
+        "name": "Dr.Amanjot Kaur Gill",
+        "email": "mba@gndec.ac.in",
+        "phone": "",
+        "sourceUrl": "https://mba.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.064Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "mca",
+      "name": "Computer Applications",
+      "short": "MCA",
+      "homepage": "https://mca.gndec.ac.in/",
+      "academics": [
+        "https://mca.gndec.ac.in/?q=node/12",
+        "https://mca.gndec.ac.in/?q=node/2"
+      ],
+      "hod": {
+        "name": "Dr. Jasbir Singh Saini",
+        "email": "mca@gndec.ac.in",
+        "phone": "",
+        "sourceUrl": "https://mca.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.256Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "applied",
+      "name": "Applied Sciences",
+      "short": "AS",
+      "homepage": "https://appsc.gndec.ac.in/",
+      "academics": [
+        "https://appsc.gndec.ac.in/academics",
+        "https://appsc.gndec.ac.in/node/27"
+      ],
+      "hod": {
+        "name": "Dr. Harpreet Kaur Grewal",
+        "email": "applied@gndec.ac.in",
+        "phone": "0161-5064531",
+        "sourceUrl": "https://appsc.gndec.ac.in/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.182Z",
+      "syllabusErrors": []
+    },
+    {
+      "id": "architecture",
+      "name": "School of Architecture",
+      "short": "ARCH",
+      "homepage": "https://architecture.gndec.ac.in/website1/",
+      "academics": [
+        "https://architecture.gndec.ac.in/website1/node/4"
+      ],
+      "contact": "https://architecture.gndec.ac.in/website1/node/5",
+      "facultyDirectory": "https://gndec.ac.in/faculty/?deptt=99",
+      "hod": {
+        "name": "AR.AKANKSHA SHARMA",
+        "email": "hod_arch@gndec.ac.in",
+        "phone": "0161-2502700",
+        "sourceUrl": "https://architecture.gndec.ac.in/website1/",
+        "verified": true
+      },
+      "error": "",
+      "checkedAt": "2026-11-07T13:47:25.197Z",
+      "syllabusErrors": []
+    }
+  ],
+  "notices": [
+    {
+      "id": "tentative-date-sheet-for-regular-end-semester-examinations-november-2026",
+      "title": "Tentative Date Sheet for Regular End Semester Examinations – November 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/tentative-date-sheet-for-end-semester-examinations-%E2%80%93-november-2026",
+      "author": "coe_office",
+      "publishedAt": "2026-11-06",
+      "category": "Examination",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "reminder-pending-original-documents-admissions-2026",
+      "title": "Reminder Pending Original Documents Admissions 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/reminder-pending-original-documents-admissions-2026",
+      "author": "administrator",
+      "publishedAt": "2026-10-23",
+      "category": "Admissions",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "readmission-notice-13-30-09-26-neelam-kumari",
+      "title": "Readmission_Notice 13_30.09.26, Neelam Kumari",
+      "url": "https://erp.gndec.ac.in/noticeboard/readmission-notice-13-300926-neelam-kumari",
+      "author": "administrator",
+      "publishedAt": "2026-09-30",
+      "category": "Admissions",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "id-card-reminder-notice-28-9-26",
+      "title": "ID Card Reminder Notice 28.9.26",
+      "url": "https://erp.gndec.ac.in/noticeboard/id-card-reminder-notice-28926",
+      "author": "administrator",
+      "publishedAt": "2026-09-28",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "original-documents-uploading-reminder-i-2026",
+      "title": "Original Documents Uploading Reminder I 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/original-documents-collection-reminder-i-2026",
+      "author": "administrator",
+      "publishedAt": "2026-09-22",
+      "category": "Admissions",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "id-cards-warning-notice-2026",
+      "title": "ID Cards Warning Notice 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/id-cards-warning-notice-2026",
+      "author": "administrator",
+      "publishedAt": "2026-09-16",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "final-id-card-notice-pendancy-list-2026",
+      "title": "Final ID Card Notice & Pendancy List 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/final-id-card-notice-pendancy-list-2026",
+      "author": "administrator",
+      "publishedAt": "2026-09-10",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "revised-notice-for-students-regarding-pms-scholarship-2026-27",
+      "title": "Revised Notice for Students regarding PMS Scholarship 2026-27",
+      "url": "https://erp.gndec.ac.in/noticeboard/revised-notice-for-students-regarding-pms-scholarship-2026-27",
+      "author": "administrator",
+      "publishedAt": "2026-09-09",
+      "category": "Admissions",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "venue-and-timing-of-makeup-examination-may-2026",
+      "title": "Venue and Timing of Makeup Examination May-2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/venue-and-timing-of-makeup-examination-may-2026",
+      "author": "coe_office",
+      "publishedAt": "2026-09-09",
+      "category": "Examination",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "final-date-sheet-for-makeup-examinations-may-2026",
+      "title": "Final date sheet for Makeup Examinations May -2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/final-date-sheet-for-makeup-examinations-may-2026",
+      "author": "coe_office",
+      "publishedAt": "2026-09-08",
+      "category": "Examination",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "examination-form-filling-process-of-makeup-examination-may-2026",
+      "title": "Examination form filling process of Makeup Examination May-2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/examination-form-filling-process-of-makeup-examination-may-2026",
+      "author": "coe_office",
+      "publishedAt": "2026-09-02",
+      "category": "Examination",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "re-opening-of-online-registration-process-for-the-course-s-detention-july-dec-20",
+      "title": "RE-OPENING OF ONLINE REGISTRATION PROCESS FOR THE COURSE(S) DETENTION (JULY-DEC, 2026)",
+      "url": "https://erp.gndec.ac.in/noticeboard/re-opening-of-online-registration-process-for-the-courses-detention-july-dec-2026",
+      "author": "administrator",
+      "publishedAt": "2026-09-02",
+      "category": "General",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "schedule-for-end-semester-makeup-examination-may-2026",
+      "title": "Schedule for End Semester Makeup Examination May-2026.",
+      "url": "https://erp.gndec.ac.in/noticeboard/schedule-for-end-semester-makeup-examination-may-2026",
+      "author": "coe_office",
+      "publishedAt": "2026-09-02",
+      "category": "Examination",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "original-documents-collection-notice-for-newly-admitted-ug-pg-students-in-2026",
+      "title": "Original Documents Collection Notice for Newly Admitted UG/PG Students in 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/original-documents-collection-notice-for-newly-admitted-ug-pg-students-in-2026",
+      "author": "administrator",
+      "publishedAt": "2026-08-25",
+      "category": "Admissions",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "id-cards-final-notice-2026",
+      "title": "ID Cards Final Notice 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/id-cards-final-notice-2026",
+      "author": "administrator",
+      "publishedAt": "2026-08-18",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "original-documents-uploading-notice-2026",
+      "title": "Original Documents Uploading Notice 2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/original-documents-uploading-notice-2026",
+      "author": "administrator",
+      "publishedAt": "2026-08-18",
+      "category": "Admissions",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "readmission-notice-12-04-08-26",
+      "title": "Readmission_Notice 12_04.08.26",
+      "url": "https://erp.gndec.ac.in/noticeboard/readmission-notice-12-040826",
+      "author": "administrator",
+      "publishedAt": "2026-08-04",
+      "category": "Admissions",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "six-months-progress-presentation-of-ms-ritu-phd-regd-no-1903009-urn-1935251",
+      "title": "Six Months Progress Presentation of Ms. Ritu, PhD. Regd. No.1903009, URN 1935251",
+      "url": "https://erp.gndec.ac.in/noticeboard/six-months-progress-presentation-of-ms-ritu-phd-regd-no1903009-urn-1935251",
+      "author": "administrator",
+      "publishedAt": "2026-07-28",
+      "category": "General",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "struck-off-notice-43-25-07-26-pdf",
+      "title": "Struck_off_Notice_43_25.07.26.pdf",
+      "url": "https://erp.gndec.ac.in/noticeboard/struck-off-notice-43-250726pdf",
+      "author": "administrator",
+      "publishedAt": "2026-07-28",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "notice-regarding-classes-of-odd-semester",
+      "title": "Notice regarding classes of Odd Semester",
+      "url": "https://erp.gndec.ac.in/noticeboard/notice-regarding-classes-of-odd-semester",
+      "author": "administrator",
+      "publishedAt": "2026-07-23",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    }
+  ],
+  "syllabus": [
+    {
+      "id": "ce-b-tech-batch-2017-onwards",
+      "label": "B.Tech (Batch 2017 & Onwards)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Study%20scheme%20and%20CO%20of%20UG%202017_Jan_2019.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-b-tech-batch-2014-onwards",
+      "label": "B.Tech (Batch 2014 & Onwards)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Study%20scheme%20and%20CO%20of%20UG%202014_2_1.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-structural-engineering-batch-2019-onward",
+      "label": "M.Tech Structural Engineering (Batch 2019 & Onward)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Updated%20by%20HVS%20MTech%20Scheme%20%26%20Syllabus%20STRUCTURE%202019_17_04_2020.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-geotechnical-engineering-and-sm-fe-batch-2019-onward",
+      "label": "M.Tech Geotechnical Engineering and SM&FE (Batch 2019 & Onward)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/MTech%20Scheme%20%26%20Syllabus%20GEOTECH%202019_17_04_2020_0.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-environmental-science-engineering-batch-2019-onward",
+      "label": "M.Tech Environmental Science & Engineering (Batch 2019 & Onward)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/MTech%20Scheme%20%26%20Syllabus%20ENV%202019_17_04_2020.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-structural-engineering-batch-2016-onward",
+      "label": "M.Tech Structural Engineering (Batch 2016 & Onward)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Study%20scheme%20and%20syllabus%20STR%202016%20BOS-VI_1.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-geotechnical-engineering-and-sm-fe-batch-2016-onward",
+      "label": "M.Tech Geotechnical Engineering and SM&FE (Batch 2016 & Onward)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Study%20scheme%20and%20syllabus%20GEO%202016%20BOS-VIII_22_7_2018.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-environmental-science-engineering-batch-2016-onward",
+      "label": "M.Tech Environmental Science & Engineering (Batch 2016 & Onward)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Study%20scheme%20and%20syllabus%20ENV%202016%20BOS-VI_0.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ece-study-scheme-for-b-tech-ece-for-3rd-and-4th-sem-batch-2024-onwards",
+      "label": "*Study Scheme for B.Tech (ECE) for 3rd and 4th Sem (batch 2024 onwards) *",
+      "url": "https://ece.gndec.ac.in/sites/default/files/scheme%20%282024%293rd%20and%204th%20sem.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-syllabus-for-3rd-semester",
+      "label": "Syllabus for 3rd semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Final%203rd%20sem%20syllabus.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-syllabus-for-4th-semester",
+      "label": "Syllabus for 4th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Final%204th%20sem%20syllabus.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-study-scheme-for-b-tech-ece-for-5th-and-6th-sem-batch-2024-onwards",
+      "label": "*Study Scheme for B.Tech (ECE) for 5th and 6th Sem (batch 2024 onwards) *",
+      "url": "https://ece.gndec.ac.in/sites/default/files/scheme_2024%20%285-6%20th%20semester%29.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-syllabus-for-5th-semester",
+      "label": "Syllabus for 5th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/05th_Sem%20syllabus%2C%20BTech%202024%20scheme.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-syllabus-for-6th-semester",
+      "label": "Syllabus for 6th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/6th%20sem%20syllebus%2C%20BTech%202024%20scheme.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-m-tech-study-scheme-for-2019-admission-batch-onwards",
+      "label": "*M.Tech. Study scheme for 2019 Admission Batch onwards *",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Course%20Scheme%20-%20M.Tech_.%20ECE%20%281%29.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-m-tech-syllabus-of-1st-and-2nd-semester",
+      "label": "M.Tech. syllabus of 1st and 2nd Semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Syllabus%20-%20M.Tech_.%20ECE.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-m-tech-syllabus-of-3rd-semester",
+      "label": "M.Tech. syllabus of 3rd Semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/updated%20M.Tech_.%20Syllabus%20-%2005.11.2020.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-study-scheme-for-minor-specialization-in-b-tech-ece",
+      "label": "*Study Scheme for Minor Specialization in B.Tech (ECE) *",
+      "url": "https://ece.gndec.ac.in/sites/default/files/study_scheme_minor.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-syllabus-of-minor-specialization-in-b-tech-ece",
+      "label": "Syllabus of Minor Specialization in B.Tech (ECE)",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Minor_syllabus.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-syllabus-scheme-for-b-tech-electronics-and-communication-engineering-batch-2",
+      "label": "*Syllabus Scheme for B. Tech.–Electronics and Communication Engineering (Batch 2018 onwards) *",
+      "url": "https://ece.gndec.ac.in/sites/default/files/2018%20-%20B.Tech_.%20Scheme.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-syllabus-of-3rd-4th-semester",
+      "label": "B.Tech. Syllabus of 3rd & 4th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/syllabus%202018%20scheme.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-syllabus-of-5th-semester",
+      "label": "B.Tech. Syllabus of 5th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/syllabus_5th%20sem_2018.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-syllabus-of-6th-7th-8th-semester",
+      "label": "B.Tech. Syllabus of 6th, 7th & 8th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/2018%20-%20B.Tech%206th%20%2C7th%2C%20and%208th%20Sem%20Syllabus%20%28Updated%29%20%281%29.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-study-scheme-for-2017-admission-batch",
+      "label": "*B.Tech. Study Scheme for 2017 Admission Batch*",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Final%20B.Tech%20Study%20Scheme%202017%20admission%20Batch.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-3rd-semester-syllabus",
+      "label": "B.Tech. 3rd Semester syllabus",
+      "url": "https://ece.gndec.ac.in/sites/default/files/B.Tech%203rd%20Sem%20syllabus%20%281%29.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-4th-5th-semester-syllabus",
+      "label": "B.Tech. 4th & 5th Semester syllabus",
+      "url": "https://ece.gndec.ac.in/sites/default/files/B.tech%204th%20%26%205th%20Sem%20syllabus.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-6th-semester-syllabus",
+      "label": "B.Tech. 6th Semester syllabus",
+      "url": "https://ece.gndec.ac.in/sites/default/files/B.Tech%206th%20Sem.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-7th-8th-semester-syllabus",
+      "label": "B.Tech. 7th & 8th Semester syllabus",
+      "url": "https://ece.gndec.ac.in/sites/default/files/B.Tech%207th%20%26%208th%20Sem%20modified.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-study-scheme-for-2014-admission-batch-onwards",
+      "label": "*B.Tech. Study Scheme for 2014 Admission Batch Onwards*",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Final%20B.Tech%20Study%20Scheme%202014-%20%202016%20admission%20Batch.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-syllabus-for-3rd-semester",
+      "label": "B.Tech syllabus for 3rd semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/B.tech%203rd%20Sem.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-syllabus-for-4th-5th-semester",
+      "label": "B.Tech. syllabus for 4th-5th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/B.TECH%20SYLLABUS%204th-%205th%20SEM%20As%20per%20%20SEP%202016%20Scheme.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-syllabus-for-6th-semester",
+      "label": "B.Tech syllabus for 6th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/final%285-4-17%29syllabus%206th%20semester%20%20-2017.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-b-tech-syllabus-for-7th-8th-semester",
+      "label": "B.Tech syllabus for 7th & 8th semester",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Syllabus%207th%20%26%208th%20Sem%20%202017.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ece-m-tech-study-scheme-and-syllabus-for-2014-batch-onward",
+      "label": "*M.Tech Study scheme and Syllabus for 2014 batch onward*",
+      "url": "https://ece.gndec.ac.in/sites/default/files/Complete%20M%20Tech%20Syllabus%20File%20%28Sep%20%202016%291111-converted.pdf",
+      "department": "Electronics & Communication Engineering",
+      "departmentId": "ece",
+      "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+      "external": false
+    },
+    {
+      "id": "ee-b-tech-syllabus-scheme-2024-onwards-6th-semester-file-uploaded-on-24-07-2026",
+      "label": "B.TECH SYLLABUS SCHEME 2024 ONWARDS(6th Semester) (file uploaded on 24.07.2026)",
+      "url": "https://ee.gndec.ac.in/sites/default/files/Signed%20Scheme%202024%20and%20sylabus_6th%20sem_compressed.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-b-tech-syllabus-scheme-2024-onwards-5th-semester-file-uploaded-on-24-07-2026",
+      "label": "B.TECH SYLLABUS SCHEME 2024 ONWARDS(5th Semester) (file uploaded on 24.07.2026)",
+      "url": "https://ee.gndec.ac.in/sites/default/files/Signed%20study%20scheme%202024%20and%20Syllabus_5th%20sem_compressed.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-btech-syllabus-2024-non-technical-subjects",
+      "label": "BTECH SYLLABUS 2024 Non- Technical Subjects",
+      "url": "https://ee.gndec.ac.in/sites/default/files/Signed%20Syllabus_Indian%20Constitution_Bussiness%20Essentials%281%29.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-b-tech-mpd-syllabus",
+      "label": "B.TECH MPD syllabus",
+      "url": "https://ee.gndec.ac.in/sites/default/files/Mpd%20syllabus%20.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-b-tech-minor-degree-study-scheme",
+      "label": "B.Tech Minor Degree Study Scheme",
+      "url": "https://ee.gndec.ac.in/sites/default/files/Electrical%20Engineering%20Minor%20Degree%20Sche.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-b-tech-syllabus-scheme-2024-onwards-3rd-4th-semester-file-uploaded-on-19-12-2",
+      "label": "B.TECH SYLLABUS SCHEME 2024 ONWARDS(3rd -4th Semester) (file uploaded on 19.12.2025)",
+      "url": "https://ee.gndec.ac.in/sites/default/files/Signed%20Scheme%20and%20Syllabus%203rdand%204th%20sem%202024%20scheme%20%281%29.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-b-tech-syllabus-scheme-2018-onwards-3rd-8th-semester-file-updated-on-09-12-20",
+      "label": "B.TECH SYLLABUS SCHEME 2018 ONWARDS (3rd - 8th Semester) (file updated on 09.12.2021)",
+      "url": "https://ee.gndec.ac.in/sites/default/files/CONS.%20B.Tech_._EE_%203-8th%20sem%20with%20scheme%20%28FINAL%29%201.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-b-tech-syllabus-scheme-2014-onwards-3rd-4th-5th-6th-7th-8th-semesters-file-up",
+      "label": "B.TECH SYLLABUS SCHEME 2014 ONWARDS 3rd ,4th ,5th ,6th ,7th & 8th SEMESTERS (file updated on 27.7.2017)",
+      "url": "https://ee.gndec.ac.in/sites/default/files/B.Tech_.%20Syllabus%20Scheme%202014%20Onwards%2027.7.17_0.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-mtech-power-engg-full-time-syllabus-2019-onwards",
+      "label": "MTECH POWER ENGG.(Full Time) SYLLABUS 2019 ONWARDS",
+      "url": "https://ee.gndec.ac.in/sites/default/files/1%20FINAL%20M.Tech%20POWER%20Scheme%202019%20onwards%20on%2018%20july%20%281%29_0.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-mtech-power-engg-ft-syllabus-2014-onwards",
+      "label": "MTECH POWER ENGG.(FT) SYLLABUS 2014 ONWARDS",
+      "url": "https://ee.gndec.ac.in/sites/default/files/newformatMTECH%20POWER%20SYLLABUS%202014%20ONWARDS%20modified%20Aug%202017.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-mtech-electrical-engg-part-time-syllabus-2019-onwards",
+      "label": "MTECH ELECTRICAL ENGG.(Part Time) SYLLABUS 2019 ONWARDS",
+      "url": "https://ee.gndec.ac.in/sites/default/files/1M.Tech%20ELECTRICAL%20Scheme%202019%20onwards%20on%2018%20july%20%281%29.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-mtech-electrical-engg-pt-syllabus-2014-onwards",
+      "label": "MTECH ELECTRICAL ENGG.(PT) SYLLABUS 2014 ONWARDS",
+      "url": "https://ee.gndec.ac.in/sites/default/files/MTECH-ELE-SYLLABUS-2014-ONWARDS%20aug%202017.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-phd-syllabus",
+      "label": "PhD Syllabus",
+      "url": "https://ee.gndec.ac.in/sites/default/files/phd%20syllabus.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-phd-study-scheme",
+      "label": "PhD Study Scheme",
+      "url": "https://ee.gndec.ac.in/sites/default/files/phd%20study%20scheme%201.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ee-prerequisites-of-the-courses-in-curriculum-mapping",
+      "label": "Prerequisites of the courses in Curriculum Mapping",
+      "url": "https://ee.gndec.ac.in/sites/default/files/schematics.pdf",
+      "department": "Electrical Engineering",
+      "departmentId": "ee",
+      "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "it-notice-regarding-professional-elective-iv-for-b-tech-5th-sem-students-batch-2",
+      "label": "Notice regarding Professional Elective -IV for B.Tech 5th Sem students ( Batch 2024-2028 ) Study Scheme 2024",
+      "url": "https://it.gndec.ac.in/sites/default/files/Professional%20Elective%20July-Dec%202026%20pdf.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "sourcePage": "https://it.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-of-b-tech-robotics-and-artificial-intelligence-2025",
+      "label": "Study scheme and Syllabus of B. Tech. Robotics and Artificial Intelligence (2025 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/B.%20Tech.%20RAI%20Syllabus%202024_0.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-b-tech-mechanical-engineering-2024-onwards",
+      "label": "Study scheme and Syllabus B. Tech. Mechanical Engineering (2024 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/B.%20Tech.%20ME%20Syllabus%202024%20R1.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-of-b-tech-mechanical-engineering-2018-onwards",
+      "label": "Study scheme and syllabus of B. Tech. Mechanical Engineering (2018 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/Study%20scheme%20and%20syllabus%20B.TEch%20MEch%202018%20batch%20onwards.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-b-tech-mechanical-engineering-2014-onwards",
+      "label": "Syllabus of B. Tech. Mechanical Engineering (2014 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/2014%20Consolidated.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-modified-note-of-study-scheme-4th-sem-b-tech-2014-onward",
+      "label": "Modified Note of Study Scheme (4th Sem. B.Tech. 2014 onward)",
+      "url": "https://me.gndec.ac.in/Modified-Note-of-Study-Scheme_4th-Sem._B.Tech_.-Mech._2014-onwards.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-b-tech-mechanical-engineering-from-admission-batch-2011-to-2013",
+      "label": "Syllabus of B. Tech. Mechanical Engineering (From Admission Batch 2011 to 2013)",
+      "url": "https://me.gndec.ac.in/sites/default/files/18-12-13%20Btech2011%20ME.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-of-b-tech-2020-onwards",
+      "label": "Study Scheme of B. Tech. (2020 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/B.%20Tech%20Syllabus%20Scheme%202020%20%281%29.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-b-tech-2020-onwards-elective-subjects",
+      "label": "Syllabus of B. Tech. (2020 onwards) Elective Subjects",
+      "url": "https://me.gndec.ac.in/sites/default/files/Elective%20Subjects%202020.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-of-b-tech-2018-onwards",
+      "label": "Study Scheme of B. Tech. (2018 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/B.%20Tech%20Syllabus%20Scheme%202018%20%281%29.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-b-tech-2018-onwards",
+      "label": "Syllabus of B. Tech. (2018 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/B.tech%20syllabus%202018%20onwards.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-b-tech-2018-onwards-elective-subjects",
+      "label": "Syllabus of B. Tech. (2018 onwards) Elective Subjects",
+      "url": "https://me.gndec.ac.in/sites/default/files/Elective%202018.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-of-b-tech-2014-to-2018",
+      "label": "Study Scheme of B. Tech. (2014 to 2018)",
+      "url": "https://me.gndec.ac.in/sites/default/files/Study%20Scheme2014.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-b-tech-2014-to-2018",
+      "label": "Syllabus of B. Tech. (2014 to 2018)",
+      "url": "https://me.gndec.ac.in/sites/default/files/Syllabus%202014onwards%20pe.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-of-b-tech-2011-to-2014",
+      "label": "Study Scheme and Syllabus of B. Tech. (2011 to 2014)",
+      "url": "https://me.gndec.ac.in/sites/default/files/Current-Syllabus.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-of-m-tech-mechanical-engineering-2019-onwards",
+      "label": "Study scheme and syllabus of M. Tech. Mechanical Engineering (2019 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/Study%20Scheme%20and%20syllabus%20M.Tech%20MEchanical%202019%20Batch%20onwards.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-of-m-tech-production-engineering-2019-onwards",
+      "label": "Study Scheme of M. Tech. Production Engineering (2019 onwards)",
+      "url": "https://me.gndec.ac.in/sites/default/files/M.%20Tech.%20Scheme%202019onwards.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-m-tech-production-engineering-2019-onwards",
+      "label": "Syllabus of M. Tech. Production Engineering 2019 onwards",
+      "url": "https://me.gndec.ac.in/sites/default/files/M.Tech%20Syllabus%202019%20onwards.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-of-m-tech-production-engineering-2014-2018",
+      "label": "Study Scheme and Syllabus of M. Tech. Production Engineering (2014-2018)",
+      "url": "https://me.gndec.ac.in/sites/default/files/MTech_Prod_2014_1.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-of-m-tech-2004-2014",
+      "label": "Study Scheme and Syllabus of M. Tech. (2004-2014)",
+      "url": "https://me.gndec.ac.in/sites/default/files/Latest-Syllabus-of-M.TechPE.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-syllabus-of-m-tech-production-engineering-from-admission-batch-2004-to-2013",
+      "label": "Syllabus of M. Tech. Production Engineering (From Admission Batch 2004 to 2013)",
+      "url": "https://me.gndec.ac.in/sites/default/files/mproduction-04.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "me-study-scheme-and-syllabus-of-post-graduate-diploma-program",
+      "label": "Study Scheme and Syllabus of Post Graduate Diploma Program",
+      "url": "https://me.gndec.ac.in/sites/default/files/PG%20Diploma%20syllabus%20modified_0.pdf",
+      "department": "Mechanical & Production Engineering",
+      "departmentId": "me",
+      "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+      "external": false
+    },
+    {
+      "id": "mba-study-scheme-2019-mba",
+      "label": "Study scheme,2019 MBA.",
+      "url": "https://mba.gndec.ac.in/sites/default/files/study%20scheme%20MBA.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-syllabus-i-ii-semester-mba",
+      "label": "Syllabus I&II SEMESTER -MBA.",
+      "url": "https://mba.gndec.ac.in/sites/default/files/UPDATED%20VERSION--1%262%20semesters-2019%20syllabus.docx",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-syllabus-iii-iv-semester-mba",
+      "label": "Syllabus III&IV SEMESTER-MBA.",
+      "url": "https://mba.gndec.ac.in/sites/default/files/new%20compressed%20file%20of%203rd%20and%204th%20sem%20syllabus-min_compressed-compressed.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-bba-study-scheme-2024",
+      "label": "BBA Study Scheme ,2024.",
+      "url": "https://mba.gndec.ac.in/sites/default/files/Study%20Scheme%202024%20BBA.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-bba-syllabus-i-vi-semester-2024-onwards",
+      "label": "BBA Syllabus I-VI SEMESTER- 2024&onwards",
+      "url": "https://mba.gndec.ac.in/sites/default/files/BBA%20syllabus%20.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-b-com-entrepreneurship-syllabus-disaster-management-2024",
+      "label": "(B.Com Entrepreneurship) Syllabus Disaster Management-2024.",
+      "url": "https://mba.gndec.ac.in/sites/default/files/Syllabus%20Disaster%20Management%20%28BCom%20Enterpreneurship%29.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-b-b-a-study-scheme-syllabus-2021",
+      "label": "B.B.A STUDY SCHEME & SYLLABUS,2021",
+      "url": "https://mba.gndec.ac.in/sites/default/files/BBA%20syllabus%20Final.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-bachelor-of-commerce-entrepreneurship-study-scheme-2024",
+      "label": "Bachelor of Commerce (Entrepreneurship), Study Scheme,2024",
+      "url": "https://mba.gndec.ac.in/sites/default/files/BCom%20Study%20Scheme%202024.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mba-bachelor-of-commerce-entrepreneurship-syllabus-i-vi-semester-2024",
+      "label": "Bachelor of Commerce (Entrepreneurship),Syllabus I-VI SEMESTER, 2024",
+      "url": "https://mba.gndec.ac.in/sites/default/files/BCom_0.pdf",
+      "department": "Business Administration",
+      "departmentId": "mba",
+      "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+      "external": false
+    },
+    {
+      "id": "mca-datesheet-and-syllabus-for-first-sessionals-useful-links-teqip-ii-gndec-cell",
+      "label": "Datesheet and Syllabus for First Sessionals --> USEFUL LINKS TEQIP-II (GNDEC Cell)",
+      "url": "https://mca.gndec.ac.in/sites/default/files/mcamst1.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "mca-course-and-syllabus-bca-batch-2025-onwards-1st-to-4th-sem",
+      "label": "Course and Syllabus BCA Batch 2025 Onwards (1st to 4th sem)",
+      "url": "https://ca.gndec.ac.in/sites/default/files/BCA_2025Sylsch.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "mca-course-and-syllabus-bca-batch-2021-onwards",
+      "label": "Course and Syllabus BCA Batch 2021 Onwards",
+      "url": "https://ca.gndec.ac.in/sites/default/files/BCA-2021.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "mca-course-and-syllabus-bca-batch-2020-onwards",
+      "label": "Course and Syllabus BCA Batch 2020 Onwards",
+      "url": "https://mca.gndec.ac.in/sites/default/files/bcasyl2020.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "mca-course-and-syllabus-mca-batch-2022-onwards",
+      "label": "Course and Syllabus MCA Batch 2022 Onwards",
+      "url": "https://ca.gndec.ac.in/sites/default/files/MCA%202022.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "mca-course-and-syllabus-mca-batch-2020-onwards",
+      "label": "Course and Syllabus MCA Batch 2020 Onwards",
+      "url": "https://gndec.ac.in/sites/default/files/MCA%20Syllabus2020.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "mca-course-and-syllabus-mca-batch-2015-onwards",
+      "label": "Course and Syllabus MCA Batch 2015 Onwards",
+      "url": "https://mca.gndec.ac.in/sites/default/files/MCASyllabus2015OnFinal.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "mca-course-and-syllabus-mca-batch-2012-onwards",
+      "label": "Course and Syllabus MCA Batch 2012 Onwards",
+      "url": "https://mca.gndec.ac.in/sites/default/files/update%20MCA%20Batch%202012%20Syllabus--21-07-2014.pdf",
+      "department": "Computer Applications",
+      "departmentId": "mca",
+      "sourcePage": "https://mca.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "as-study-scheme-and-syllabus-of-b-tech-first-year-for-batch-2024-onward",
+      "label": "Study scheme and syllabus of B.Tech. First year for Batch 2024 onward",
+      "url": "https://appsc.gndec.ac.in/sites/default/files/2026-03/ss%20and%20Syllabus%20sem1%2C2%20Dec%202025%20unsigned.pdf",
+      "department": "Applied Sciences",
+      "departmentId": "applied",
+      "sourcePage": "https://appsc.gndec.ac.in/node/27",
+      "external": false
+    },
+    {
+      "id": "as-study-scheme-and-syllabus-of-b-tech-first-year-for-batch-2018-2023",
+      "label": "Study Scheme and Syllabus of B.Tech. First year for Batch 2018-2023",
+      "url": "https://appsc.gndec.ac.in/sites/default/files/2024-08/B.Tech_1st_year_SS_and_syllabus_2018_onward.pdf",
+      "department": "Applied Sciences",
+      "departmentId": "applied",
+      "sourcePage": "https://appsc.gndec.ac.in/node/27",
+      "external": false
+    },
+    {
+      "id": "as-study-scheme-and-syllabus-of-b-tech-first-year-for-batch-2017",
+      "label": "Study Scheme and Syllabus of B.Tech. First year for Batch 2017",
+      "url": "https://appsc.gndec.ac.in/sites/default/files/2024-08/SS%2BSyllabus2017.pdf",
+      "department": "Applied Sciences",
+      "departmentId": "applied",
+      "sourcePage": "https://appsc.gndec.ac.in/node/27",
+      "external": false
+    },
+    {
+      "id": "as-study-scheme-and-syllabus-of-b-tech-first-year-for-batch-2014-2016",
+      "label": "Study Scheme and Syllabus of B.Tech. First year for Batch 2014-2016",
+      "url": "https://appsc.gndec.ac.in/sites/default/files/2024-08/2014%20ss%20and%20syllabus.pdf",
+      "department": "Applied Sciences",
+      "departmentId": "applied",
+      "sourcePage": "https://appsc.gndec.ac.in/node/27",
+      "external": false
+    },
+    {
+      "id": "as-study-scheme-and-syllabus-of-b-tech-first-year-for-batch-2011-2013",
+      "label": "Study Scheme and Syllabus of B.Tech. First year for Batch 2011-2013",
+      "url": "https://appsc.gndec.ac.in/sites/default/files/2024-08/2011%20B%20Tech%20first%20year.pdf",
+      "department": "Applied Sciences",
+      "departmentId": "applied",
+      "sourcePage": "https://appsc.gndec.ac.in/node/27",
+      "external": false
+    },
+    {
+      "id": "as-study-scheme-and-syllabus-of-b-tech-first-year-for-batch-2004-2010",
+      "label": "Study Scheme and Syllabus of B.Tech. First year for Batch 2004-2010",
+      "url": "https://appsc.gndec.ac.in/sites/default/files/2024-08/2004%20B%20Tech%20PTU.pdf",
+      "department": "Applied Sciences",
+      "departmentId": "applied",
+      "sourcePage": "https://appsc.gndec.ac.in/node/27",
+      "external": false
+    },
+    {
+      "id": "arch-https-ptu-ac-in-wp-content-uploads-2022-03-syllabus-of-b-arch-1st-2nd-sem-b",
+      "label": "https://ptu.ac.in/wp-content/uploads/2022/03/Syllabus-of-B.Arch_.-1st-2nd-Sem.-Batch-2021-onwards.pdf",
+      "url": "https://ptu.ac.in/wp-content/uploads/2022/03/Syllabus-of-B.Arch_.-1st-2nd-Sem.-Batch-2021-onwards.pdf",
+      "department": "School of Architecture",
+      "departmentId": "architecture",
+      "sourcePage": "https://architecture.gndec.ac.in/website1/node/4",
+      "external": true
+    }
+  ],
+  "coverage": {
+    "departments": 10,
+    "departmentsWithHod": 10,
+    "notices": 20,
+    "syllabusDocuments": 95
+  },
+  "noticeboardError": "",
+  "unavailableDepartments": [],
+  "seededAt": "2026-11-07T13:47:37.212Z"
+}

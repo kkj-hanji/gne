@@ -66,6 +66,24 @@ const FALLBACK_STUDENT_SECTION_SOURCES = {
   RAI: "https://appsc.gndec.ac.in/sites/default/files/2026-08/RAI%20Permanent%20Sections%202026_1.pdf"
 };
 const STUDENT_BRANCHES = Object.freeze(Object.keys(FALLBACK_STUDENT_SECTION_SOURCES));
+const STUDENT_BATCHES = Object.freeze(["2026", "2025"]);
+
+// GNDEC publishes two current admission cohorts as public section rosters.
+// 2026 is the active first-year cohort; 2025 is the preceding cohort whose
+// second-semester list remains on the official timetable index. Older cohorts
+// do not have a public section roster, so Compass does not invent one.
+const FALLBACK_STUDENT_BATCH_SOURCES = {
+  "2026": FALLBACK_STUDENT_SECTION_SOURCES,
+  "2025": {
+    CE: "https://appsc.gndec.ac.in/sites/default/files/2026-02/CE%20Sections%20sem-2%202025.pdf",
+    CS: "https://appsc.gndec.ac.in/sites/default/files/2026-02/CS%20Sections%20sem-2%202025.pdf",
+    EC: "https://appsc.gndec.ac.in/sites/default/files/2026-02/EC%20Sections%20sem-2%202025.pdf",
+    EE: "https://appsc.gndec.ac.in/sites/default/files/2026-02/EE%20Sections%20sem-2%202025.pdf",
+    IT: "https://appsc.gndec.ac.in/sites/default/files/2026-02/IT%20Sections%20sem-2%202025.pdf",
+    ME: "https://appsc.gndec.ac.in/sites/default/files/2026-02/ME%20Sections%20sem-2%202025.pdf",
+    RAI: "https://appsc.gndec.ac.in/sites/default/files/2026-02/RAI%20Sections%20sem-2%202025.pdf"
+  }
+};
 
 // GNDEC replaced these verified temporary-section links with the Permanent
 // Sections files on the timetable index. The archived PDFs remain official
@@ -113,6 +131,7 @@ function fallbackRegistry() {
       fallbackSourceFooter: LEGACY_FALLBACK_SOURCE_FOOTER
     }])),
     studentSectionSources: Object.fromEntries(Object.entries(FALLBACK_STUDENT_SECTION_SOURCES).map(([branch, url]) => [branch, { url, verified: true }])),
+    studentBatchSources: Object.fromEntries(Object.entries(FALLBACK_STUDENT_BATCH_SOURCES).map(([batch, branches]) => [batch, Object.fromEntries(Object.entries(branches).map(([branch, url]) => [branch, { url, verified: true }]))])),
     studentHistorySources: Object.fromEntries(Object.entries(FALLBACK_STUDENT_HISTORY_SOURCES).map(([branch, records]) => [branch, records.map((record) => ({ ...record, verified: true }))])),
     syllabusSource: { url: FALLBACK_SYLLABUS_URL, verified: true, label: "First-year study scheme & syllabus" },
     academicCalendarSource: { ...FALLBACK_ACADEMIC_CALENDAR_SOURCE, verified: true },
@@ -387,6 +406,19 @@ function rosterBranchForLink(link) {
   return branch && STUDENT_BRANCHES.includes(branch) && isStudentRosterLink(link) ? branch : "";
 }
 
+function rosterBatchForLink(link) {
+  if (!rosterBranchForLink(link)) return "";
+  const url = String(link.url || "");
+  const text = decodedLinkText(link).toLowerCase();
+  // The 2026 admission cohort is published under 2026-08 (temporary) and
+  // 2026-09 (permanent). The 2025 cohort's latest public section list is the
+  // second-semester file under 2026-02; the 2025-10 first-semester lists are
+  // retained as an earlier official revision.
+  if (/\/2026-(?:08|09)\//.test(url) || /\b(?:permanent|temporary)\s+sections?\s+2026\b|\bbranch\s+students?\s+2026\b/.test(text)) return "2026";
+  if (/\/2026-02\//.test(url) || /\/2025-(?:08|10)\//.test(url) || /\bsem(?:ester)?[-\s]*2\s*2025\b|\bsections?\s+sem[-\s]*2\s*2025\b|\bstudents?\s+sections?\s+list\b/.test(text)) return "2025";
+  return "";
+}
+
 function rosterCandidateRank(link, index) {
   const text = decodedLinkText(link).toLowerCase();
   const month = sourceReleaseMonth(link.url).replace("-", "");
@@ -397,11 +429,12 @@ function rosterCandidateRank(link, index) {
   return [release, kind, -index];
 }
 
-function newestRosterCandidates(links) {
+function newestRosterCandidates(links, batch = "") {
   const candidates = new Map();
   links.forEach((link, index) => {
     const branch = rosterBranchForLink(link);
     if (!branch) return;
+    if (batch && rosterBatchForLink(link) !== batch) return;
     const rows = candidates.get(branch) || [];
     rows.push({ url: link.url, rank: rosterCandidateRank(link, index) });
     candidates.set(branch, rows);
@@ -410,6 +443,15 @@ function newestRosterCandidates(links) {
     rows.sort((left, right) => left.rank[0] - right.rank[0] || left.rank[1] - right.rank[1] || left.rank[2] - right.rank[2]).reverse();
     return rows[0]?.url ? [[branch, { url: rows[0].url }]] : [];
   }));
+}
+
+function studentBatchCandidates(links) {
+  const batches = {};
+  for (const batch of STUDENT_BATCHES) {
+    const candidates = newestRosterCandidates(links, batch);
+    if (Object.keys(candidates).length) batches[batch] = candidates;
+  }
+  return batches;
 }
 
 function isTimetableNoticeLink(link) {
@@ -448,7 +490,7 @@ async function discoverSources() {
   const bundle = latestCompleteTimetableBundle(links);
   if (!bundle) throw new Error("GNDEC index did not expose a complete timetable set.");
   const sources = bundle.sources;
-  return { version: effectiveVersion(html), sources, studentSectionSources: newestRosterCandidates(links), extraLinks: sortCurrentNoticeLinks(extraLinks, sourceReleaseMonth(sources.groups?.url)) };
+  return { version: effectiveVersion(html), sources, studentSectionSources: newestRosterCandidates(links, "2026"), studentBatchSources: studentBatchCandidates(links), extraLinks: sortCurrentNoticeLinks(extraLinks, sourceReleaseMonth(sources.groups?.url)) };
 }
 
 async function discoverSyllabusSource() {
@@ -518,6 +560,7 @@ function sourceIdentity(registry) {
     version: registry.version,
     sources: Object.fromEntries(Object.entries(registry.sources).map(([id, record]) => [id, [record.url, record.hash, record.fallbackUrl || "", record.fallbackVersion || ""]])),
     studentSectionSources: Object.fromEntries(Object.entries(registry.studentSectionSources).map(([id, record]) => [id, [record.url, record.hash]])),
+    studentBatchSources: Object.fromEntries(Object.entries(registry.studentBatchSources || {}).map(([batch, branches]) => [batch, Object.fromEntries(Object.entries(branches).map(([id, record]) => [id, [record.url, record.hash]]))])),
     studentHistorySources: Object.fromEntries(Object.entries(registry.studentHistorySources || {}).map(([id, records]) => [id, records.map((record) => [record.id, record.url, record.hash])]))
     , syllabusSource: registry.syllabusSource ? [registry.syllabusSource.url, registry.syllabusSource.hash] : null
     , academicCalendarSource: registry.academicCalendarSource ? [registry.academicCalendarSource.url, registry.academicCalendarSource.hash] : null
@@ -548,13 +591,22 @@ async function refreshSourceRegistry(env) {
   // GNDEC occasionally republishes a branch PDF later than the timetable and
   // can temporarily omit another branch from the index. Retain the last
   // verified current PDF for any missing branch instead of making its roster
-  // disappear, while validating every newly discovered replacement.
-  const rosterRecords = Object.fromEntries(STUDENT_BRANCHES.map((branch) => [branch,
-    discovered.studentSectionSources[branch]
-      || previous?.studentSectionSources?.[branch]
-      || { url: FALLBACK_STUDENT_SECTION_SOURCES[branch] }
-  ]));
-  const studentSectionSources = Object.fromEntries(await Promise.all(Object.entries(rosterRecords).map(async ([branch, record]) => [branch, await validatePdfSource(record)])));
+  // disappear, while validating every newly discovered replacement. The same
+  // rule applies independently to each published admission cohort.
+  const previousBatches = previous?.studentBatchSources || {};
+  const studentBatchSources = {};
+  for (const batch of STUDENT_BATCHES) {
+    const discoveredBatch = discovered.studentBatchSources?.[batch] || {};
+    const previousBatch = previousBatches[batch] || (batch === "2026" ? previous?.studentSectionSources : null) || {};
+    const fallbackBatch = FALLBACK_STUDENT_BATCH_SOURCES[batch] || {};
+    const rosterRecords = Object.fromEntries(STUDENT_BRANCHES.map((branch) => [branch,
+      discoveredBatch[branch]
+        || previousBatch[branch]
+        || { url: fallbackBatch[branch] }
+    ]));
+    studentBatchSources[batch] = Object.fromEntries(await Promise.all(Object.entries(rosterRecords).map(async ([branch, record]) => [branch, await validatePdfSource(record)])));
+  }
+  const studentSectionSources = studentBatchSources["2026"];
   const studentHistorySources = Object.fromEntries(await Promise.all(Object.entries(FALLBACK_STUDENT_HISTORY_SOURCES).map(async ([branch, records]) => [branch, await Promise.all(records.map(validatePdfSource))])));
   let syllabusSource = previous?.syllabusSource || { url: FALLBACK_SYLLABUS_URL, verified: true, label: "First-year study scheme & syllabus" };
   try { syllabusSource = await validatePdfSource(await discoverSyllabusSource()); } catch { /* retain the last verified syllabus if the index is unavailable */ }
@@ -568,6 +620,7 @@ async function refreshSourceRegistry(env) {
     updatedAt: new Date().toISOString(),
     sources,
     studentSectionSources,
+    studentBatchSources,
     studentHistorySources,
     syllabusSource,
     academicCalendarSource,
@@ -750,6 +803,20 @@ export default {
     const url = new URL(request.url);
     const examResult = await examResponse(request, env, adminAuthorized(request, env));
     if (examResult) return examResult;
+    const datesheetResult = await datesheetResponse(request, env, ctx);
+    if (datesheetResult) return datesheetResult;
+    const campusResult = await campusResponse(request, env, ctx);
+    if (campusResult) return campusResult;
+    if (url.pathname === "/api/admin/datesheet/refresh") {
+      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
+      try { return Response.json({ datesheet: await refreshDatesheet(env) }); }
+      catch (error) { return Response.json({ error: error.message || "Datesheet refresh failed." }, { status: 502 }); }
+    }
+    if (url.pathname === "/api/admin/campus/refresh") {
+      if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
+      try { return Response.json({ campus: await refreshCampus(env) }); }
+      catch (error) { return Response.json({ error: error.message || "Campus refresh failed." }, { status: 502 }); }
+    }
     if (url.pathname === "/api/admin/sources/refresh") {
       if (request.method !== "POST" || !adminAuthorized(request, env)) return Response.json({ error: "Admin authorization required." }, { status: 401 });
       try { return Response.json({ registry: await refreshSourceRegistry(env) }); } catch (error) { return Response.json({ error: error.message || "Source refresh failed." }, { status: 502 }); }
@@ -841,9 +908,13 @@ export default {
         // from an older file that has the same displayed date or URL.
         sources: Object.entries(registry.sources).map(([id, record]) => ({ id, label: SOURCE_LABELS[id] || id, url: record.url, verified: record.verified === true, contentHash: record.hash || "", sourceGenerator: record.sourceGenerator || "", sourceFooter: record.sourceFooter || "" })),
         studentSectionSources: Object.entries(registry.studentSectionSources).map(([branch, record]) => ({ branch, url: record.url, verified: record.verified === true, contentHash: record.hash || "" })),
+        studentBatchSources: Object.fromEntries(Object.entries(registry.studentBatchSources || { "2026": registry.studentSectionSources }).map(([batch, branches]) => [batch, Object.entries(branches).map(([branch, record]) => ({ batch, branch, url: record.url, verified: record.verified === true, contentHash: record.hash || "" }))])),
+        studentBatches: Object.keys(registry.studentBatchSources || { "2026": registry.studentSectionSources }),
         studentHistorySources: Object.entries(Object.keys(registry.studentHistorySources || {}).length ? registry.studentHistorySources : FALLBACK_STUDENT_HISTORY_SOURCES).flatMap(([branch, records]) => records.map((record) => ({ branch, id: record.id, version: record.version, url: record.url, verified: record.verified !== false, contentHash: record.hash || "" }))),
         syllabusSource: registry.syllabusSource ? { label: registry.syllabusSource.label || "First-year study scheme & syllabus", url: registry.syllabusSource.url, verified: registry.syllabusSource.verified === true } : null,
         academicCalendarSource: registry.academicCalendarSource ? { label: registry.academicCalendarSource.label || "Current academic calendar", url: registry.academicCalendarSource.url, verified: registry.academicCalendarSource.verified === true, contentHash: registry.academicCalendarSource.hash || "" } : null,
+        datesheet: await datesheetMeta(env),
+        campus: await campusMeta(env),
         extraLinks: registry.extraLinks || [], cacheSeconds: CACHE_SECONDS,
         dataHandling: "Saved student profiles and roster searches stay on the device. The shared registry stores only public GNDEC source metadata and anonymous AI-limit counters. Open-ended study prompts are stripped of student identifiers before external inference."
       }, { headers: { "Cache-Control": "public, max-age=300" } });
@@ -859,12 +930,15 @@ export default {
 
     if (url.pathname === "/api/section-list") {
       const branch = url.searchParams.get("branch")?.toUpperCase();
+      const batch = url.searchParams.get("batch") || "2026";
       const registry = await currentRegistry(env, ctx);
       const historyId = url.searchParams.get("history");
+      const batchSources = registry.studentBatchSources?.[batch] || (batch === "2026" ? registry.studentSectionSources : null);
+      if (!batchSources) return Response.json({ error: `No official student roster is published for the ${batch} batch.` }, { status: 404 });
       const historyRecords = registry.studentHistorySources?.[branch] || FALLBACK_STUDENT_HISTORY_SOURCES[branch] || [];
-      const record = historyId ? historyRecords.find((candidate) => historyId === "1" || candidate.id === historyId) : registry.studentSectionSources[branch];
+      const record = historyId ? historyRecords.find((candidate) => historyId === "1" || candidate.id === historyId) : batchSources[branch];
       if (!record) return Response.json({ error: historyId ? "No verified historical student list is available for that branch." : "No current official student list is available for that branch." }, { status: 404 });
-      return proxySource(request, ctx, record, historyId ? `student-roster-history-${branch}-${record.id}` : `student-roster-${branch}`, "application/pdf", SECTION_CACHE_SECONDS);
+      return proxySource(request, ctx, record, historyId ? `student-roster-history-${branch}-${record.id}` : `student-roster-${batch}-${branch}`, "application/pdf", SECTION_CACHE_SECONDS);
     }
 
     if (url.pathname === "/api/syllabus") {
@@ -938,10 +1012,20 @@ export default {
     }
     return new Response("Not Found", { status: 404 });
   },
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
     // A failed discovery never replaces the active registry: the last verified
     // snapshot continues serving students until GNDEC is reachable again.
+    if (event?.cron === "42 */6 * * *") {
+      ctx.waitUntil(refreshDatesheet(env).catch(() => {}));
+      return;
+    }
+    if (event?.cron === "27 */6 * * *") {
+      ctx.waitUntil(refreshCampus(env).catch(() => {}));
+      return;
+    }
     ctx.waitUntil(refreshSourceRegistry(env).catch(() => {}));
   }
 };
 import { examResponse } from "./exam-store.js";
+import { datesheetMeta, datesheetResponse, refreshDatesheet } from "./datesheet.js";
+import { campusMeta, campusResponse, refreshCampus } from "./campus.js";

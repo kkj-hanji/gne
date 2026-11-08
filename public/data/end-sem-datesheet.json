@@ -1,0 +1,3813 @@
+{
+  "title": "Tentative End Semester Examination Date Sheet · November–December 2026",
+  "source": {
+    "title": "Tentative Date Sheet for Regular End Semester Examinations – November 2026",
+    "url": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc",
+    "spreadsheetId": "1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc",
+    "publishedBy": "Controller of Examination, GNDEC",
+    "provenance": "Published as a public Google Sheet linked from the official GNDEC ERP noticeboard. Tabs are department/programme datesheets. The sheet prints session windows but not rooms, seats, or reporting times; no such facts are inferred."
+  },
+  "checkedAt": "2026-11-07T13:43:03.603Z",
+  "tabs": [
+    {
+      "id": "applied-sciences",
+      "label": "Applied Sciences",
+      "gid": "927569471",
+      "department": "Applied Sciences",
+      "headers": [
+        {
+          "label": "I(Chemistry Group)E",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "Chemistry Group",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "I(Physics Group)E",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "Physics Group",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Mathematics 1",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Chemistry Group)E",
+          "qualifier": "Chemistry Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-04",
+          "subject": "Mathematics 1",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Physics Group)E",
+          "qualifier": "Physics Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Physics",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Physics Group)E",
+          "qualifier": "Physics Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Chemistry",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Chemistry Group)E",
+          "qualifier": "Chemistry Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Economics",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Physics Group)E",
+          "qualifier": "Physics Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Professional English Communication",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Chemistry Group)E",
+          "qualifier": "Chemistry Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Programming for Problem Solving",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Chemistry Group)E",
+          "qualifier": "Chemistry Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Programming for Problem Solving",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Physics Group)E",
+          "qualifier": "Physics Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Engg.Drawing and Graphics",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Physics Group)E",
+          "qualifier": "Physics Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "BEEE",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(Chemistry Group)E",
+          "qualifier": "Chemistry Group",
+          "programme": "",
+          "session": "",
+          "sessionStart": null,
+          "sessionEnd": null,
+          "sessionRaw": "",
+          "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here."
+        }
+      ],
+      "sessionAssignmentReliable": false,
+      "sessionNote": "The official sheet labels both the Chemistry and Physics group headers with (E), while its session legend and the noticeboard copy place Chemistry in the morning window and Physics in the evening window. Verify the sitting on the official notice before travelling; Compass does not guess a session here.",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=927569471",
+      "error": ""
+    },
+    {
+      "id": "ce",
+      "label": "CE",
+      "gid": "1316315913",
+      "department": "Civil Engg.",
+      "headers": [
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "VII(E)",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "V(M)(Working Professionals)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "Working Professionals",
+          "sessionCode": "M",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Fluid Mechanics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Structural Design -I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Elective-III",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Structural Design -I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)(Working Professionals)",
+          "qualifier": "Working Professionals",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Probability and Statistics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Geotechnical Engineering",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Elective-IV",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Geotechnical Engineering",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)(Working Professionals)",
+          "qualifier": "Working Professionals",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Business Essentials for Engineers",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Elective-I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Open elective-II",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Elective-I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)(Working Professionals)",
+          "qualifier": "Working Professionals",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Solid Mechanics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Structural Analysis-II",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Environmental Engineering - II",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)(Working Professionals)",
+          "qualifier": "Working Professionals",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Building Material and Testing",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Construction Engineering and Project Management",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-II",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)(Working Professionals)",
+          "qualifier": "Working Professionals",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Environmental Engineering - I",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-22",
+          "subject": "Irrigation Engineering",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1316315913",
+      "error": ""
+    },
+    {
+      "id": "cse",
+      "label": "CSE",
+      "gid": "772399723",
+      "department": "Computer Science and Engg.",
+      "headers": [
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "VII(E)",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Digital Electronics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Design and Analysis of Algorithms",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Elective-III",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Applied Mathematics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Cyber Security",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Elective-IV",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Object Oriented Programming",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Software Engineering",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Open elective-II",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Computer Architecture",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Theory of Computation",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Data Structures",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Entrepreneurship and Startups",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Elective-1",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=772399723",
+      "error": ""
+    },
+    {
+      "id": "ee",
+      "label": "EE",
+      "gid": "1948849421",
+      "department": "Electrical Engg.",
+      "headers": [
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "VII(E)",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Transformer and DC Machines",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Control Systems",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Elective-III",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Mathematics-III",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "PLC and Industrial Drives",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Elective-IV",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Business Essentials for Engineers",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Entrepreneurship and Startups",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Open elective-II",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Signals and Systems",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Synchronous Machines",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Measurements and Instrumentation",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Analog Electronics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1948849421",
+      "error": ""
+    },
+    {
+      "id": "ece",
+      "label": "ECE",
+      "gid": "1643528018",
+      "department": "Electronics and Communication Engg.",
+      "headers": [
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "VII(E)",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Electronic Devices and Circuits",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Digital Signal Processing",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Elective-III",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Digital System Design",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Microprocessor and Microcontroller",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Elective-IV",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Business Essentials for Engineers",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Elective 1",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Open elective-II",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Signals and Systems",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Electromagnetics and Wave Propagation",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Probability and Random Processes",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Entrepreneurship and Startups",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Analog and Digital Communication System",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1643528018",
+      "error": ""
+    },
+    {
+      "id": "it",
+      "label": "IT",
+      "gid": "726898590",
+      "department": "Information Technology",
+      "headers": [
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "VII(E)",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Data Communication and Computer Networks",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Design and Analysis of Algorithms",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Elective-III",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Digital Logic",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Cloud of Things",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Elective-IV",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Business Essentials for Engineers",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Elective-I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Open elective-II",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Probability and Statistics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Machine Learning",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Data Structures",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Computer Organization and Architecture",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=726898590",
+      "error": ""
+    },
+    {
+      "id": "me",
+      "label": "ME",
+      "gid": "1138608011",
+      "department": "Mechanical Engineering",
+      "headers": [
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "VII(E)",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Applied Thermodynamics-I",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Heat Transfer",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Elective-III",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Manufacturing Processes",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Mechanical Measurement and Control",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Elective-IV",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Industrial Automation and Robotics",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Open elective-II",
+          "semester": "VII",
+          "semesterNumber": 7,
+          "header": "VII(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Strength of Materials",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Design of Machine Elements",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Engineering Materials and Metallurgy",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-II",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1138608011",
+      "error": ""
+    },
+    {
+      "id": "rai",
+      "label": "RAI",
+      "gid": "2135911947",
+      "department": "MECH.(RAI)",
+      "headers": [
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Kinematics of Robotics-I",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Elements of Mechanical Engineering",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Engineering Materials",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Mathematics-III",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Introduction to Artificial Intelligence",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=2135911947",
+      "error": ""
+    },
+    {
+      "id": "bba",
+      "label": "BBA",
+      "gid": "317475533",
+      "department": "Business Administration(BBA)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(E)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Management Accounting",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Financial Accounting",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Human Resource Management",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Strategy Management",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "General English",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Indian Systems of Health and Wellness",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Elective-II",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Principles and Practices of Management",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Management Information System",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Logistics and Supply Chain Management",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Business Statistics and Logic",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Legal and Ethical Issues in Business",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Business Environment and Public Policy",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-22",
+          "subject": "Managerial Skills and Business Etiquette",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-23",
+          "subject": "Business Communication-I",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-24",
+          "subject": "Environmental Science and Sustainability",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=317475533",
+      "error": ""
+    },
+    {
+      "id": "mba",
+      "label": "MBA",
+      "gid": "1354584652",
+      "department": "Business Administration(MBA)",
+      "headers": [
+        {
+          "label": "I(M)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "III(E)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-07",
+          "subject": "Business Analytics",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Entrepreneurship and Project Management",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Fundamental of Management",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Investment Analysis and Portfolio Management(F)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Business Communication",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Understanding self-Indian Perspective(HR)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Financial Reporting and Analysis",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Consumer Behaviour(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Manpower Planning, Recruitment, and Selection(HR)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Organisational Behaviour and Design",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Managerial Economics",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Financial Markets and Services(F)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-22",
+          "subject": "Digital and Social Media Marketing(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-23",
+          "subject": "Employee Relations(HR)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-24",
+          "subject": "Mergers, Acquisitions and Corporate Restructuring(F)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1354584652",
+      "error": ""
+    },
+    {
+      "id": "b-com",
+      "label": "B.Com",
+      "gid": "619696405",
+      "department": "Business Administration(B.Com)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "III(E)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Financial Accounting",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-04",
+          "subject": "Operations Research",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Research Methodology",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Commercial Law",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Business Economics",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Elective-I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Auditing and Corporate Governance",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Entrepreneurial Ecosystem",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Elective-II",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Entrepreneurial Business Management",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Effective Communication for Entrepreneurs-II",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Introduction to Marketing Management",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Entrepreneurship Development-I",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-22",
+          "subject": "Effective Communication for Entrepreneurs-I",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-23",
+          "subject": "Entrepreneurial Social Responsibility",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-24",
+          "subject": "Introductory Computing",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=619696405",
+      "error": ""
+    },
+    {
+      "id": "bca",
+      "label": "BCA",
+      "gid": "1377532834",
+      "department": "Business Administration(BCA)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "V(M)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-08",
+          "subject": "Programmimg for Problem Solving",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Programming in PHP",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Basics of Python Programming",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "General English",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Open Elective",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Fundamentals of Computer and IT",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Computer Networks",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Elective-I",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Mathematics Foundations to Computer Science",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Data Structures-I",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Elective II",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Environmental Science and Sustainability",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Introduction to Cloud Computing",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Web Designing",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Machine Learning",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1377532834",
+      "error": ""
+    },
+    {
+      "id": "mca",
+      "label": "MCA",
+      "gid": "419001169",
+      "department": "Computer Application (MCA)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Artificial Intelligence with Python",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Relational Database Management System",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Web Technologies",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Information Management",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Elective-II",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Technical Communications",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Interactive Computer Graphics",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Object Oriented Programming using C++ and Java",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Advanced Software Engineering",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=419001169",
+      "error": ""
+    },
+    {
+      "id": "b-voc",
+      "label": "B.VOC",
+      "gid": "703120724",
+      "department": "Architecture(B.Voc)",
+      "headers": [
+        {
+          "label": "I(M)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": ""
+        },
+        {
+          "label": "III(E)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        },
+        {
+          "label": "V(E)",
+          "semester": "V",
+          "semesterNumber": 5,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": ""
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-08",
+          "subject": "History of Interior Design-II",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-09",
+          "subject": "Communicative English",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Estimating, Costing and Specifications",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "HVPE",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(M)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Climate Responsive Indoor Environment Control",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Smart Technology and Market Trends",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Interior Services",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Interior Landscape",
+          "semester": "V",
+          "semesterNumber": 5,
+          "header": "V(E)",
+          "qualifier": "",
+          "programme": "",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=703120724",
+      "error": ""
+    },
+    {
+      "id": "m-tech-ce",
+      "label": "M.Tech(CE)",
+      "gid": "586805038",
+      "department": "Civil Engg.(M.Tech)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": "M.Tech.(Structural Engg.)"
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": "M.Tech.(Structural Engg.)"
+        },
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": "M.Tech(Environmental Sci & Engg.)"
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Elective-V",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(Structural Engg.)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-04",
+          "subject": "Physico-Chemical Treatment Methods",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Environmental Sci & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Advanced Structural Analysis",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Structural Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Open Elective",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(Structural Engg.)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Solid and Hazardous Waste Management",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Environmental Sci & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Research Methodology and IPR",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Structural Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Research Methodology and IPR",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Environmental Sci & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Elective-I",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Environmental Sci & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Finite Element Method in Structural Engineering",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Structural Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-1",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Structural Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-II",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Environmental Sci & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-21",
+          "subject": "Elective-II",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Structural Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=586805038",
+      "error": ""
+    },
+    {
+      "id": "m-tech-cse",
+      "label": "M.TECH(CSE)",
+      "gid": "1165023433",
+      "department": "Computer Sci & Engg.(M.Tech)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": "M.Tech.(Computer Science & Engg.)"
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": "M.Tech.(Computer Science & Engg.)"
+        },
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": "M.Tech(Computer Science and IT )"
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": "M.Tech(Computer Science and IT )"
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "Mathematical Foundations of Computer Science",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Computer Science & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-04",
+          "subject": "Elective-V",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(Computer Science & Engg.)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-04",
+          "subject": "Digital Image Processing",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Computer Science and IT )",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Open Elective",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(Computer Science & Engg.)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Open Elective",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech(Computer Science and IT )",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Advanced Data Structures",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Computer Science & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Soft Computing",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Computer Science and IT )",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Research Methodology and IPR",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Computer Science & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Research Methodology and IPR",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Computer Science and IT )",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Elective-V",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech(Computer Science and IT )",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Elective-I",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Computer Science & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-16",
+          "subject": "Elective-I",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Computer Science and IT )",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-II",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Computer Science & Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-18",
+          "subject": "Elective-II",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech(Computer Science and IT )",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1165023433",
+      "error": ""
+    },
+    {
+      "id": "m-tech-ece",
+      "label": "M.TEch(ECE)",
+      "gid": "1660171489",
+      "department": "Electronics and Communication Engg.(M.Tech)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": "M.Tech.(ECE)"
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": "M.Tech.(ECE)"
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "VLSI Physical Design and Automation",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(ECE)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-04",
+          "subject": "Elective-V",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(ECE)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Open Elective",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(ECE)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Modern Communication Systems",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(ECE)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Research Methodology and IPR",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(ECE)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Elective-1",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(ECE)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Elective-II",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(ECE)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=1660171489",
+      "error": ""
+    },
+    {
+      "id": "m-tech-ee",
+      "label": "M.Tech(EE)",
+      "gid": "600255347",
+      "department": "Electrical Engg.(M.Tech)",
+      "headers": [
+        {
+          "label": "I(E)",
+          "semester": "I",
+          "semesterNumber": 1,
+          "qualifier": "",
+          "sessionCode": "E",
+          "programme": "M.Tech.(Power Engg.)"
+        },
+        {
+          "label": "III(M)",
+          "semester": "III",
+          "semesterNumber": 3,
+          "qualifier": "",
+          "sessionCode": "M",
+          "programme": "M.Tech.(Power Engg.)"
+        }
+      ],
+      "sessions": [
+        {
+          "label": "Morning",
+          "start": 540,
+          "end": 720,
+          "raw": "9:00-12:00(Morning)"
+        },
+        {
+          "label": "Evening",
+          "start": 780,
+          "end": 960,
+          "raw": "1:00-4:00(Evening)"
+        }
+      ],
+      "entries": [
+        {
+          "date": "2026-12-04",
+          "subject": "VLSI Physical Design and Automation",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Power Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-07",
+          "subject": "Open Elective",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(Power Engg.)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-08",
+          "subject": "Modern Communication Systems",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Power Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-10",
+          "subject": "Research Methodology and IPR",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Power Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-11",
+          "subject": "Elective-V",
+          "semester": "III",
+          "semesterNumber": 3,
+          "header": "III(M)",
+          "qualifier": "",
+          "programme": "M.Tech.(Power Engg.)",
+          "session": "Morning",
+          "sessionStart": 540,
+          "sessionEnd": 720,
+          "sessionRaw": "9:00-12:00(Morning)"
+        },
+        {
+          "date": "2026-12-15",
+          "subject": "Elective-1",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Power Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        },
+        {
+          "date": "2026-12-17",
+          "subject": "Elective-II",
+          "semester": "I",
+          "semesterNumber": 1,
+          "header": "I(E)",
+          "qualifier": "",
+          "programme": "M.Tech.(Power Engg.)",
+          "session": "Evening",
+          "sessionStart": 780,
+          "sessionEnd": 960,
+          "sessionRaw": "1:00-4:00(Evening)"
+        }
+      ],
+      "sessionAssignmentReliable": true,
+      "sessionNote": "",
+      "sourceUrl": "https://docs.google.com/spreadsheets/d/1scMqukyMApsKyemMTbmm9FNUHWv2weZpj1ZGZe-SUfc/edit#gid=600255347",
+      "error": ""
+    }
+  ],
+  "totals": {
+    "tabs": 18,
+    "readableTabs": 18,
+    "entries": 222
+  },
+  "unavailableTabs": [],
+  "discoveryError": "",
+  "seededAt": "2026-11-07T13:43:03.603Z"
+}

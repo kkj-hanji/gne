@@ -7,7 +7,7 @@
     "required": ["MY_NVIDIA_API_KEY", "ADMIN_API_TOKEN"]
   },
   "triggers": {
-    "crons": ["17 */4 * * *"]
+    "crons": ["17 */4 * * *", "42 */6 * * *", "27 */6 * * *"]
   },
   "kv_namespaces": [
     {
