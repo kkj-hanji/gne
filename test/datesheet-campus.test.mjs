@@ -103,3 +103,22 @@ test("syllabus discovery keeps only official syllabus documents and preserves pr
   assert.equal(documents[0].sourcePage, "https://cse.gndec.ac.in/academics");
   assert.equal(documents[0].external, false);
 });
+
+test("Ask Compass chat resolves datesheet and campus facts before the academic calendar", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+  const start = source.indexOf('$("question-form").addEventListener("submit"');
+  const end = source.indexOf('const clearChat = $("clear-chat")');
+  assert.ok(start > 0 && end > start, "The chat submit handler must be present");
+  const handler = source.slice(start, end);
+  const datesheetAt = handler.indexOf("CompassEseDatesheet?.matches");
+  const campusAt = handler.indexOf("CompassCampus?.matches");
+  const calendarAt = handler.indexOf("academicCalendarAnswer(question)");
+  assert.ok(datesheetAt > 0, "The chat handler must resolve the ESE datesheet");
+  assert.ok(campusAt > 0, "The chat handler must resolve campus facts");
+  assert.ok(calendarAt > 0, "The chat handler still uses the academic calendar");
+  assert.ok(datesheetAt < calendarAt, "A datesheet question must not be answered as the academic calendar");
+  assert.ok(campusAt < calendarAt, "Campus facts must be resolved before the academic calendar");
+  assert.match(handler.slice(datesheetAt, campusAt), /CompassEseDatesheet\.load\(\)/);
+  assert.match(handler.slice(campusAt, calendarAt), /CompassCampus\.load\(\)/);
+});

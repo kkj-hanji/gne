@@ -7249,6 +7249,35 @@ function initEvents() {
       persistChat();
       return;
     }
+    // The tentative ESE datesheet is a more specific official answer than the
+    // academic calendar's semester window. Resolve it first, and load its data
+    // on demand so a cold tab never falls through to the calendar.
+    if (globalThis.CompassEseDatesheet?.matches(question)) {
+      const bubble = ensureChatBubble("assistant thinking", "<p><strong>Checking the official tentative end-semester datesheet…</strong></p>");
+      try { await globalThis.CompassEseDatesheet.load(); } catch { /* the answer reports missing data safely */ }
+      const datesheetAnswer = globalThis.CompassEseDatesheet.answer(question);
+      if (datesheetAnswer) {
+        bubble.className = "chat-bubble assistant";
+        bubble.innerHTML = `${datesheetAnswer}${followupSuggestions(question)}`;
+        persistChat();
+        return;
+      }
+      bubble.remove();
+    }
+    // Campus facts (HODs, notices, syllabus documents) are verified local
+    // answers, so resolve them before any external AI route.
+    if (globalThis.CompassCampus?.matches(question)) {
+      const bubble = ensureChatBubble("assistant thinking", "<p><strong>Checking the official campus directory…</strong></p>");
+      try { await globalThis.CompassCampus.load(); } catch { /* the answer reports missing data safely */ }
+      const campusAnswer = globalThis.CompassCampus.answer(question);
+      if (campusAnswer) {
+        bubble.className = "chat-bubble assistant";
+        bubble.innerHTML = `${campusAnswer}${followupSuggestions(question)}`;
+        persistChat();
+        return;
+      }
+      bubble.remove();
+    }
     const academic = academicCalendarAnswer(question);
     if (academic) { ensureChatBubble("assistant", academic); persistChat(); return; }
     // A transcribed MSE-II theory date sheet is the only verified source for its
