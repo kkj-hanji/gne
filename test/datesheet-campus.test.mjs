@@ -122,3 +122,17 @@ test("Ask Compass chat resolves datesheet and campus facts before the academic c
   assert.match(handler.slice(datesheetAt, campusAt), /CompassEseDatesheet\.load\(\)/);
   assert.match(handler.slice(campusAt, calendarAt), /CompassCampus\.load\(\)/);
 });
+
+test("campus chat matches qualified notice requests without stealing subject syllabus questions", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const vm = await import("node:vm");
+  const source = await readFile(new URL("../public/campus.js", import.meta.url), "utf8");
+  const context = vm.createContext({ console });
+  vm.runInContext(source, context);
+  const campus = context.CompassCampus;
+  assert.equal(campus.matches("latest GNDEC notices"), true);
+  assert.equal(campus.matches("recent college circulars"), true);
+  assert.equal(campus.matches("noticeboard"), true);
+  assert.equal(campus.matches("physics syllabus"), false);
+  assert.equal(campus.matches("CSE syllabus pdf"), true);
+});

@@ -76,11 +76,19 @@
     return normalize(`${document.label} ${document.department} ${document.sourcePage}`).includes(q);
   }
 
+  // A notice request can carry a qualifier between the adjective and the noun
+  // ("latest GNDEC notices", "recent college circulars"), so match the pair
+  // rather than one fixed phrase.
+  function noticeRequest(q) {
+    if (/\b(?:noticeboard|circulars?)\b/.test(q)) return true;
+    return /\bnotices?\b/.test(q) && /\b(?:latest|recent|new|college|gndec|campus|official|erp)\b/.test(q);
+  }
+
   function matches(question) {
     const q = normalize(question);
     if (!q) return false;
     if (/\b(?:hod|head\s+of\s+(?:the\s+)?department|head\s+of\s+dept)\b/.test(q)) return true;
-    if (/\b(?:noticeboard|latest\s+notices?|recent\s+notices?|college\s+notices?|circulars?)\b/.test(q)) return true;
+    if (noticeRequest(q)) return true;
     if (/\b(?:syllabus|study\s+scheme|curriculum)\b/.test(q)) {
       // First-year subject questions ("physics syllabus", "maths unit 2")
       // belong to the structured syllabus engine, not to a document index.
@@ -110,8 +118,8 @@
       return `<p><strong>Head of Department</strong></p>${rows}${sourceLine}`;
     }
 
-    if (/\b(?:noticeboard|latest\s+notices?|recent\s+notices?|college\s+notices?|circulars?)\b/.test(q)) {
-      const query = q.replace(/\b(?:latest|recent|college|official|noticeboard|notices?|circulars?|show|list|me|the|about|on|for)\b/g, " ").trim();
+    if (noticeRequest(q)) {
+      const query = q.replace(/\b(?:latest|recent|new|college|gndec|campus|erp|official|noticeboard|notices?|circulars?|show|list|me|the|about|on|for)\b/g, " ").trim();
       const notices = (data.notices || []).filter((notice) => noticeMatches(notice, query)).slice(0, 10);
       const rows = notices.map((notice) => `<li><strong>${escapeHtml(notice.title)}</strong><br /><small>${escapeHtml(notice.publishedAt)} · ${escapeHtml(notice.author)} · ${escapeHtml(notice.category)}</small><br /><a href="${escapeHtml(notice.url)}" target="_blank" rel="noopener noreferrer">Read official notice</a></li>`).join("");
       return `<p><strong>Official GNDEC notices</strong></p>${notices.length ? `<ol>${rows}</ol>` : "<p>No official notice matches that filter.</p>"}<p class="answer-source"><a href="${escapeHtml(data.source?.noticeboard || "https://erp.gndec.ac.in/noticeboard")}" target="_blank" rel="noopener noreferrer">ERP noticeboard</a>${data.checkedAt ? ` · checked ${escapeHtml(String(data.checkedAt).slice(0, 10))}` : ""}.</p>`;

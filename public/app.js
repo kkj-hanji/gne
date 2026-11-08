@@ -5891,6 +5891,7 @@ function legacyStudentLookupAnswer(lookup) {
   const add = (enabled, label, value, missing = "Not published in current roster") => { if (enabled) rows.push(`<strong>${escapeHtml(label)}</strong><br />${escapeHtml(value || missing)}`); };
   add(full || fields.name, "Student name", record.name);
   add(full || fields.branch, "Branch", record.branch);
+  add((full || fields.batch) && Boolean(record.batch), "Admission batch", record.batch ? `${record.batch} batch` : "");
   add(full || fields.crn, "CRN", record.crn);
   add(full || fields.serial, "Current serial", record.currentSerialNo);
   add(full || fields.previousSerials, "Previous serials", record.oldSerialNos?.join(", "));
