@@ -5819,7 +5819,8 @@ function safeRosterLookupRecord(record = {}) {
     academicGroup: normalized.academicGroup,
     mentor: normalized.mentor,
     mentorPhone: normalized.mentorPhone,
-    mentorVenue: normalized.mentorVenue
+    mentorVenue: normalized.mentorVenue,
+    batch: normalized.batch
   };
 }
 

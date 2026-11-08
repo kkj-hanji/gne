@@ -1544,3 +1544,10 @@ test("Multilingual, fuzzy, broken queries are accepted by AI proxy", async () =>
   const redacted = redactSensitiveAiText(query);
   assert.doesNotMatch(redacted, /\[removed\]/); // Assuming no profile loaded, should just pass through
 });
+
+test("safe roster lookup keeps the published admission batch", () => {
+  const { safeRosterLookupRecord } = context.__parserTest;
+  const record = safeRosterLookupRecord({ name: "Aalamjit Singh", crn: "2514001", branch: "CE", section: "CEA", subsection: "CEA1", batch: "2025" });
+  assert.equal(record.batch, "2025");
+  assert.equal(record.crn, "2514001");
+});
