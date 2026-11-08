@@ -87,6 +87,9 @@
   function matches(question) {
     const q = normalize(question);
     if (!q) return false;
+    // Meeting minutes are a transcribed notice with its own verified engine;
+    // "HOD meeting" must not be answered with the department-head directory.
+    if (/\b(?:meeting|minutes|mom)\b/.test(q)) return false;
     if (/\b(?:hod|head\s+of\s+(?:the\s+)?department|head\s+of\s+dept)\b/.test(q)) return true;
     if (noticeRequest(q)) return true;
     if (/\b(?:syllabus|study\s+scheme|curriculum)\b/.test(q)) {

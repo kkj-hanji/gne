@@ -146,3 +146,15 @@ test("syllabus discovery accepts camelCase and underscore-joined official file n
   assert.equal(documents.length, 2);
   assert.ok(documents.every((document) => document.departmentId === "cse"));
 });
+
+test("campus chat leaves HOD meeting minutes to the transcribed notice engine", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const vm = await import("node:vm");
+  const source = await readFile(new URL("../public/campus.js", import.meta.url), "utf8");
+  const context = vm.createContext({ console });
+  vm.runInContext(source, context);
+  const campus = context.CompassCampus;
+  assert.equal(campus.matches("HOD meeting 30 October 2026 decisions"), false);
+  assert.equal(campus.matches("minutes of HOD meeting"), false);
+  assert.equal(campus.matches("who is HOD CSE"), true);
+});
