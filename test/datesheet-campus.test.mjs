@@ -119,6 +119,8 @@ test("Ask Compass chat resolves datesheet and campus facts before the academic c
   assert.ok(calendarAt > 0, "The chat handler still uses the academic calendar");
   assert.ok(datesheetAt < calendarAt, "A datesheet question must not be answered as the academic calendar");
   assert.ok(campusAt < calendarAt, "Campus facts must be resolved before the academic calendar");
+  const noticeAt = handler.indexOf("academicNoticeAnswer(question)");
+  assert.ok(noticeAt > 0 && noticeAt < campusAt, "Transcribed notices must beat the HOD directory");
   assert.match(handler.slice(datesheetAt, campusAt), /CompassEseDatesheet\.load\(\)/);
   assert.match(handler.slice(campusAt, calendarAt), /CompassCampus\.load\(\)/);
 });

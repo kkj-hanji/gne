@@ -7266,6 +7266,15 @@ function initEvents() {
       }
       bubble.remove();
     }
+    // Transcribed notices (HOD minutes) are exact official text and must beat
+    // the faculty directory, which would otherwise read "HOD meeting" as a
+    // request for every head of department.
+    const transcribedNotice = academicNoticeAnswer(question);
+    if (transcribedNotice) {
+      ensureChatBubble("assistant", `${transcribedNotice}${followupSuggestions(question)}`);
+      persistChat();
+      return;
+    }
     // Campus facts (HODs, notices, syllabus documents) are verified local
     // answers, so resolve them before any external AI route.
     if (globalThis.CompassCampus?.matches(question)) {
