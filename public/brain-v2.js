@@ -784,7 +784,7 @@
     if (lookup.status === "none") return result("STUDENT_LOOKUP_NONE", 0.99, `<p><strong><u>No verified student found</u></strong></p><p>No current roster record matched <strong>${escapeHtml(lookup.query || "that value")}</strong>. Check the spelling or use an exact CRN.</p>${partial}<p class="answer-source">${escapeHtml(source)}.</p>`, { query: lookup.query || "" }, ["search verified current rosters", "compare exact identifiers", "rank conservative name matches", "return no-match safely"]);
     if (lookup.status === "multiple") {
       if (!records.length) return null;
-      return result("STUDENT_LOOKUP_AMBIGUOUS", 0.99, `<p><strong><u>More than one student may match</u></strong></p><p>Use a CRN or more specific spelling:</p><ol>${records.map((record) => `<li><strong>${escapeHtml(record.name)}</strong> · ${escapeHtml(record.crn ? `CRN ${record.crn}` : `Serial ${record.currentSerialNo || "not published"}`)} · ${escapeHtml([record.section, record.subsection].filter(Boolean).join(" / "))}</li>`).join("")}</ol>${partial}<p class="answer-source">${escapeHtml(source)}.</p>`, { count: records.length }, ["search verified current rosters", "detect ambiguity", "show bounded disambiguation choices", "preserve active profile"]);
+      return result("STUDENT_LOOKUP_AMBIGUOUS", 0.99, `<p><strong><u>More than one student may match</u></strong></p><p>Use a CRN or more specific spelling:</p><ol>${records.map((record) => `<li><strong>${escapeHtml(record.name)}</strong> · ${escapeHtml(record.crn ? `CRN ${record.crn}` : `Serial ${record.currentSerialNo || "not published"}`)}${record.batch ? ` · ${escapeHtml(record.batch)} batch` : ""} · ${escapeHtml([record.section, record.subsection].filter(Boolean).join(" / "))}</li>`).join("")}</ol>${partial}<p class="answer-source">${escapeHtml(source)}.</p>`, { count: records.length }, ["search verified current rosters", "detect ambiguity", "show bounded disambiguation choices", "preserve active profile"]);
     }
     const record = records[0];
     if (!record || !record.name || !record.section) return null;
@@ -794,6 +794,7 @@
     const add = (enabled, label, value, missing = "Not published in current roster") => { if (enabled) rows.push(`<strong>${escapeHtml(label)}</strong><br />${escapeHtml(value || missing)}`); };
     add(full || fields.name, "Student name", record.name);
     add(full || fields.branch, "Branch", record.branch);
+    add((full || fields.batch) && Boolean(record.batch), "Admission batch", record.batch ? `${record.batch} batch` : "");
     add(full || fields.crn, "CRN", record.crn);
     add(full || fields.serial, "Current serial", record.currentSerialNo);
     add(full || fields.previousSerials, "Previous serials", Array.isArray(record.oldSerialNos) ? record.oldSerialNos.join(", ") : "");
