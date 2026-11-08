@@ -190,7 +190,10 @@ export function parseSyllabusLinks(html, pageUrl, department) {
     if (!/^https?:\/\//i.test(url)) continue;
     if (!/\.(?:pdf|docx?|html?)(?:[?#].*)?$/i.test(url)) continue;
     const haystack = `${label} ${decodeURIComponent(url)}`;
-    if (!/\b(?:syllab(?:us|i)|study\s*scheme|scheme\s*(?:&|and)?\s*syllabus|curriculum|course\s*(?:scheme|structure)|programme\s*(?:scheme|structure))\b/i.test(haystack)) continue;
+    // Syllabus file names are often camelCase or underscore-joined
+    // ("MinorDegreeSyllabus.pdf", "Scheme_and_Syllabus.pdf"), so a leading
+    // word boundary would skip them.
+    if (!/(?:syllab(?:us|i)|study[\s_-]*scheme|scheme[\s_-]*(?:&|and)?[\s_-]*syllabus|curriculum|course[\s_-]*(?:scheme|structure)|programme[\s_-]*(?:scheme|structure))/i.test(haystack)) continue;
     const key = `${department.id}|${url}`;
     if (seen.has(key)) continue;
     seen.add(key);

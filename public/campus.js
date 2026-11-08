@@ -129,7 +129,10 @@
       const query = q.replace(/\b(?:syllabus|study|scheme|curriculum|of|for|the|show|list|where|download|official|department|dept|all|every|please|give|me)\b/g, " ").trim();
       let documents = data.syllabus || [];
       if (id) documents = documents.filter((document) => document.departmentId === id);
-      if (query) documents = documents.filter((document) => documentMatches(document, query));
+      // A named department already scopes the list. Filtering the leftover
+      // department token ("cse") against document labels would hide the very
+      // documents the question asked for, because labels use full names.
+      if (query && !id) documents = documents.filter((document) => documentMatches(document, query));
       documents = documents.slice(0, 40);
       const rows = documents.map((document) => `<li><a href="${escapeHtml(document.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(document.label)}</a><br /><small>${escapeHtml(document.department)}${document.external ? " · external document linked by the official department page" : ""} · <a href="${escapeHtml(document.sourcePage)}" target="_blank" rel="noopener noreferrer">source page</a></small></li>`).join("");
       return `<p><strong>Published syllabus and study schemes</strong></p>${documents.length ? `<ul>${rows}</ul>` : "<p>No published syllabus document matches that department or filter.</p>"}<p class="answer-source">Official documents are linked exactly as published; Compass does not rewrite their contents. ${data.stale ? "Cached copy." : ""}</p>`;

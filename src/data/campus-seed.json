@@ -5,7 +5,7 @@
     "facultyDirectory": "https://gndec.ac.in/faculty/",
     "provenance": "Department names, Heads of Department, contact details, notices, and syllabus documents are read from public GNDEC pages. A missing value stays missing; Compass does not infer an appointment or a document."
   },
-  "checkedAt": "2026-11-07T13:47:37.212Z",
+  "checkedAt": "2026-11-08T04:24:24.117Z",
   "departments": [
     {
       "id": "ce",
@@ -23,7 +23,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:24.934Z",
+      "checkedAt": "2026-11-08T04:24:11.799Z",
       "syllabusErrors": []
     },
     {
@@ -43,7 +43,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.111Z",
+      "checkedAt": "2026-11-08T04:24:12.826Z",
       "syllabusErrors": []
     },
     {
@@ -63,7 +63,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.135Z",
+      "checkedAt": "2026-11-08T04:24:12.200Z",
       "syllabusErrors": []
     },
     {
@@ -82,7 +82,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:24.951Z",
+      "checkedAt": "2026-11-08T04:24:11.807Z",
       "syllabusErrors": []
     },
     {
@@ -101,7 +101,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.310Z",
+      "checkedAt": "2026-11-08T04:24:11.810Z",
       "syllabusErrors": []
     },
     {
@@ -121,7 +121,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.004Z",
+      "checkedAt": "2026-11-08T04:24:12.076Z",
       "syllabusErrors": []
     },
     {
@@ -141,7 +141,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.064Z",
+      "checkedAt": "2026-11-08T04:24:11.872Z",
       "syllabusErrors": []
     },
     {
@@ -161,7 +161,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.256Z",
+      "checkedAt": "2026-11-08T04:24:11.982Z",
       "syllabusErrors": []
     },
     {
@@ -181,7 +181,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.182Z",
+      "checkedAt": "2026-11-08T04:24:11.973Z",
       "syllabusErrors": []
     },
     {
@@ -202,7 +202,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-07T13:47:25.197Z",
+      "checkedAt": "2026-11-08T04:24:12.612Z",
       "syllabusErrors": []
     }
   ],
@@ -390,6 +390,15 @@
   ],
   "syllabus": [
     {
+      "id": "ce-b-tech-batch-2024-onwards",
+      "label": "B.Tech (Batch 2024 & Onwards)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/3_4_5_6_syllabus_draft_8_3_26_Print_website%206th%20sem.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
       "id": "ce-b-tech-batch-2017-onwards",
       "label": "B.Tech (Batch 2017 & Onwards)",
       "url": "https://ce.gndec.ac.in/sites/default/files/Study%20scheme%20and%20CO%20of%20UG%202017_Jan_2019.pdf",
@@ -402,6 +411,15 @@
       "id": "ce-b-tech-batch-2014-onwards",
       "label": "B.Tech (Batch 2014 & Onwards)",
       "url": "https://ce.gndec.ac.in/sites/default/files/Study%20scheme%20and%20CO%20of%20UG%202014_2_1.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-b-tech-batch-2011-onwards",
+      "label": "B.Tech (Batch 2011 & Onwards)",
+      "url": "https://ce.gndec.ac.in/Syllabus_of_B.Tech-Civil.pdf",
       "department": "Civil Engineering",
       "departmentId": "ce",
       "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
@@ -459,6 +477,60 @@
       "department": "Civil Engineering",
       "departmentId": "ce",
       "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-structural-engineering-batch-2014-onward",
+      "label": "M.Tech Structural Engineering (Batch 2014 & Onward)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Scheme%26Syllabus_Structural_2014_Nov%202016.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-geotechnical-engineering-smfe-batch-2014-onward",
+      "label": "M.Tech Geotechnical Engineering &SMFE (Batch 2014 & Onward)",
+      "url": "https://ce.gndec.ac.in/SchemeSyllabus_Geotech_Aug-20161.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-m-tech-environmental-science-engineering-batch-2014-onward",
+      "label": "M.Tech Environmental Science & Engineering (Batch 2014 & Onward)",
+      "url": "https://ce.gndec.ac.in/SchemeSyllabus_Env.Sci-_Aug-2016.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "ce-minor-engineering-in-b-tech-civil",
+      "label": "Minor Engineering in B.Tech (Civil)",
+      "url": "https://ce.gndec.ac.in/sites/default/files/Minor_Engg_Syllabus_and_scheme_2.pdf",
+      "department": "Civil Engineering",
+      "departmentId": "ce",
+      "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "cse-minor-engineering-degree-in-computer-science-and-engineering",
+      "label": "Minor Engineering Degree in Computer Science and Engineering",
+      "url": "https://cse.gndec.ac.in/sites/default/files/MinorDegreeSyllabus.pdf",
+      "department": "Computer Science & Engineering",
+      "departmentId": "cse",
+      "sourcePage": "https://cse.gndec.ac.in/?q=node/2",
+      "external": false
+    },
+    {
+      "id": "cse-postgraduate-diploma-in-machine-learning-and-artificial-intelligence",
+      "label": "Postgraduate Diploma in Machine Learning and Artificial Intelligence",
+      "url": "https://cse.gndec.ac.in/sites/default/files/PG-Diploma_in_ML_and_AI__Scheme_and_Syllabus.pdf",
+      "department": "Computer Science & Engineering",
+      "departmentId": "cse",
+      "sourcePage": "https://cse.gndec.ac.in/?q=node/2",
       "external": false
     },
     {
@@ -1249,9 +1321,9 @@
     "departments": 10,
     "departmentsWithHod": 10,
     "notices": 20,
-    "syllabusDocuments": 95
+    "syllabusDocuments": 103
   },
   "noticeboardError": "",
   "unavailableDepartments": [],
-  "seededAt": "2026-11-07T13:47:37.212Z"
+  "seededAt": "2026-11-08T04:24:24.117Z"
 }

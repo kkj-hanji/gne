@@ -136,3 +136,13 @@ test("campus chat matches qualified notice requests without stealing subject syl
   assert.equal(campus.matches("physics syllabus"), false);
   assert.equal(campus.matches("CSE syllabus pdf"), true);
 });
+
+test("syllabus discovery accepts camelCase and underscore-joined official file names", () => {
+  const department = { id: "cse", short: "CSE", name: "Computer Science & Engineering" };
+  const html = `
+    <a href="/sites/default/files/MinorDegreeSyllabus.pdf">Minor Degree</a>
+    <a href="/sites/default/files/PG-Diploma_in_ML_and_AI__Scheme_and_Syllabus.pdf">PG Diploma</a>`;
+  const documents = parseSyllabusLinks(html, "https://cse.gndec.ac.in/?q=node/2", department);
+  assert.equal(documents.length, 2);
+  assert.ok(documents.every((document) => document.departmentId === "cse"));
+});
