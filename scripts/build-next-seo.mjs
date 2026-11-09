@@ -32,19 +32,36 @@ const ORIGIN = normalizeOrigin(process.env.PUBLIC_ORIGIN || SITE.defaultOrigin);
 const LEGACY = process.env.LEGACY_ORIGIN || "https://gndec-compass.koush3069.workers.dev";
 
 const SOURCES = {
-  groups: { local: [".cache-next/groups.html", "fet_groups.html"], url: `${LEGACY}/api/timetable?source=groups` },
-  rooms: { local: [".cache-next/rooms.html", "fet_rooms.html"], url: `${LEGACY}/api/timetable?source=rooms` },
-  datesheet: { local: [".cache-next/datesheet.json", "data/end-sem-datesheet.json"], url: `${LEGACY}/data/end-sem-datesheet.json` }
+  groups: { local: [".cache-next/groups.html"], url: `${LEGACY}/api/timetable?source=groups` },
+  rooms: { local: [".cache-next/rooms.html"], url: `${LEGACY}/api/timetable?source=rooms` },
+  datesheet: { local: [".cache-next/datesheet.json"], url: `${LEGACY}/data/end-sem-datesheet.json` }
 };
+
+/**
+ * Refuse to publish a source that lost characters in transit. A single U+FFFD
+ * means the bytes were decoded with the wrong charset (or a body was truncated),
+ * and publishing it would put mangled names and rooms on the site.
+ */
+function assertReadable(key, text) {
+  const losses = (text.match(/\uFFFD/g) || []).length;
+  if (losses) throw new Error(`${key} source has ${losses} unreadable character(s); refusing to publish partial facts. Clear .cache-next and retry.`);
+  return text;
+}
 
 async function loadSource(key) {
   for (const relative of SOURCES[key].local) {
     const candidate = path.join(ROOT, relative);
-    if (existsSync(candidate)) return readFile(candidate, "utf8");
+    if (!existsSync(candidate)) continue;
+    const cached = await readFile(candidate, "utf8");
+    if ((cached.match(/\uFFFD/g) || []).length) {
+      console.warn(`${relative} is unreadable; refetching ${key} from the verified release.`);
+      continue;
+    }
+    return cached;
   }
   const response = await fetch(SOURCES[key].url, { headers: { Accept: "text/html,application/json" } });
   if (!response.ok) throw new Error(`${key} fetch failed: HTTP ${response.status}`);
-  const text = await response.text();
+  const text = assertReadable(key, await response.text());
   await mkdir(CACHE, { recursive: true });
   await writeFile(path.join(CACHE, `${key}${key === "datesheet" ? ".json" : ".html"}`), text, "utf8");
   return text;

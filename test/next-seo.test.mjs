@@ -194,6 +194,14 @@ test("no page advertises a feature the app does not have (map, AI timetable)", a
   }
 });
 
+test("the generator never publishes a source it cannot read cleanly", async () => {
+  const script = await read("scripts/build-next-seo.mjs");
+  // The committed legacy fixture is a historical snapshot and is not a valid
+  // source for fresh pages: it contains characters lost in transit.
+  assert.doesNotMatch(script, /fet_groups\.html/, "SEO pages must come from the live release or .cache-next");
+  assert.match(script, /\\uFFFD/, "the generator must refuse undecodable source text");
+});
+
 /* ── sitemap, robots, social image ─────────────────────────────────────── */
 
 test("sitemap lists every route and generated page exactly once", async () => {
