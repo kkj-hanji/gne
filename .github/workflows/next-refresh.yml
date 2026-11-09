@@ -25,6 +25,8 @@ jobs:
     env:
       PUBLIC_ORIGIN: https://gndec-compass-next.koush3069.workers.dev
       LEGACY_ORIGIN: https://gndec-compass.koush3069.workers.dev
+      # Empty when the secret is not configured; the deploy step then skips.
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,8 +68,6 @@ jobs:
 
       - name: Deploy the new Worker
         if: steps.commit.outputs.changed == 'true' && env.CF_TOKEN != ''
-        env:
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

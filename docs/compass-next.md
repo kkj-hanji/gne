@@ -179,6 +179,9 @@ never sends settings to a server.
 - Static pages are regenerated from the verified release and stale pages are
   removed, so the site cannot advertise a section or teacher that no longer
   exists.
+- The generator reads only the live release or the local `.cache-next`
+  snapshot, and refuses a source that contains replacement characters, so a
+  truncated or mis-decoded body can never be published as fact.
 - Canonical origin defaults to
   `https://gndec-compass-next.koush3069.workers.dev` and can be overridden with
   the `PUBLIC_ORIGIN` Worker variable.
