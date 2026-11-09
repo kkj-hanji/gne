@@ -4,16 +4,38 @@
   "main": "src/next-worker.js",
   "compatibility_date": "2026-08-11",
   "vars": {
-    "APP_VERSION": "2.0.0",
+    "APP_VERSION": "2.1.0",
     "APP_CHANNEL": "stable",
     "BUILD_TIME": "2026-11-09",
     "PUBLIC_ORIGIN": "https://gndec-compass-next.koush3069.workers.dev",
-    "LEGACY_ORIGIN": "https://gndec-compass.koush3069.workers.dev"
+    "LEGACY_ORIGIN": "https://gndec-compass.koush3069.workers.dev",
+    "V2_ORIGIN": "https://gndec-compass-v2.koush3069.workers.dev"
   },
+  "kv_namespaces": [
+    {
+      "binding": "CONTENT",
+      "id": "dd250c35d94b4468b5340b324a5e6c03"
+    }
+  ],
   "assets": {
     "directory": "next",
     "binding": "ASSETS",
-    "run_worker_first": ["/", "/api/*", "/today", "/timetable", "/rooms", "/ask", "/notices", "/directory", "/compare", "/settings"],
+    "run_worker_first": [
+      "/",
+      "/api/*",
+      "/today",
+      "/timetable",
+      "/rooms",
+      "/ask",
+      "/notices",
+      "/papers",
+      "/syllabus",
+      "/calendar",
+      "/directory",
+      "/compare",
+      "/settings",
+      "/admin"
+    ],
     "not_found_handling": "single-page-application"
   },
   "services": [

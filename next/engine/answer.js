@@ -25,6 +25,10 @@ import {
   resolveQuestionDay
 } from "./datetime.js";
 import { computeFreeRooms, formatFreeWindow, groupRooms, isRoomFree, zoneFromQuestion } from "./free-rooms.js";
+import { academicPeriodFor, dayOfWeek, holidayOn, upcomingHolidays } from "./calendar.js";
+import { filterNotices, noticeStats } from "./notices.js";
+import { searchPapers } from "./papers.js";
+import { searchSyllabus } from "./syllabus.js";
 import {
   bestMatch,
   canonicalize,
@@ -777,14 +781,222 @@ function datesheetSource(data) {
   return `<p class="answer-source">${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Official tentative ESE datesheet</a>` : "Official tentative ESE datesheet"}${data?.checkedAt ? ` · checked ${escapeHtml(String(data.checkedAt).slice(0, 10))}` : ""}.</p>`;
 }
 
-function holidayResult(question, ctx) {
-  if (!wants(question, VOCAB.holiday) && !wants(question, ["college open", "college closed", "classes off"])) return null;
+/* ── Content results: notices, papers, syllabus, calendar, mentoring ───── */
+
+const CONTENT_STOPWORDS = Object.freeze([
+  "notice", "notices", "latest", "new", "news", "update", "updates", "college", "gndec",
+  "kya", "hai", "hain", "what", "which", "about", "show", "tell", "give", "any", "the",
+  "for", "from", "with", "and", "today", "aaj", "please", "kindly", "bata", "batao",
+  "question", "questions", "bank", "banks", "paper", "papers", "previous", "year", "years",
+  "old", "past", "sample", "pyq", "pyqs", "sqb", "subject", "subjects", "document", "documents",
+  "syllabus", "syllabi", "link", "links", "list", "find", "search"
+]);
+
+function contentQuery(text) {
+  return contentTokens(text)
+    .filter((token) => token.length > 1 && !CONTENT_STOPWORDS.includes(token))
+    .slice(0, 6)
+    .join(" ");
+}
+
+function contentSource(href, label) {
+  return href
+    ? `<p class="answer-source"><a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a></p>`
+    : "";
+}
+
+function noticesResult(question, ctx) {
+  const text = canonicalize(question);
+  if (!wants(text, ["notice", "notices", "noticeboard", "notice board", "circular", "suchna", "soochna", "news", "update", "updates"])) return null;
+  const list = Array.isArray(ctx.notices) ? ctx.notices : [];
+  const today = ctx.now?.dateISO || new Date().toISOString().slice(0, 10);
+  if (!list.length) {
+    return {
+      html: `<p><strong>No verified notice is loaded on this device right now.</strong></p>
+        <p>Compass will not invent a notice or a date. The official GNDEC notice board always has the latest circulars.</p>
+        ${contentSource("https://erp.gndec.ac.in/notice", "Open the official GNDEC notice board")}`,
+      intent: "NOTICES_EMPTY", confidence: 0.9,
+      plan: ["check the loaded notice sources", "refuse to invent a notice", "point to the official board"]
+    };
+  }
+  const query = contentQuery(text);
+  const stats = noticeStats(list, today);
+  const matched = (query ? filterNotices(list, { query }) : list).slice(0, 6);
+  if (!matched.length) {
+    return {
+      html: `<p>No published notice matches <strong>${escapeHtml(query)}</strong>. ${stats.total} notices are loaded, but none mention that.</p>
+        <p>Open Notices to search the full list, or check the official board.</p>
+        ${contentSource("https://erp.gndec.ac.in/notice", "Official GNDEC notice board")}`,
+      intent: "NOTICES_NONE", confidence: 0.9,
+      plan: ["read the merged notice sources", "match the requested words", "refuse to invent a notice"]
+    };
+  }
   return {
-    html: `<p><strong>Compass does not load a verified holiday calendar on this device.</strong></p>
-      <p>Check the official GNDEC notice board before assuming a holiday. Your published weekly timetable still applies unless the college announces a change.</p>`,
-    intent: "HOLIDAY_UNAVAILABLE", confidence: 0.88,
-    plan: ["check for verified holiday data", "refuse to guess", "point to official notices"],
-    entities: {}
+    html: `<p><strong>${stats.total} published notice${stats.total === 1 ? "" : "s"}</strong>${stats.fresh ? ` · ${stats.fresh} new in the last 14 days` : ""}${query ? ` · matching “${escapeHtml(query)}”` : " · newest first"}</p>
+      <div class="answer-table">${matched.map((notice) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(notice.date || "Undated")}</div><div class="answer-class-body"><strong>${notice.url ? `<a href="${escapeHtml(notice.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a>` : escapeHtml(notice.title)}</strong><div class="answer-class-meta">${escapeHtml(notice.category)}${notice.author ? ` · ${escapeHtml(notice.author)}` : ""} · ${escapeHtml(notice.admin ? "admin" : notice.transcribed ? "transcribed" : "official")}</div></div></div>`).join("")}</div>
+      <p class="answer-meta">Every entry links its source. Compass never rewrites a notice.</p>`,
+    intent: "NOTICES", confidence: 0.93,
+    plan: ["merge admin, transcribed and official notices", "de-duplicate by source URL", "filter by the requested words", "link the original"],
+    entities: { query }
+  };
+}
+
+function papersResult(question, ctx) {
+  const text = canonicalize(question);
+  if (!wants(text, ["question bank", "question banks", "question paper", "question papers", "previous year", "previous years", "pyq", "pyqs", "past paper", "old paper", "sample paper", "sqb", "syllabus paper"])) return null;
+  const list = Array.isArray(ctx.papers) ? ctx.papers : [];
+  if (!list.length) return null;
+  const query = contentQuery(text);
+  const matched = searchPapers(list, query, { limit: 8 });
+  if (!matched.length) {
+    return {
+      html: `<p>No verified question bank matches <strong>${escapeHtml(query || "that")}</strong>. ${list.length} official documents are indexed.</p>
+        <p>Open Papers to search every indexed subject, or ask your department for the paper.</p>`,
+      intent: "PAPERS_NONE", confidence: 0.9,
+      plan: ["read the official question-bank index", "match subject or code", "refuse to invent a paper"]
+    };
+  }
+  return {
+    html: `<p><strong>Official question banks</strong>${query ? ` · matching “${escapeHtml(query)}”` : ` · ${list.length} indexed`}</p>
+      <div class="answer-table">${matched.map((paper) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(paper.code || paper.semester || "PDF")}</div><div class="answer-class-body"><strong><a href="${escapeHtml(paper.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(paper.subject)}</a></strong><div class="answer-class-meta">${escapeHtml(paper.department || "GNDEC")}${paper.semester ? ` · semester ${escapeHtml(paper.semester)}` : ""} · official PDF</div></div></div>`).join("")}</div>
+      <p class="answer-meta">Compass indexes the official link and never hosts or rewrites a paper.</p>`,
+    intent: "PAPERS", confidence: 0.93,
+    plan: ["read the official question-bank index", "match subject, code or department", "link the official PDF"],
+    entities: { query }
+  };
+}
+
+function syllabusResult(question, ctx) {
+  const text = canonicalize(question);
+  if (!wants(text, VOCAB.syllabus)) return null;
+  const list = Array.isArray(ctx.syllabus) ? ctx.syllabus : [];
+  if (!list.length) return null;
+  const query = contentQuery(text);
+  const matched = searchSyllabus(list, query, { limit: 8 });
+  if (!matched.length) {
+    return {
+      html: `<p>No published syllabus document matches <strong>${escapeHtml(query || "that")}</strong>. ${list.length} official documents are indexed.</p>
+        <p>Open Syllabus to browse by department and batch.</p>`,
+      intent: "SYLLABUS_NONE", confidence: 0.9,
+      plan: ["read the official syllabus index", "match department or batch", "refuse to invent contents"]
+    };
+  }
+  return {
+    html: `<p><strong>Official syllabus documents</strong>${query ? ` · matching “${escapeHtml(query)}”` : ""}</p>
+      <div class="answer-table">${matched.map((doc) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(doc.semester ? `Sem ${doc.semester}` : "PDF")}</div><div class="answer-class-body"><strong><a href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc.label)}</a></strong><div class="answer-class-meta">${escapeHtml(doc.department)} · official PDF</div></div></div>`).join("")}</div>
+      <p class="answer-meta">Compass links the document; it never re-types a syllabus or invents a unit.</p>`,
+    intent: "SYLLABUS", confidence: 0.93,
+    plan: ["read the official syllabus index", "match department, batch or semester", "link the official PDF"],
+    entities: { query }
+  };
+}
+
+function academicCalendarResult(question, ctx) {
+  const text = canonicalize(question);
+  if (!wants(text, ["academic calendar", "semester", "session", "preparatory", "vacation"])) return null;
+  const periods = academicPeriodFor(text);
+  if (!periods.length) return null;
+  return {
+    html: `<p><strong>Published academic periods</strong></p>
+      <div class="answer-table">${periods.map((period) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(period.start)}</div><div class="answer-class-body"><strong>${escapeHtml(period.scope)}</strong><div class="answer-class-meta">Semester starts ${escapeHtml(period.start)} · preparatory leave ${escapeHtml(period.prepStart)} → ${escapeHtml(period.prepEnd)} · examinations from ${escapeHtml(period.examsStart)}</div></div></div>`).join("")}</div>
+      <p class="answer-meta">These are published academic periods, not individual subject sittings. Check the official datesheet before travelling.</p>
+      ${contentSource("https://gndec.ac.in/sites/default/files/acjul-dec26.pdf", "Official academic calendar PDF")}`,
+    intent: "ACADEMIC_CALENDAR", confidence: 0.92,
+    plan: ["read the published academic calendar", "filter the requested programme", "never infer a subject sitting"]
+  };
+}
+
+function mentoringResult(question, ctx) {
+  const text = canonicalize(question);
+  if (!wants(text, ["mentor", "mentoring", "mentorship"])) return null;
+  // Only a question about *my* mentor uses the device profile. A bare mention
+  // ("section and mentor") belongs to the profile answer and must not split.
+  if (!wants(text, ["my", "mine", "mera", "meri", "mere"])) return null;
+  const profile = ctx.profile || {};
+  if (!profile.mentor) {
+    return {
+      html: `<p><strong>No mentor is saved on this device.</strong></p>
+        <p>Add your mentor in <strong>Settings → Profile</strong>. Compass then fills the mentoring class teacher and venue only when the official timetable leaves them blank.</p>`,
+      intent: "MENTOR_EMPTY", confidence: 0.9,
+      plan: ["read the device profile", "refuse to guess a mentor", "offer profile setup"]
+    };
+  }
+  const venue = profile.mentorVenue || profile.venue;
+  return {
+    html: `<p><strong>Your saved mentor:</strong> ${escapeHtml(profile.mentor)}${venue ? ` · ${escapeHtml(venue)}` : ""}</p>
+      <p class="answer-meta">Saved on this device and applied only to your selected section and sub-group. The official timetable always wins when it prints a teacher or room.</p>`,
+    intent: "MENTOR", confidence: 0.95,
+    plan: ["read the saved device profile", "match the selected section", "never overwrite printed timetable details"]
+  };
+}
+
+function departmentResult(question, ctx) {
+  const text = canonicalize(question);
+  if (!wants(text, ["hod", "head of department", "department", "dept", "branch"])) return null;
+  const departments = Array.isArray(ctx.departments) ? ctx.departments : [];
+  if (!departments.length) return null;
+  const lower = text;
+  const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = departments.find((dept) => dept?.name && lower.includes(String(dept.name).toLowerCase()))
+    || departments.find((dept) => dept?.short && new RegExp(`\\b${escapeRe(String(dept.short).toLowerCase())}\\b`).test(lower));
+  if (!match) return null;
+  const hod = match.hod || {};
+  if (!hod.name) {
+    return {
+      html: `<p><strong>${escapeHtml(match.name)}</strong></p><p>No verified head-of-department detail is published for this department right now.</p>${contentSource(match.homepage, "Official department page")}`,
+      intent: "DEPARTMENT_NO_HOD", confidence: 0.85,
+      plan: ["read the official campus directory", "refuse to invent a name", "link the department page"]
+    };
+  }
+  return {
+    html: `<p><strong>${escapeHtml(match.name)}</strong> · Head of Department: <strong>${escapeHtml(hod.name)}</strong></p>
+      <p class="answer-meta">${hod.email ? `${escapeHtml(hod.email)} · ` : ""}${hod.phone ? `${escapeHtml(hod.phone)} · ` : ""}${hod.verified === false ? "not verified" : "verified from the official department page"}</p>
+      ${contentSource(hod.sourceUrl || match.homepage, "Official department page")}`,
+    intent: "DEPARTMENT", confidence: 0.92,
+    plan: ["read the official campus directory", "match the department", "link the department page"]
+  };
+}
+
+function holidayResult(question, ctx) {
+  const text = canonicalize(question);
+  if (!wants(text, VOCAB.holiday) && !wants(text, ["college open", "college closed", "classes off", "chutti", "chhutti", "off day"])) return null;
+  const overrides = Array.isArray(ctx.holidays) ? ctx.holidays : [];
+  const today = ctx.now?.dateISO || new Date().toISOString().slice(0, 10);
+  const explicit = parseDateQuestion(text);
+  if (explicit) {
+    const item = holidayOn(explicit, overrides);
+    if (item) {
+      const kind = item.type === "working" ? "a working day" : item.type === "restricted" ? "a restricted holiday" : item.type === "half-day" ? "a half-day" : "a closed holiday";
+      return {
+        html: `<p><strong>${escapeHtml(explicit)} (${escapeHtml(dayOfWeek(explicit))}) is ${kind}: ${escapeHtml(item.name)}.</strong></p>
+          <p class="answer-meta">${item.overridden ? "This date is an admin-confirmed override." : "From the official GNDEC holiday list."} Your weekly timetable still applies to working days.</p>`,
+        intent: "HOLIDAY", confidence: 0.95,
+        plan: ["read the official holiday list", "merge admin overrides", "answer the requested date"]
+      };
+    }
+    return {
+      html: `<p>No published holiday or override is recorded for <strong>${escapeHtml(explicit)}</strong>.</p>
+        <p>Compass will not guess a holiday. Check the official notice board before assuming a day off.</p>
+        ${contentSource("https://gndec.ac.in/?q=holidays", "Official GNDEC holiday list")}`,
+      intent: "HOLIDAY_NONE", confidence: 0.9,
+      plan: ["read the official holiday list", "check admin overrides", "refuse to guess"]
+    };
+  }
+  const upcoming = upcomingHolidays(today, { overrides, limit: 6 });
+  if (!upcoming.length) {
+    return {
+      html: `<p>No further published holiday remains in this academic year. Compass will not invent one.</p>
+        ${contentSource("https://gndec.ac.in/?q=holidays", "Official GNDEC holiday list")}`,
+      intent: "HOLIDAY_NONE", confidence: 0.9,
+      plan: ["read the official holiday list", "filter dates after today", "refuse to guess"]
+    };
+  }
+  return {
+    html: `<p><strong>Next published holidays</strong></p>
+      <div class="answer-table">${upcoming.map((item) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(item.date)}</div><div class="answer-class-body"><strong>${escapeHtml(item.name)}</strong><div class="answer-class-meta">${escapeHtml(dayOfWeek(item.date))}${item.type !== "holiday" ? ` · ${escapeHtml(item.type)}` : ""}${item.overridden ? " · admin override" : " · official list"}</div></div></div>`).join("")}</div>
+      ${contentSource("https://gndec.ac.in/sites/default/files/LoH26.pdf", "Official holiday list PDF")}`,
+    intent: "HOLIDAY", confidence: 0.94,
+    plan: ["read the official holiday list", "merge admin overrides", "list the next published dates"]
   };
 }
 
@@ -916,10 +1128,24 @@ function answerOnce(question, ctx, memory) {
   const profile = profileResult(text, ctx);
   if (profile) return profile;
 
-  if (wants(text, VOCAB.syllabus) && !wants(text, VOCAB.exam)) {
-    // Syllabus and catalogue facts belong to the verified Brain/external layer.
-    return null;
-  }
+  // Content answers work before the timetable loads: notices, papers,
+  // syllabus links, mentors, departments, the calendar and the datesheet all
+  // come from their own verified source.
+  const contentAnswer = noticesResult(text, ctx)
+    || papersResult(text, ctx)
+    || syllabusResult(text, ctx)
+    || mentoringResult(text, ctx)
+    || departmentResult(text, ctx);
+  if (contentAnswer) return contentAnswer;
+
+  const academic = academicCalendarResult(text, ctx);
+  if (academic) return academic;
+
+  const holidayEarly = holidayResult(text, ctx);
+  if (holidayEarly) return holidayEarly;
+
+  const datesheetEarly = datesheetResult(text, ctx);
+  if (datesheetEarly) return datesheetEarly;
 
   if (!ctx.schedule?.length) {
     return {
@@ -941,9 +1167,6 @@ function answerOnce(question, ctx, memory) {
   const attendance = attendanceResult(text, scopedCtx);
   if (attendance) return attendance;
 
-  const datesheet = datesheetResult(text, scopedCtx);
-  if (datesheet) return datesheet;
-
   const freeRooms = freeRoomsResult(text, scopedCtx);
   if (freeRooms) return freeRooms;
 
@@ -957,9 +1180,6 @@ function answerOnce(question, ctx, memory) {
   if (nextIntent && wants(text, ["class", "lecture", "period", "slot"])) return nextClassResult(scopedCtx);
 
   if (wants(text, VOCAB.week)) return weekResult(scopedCtx);
-
-  const holiday = holidayResult(text, scopedCtx);
-  if (holiday) return holiday;
 
   const day = resolveQuestionDay(text, scopedCtx.now);
   if (day) {
@@ -1045,6 +1265,11 @@ export function buildAnswerContext({
   now = getIndiaNow(),
   metadata = null,
   datesheet = null,
+  notices = [],
+  papers = [],
+  syllabus = [],
+  holidays = [],
+  departments = [],
   clock = "12h",
   showTeacher = true,
   showRoom = true,
@@ -1055,6 +1280,7 @@ export function buildAnswerContext({
 } = {}) {
   return {
     schedule, roomSchedule, group, subgroup, profile, now, metadata, datesheet,
+    notices, papers, syllabus, holidays, departments,
     clock, showTeacher, showRoom, showCode, roomDuration, includeLabs, includeLectureHalls
   };
 }

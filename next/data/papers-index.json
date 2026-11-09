@@ -1,0 +1,617 @@
+{
+  "builtAt": "2026-11-09T14:44:18.622Z",
+  "note": "Official subject question banks published by a GNDEC department. Compass links the source PDF and never hosts a copy.",
+  "sources": [
+    {
+      "department": "Information Technology",
+      "departmentId": "it",
+      "url": "https://it.gndec.ac.in/?q=sqb",
+      "label": "Subject Question Bank",
+      "found": 81,
+      "error": ""
+    }
+  ],
+  "total": 75,
+  "papers": [
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/DCLD_ESIT-101.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Digital circuits and Logic Design(ESIT-101)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Object%20Oriented%20Programming%20using%20C%2B%2B%20PCIT102.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Object Oriented Programming using C++ (PCIT102)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Data%20Structures%20%28PCIT-101%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Data Structures (PCIT-101)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Data%20Communication%20and%20Computer%20Networks%20PCIT-103.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Data Communication and Computer Networks( PCIT-103)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Professional%20Practice%2C%20Lawa%20%26%20Ethics%20for%20IT%20Engineers%28HSIMT_101%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Professional Practice, Lawa & Ethics for IT Engineers(HSIMT_101)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/theory%20of%20computation-it-14503.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Theory of computation(IT-14503)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/DOT%20NET%20Technologies%20%20%20DEIT-14514.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "DOT NET Technologies (DEIT-14514)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Cloud%20Infrastructure%20and%20Services%20%28Elective-III%29_DEIT-14713.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Cloud Infrastructure and Services (Elective-III)(DEIT-14713)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/JAVA_IT-14502.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "JAVA(IT-14502)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Business%20Enterprise%20Application%20%2814701%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Business Enterprise Application (14701)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Computer%20Forensics%20DEIT-14718.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Computer Forensics (DEIT-14718)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/BIA%20Ques_bank%28Elective%20.1%29-converted.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Business Intelligence & Its Application(DEIT-14510)(Elective .1)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/IT-14702%20ICT%20in%20Agriculture%20and%20Rural%20Development.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "ICT in Agriculture and Rural Development(IT-14702 )",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Advanced%20Web%20Technologies%20-%20DEIT-14516.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Advanced Web Technologies (DEIT-14516)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Professional%20Elective%20July-Dec%202026%20pdf.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Notice regarding Professional Elective -IV for B.Tech 5th Sem students ( Batch 2024-2028 ) Study Scheme 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Final%20Training%20Semester%20Allotment%20Batch%202023-27%20-%20Sheet1.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Final Allotment Training Semester Batch(2023-2027)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/New%20Final%20List%20Elective%20full%20%281%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Electives for Session Jan-May 2026 (8th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/makeup%20Sep%202025.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Schedule for display of Makeup answer sheets for May 2025",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/WhatsApp%20Image%202025-06-30%20at%2010.31.14.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Schedule for display of answer sheets of ESE of 8th semester",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/WhatsApp%20Image%202025-06-13%20at%2011.33.02%20AM%20%281%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Institutional Training (TR 101) on “ Linux Administration” for Batch 2024-2028",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Training%204%20weeks.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "4 week Summer Training Program on SMARTFUSION ( June-July, 2025)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Final%20Allotment%20Training%20Semester%20Batch%282022-2026%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Final Allotment Training Semester Batch(2022-2026)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Makeup%20%20Display%20sheets.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Schedule for display of Makeup for Nov 2024 answer sheets of B.Tech and M.Tech",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Training%20TR-103%20Internal%20Viva%20%281%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Training( TR-103) Internal Viva Schedule (Aug-Dec 2024)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Training%20TR-104%20Internal%20Viva%20%281%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Training( TR-104) Internal Viva Schedule (Aug-Dec 2024)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Student%203rd%20sem%20Btech%20Mtech%20duty%20chart_24.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "B.Tech. ( 3rd Sem) and M.Tech. (CSIT, 1st Sem) Date sheet for the Internal & External Practical Examination of Regular and Reappear (Aug-Dec 2024)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Student%205th%207th%20sem%20duty%20chart_24.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "B.Tech. ( 5th , 7th Sem) and M.Tech. (CSIT, 3rd Sem) Date sheet for the Internal & External Practical Examination of Regular and Reappear (Aug-Dec 2024)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Copy%2520of%2520Even%2520Sem%2520display%2520sheets.pdf.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Schedule for Display of Answer sheets of ESE of M.Tech and B.Tech 4th and 6th semester (JAN-MAY 2024)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/26-4-24%28Friday_Morning%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Seating Plan 26th April 2024 (Morning) Mid Semester Examination-2 (JAN-MAY 2024)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Training%20Semester%20Altotment%20Batch%202021-25.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Training Semester Allotment Batch 2021-25",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Elective%20III%20and%20IV%20for%20session%20Jan-%20May%2C%202024%288th%20Sem%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-III & IV for session Jan-June 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Elective-II%20for%20session%20Jan-May%202024%20%286th%20Semester%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-II for session Jan-June 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Student%20External%20Duty%20Chart_23.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Schedule for Practical Exam (AUG - DEC 2023)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Electives%20for%203rd%20year%20%285th%20Sem%29%20Aug-Dec%202023%20final.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-1 for Session Aug-Dec 2023 (5th Semester) (Scheme-2018)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Adobe%20Scan%2027%20Jun%202023.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Summer Training in Coordination with Infosys",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/elec2%206th%20sem.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-2 for session Jan-Jun 2023 (6th Semester) (Scheme-2018)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/8th%20sem%20elective%20III%20%26%20IV.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-3 and Elective-4 for session Jan-June 2023 (8th Semester) (Scheme-2018)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/ilovepdf_merged.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Notice of Internal Viva (TR-103, TR-104) (AUG - DEC 2022)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/20220920101433.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "M.Tech Datesheet Mid Semester Examination-1 (AUG-DEC 2022)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/20220920101352.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "B.Tech Datesheet Mid Semester Examination-1 (AUG-DEC 2022)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/8th%20sem%20elective%20alotted.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Updated:Elective-3 and Elective-4 for session Aug-Dec 2022 (7th Semester) (Scheme-2018)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/ELECTIVE%203rd%20year%202022final%20list%20%281%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Updated: Elective-1 for session Aug-Dec 2022 (5th Semester) (Scheme-2018))",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/One%20Semester%20Training%20%28TR-104%29%20Session%20Aug%20-%20Dec%202022.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "One Semester Training (TR-104) Session Aug - Dec 2022",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Guidelines%20for%206%20Months%20Industrial%20Training%20TR-104.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Notice: Guidelines for 6 Months Industrial Training TR-104",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Guidelines%20for%204%20Weeks%20Training%20TR-102%20%26%20TR-103%20%281%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Notice:Guidelines for 4 Weeks Training TR-102 & TR-103",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/IMG_20210719_160043.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Industrial Training 2nd Sem",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/newsletter-it-dept%20july-dec%202025_compressed.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Newsletter July-Dec 2025",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/newsletter-it-dept%20%281%29_compressed-2.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Newsletter Jan-June 2025",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/NW_FINAL_NEWSLETTER_24-11.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Newsletter Aug-Dec 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/SECTIONS%202025-29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of Third Semester (Batch 2025-2029) session Aug-Dec 2026",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Design%20Thinking%20%20Groups%202024-28.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of Design Thinking of 5th Semester (Batch 2024-2028) session Aug-Dec 2026",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Detension_Subjects_Alotment%20website.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Detention Students Subject Allotment ( Jan-May 2026)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/CLASS%28D2_IT%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Updated time table for D2IT (Section A, B& C) w.e.f 13 October 2025",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Book1%20%282%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of Third Semester (Batch 2024-2028) session Aug-Dec 2025",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/course%20choice%20sem%205%20batch%202023%20%281%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Electives for Session Aug-Dec 2025 (5th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/Elective%20Allotment%28%20Sem%207%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Electives for Session Aug-Dec 2025 (7th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/elective_choice%20for%206th%20sem.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-II for Session Jan-June 2025 (6th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/elective%203rd%20and%204th%20for%208%20sem.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-III & IV for Session Jan-June 2025 (8th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/ELECTIVE%20Choice%20for%20all%20final%20year%20batch%202021-25%20%287th%20sem%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-III and IV for Session Aug-Dec 2024 (7th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/elective_choice_5th-sem-2.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Elective-I for Session Aug-Dec 2024 (5th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D2IT2024%20-%20D2IT%2823-27%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of Third Semester (Batch 2023-2027) session Aug-Dec 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D2IT_4.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of Fourth Semester (Batch 2022-2026) session Jan-June 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D3IT_2.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of Sixth Semester (Batch 2021-2025) session Jan-June 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D4IT.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of 7th/8th Semester (Batch 2020-2024) session Jan-June 2024",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D2IT_3.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Updated List of Students of Third Semester (Batch 2022-2026) session July-Dec 2023",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/FINAL_D3_IT.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of Fifth Semester (Batch 2021-2025) session July-Dec 2023",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D4IT%20_0.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "List of Students of 7th/8th Semester (Batch 2020-2024) session July-Dec 2023",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D2IT%20Section-wise%20Student%20List%20%282%29_0.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Second Year Section-wise Student List(July-Dec, 2022)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D3IT%20Section-wise%20Student%20List.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Third Year Students (5th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D4IT%20Students%287th-8th%20Sem%29.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Final Year Students (7th/8th Semester)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/student_achievement_fulldata.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Achievements of students",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/stiphend_students.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Stipend to Student",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/D2IT%20%282%29_0.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "D2-IT Student list (Session : Aug - Dec, 2020)",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/laboratories.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Laboratories",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    },
+    {
+      "url": "https://it.gndec.ac.in/sites/default/files/infrastructure.pdf",
+      "department": "Information Technology",
+      "departmentId": "it",
+      "title": "Infrastructure",
+      "source": "https://it.gndec.ac.in/?q=sqb",
+      "type": "question-bank"
+    }
+  ]
+}

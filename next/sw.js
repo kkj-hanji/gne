@@ -9,7 +9,7 @@
  *   navigation cached shell, never a guessed offline error page
  */
 
-const VERSION = "compass-next-v2.3.0";
+const VERSION = "compass-next-v2.4.0";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 
@@ -32,6 +32,12 @@ const SHELL_ASSETS = [
   "./engine/storage.js",
   "./engine/reminders.js",
   "./engine/ics.js",
+  "./engine/calendar.js",
+  "./engine/mentoring.js",
+  "./engine/notices.js",
+  "./engine/papers.js",
+  "./engine/syllabus.js",
+  "./data/papers-index.json",
   "./icons/icon.svg",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

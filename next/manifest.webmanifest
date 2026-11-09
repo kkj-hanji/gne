@@ -68,6 +68,34 @@
       "description": "Find a free room right now",
       "url": "./rooms",
       "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Notices",
+      "short_name": "Notices",
+      "description": "Official notices and exam updates",
+      "url": "./notices",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Question banks",
+      "short_name": "Papers",
+      "description": "Official subject question banks",
+      "url": "./papers",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Syllabus",
+      "short_name": "Syllabus",
+      "description": "Official department syllabus PDFs",
+      "url": "./syllabus",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Academic calendar",
+      "short_name": "Calendar",
+      "description": "Academic periods and holidays",
+      "url": "./calendar",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

@@ -97,6 +97,37 @@ export const ROUTES = Object.freeze({
       "Every published GNDEC notice collected in one place: examination notices, academic calendar updates, fee and admission notices, with direct links to the official college page.",
     keywords: ["gndec notices", "gndec notice board", "gndec academic calendar", "gndec exam notice", "gndec latest news"]
   },
+  papers: {
+    slug: "papers",
+    title: "GNDEC Question Banks and Previous Year Papers — Official PDFs",
+    heading: "GNDEC Question Banks",
+    description:
+      "Every subject question bank and previous-year paper that a GNDEC department publishes, with a direct link to the official PDF. Search by subject, code, department or semester.",
+    keywords: ["gndec question bank", "gndec previous year papers", "gndec sqb", "it gndec question papers", "gndec subject question bank", "gndec old papers"]
+  },
+  syllabus: {
+    slug: "syllabus",
+    title: "GNDEC Syllabus — Every Department and Batch, Official PDFs",
+    heading: "GNDEC Syllabus",
+    description:
+      "Official GNDEC syllabus documents for every department and batch, linked directly from the department sites. Search by department, batch or semester.",
+    keywords: ["gndec syllabus", "gndec btech syllabus", "gndec it syllabus", "gndec cse syllabus", "gndec syllabus pdf", "gndec batch 2024 syllabus"]
+  },
+  calendar: {
+    slug: "calendar",
+    title: "GNDEC Academic Calendar, Holidays and Exam Periods",
+    heading: "Academic Calendar",
+    description:
+      "The official GNDEC academic calendar for July–December 2026, the published holiday list and every admin-confirmed change, with the source PDF for each entry.",
+    keywords: ["gndec academic calendar", "gndec holidays", "gndec holiday list 2026", "gndec exam dates", "gndec semester dates"]
+  },
+  admin: {
+    slug: "admin",
+    title: "GNDEC Compass Admin",
+    heading: "Admin",
+    description: "Private publishing workspace for GNDEC Compass notices, date sheets, question banks, syllabus links and announcements.",
+    keywords: ["gndec compass admin", "compass publishing"]
+  },
   directory: {
     slug: "directory",
     title: "GNDEC Faculty, Student and Syllabus Directory",
@@ -123,7 +154,7 @@ export const ROUTES = Object.freeze({
   }
 });
 
-export const ROUTE_ORDER = Object.freeze(["today", "timetable", "rooms", "ask", "notices", "directory", "compare", "settings"]);
+export const ROUTE_ORDER = Object.freeze(["today", "timetable", "rooms", "ask", "notices", "papers", "syllabus", "calendar", "directory", "compare", "settings"]);
 
 export function normalizeOrigin(origin = "") {
   const raw = String(origin || "").trim();
@@ -307,11 +338,12 @@ export function headTags({ origin = SITE.defaultOrigin, route = "today", section
     : `${base}/${meta.slug}`;
   const keywords = [...new Set([...meta.keywords, ...SITE.alternateName.map((name) => name.toLowerCase())])].join(", ");
   const image = `${base}/icons/og-cover.svg`;
+  const robots = route === "admin" ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1";
   const blocks = [
     `<title>${escapeText(meta.title)}</title>`,
     `<meta name="description" content="${escapeAttr(meta.description)}" />`,
     `<meta name="keywords" content="${escapeAttr(keywords)}" />`,
-    `<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />`,
+    `<meta name="robots" content="${robots}" />`,
     `<meta name="googlebot" content="index, follow" />`,
     `<link rel="canonical" href="${escapeAttr(canonical)}" />`,
     `<meta property="og:type" content="website" />`,

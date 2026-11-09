@@ -50,7 +50,7 @@ test("version describes the engine and privacy posture", async () => {
   assert.equal(payload.app.name, APP_NAME);
   assert.equal(payload.app.version, APP_VERSION);
   assert.equal(payload.app.channel, "stable");
-  assert.equal(payload.app.schema, 2);
+  assert.equal(payload.app.schema, 3);
   assert.equal(payload.legacy.url, "https://legacy.compass.test");
   assert.equal(payload.legacy.frozen, true);
   assert.equal(payload.engine.local, true);

@@ -22,7 +22,7 @@ export const LEGACY_PROFILE_KEY = "gndec-compass-student-v1";
 export const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 export const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.1.0";
 export const APP_CHANNEL = "stable";
 
 export const THEMES = ["system", "light", "dark", "oled"];
@@ -89,6 +89,12 @@ export const FLAGS = Object.freeze([
   }),
   flag("experience.showBuildChannel", "Show build channel", "Display whether this build is stable or beta in the header.", {
     category: "experience", default: false, keywords: "beta stable build"
+  }),
+  flag("experience.previousBuild", "Show previous generation", "Keep a labelled card that opens the earlier 2.0 Worker in a new tab. It has its own storage and never shares this app's cache.", {
+    category: "experience", default: true, keywords: "v2 previous rollback old build"
+  }),
+  flag("experience.adminLink", "Show admin link", "Show the publishing shortcut in Settings. The admin page itself always requires a token.", {
+    category: "experience", default: true, keywords: "admin publish upload"
   }),
 
   // ── Appearance ───────────────────────────────────────────────────────────
@@ -377,6 +383,9 @@ export const FLAGS = Object.freeze([
   }),
   flag("data.snapshots", "Rollback snapshots", "How many verified releases to keep on this device for instant rollback.", {
     category: "data", type: "range", default: 3, min: 1, max: 5, step: 1, unit: "releases", keywords: "rollback versions"
+  }),
+  flag("data.transcribedNotices", "Include transcribed notices", "Show notices transcribed from photographed official circulars. Every transcription is labelled and links to the original page.", {
+    category: "data", default: true, keywords: "transcribed notice circular"
   }),
 
   // ── Notifications ────────────────────────────────────────────────────────

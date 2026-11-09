@@ -9,9 +9,25 @@
  */
 
 import { SITE, headTags, injectHead, normalizeOrigin, routeFromPath } from "../next/seo-meta.js";
+import {
+  ContentError,
+  addEditor,
+  authorize,
+  deleteItem,
+  getFile,
+  listEditors,
+  ownerTokenConfigured,
+  publicPayload,
+  putFile,
+  readAll,
+  readAudit,
+  removeEditor,
+  restorePrevious,
+  upsertItem
+} from "./content-store.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.1.0";
 export const BUILD_DATE = "2026-11-09";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
@@ -238,13 +254,22 @@ export function versionPayload(env = {}) {
       version: String(env.APP_VERSION || APP_VERSION),
       channel: String(env.APP_CHANNEL || "stable"),
       build: String(env.BUILD_TIME || BUILD_DATE),
-      schema: 2
+      schema: 3
     },
     legacy: {
       label: "GNDEC Compass — frozen current build",
       url: legacyOrigin(env),
       frozen: true,
       note: "The legacy build runs on its own origin and keeps its own service-worker scope."
+    },
+    previous: {
+      label: "GNDEC Compass 2.0 — previous generation",
+      url: String(env.V2_ORIGIN || "https://gndec-compass-v2.koush3069.workers.dev"),
+      note: "A separate Worker. Opened in a new tab from Settings; no shared storage."
+    },
+    content: {
+      store: Boolean(env?.CONTENT),
+      admin: Boolean(env?.ADMIN_API_TOKEN)
     },
     engine: {
       local: true,
@@ -259,6 +284,146 @@ export function versionPayload(env = {}) {
   };
 }
 
+/* ── Content API ────────────────────────────────────────────────────────── */
+
+const MAX_JSON_BODY = 120_000;
+const MAX_UPLOAD_BODY = 1_700_000;
+
+async function readJsonBody(request) {
+  const contentType = String(request.headers.get("Content-Type") || "");
+  if (!/application\/json/i.test(contentType)) {
+    throw new ContentError("Send JSON with Content-Type: application/json.");
+  }
+  const declared = Number(request.headers.get("Content-Length") || 0);
+  if (declared > MAX_JSON_BODY) throw new ContentError("The request body is too large.", 413);
+  const text = await request.text();
+  if (text.length > MAX_JSON_BODY) throw new ContentError("The request body is too large.", 413);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ContentError("The request body is not valid JSON.");
+  }
+}
+
+async function requireAuth(env, request) {
+  const auth = await authorize(env, request);
+  if (!auth.ok) throw new ContentError("A valid admin token is required.", 401);
+  return auth;
+}
+
+function contentErrorResponse(error) {
+  const status = error instanceof ContentError ? error.status : 500;
+  return jsonResponse({
+    error: status === 500 ? "The content store could not complete this request." : error.message
+  }, { status });
+}
+
+async function publicContent(env) {
+  const all = await readAll(env);
+  return publicPayload(all);
+}
+
+async function adminRequest(request, env, deps = {}) {
+  const url = new URL(request.url);
+  const method = request.method.toUpperCase();
+
+  if (url.pathname === "/api/content") {
+    if (method !== "GET" && method !== "HEAD") {
+      return jsonResponse({ error: "Method not allowed." }, { status: 405, headers: { Allow: "GET, HEAD" } });
+    }
+    const payload = await publicContent(env);
+    return jsonResponse(payload, {
+      headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=300" }
+    });
+  }
+
+  if (url.pathname.startsWith("/api/content/file/")) {
+    if (method !== "GET" && method !== "HEAD") {
+      return jsonResponse({ error: "Method not allowed." }, { status: 405, headers: { Allow: "GET, HEAD" } });
+    }
+    const id = url.pathname.slice("/api/content/file/".length);
+    const file = await getFile(env, id);
+    if (!file) return jsonResponse({ error: "File not found." }, { status: 404 });
+    return new Response(method === "HEAD" ? null : file.bytes, {
+      status: 200,
+      headers: {
+        "Content-Type": file.type,
+        "Content-Length": String(file.bytes.byteLength || file.bytes.length || 0),
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Disposition": `inline; filename="${String(file.name).replace(/[^\w.\- ]+/g, "_").slice(0, 80)}"`
+      }
+    });
+  }
+
+  const auth = await requireAuth(env, request);
+
+  if (url.pathname === "/api/admin/session") {
+    return jsonResponse({
+      ok: true,
+      role: auth.role,
+      actor: auth.actor,
+      store: Boolean(env?.CONTENT),
+      ownerToken: await ownerTokenConfigured(env)
+    });
+  }
+
+  if (url.pathname === "/api/admin/content" && (method === "GET" || method === "HEAD")) {
+    const all = await readAll(env);
+    return jsonResponse({
+      ...all,
+      editors: auth.role === "owner" ? await listEditors(env) : [],
+      audit: await readAudit(env, 40),
+      role: auth.role
+    });
+  }
+
+  if (url.pathname === "/api/admin/audit" && (method === "GET" || method === "HEAD")) {
+    return jsonResponse({ audit: await readAudit(env, 60) });
+  }
+
+  if (url.pathname === "/api/admin/content" && method === "POST") {
+    const body = await readJsonBody(request);
+    const action = String(body?.action || "upsert").toLowerCase();
+    if (action === "upsert") {
+      const item = await upsertItem(env, body?.collection, body?.item, { actor: auth.actor });
+      return jsonResponse({ ok: true, item });
+    }
+    if (action === "delete") {
+      return jsonResponse({ ok: true, ...(await deleteItem(env, body?.collection, body?.id, { actor: auth.actor })) });
+    }
+    if (action === "restore") {
+      return jsonResponse({ ok: true, ...(await restorePrevious(env, body?.collection, { actor: auth.actor })) });
+    }
+    throw new ContentError("Unknown content action.");
+  }
+
+  if (url.pathname === "/api/admin/upload" && method === "POST") {
+    const declared = Number(request.headers.get("Content-Length") || 0);
+    if (declared > MAX_UPLOAD_BODY) throw new ContentError("The upload is larger than 1.5 MB.", 413);
+    const type = String(request.headers.get("Content-Type") || "").split(";")[0].trim();
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    const name = url.searchParams.get("name") || "upload";
+    const file = await putFile(env, { bytes, type, name });
+    return jsonResponse({ ok: true, ...file });
+  }
+
+  if (url.pathname === "/api/admin/editors") {
+    if (auth.role !== "owner") throw new ContentError("Only the owner can manage editors.", 403);
+    if (method === "GET") return jsonResponse({ editors: await listEditors(env) });
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      return jsonResponse({ ok: true, editors: await addEditor(env, { name: body?.name, token: body?.token }) });
+    }
+    if (method === "DELETE") {
+      const body = await readJsonBody(request);
+      return jsonResponse({ ok: true, editors: await removeEditor(env, { name: body?.name }) });
+    }
+    return jsonResponse({ error: "Method not allowed." }, { status: 405 });
+  }
+
+  return jsonResponse({ error: "Unknown admin route." }, { status: 404 });
+}
+
 export async function handleRequest(request, env = {}, ctx = {}, deps = {}) {
   const url = new URL(request.url);
 
@@ -268,6 +433,7 @@ export async function handleRequest(request, env = {}, ctx = {}, deps = {}) {
       app: APP_NAME,
       version: String(env.APP_VERSION || APP_VERSION),
       legacy: legacyOrigin(env),
+      content: Boolean(env?.CONTENT),
       time: new Date().toISOString()
     }));
   }
@@ -276,6 +442,14 @@ export async function handleRequest(request, env = {}, ctx = {}, deps = {}) {
     return securityHeaders(jsonResponse(versionPayload(env), {
       headers: { "Cache-Control": "public, max-age=120" }
     }));
+  }
+
+  if (url.pathname === "/api/content" || url.pathname.startsWith("/api/content/") || url.pathname.startsWith("/api/admin/")) {
+    try {
+      return securityHeaders(await adminRequest(request, env, deps));
+    } catch (error) {
+      return securityHeaders(contentErrorResponse(error));
+    }
   }
 
   if (url.pathname.startsWith(PROXY_PREFIX)) {

@@ -30,6 +30,16 @@ import {
 import { digestCopy, dueReminder, isQuietTime, notificationCopy } from "./engine/reminders.js";
 import { buildIcs, downloadIcs } from "./engine/ics.js";
 import { ROUTES as SEO_ROUTES, headTags, routeFromPath } from "./seo-meta.js";
+import { applyMentoringOverrides, MENTORING_SUBJECT, profileAppliesToSelection } from "./engine/mentoring.js";
+import {
+  NOTICE_CATEGORIES, TRANSCRIBED_NOTICES, filterNotices, isRecent, mergeNotices, noticeStats, slugify
+} from "./engine/notices.js";
+import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
+import { buildSyllabusIndex, groupSyllabus, searchSyllabus } from "./engine/syllabus.js";
+import {
+  ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
+  dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
+} from "./engine/calendar.js";
 
 const CHAT_KEY = "gndec-compass-next-chat-v1";
 const SELECTION_KEY = "gndec-compass-next-selection-v1";
@@ -64,6 +74,26 @@ const state = {
   datesheet: null,
   notices: [],
   noticesStatus: "idle",
+  content: { notices: [], announcements: [], holidays: [], papers: [], syllabus: [], datesheets: [], links: [], configured: false, meta: null },
+  contentStatus: "idle",
+  campus: { notices: [], syllabus: [], departments: [], checkedAt: "" },
+  campusStatus: "idle",
+  papers: { records: [], loadedAt: "", sources: [] },
+  papersStatus: "idle",
+  noticeQuery: "",
+  noticeCategory: "",
+  calendarMonth: "",
+  paperQuery: "",
+  paperDepartment: "",
+  syllabusQuery: "",
+  syllabusDepartment: "",
+  adminToken: "",
+  adminStatus: "idle",
+  adminData: null,
+  adminError: "",
+  adminTab: "notices",
+  adminEditing: null,
+  adminBusy: false,
   directoryTab: "faculty",
   directoryQuery: "",
   directoryStatus: "idle",
@@ -171,7 +201,9 @@ function subgroupsFor(group) {
 }
 
 function classesForDay(day) {
-  return classesFor(state.schedule, state.group, day, state.subgroup);
+  const entries = classesFor(state.schedule, state.group, day, state.subgroup);
+  if (!profileAppliesToSelection(state.profile, state.group, state.subgroup)) return entries;
+  return applyMentoringOverrides(entries, state.profile);
 }
 
 function preferredGroup(groups) {
@@ -408,6 +440,103 @@ async function loadNotices() {
   }
 }
 
+/* ── Live content: admin overlay + campus directory + papers ───────────── */
+
+async function loadContent() {
+  state.contentStatus = "loading";
+  try {
+    const data = await fetchJson("/api/content", {}, 12000);
+    state.content = {
+      notices: Array.isArray(data?.notices) ? data.notices : [],
+      announcements: Array.isArray(data?.announcements) ? data.announcements : [],
+      holidays: Array.isArray(data?.holidays) ? data.holidays : [],
+      papers: Array.isArray(data?.papers) ? data.papers : [],
+      syllabus: Array.isArray(data?.syllabus) ? data.syllabus : [],
+      datesheets: Array.isArray(data?.datesheets) ? data.datesheets : [],
+      links: Array.isArray(data?.links) ? data.links : [],
+      configured: Boolean(data?.configured),
+      meta: data?.meta || null
+    };
+    state.contentStatus = "ready";
+  } catch {
+    state.contentStatus = "error";
+  }
+}
+
+async function loadCampus() {
+  state.campusStatus = "loading";
+  try {
+    const data = await fetchJson("/api/legacy/data/campus.json", {}, 20000);
+    state.campus = {
+      notices: Array.isArray(data?.notices) ? data.notices : [],
+      syllabus: Array.isArray(data?.syllabus) ? data.syllabus : [],
+      departments: Array.isArray(data?.departments) ? data.departments : [],
+      checkedAt: String(data?.checkedAt || "")
+    };
+    state.campusStatus = "ready";
+  } catch {
+    state.campusStatus = "error";
+  }
+}
+
+async function loadPapers() {
+  state.papersStatus = "loading";
+  try {
+    const data = await fetchJson("/data/papers-index.json", {}, 20000);
+    state.papers = {
+      records: Array.isArray(data?.papers) ? data.papers : [],
+      loadedAt: String(data?.builtAt || ""),
+      sources: Array.isArray(data?.sources) ? data.sources : []
+    };
+    state.papersStatus = "ready";
+  } catch {
+    state.papers = { records: [], loadedAt: "", sources: [] };
+    state.papersStatus = "error";
+  }
+}
+
+/** Every notice source, merged once per render. */
+function allNotices() {
+  return mergeNotices({
+    admin: state.content.notices,
+    transcribed: transcribedNotices(),
+    campus: state.campus.notices,
+    curated: state.notices
+  });
+}
+
+function transcribedNotices() {
+  return state.values["data.transcribedNotices"] === false ? [] : TRANSCRIBED_NOTICES;
+}
+
+function allSyllabus() {
+  return buildSyllabusIndex([...state.campus.syllabus, ...state.content.syllabus]);
+}
+
+function allPapers() {
+  return buildPaperIndex([...state.papers.records, ...state.content.papers]);
+}
+
+function holidayOverrides() {
+  return [...state.content.holidays, ...state.content.datesheets.filter((item) => String(item.scope || "").toLowerCase() === "holiday")];
+}
+
+function activeAnnouncements() {
+  const today = now().dateISO;
+  return state.content.announcements.filter((item) => !item.expiresAt || item.expiresAt >= today);
+}
+
+async function ensureLiveContent() {
+  const jobs = [];
+  if (state.contentStatus === "idle") jobs.push(loadContent());
+  if (state.campusStatus === "idle") jobs.push(loadCampus());
+  if (state.noticesStatus === "idle") jobs.push(loadNotices());
+  if (state.papersStatus === "idle") jobs.push(loadPapers());
+  if (!jobs.length) return;
+  await Promise.allSettled(jobs);
+  if (["notices", "papers", "syllabus", "calendar", "today", "admin"].includes(state.route)) render();
+}
+
 /* ── Directory data (faculty, students, syllabus) ──────────────────────── */
 
 function ensureDirectoryData() {
@@ -512,9 +641,13 @@ const ROUTES = {
   rooms: { title: "Rooms", eyebrow: "Published room timetable" },
   ask: { title: "Ask Compass", eyebrow: "Deterministic, never guesses" },
   notices: { title: "Notices", eyebrow: "Official college updates" },
+  papers: { title: "Papers", eyebrow: "Official subject question banks" },
+  syllabus: { title: "Syllabus", eyebrow: "Published department documents" },
+  calendar: { title: "Calendar", eyebrow: "Academic periods and holidays" },
   directory: { title: "Directory", eyebrow: "Faculty, students and syllabus" },
   compare: { title: "Compare", eyebrow: "Two sections, side by side" },
-  settings: { title: "Settings", eyebrow: "Controls, data and rollback" }
+  settings: { title: "Settings", eyebrow: "Controls, data and rollback" },
+  admin: { title: "Admin", eyebrow: "Publish to Compass" }
 };
 
 function parseRoute() {
@@ -623,9 +756,13 @@ function render() {
     case "rooms": html = renderRooms(); break;
     case "ask": html = renderAsk(); break;
     case "notices": html = renderNotices(); break;
+    case "papers": html = renderPapers(); break;
+    case "syllabus": html = renderSyllabus(); break;
+    case "calendar": html = renderCalendar(); break;
     case "directory": html = renderDirectory(); break;
     case "compare": html = renderCompare(); break;
     case "settings": html = renderSettings(); break;
+    case "admin": html = renderAdmin(); break;
     default: html = renderToday();
   }
   view.innerHTML = html;
@@ -642,9 +779,12 @@ function render() {
 }
 
 function ensureRouteData() {
-  if (state.route === "notices" && state.noticesStatus === "idle") {
-    state.noticesStatus = "loading";
-    loadNotices().then(() => { if (state.route === "notices") render(); });
+  if (["notices", "papers", "syllabus", "calendar", "today", "admin"].includes(state.route)) {
+    ensureLiveContent();
+  }
+  if (state.route === "admin" && state.adminToken && state.adminStatus === "idle") {
+    state.adminStatus = "loading";
+    adminLoad().catch(() => {});
   }
   if (state.route === "directory") ensureDirectoryData();
 }
@@ -724,11 +864,15 @@ function renderToday() {
   const hero = renderHero(info, clock, greeting + name);
   const freeRooms = v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
   const timeline = v("today.hero") === "timeline" ? "" : renderTodayTimeline(today, clock);
-  const notices = v("today.noticesCard") && state.notices.length ? renderNoticesCard() : "";
+  const notices = v("today.noticesCard") ? renderNoticesCard() : "";
   const examCard = v("today.examCountdown") && exam ? renderExamCard(exam) : "";
+  const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
+  const holiday = v("today.holidayBanner") ? holidayOn(clock.dateISO, holidayOverrides()) : null;
 
   return `<div class="page page-today">
     ${hero}
+    ${holiday ? `<div class="announcement ${holiday.type === "working" ? "is-warning" : "is-info"}"><strong>${escapeHtml(holiday.type === "working" ? "Working day" : holiday.type === "restricted" ? "Restricted holiday" : holiday.type === "half-day" ? "Half day" : "Holiday")} · ${escapeHtml(dateOnly(holiday.date))}</strong><p>${escapeHtml(holiday.name)}${holiday.overridden ? " · admin-confirmed override" : " · from the official GNDEC holiday list"}</p></div>` : ""}
+    ${announcements.length ? `<section class="announcement-stack">${announcements.map((item) => `<div class="announcement is-${escapeHtml(item.level)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></div>`).join("")}</section>` : ""}
     <div class="stat-grid">
       <div class="stat"><div class="stat-label">Classes today</div><div class="stat-value">${today.length}</div><div class="stat-sub">${escapeHtml(clock.day)}</div></div>
       <div class="stat"><div class="stat-label">Free rooms now</div><div class="stat-value">${free.error ? "—" : free.rooms.length}</div><div class="stat-sub">${free.error ? "Room data loading" : `for the next hour`}</div></div>
@@ -883,15 +1027,16 @@ function shortExamDate(iso) {
 }
 
 function renderNoticesCard() {
-  const notices = state.notices.slice(0, 3);
+  const notices = allNotices().slice(0, 4);
+  if (!notices.length) return "";
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Official college links</h2><p class="card-sub">Published by GNDEC, newest first</p></div></div>
-    <div class="timeline">${notices.map((notice) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(dayMonth(notice.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject"><a href="${escapeHtml(notice.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a></div></div></div>`).join("")}</div>
+    <div class="card-head"><div><h2 class="card-title">Latest notices</h2><p class="card-sub">Official, transcribed and admin updates · newest first</p></div><div class="card-actions"><button class="btn btn-sm" data-route="notices">All notices</button></div></div>
+    <div class="timeline">${notices.map((notice) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(dayMonth(notice.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${notice.url ? `<a href="${escapeHtml(notice.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a>` : escapeHtml(notice.title)}</div><div class="timeline-meta">${escapeHtml(notice.category)}${notice.admin ? " · admin" : notice.transcribed ? " · transcribed" : " · official"}</div></div></div>`).join("")}</div>
   </section>`;
 }
 
 function renderQuickAsk() {
-  const chips = suggestedQuestions().slice(0, 4);
+  const chips = suggestedQuestions().slice(0, 6);
   return `<section class="card">
     <div class="card-head"><div><h2 class="card-title">Ask Compass</h2><p class="card-sub">Verified answers from your active section and timetable.</p></div></div>
     <div class="chip-row">${chips.map((chip) => `<button class="chip" data-ask-question="${escapeHtml(chip)}">${escapeHtml(chip)}</button>`).join("")}</div>
@@ -908,6 +1053,9 @@ function suggestedQuestions() {
   if (nextExam()) list.push("When is my ESE exam?");
   const subjects = [...new Set(classesForDay(now().day).map((entry) => entry.subject))].slice(0, 2);
   subjects.forEach((subject) => list.push(`When is ${subject}?`));
+  list.push("Show latest notices");
+  list.push("When is the next holiday?");
+  if (subjects[0]) list.push(`Question bank for ${subjects[0]}`);
   return [...new Set(list)];
 }
 
@@ -1051,31 +1199,600 @@ function renderHeatmap() {
 
 /* ── Notices ───────────────────────────────────────────────────────────── */
 
+function noticeCard(notice, { dense = false } = {}) {
+  const fresh = isRecent(notice.date, now().dateISO, 14);
+  const sourceLabel = notice.admin ? "Compass admin" : notice.transcribed ? "Transcribed" : "Official";
+  const href = notice.url || "";
+  const title = href
+    ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a>`
+    : escapeHtml(notice.title);
+  const body = notice.body
+    ? `<p class="notice-body">${escapeHtml(notice.body.slice(0, dense ? 180 : 420))}${notice.body.length > (dense ? 180 : 420) ? "…" : ""}</p>`
+    : "";
+  return `<article class="notice-card${notice.pinned ? " is-pinned" : ""}">
+    <div class="notice-top">
+      <span class="badge">${escapeHtml(notice.category)}</span>
+      ${fresh ? `<span class="badge badge-warn">New</span>` : ""}
+      ${notice.pinned ? `<span class="badge">Pinned</span>` : ""}
+      <span class="notice-source">${escapeHtml(sourceLabel)}</span>
+    </div>
+    <h3 class="notice-title">${title}</h3>
+    <p class="notice-meta">${notice.date ? `<time datetime="${escapeHtml(notice.date)}">${escapeHtml(dateOnly(notice.date))}</time>` : "Undated"}${notice.author ? ` · ${escapeHtml(notice.author)}` : ""}</p>
+    ${body}
+    ${notice.attachments?.length ? `<div class="chip-row">${notice.attachments.map((file) => `<a class="chip" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(file.label)}</a>`).join("")}</div>` : ""}
+  </article>`;
+}
+
 function renderNotices() {
-  const loading = state.noticesStatus === "loading" || (state.noticesStatus === "idle" && !state.notices.length);
-  const failed = state.noticesStatus === "error";
-  const notices = [...state.notices].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-  const next = nextExam();
+  const list = allNotices();
+  const stats = noticeStats(list, now().dateISO);
+  const filtered = filterNotices(list, { query: state.noticeQuery, category: state.noticeCategory });
+  const announcements = activeAnnouncements();
+  const nextHoliday = upcomingHolidays(now().dateISO, { overrides: holidayOverrides(), limit: 1 })[0] || null;
+  const categories = NOTICE_CATEGORIES.filter((name) => stats.byCategory[name]);
   return `<div class="page page-notices">
     <div class="page-head">
       <div class="page-head-text">
         <h2 class="page-title">Notices and updates</h2>
-        <p class="page-sub">Published by GNDEC, newest first. Compass links to the official page and never rewrites a notice.</p>
+        <p class="page-sub">Official college notices, transcribed exam sheets and admin updates. Compass links the source and never rewrites a notice.</p>
       </div>
-      <div class="page-actions"><span class="badge">${notices.length ? `${notices.length} published` : loading ? "Loading" : "No notices loaded"}</span></div>
+      <div class="page-actions">
+        <span class="badge">${stats.total} published</span>
+        ${stats.fresh ? `<span class="badge badge-warn">${stats.fresh} new</span>` : ""}
+        <a class="btn btn-sm" href="/calendar">Calendar</a>
+      </div>
     </div>
-    ${next ? `<section class="card" style="margin-bottom:14px">
-      <div class="card-head"><div><h2 class="card-title">Next published exam</h2><p class="card-sub">Tentative end-semester datesheet · confirm the official notice before travelling.</p></div><a class="btn btn-sm" href="/college/exam-datesheet/">Full datesheet</a></div>
-      <div class="stat-grid"><div class="stat"><span class="stat-label">Date</span><strong>${escapeHtml(dateOnly(next.date))}</strong></div><div class="stat"><span class="stat-label">Subject</span><strong>${escapeHtml(next.subject || "")}</strong></div><div class="stat"><span class="stat-label">Programme</span><strong>${escapeHtml(next.tab || "")}</strong></div></div>
-    </section>` : ""}
-    <section class="card">
-      <div class="card-head"><div><h2 class="card-title">Official notice board</h2><p class="card-sub">External links open on gndec.ac.in and related official sites.</p></div>${failed ? `<button class="btn btn-sm" data-action="retry-notices">Retry</button>` : ""}</div>
-      ${loading ? `<p class="card-sub">Loading the official notice list…</p>` : notices.length ? `<div class="timeline notices-timeline">${notices.map((notice) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(dayMonth(notice.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject"><a href="${escapeHtml(notice.link || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title || "Notice")}</a></div><div class="timeline-meta">${escapeHtml(dateOnly(notice.date))} · official GNDEC page</div></div></div>`).join("")}</div>` : emptyState("📌", "No notices available", "The verified notice feed is unavailable right now. The official college site still has every notice.", `<a class="btn btn-primary" href="https://gndec.ac.in/" target="_blank" rel="noopener noreferrer">Open gndec.ac.in</a>`)}
+    ${announcements.length ? `<section class="announcement-stack">${announcements.map((item) => `<div class="announcement is-${escapeHtml(item.level)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></div>`).join("")}</section>` : ""}
+    ${nextHoliday ? `<section class="card calendar-teaser"><div class="card-head"><div><h2 class="card-title">Next published holiday</h2><p class="card-sub">${escapeHtml(nextHoliday.name)}</p></div><strong class="teaser-date">${escapeHtml(dateOnly(nextHoliday.date))} · ${escapeHtml(dayOfWeek(nextHoliday.date))}</strong></div></section>` : ""}
+    <div class="filter-bar">
+      <input type="search" value="${escapeHtml(state.noticeQuery)}" placeholder="Search notices, subjects, dates…" data-notice-search aria-label="Search notices" />
+      <div class="chip-row" role="group" aria-label="Filter by category">
+        <button class="chip chip-button ${state.noticeCategory ? "" : "is-active"}" data-action="notice-category" data-category="">All ${stats.total}</button>
+        ${categories.map((name) => `<button class="chip chip-button ${state.noticeCategory === name ? "is-active" : ""}" data-action="notice-category" data-category="${escapeHtml(name)}">${escapeHtml(name)} ${stats.byCategory[name]}</button>`).join("")}
+      </div>
+    </div>
+    ${state.contentStatus === "error" && state.campusStatus === "error" ? emptyState("⚠", "Notice sources unavailable", "Neither the campus directory nor the content store answered. Nothing was guessed.", `<button class="btn btn-primary" data-action="retry-notices">Try again</button>`) : ""}
+    ${filtered.length ? `<div class="notice-list">${filtered.slice(0, 120).map((notice) => noticeCard(notice)).join("")}</div>` : `<section class="card">${emptyState("📌", "No matching notice", state.noticeQuery || state.noticeCategory ? `Nothing matches this filter. Clear the search to see all ${stats.total} notices.` : "The verified notice feed is empty right now. The official college site still has every notice.", `<a class="btn" href="https://erp.gndec.ac.in/notice" target="_blank" rel="noopener noreferrer">Open the official notice board ↗</a>`)}</section>`}
+    <p class="card-sub" style="margin-top:14px">Sources: GNDEC campus directory, ERP notice board, the published notice list and user-supplied transcriptions. Newest first. Nothing is generated.</p>
+  </div>`;
+}
+
+/* ── Papers ─────────────────────────────────────────────────────────────── */
+
+function renderPapers() {
+  const papers = allPapers();
+  const stats = paperStats(papers);
+  const departments = [...new Set(papers.map((paper) => paper.department).filter(Boolean))].sort();
+  const results = searchPapers(papers, state.paperQuery, { department: state.paperDepartment, limit: 150 });
+  const grouped = groupPapers(results);
+  const loading = state.papersStatus === "loading" || (state.papersStatus === "idle" && !papers.length);
+  return `<div class="page page-papers">
+    <div class="page-head">
+      <div class="page-head-text"><h2 class="page-title">Question banks</h2><p class="page-sub">Subject question banks published by GNDEC departments. Every link opens the official PDF; Compass never hosts or rewrites a paper.</p></div>
+      <div class="page-actions"><span class="badge">${stats.total} papers</span><span class="badge">${stats.departments} department${stats.departments === 1 ? "" : "s"}</span></div>
+    </div>
+    <div class="filter-bar">
+      <input type="search" value="${escapeHtml(state.paperQuery)}" placeholder="Search subject, code or semester…" data-paper-search aria-label="Search question banks" />
+      <select data-paper-department aria-label="Filter by department">
+        <option value="">All departments</option>
+        ${departments.map((name) => `<option value="${escapeHtml(name)}" ${state.paperDepartment === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+      </select>
+    </div>
+    ${loading ? `<section class="card"><p class="card-sub">Loading the official question-bank index…</p></section>` : ""}
+    ${state.papersStatus === "error" ? emptyState("⚠", "Question-bank index unavailable", "The published index could not be loaded. Nothing was invented.", `<button class="btn btn-primary" data-action="retry-papers">Try again</button>`) : ""}
+    ${!loading && results.length ? grouped.map((group) => `<section class="card" style="margin-bottom:14px"><div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} document${group.count === 1 ? "" : "s"} · official GNDEC PDF</p></div></div><div class="paper-grid">${group.papers.map((paper) => `<a class="paper-card" href="${escapeHtml(paper.url)}" target="_blank" rel="noopener noreferrer"><strong>${escapeHtml(paper.subject)}</strong>${paper.code ? `<span class="paper-code">${escapeHtml(paper.code)}</span>` : ""}<small>Open official PDF ↗</small></a>`).join("")}</div></section>`).join("") : ""}
+    ${!loading && !results.length && state.papersStatus !== "error" ? `<section class="card">${emptyState("📄", "No matching question bank", papers.length ? "Try a shorter subject name or clear the department filter." : "No department currently publishes a question bank that Compass can verify. Ask an admin to upload one from Settings → Admin.")}</section>` : ""}
+    <p class="card-sub" style="margin-top:12px">Sources are recorded when the index is built. Only official <code>*.gndec.ac.in</code> PDFs are indexed automatically. ${state.papers.loadedAt ? `Index built ${escapeHtml(shortDate(state.papers.loadedAt))}.` : ""}</p>
+  </div>`;
+}
+
+/* ── Syllabus ───────────────────────────────────────────────────────────── */
+
+function renderSyllabus() {
+  const docs = allSyllabus();
+  const groups = groupSyllabus(docs);
+  const departments = groups.map((group) => group.label);
+  const active = state.syllabusDepartment || "";
+  const results = searchSyllabus(docs, state.syllabusQuery, { department: active, limit: 120 });
+  const visibleGroups = groupSyllabus(results);
+  const loading = state.campusStatus === "loading" || (state.campusStatus === "idle" && !docs.length);
+  return `<div class="page page-syllabus">
+    <div class="page-head">
+      <div class="page-head-text"><h2 class="page-title">Syllabus</h2><p class="page-sub">Every syllabus document published by a GNDEC department. Compass links the official PDF and never re-types its contents.</p></div>
+      <div class="page-actions"><span class="badge">${docs.length} documents</span><span class="badge">${groups.length} departments</span></div>
+    </div>
+    <div class="filter-bar">
+      <input type="search" value="${escapeHtml(state.syllabusQuery)}" placeholder="Search department, batch, semester…" data-syllabus-search aria-label="Search syllabus" />
+      <div class="chip-row" role="group" aria-label="Filter by department">
+        <button class="chip chip-button ${active ? "" : "is-active"}" data-action="syllabus-department" data-department="">All</button>
+        ${departments.map((name) => `<button class="chip chip-button ${active === name ? "is-active" : ""}" data-action="syllabus-department" data-department="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join("")}
+      </div>
+    </div>
+    ${loading ? `<section class="card"><p class="card-sub">Loading the published syllabus index…</p></section>` : ""}
+    ${state.campusStatus === "error" && !docs.length ? emptyState("⚠", "Syllabus index unavailable", "The department syllabus index could not be loaded. Nothing was invented.", `<button class="btn btn-primary" data-action="retry-syllabus">Try again</button>`) : ""}
+    ${visibleGroups.map((group) => `<section class="card syllabus-group" style="margin-bottom:14px">
+      <div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} document${group.count === 1 ? "" : "s"}${group.semesters.length ? ` · semesters ${group.semesters.join(", ")}` : ""}</p></div></div>
+      <ul class="doc-list">${group.docs.map((doc) => `<li><a href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc.label)}</a>${doc.semester ? `<span class="badge">Sem ${escapeHtml(doc.semester)}</span>` : ""}${doc.external ? `<span class="badge">External</span>` : ""}</li>`).join("")}</ul>
+    </section>`).join("")}
+    ${!loading && !visibleGroups.length && state.campusStatus !== "error" ? `<section class="card">${emptyState("📚", "No matching syllabus document", "Try a department name, batch year or semester.")}</section>` : ""}
+  </div>`;
+}
+
+/* ── Calendar ───────────────────────────────────────────────────────────── */
+
+function calendarMonthLabel(month) {
+  const [year, index] = month.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, index - 1, 1)));
+}
+
+function renderCalendar() {
+  const overrides = holidayOverrides();
+  const today = now().dateISO;
+  const upcoming = upcomingHolidays(today, { overrides, limit: 8 });
+  const months = {};
+  for (const item of HOLIDAYS_2026) {
+    const key = item.date.slice(0, 7);
+    if (!months[key]) months[key] = [];
+    months[key].push({ ...item, overridden: false });
+  }
+  for (const item of overrides) {
+    const key = String(item.date || "").slice(0, 7);
+    if (!key) continue;
+    if (!months[key]) months[key] = [];
+    const existing = months[key].findIndex((row) => row.date === item.date);
+    const type = item.type || (item.off === false ? "working" : "holiday");
+    const row = { date: item.date, name: item.name, type, overridden: true };
+    if (existing >= 0) months[key][existing] = row;
+    else months[key].push(row);
+  }
+  const monthKeys = Object.keys(months).sort();
+  return `<div class="page page-calendar">
+    <div class="page-head">
+      <div class="page-head-text"><h2 class="page-title">Academic calendar</h2><p class="page-sub">Published academic periods, the official 2026 holiday list and any date the college changes through a notice.</p></div>
+      <div class="page-actions"><a class="btn btn-sm" href="/notices">Notices</a></div>
+    </div>
+    ${upcoming.length ? `<section class="card"><div class="card-head"><div><h2 class="card-title">Coming up</h2><p class="card-sub">Next published off days from today.</p></div></div><div class="holiday-row">${upcoming.map((item) => `<div class="holiday-pill"><strong>${escapeHtml(dateOnly(item.date))}</strong><span>${escapeHtml(dayOfWeek(item.date))}</span><small>${escapeHtml(item.name)}</small></div>`).join("")}</div></section>` : ""}
+    <section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Academic periods</h2><p class="card-sub">From the official academic calendar; these are periods, not subject exam sittings.</p></div><a class="btn btn-sm" href="${escapeHtml(CALENDAR_SOURCE.url)}" target="_blank" rel="noopener noreferrer">Official PDF ↗</a></div>
+      <div class="period-grid">${ACADEMIC_PERIODS.map((period) => `<div class="period-card"><h3>${escapeHtml(period.scope)}</h3><dl><dt>Semester starts</dt><dd>${escapeHtml(dateOnly(period.start))}</dd><dt>Preparatory leave</dt><dd>${escapeHtml(dateOnly(period.prepStart))} → ${escapeHtml(dateOnly(period.prepEnd))}</dd><dt>Examinations</dt><dd>From ${escapeHtml(dateOnly(period.examsStart))}</dd></dl></div>`).join("")}</div>
+    </section>
+    <section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Holidays 2026</h2><p class="card-sub">${HOLIDAYS_2026.length} published entries. Restricted and half-day holidays are labelled.</p></div><a class="btn btn-sm" href="${escapeHtml(HOLIDAY_SOURCE.url)}" target="_blank" rel="noopener noreferrer">Official list ↗</a></div>
+      ${monthKeys.map((key) => `<div class="month-block"><h3>${escapeHtml(calendarMonthLabel(key))}</h3><ul class="holiday-list">${months[key].sort((a, b) => a.date.localeCompare(b.date)).map((item) => `<li class="holiday-item is-${escapeHtml(item.type)}"><time datetime="${escapeHtml(item.date)}">${escapeHtml(dateOnly(item.date))}</time><span class="holiday-day">${escapeHtml(dayOfWeek(item.date))}</span><span class="holiday-name">${escapeHtml(item.name)}</span>${item.type !== "holiday" ? `<span class="badge">${escapeHtml(item.type)}</span>` : ""}${item.overridden ? `<span class="badge badge-warn">Admin override</span>` : ""}</li>`).join("")}</ul></div>`).join("")}
     </section>
   </div>`;
 }
 
 /* ── Directory: faculty, students, syllabus ────────────────────────────── */
+
+const ADMIN_TOKEN_KEY = "gndec-compass-next-admin-token-v1";
+const ADMIN_MAX_FILE = 1_500_000;
+
+const ADMIN_SCHEMAS = Object.freeze({
+  notices: {
+    title: "Notices",
+    hint: "Publish an official update. A notice needs a title and either an official https link or the transcribed text. Nothing is invented.",
+    fields: [
+      { name: "title", label: "Title", type: "text", required: true, wide: true, placeholder: "MSE-II date sheet · November 2026" },
+      { name: "date", label: "Notice date", type: "date" },
+      { name: "category", label: "Category", type: "select", options: NOTICE_CATEGORIES, default: "General" },
+      { name: "author", label: "Issued by", type: "text", placeholder: "Exam Office" },
+      { name: "url", label: "Official link", type: "url", placeholder: "https://erp.gndec.ac.in/…" },
+      { name: "body", label: "Body or transcription", type: "textarea", wide: true },
+      { name: "pinned", label: "Pin to the top", type: "checkbox" },
+      { name: "published", label: "Published", type: "checkbox", default: true }
+    ]
+  },
+  datesheets: {
+    title: "Date sheets",
+    hint: "Exam date sheets and transcribed schedules. Link the official PDF or paste the rows. A holiday can also be published here by choosing the holiday scope.",
+    fields: [
+      { name: "title", label: "Title", type: "text", required: true, wide: true },
+      { name: "date", label: "Published on", type: "date" },
+      { name: "scope", label: "Scope", type: "select", options: ["General", "Examination", "MSE", "End semester", "Holiday", "Academic"], default: "Examination" },
+      { name: "department", label: "Department or programme", type: "text" },
+      { name: "url", label: "Official PDF", type: "url" },
+      { name: "body", label: "Transcribed rows", type: "textarea", wide: true },
+      { name: "published", label: "Published", type: "checkbox", default: true }
+    ]
+  },
+  holidays: {
+    title: "Calendar overrides",
+    hint: "Override the official holiday list only when the college publishes a change. Every override is labelled in the Calendar.",
+    fields: [
+      { name: "date", label: "Date", type: "date", required: true },
+      { name: "name", label: "Reason", type: "text", required: true, wide: true, placeholder: "Holiday in lieu of working Saturday" },
+      { name: "type", label: "Day type", type: "select", options: ["holiday", "working", "restricted", "half-day"], default: "holiday" },
+      { name: "published", label: "Published", type: "checkbox", default: true }
+    ]
+  },
+  papers: {
+    title: "Question banks",
+    hint: "Add a verified question bank or previous paper. Only an official https PDF link is accepted.",
+    fields: [
+      { name: "url", label: "Official PDF", type: "url", required: true, wide: true },
+      { name: "subject", label: "Subject", type: "text", wide: true },
+      { name: "code", label: "Subject code", type: "text", placeholder: "PCIT-101" },
+      { name: "department", label: "Department", type: "text", placeholder: "Information Technology" },
+      { name: "semester", label: "Semester", type: "text" },
+      { name: "year", label: "Year", type: "text" },
+      { name: "type", label: "Document type", type: "select", options: ["question-bank", "previous-paper", "sample-paper"], default: "question-bank" },
+      { name: "published", label: "Published", type: "checkbox", default: true }
+    ]
+  },
+  syllabus: {
+    title: "Syllabus links",
+    hint: "Link an official syllabus PDF. Compass never re-types the document.",
+    fields: [
+      { name: "url", label: "Official PDF", type: "url", required: true, wide: true },
+      { name: "label", label: "Document label", type: "text", required: true, wide: true, placeholder: "B.Tech (Batch 2024 & Onwards)" },
+      { name: "department", label: "Department", type: "text" },
+      { name: "semester", label: "Semester", type: "text" },
+      { name: "published", label: "Published", type: "checkbox", default: true }
+    ]
+  },
+  announcements: {
+    title: "Announcements",
+    hint: "A short message shown above notices and on Today. Use it for admin notes, never for invented college facts.",
+    fields: [
+      { name: "title", label: "Heading", type: "text", required: true, wide: true },
+      { name: "body", label: "Message", type: "textarea", required: true, wide: true },
+      { name: "level", label: "Tone", type: "select", options: ["info", "warning", "critical"], default: "info" },
+      { name: "url", label: "More information link", type: "url" },
+      { name: "expiresAt", label: "Hide after", type: "date" },
+      { name: "published", label: "Published", type: "checkbox", default: true }
+    ]
+  },
+  links: {
+    title: "Official links",
+    hint: "Curated official links shown to students. Only https URLs are accepted.",
+    fields: [
+      { name: "label", label: "Label", type: "text", required: true, wide: true },
+      { name: "url", label: "https URL", type: "url", required: true, wide: true },
+      { name: "group", label: "Group", type: "text", placeholder: "Examination" },
+      { name: "published", label: "Published", type: "checkbox", default: true }
+    ]
+  }
+});
+
+const ADMIN_TABS = Object.freeze([
+  ...Object.keys(ADMIN_SCHEMAS).map((id) => ({ id, title: ADMIN_SCHEMAS[id].title })),
+  { id: "editors", title: "Editors" },
+  { id: "audit", title: "Audit" }
+]);
+
+function adminStoredToken() {
+  try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) || ""; } catch { return ""; }
+}
+
+function setAdminToken(token) {
+  state.adminToken = String(token || "");
+  try {
+    if (state.adminToken) sessionStorage.setItem(ADMIN_TOKEN_KEY, state.adminToken);
+    else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch { /* private mode: the token stays in memory for this tab */ }
+}
+
+async function adminRequest(path, { method = "GET", body = null } = {}) {
+  const headers = { Authorization: `Bearer ${state.adminToken}` };
+  if (body !== null) headers["Content-Type"] = "application/json";
+  const response = await fetch(path, {
+    method,
+    headers,
+    body: body === null ? undefined : JSON.stringify(body),
+    cache: "no-store"
+  });
+  let data = null;
+  try { data = await response.json(); } catch { data = null; }
+  if (!response.ok) throw new Error(data?.error || `Request failed (${response.status})`);
+  return data;
+}
+
+async function adminLoad({ silent = false } = {}) {
+  if (!state.adminToken) {
+    state.adminStatus = "signed-out";
+    state.adminData = null;
+    if (!silent) render();
+    return;
+  }
+  if (!silent) {
+    state.adminStatus = "loading";
+    state.adminError = "";
+    render();
+  }
+  try {
+    const data = await adminRequest("/api/admin/content");
+    state.adminData = data;
+    state.adminStatus = "ready";
+    state.adminError = "";
+  } catch (error) {
+    state.adminError = String(error.message || "The admin API did not answer.");
+    state.adminStatus = "error";
+    if (/token|unauthor/i.test(state.adminError)) setAdminToken("");
+  }
+  render();
+}
+
+function adminItems(collection) {
+  const rows = state.adminData?.collections?.[collection];
+  return Array.isArray(rows) ? [...rows] : [];
+}
+
+function adminItemTitle(collection, item = {}) {
+  if (collection === "links") return item.label || item.url || "Official link";
+  if (collection === "papers") return [item.subject || "Question bank", item.code ? `(${item.code})` : ""].join(" ").trim();
+  if (collection === "syllabus") return item.label || item.url || "Syllabus";
+  if (collection === "holidays") return item.name || item.date || "Calendar override";
+  return item.title || item.id || "Untitled";
+}
+
+function adminItemMeta(collection, item = {}) {
+  const parts = [];
+  if (collection === "holidays") parts.push(item.date, item.type || "holiday");
+  else if (collection === "papers") parts.push(item.department, item.semester ? `Sem ${item.semester}` : "", item.type);
+  else if (collection === "syllabus") parts.push(item.department, item.semester ? `Sem ${item.semester}` : "");
+  else parts.push(item.date, item.category || item.scope || item.group);
+  if (item.url) parts.push(item.url.replace(/^https?:\/\//, "").slice(0, 52));
+  if (item.body && !item.url) parts.push(`${item.body.slice(0, 70)}…`);
+  return parts.filter(Boolean).join(" · ");
+}
+
+function adminFieldValue(item, field) {
+  const raw = item?.[field.name];
+  if (raw === undefined || raw === null || raw === "") return field.default ?? "";
+  return raw;
+}
+
+function adminFieldHtml(field, item) {
+  const id = `admin-field-${field.name}`;
+  const value = adminFieldValue(item, field);
+  const wide = field.wide ? " field-wide" : "";
+  const label = `<label for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>`;
+  if (field.type === "textarea") {
+    return `<div class="field${wide}">${label}<textarea id="${id}" data-admin-field="${field.name}" rows="4" placeholder="${escapeHtml(field.placeholder || "")}">${escapeHtml(value)}</textarea></div>`;
+  }
+  if (field.type === "select") {
+    return `<div class="field${wide}">${label}<select id="${id}" data-admin-field="${field.name}">${field.options.map((option) => `<option value="${escapeHtml(option)}" ${String(value) === String(option) ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select></div>`;
+  }
+  if (field.type === "checkbox") {
+    return `<label class="check-field${wide}"><input type="checkbox" id="${id}" data-admin-field="${field.name}" ${value ? "checked" : ""} /><span>${escapeHtml(field.label)}</span></label>`;
+  }
+  return `<div class="field${wide}">${label}<input id="${id}" data-admin-field="${field.name}" type="${field.type === "url" ? "url" : field.type === "date" ? "date" : "text"}" value="${escapeHtml(value)}" placeholder="${escapeHtml(field.placeholder || "")}" ${field.type === "url" ? 'inputmode="url"' : ""} /></div>`;
+}
+
+function renderAdminForm() {
+  const editing = state.adminEditing;
+  if (!editing) return "";
+  const schema = ADMIN_SCHEMAS[editing.collection];
+  if (!schema) return "";
+  const item = editing.item || {};
+  const isEdit = Boolean(item.id);
+  return `<section class="card admin-form-card">
+    <div class="card-head"><div><h2 class="card-title">${isEdit ? "Edit" : "New"} ${escapeHtml(schema.title.replace(/s$/, "").toLowerCase())}</h2><p class="card-sub">${escapeHtml(schema.hint)}</p></div><button class="btn btn-sm btn-ghost" data-action="admin-cancel">Cancel</button></div>
+    <form id="admin-form" class="admin-form" novalidate>
+      <div class="admin-form-grid">${schema.fields.map((field) => adminFieldHtml(field, item)).join("")}</div>
+      <div class="admin-upload-row">
+        <label class="btn btn-sm admin-file-label">Upload image or PDF<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" data-admin-file /></label>
+        <span class="card-sub" id="admin-upload-status">The uploaded file is linked into the URL field. Maximum 1.5 MB.</span>
+      </div>
+      <div class="chip-row" style="margin-top:14px">
+        <button type="button" class="btn btn-primary btn-sm" data-action="admin-save" ${state.adminBusy ? "disabled" : ""}>${isEdit ? "Save changes" : "Publish"}</button>
+        <button type="button" class="btn btn-sm btn-ghost" data-action="admin-cancel">Cancel</button>
+      </div>
+    </form>
+  </section>`;
+}
+
+function renderAdminList() {
+  const tab = state.adminTab;
+  if (tab === "editors") return renderAdminEditors();
+  if (tab === "audit") return renderAdminAudit();
+  const schema = ADMIN_SCHEMAS[tab];
+  if (!schema) return "";
+  const items = adminItems(tab);
+  return `<section class="card">
+    <div class="card-head">
+      <div><h2 class="card-title">${escapeHtml(schema.title)}</h2><p class="card-sub">${items.length} item${items.length === 1 ? "" : "s"} · ${items.filter((item) => item.published !== false).length} published</p></div>
+      <div class="card-actions">
+        <button class="btn btn-sm" data-action="admin-restore" data-collection="${tab}">Undo last change</button>
+        <button class="btn btn-primary btn-sm" data-action="admin-new" data-collection="${tab}">New</button>
+      </div>
+    </div>
+    ${items.length ? `<div class="admin-list">${items.slice().sort((a, b) => String(b.updatedAt || b.date || "").localeCompare(String(a.updatedAt || a.date || ""))).map((item) => `<div class="admin-item">
+      <div class="admin-item-text">
+        <strong>${escapeHtml(adminItemTitle(tab, item))}</strong>
+        <span>${escapeHtml(adminItemMeta(tab, item))}</span>
+      </div>
+      <span class="badge ${item.published === false ? "" : "badge-accent"}">${item.published === false ? "Draft" : "Live"}</span>
+      ${item.pinned ? `<span class="badge badge-warn">Pinned</span>` : ""}
+      <div class="admin-item-actions">
+        ${item.url ? `<a class="btn btn-sm btn-ghost" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a>` : ""}
+        <button class="btn btn-sm" data-action="admin-toggle" data-collection="${tab}" data-id="${escapeHtml(item.id)}">${item.published === false ? "Publish" : "Unpublish"}</button>
+        <button class="btn btn-sm" data-action="admin-edit" data-collection="${tab}" data-id="${escapeHtml(item.id)}">Edit</button>
+        <button class="btn btn-sm btn-danger" data-action="admin-delete" data-collection="${tab}" data-id="${escapeHtml(item.id)}">Delete</button>
+      </div>
+    </div>`).join("")}</div>` : `<p class="card-sub">Nothing published in this collection yet. Use “New” to add the first verified entry.</p>`}
+  </section>`;
+}
+
+function renderAdminEditors() {
+  const editors = Array.isArray(state.adminData?.editors) ? state.adminData.editors : [];
+  const owner = state.adminData?.role === "owner";
+  return `<section class="card">
+    <div class="card-head"><div><h2 class="card-title">Editor access</h2><p class="card-sub">${owner ? "Add a friend without a redeploy. Their token is stored only as a SHA-256 hash." : "Only the owner token can manage editors."}</p></div></div>
+    ${owner ? `<div class="admin-form-grid">
+      <div class="field"><label for="admin-editor-name">Editor name</label><input id="admin-editor-name" placeholder="Friend or classmate" autocomplete="off" /></div>
+      <div class="field"><label for="admin-editor-token">Editor token (16+ characters)</label><input id="admin-editor-token" type="password" autocomplete="new-password" /></div>
+    </div>
+    <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="admin-editor-add">Add editor</button><span class="card-sub">Share the token privately. It is never shown again.</span></div>` : ""}
+    <div class="admin-list" style="margin-top:14px">
+      ${editors.length ? editors.map((editor) => `<div class="admin-item"><div class="admin-item-text"><strong>${escapeHtml(editor.name)}</strong><span>Added ${escapeHtml(shortDate(editor.createdAt))}${editor.active === false ? " · disabled" : ""}</span></div><div class="admin-item-actions">${owner ? `<button class="btn btn-sm btn-danger" data-action="admin-editor-remove" data-name="${escapeHtml(editor.name)}">Remove</button>` : ""}</div></div>`).join("") : `<p class="card-sub">No editor tokens yet. The owner token alone can publish.</p>`}
+    </div>
+  </section>`;
+}
+
+function renderAdminAudit() {
+  const rows = Array.isArray(state.adminData?.audit) ? state.adminData.audit : [];
+  return `<section class="card">
+    <div class="card-head"><div><h2 class="card-title">Audit log</h2><p class="card-sub">The last ${rows.length} writes. Kept in the content store, capped at 120 entries.</p></div></div>
+    ${rows.length ? `<div class="week-wrap"><table class="week-table" style="min-width:620px"><thead><tr><th>When</th><th>Action</th><th>Collection</th><th>Item</th><th>By</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(shortDate(row.at))}</td><td>${escapeHtml(row.action || "")}</td><td>${escapeHtml(row.collection || "")}</td><td>${escapeHtml(row.id || "")}</td><td>${escapeHtml(row.actor || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="card-sub">No writes recorded yet.</p>`}
+  </section>`;
+}
+
+function renderAdmin() {
+  if (!state.adminToken) {
+    return `<div class="page page-admin">
+      <div class="page-head">
+        <div class="page-head-text"><h2 class="page-title">Admin</h2><p class="page-sub">Publish notices, date sheets, question banks, syllabus links and announcements. Changes go live immediately and feed Ask Compass.</p></div>
+        <div class="page-actions"><a class="btn btn-sm" href="/settings">Settings</a></div>
+      </div>
+      <section class="card admin-signin">
+        <div class="card-head"><div><h2 class="card-title">Sign in to publish</h2><p class="card-sub">Use the admin token for this deployment. The token stays in this browser tab only.</p></div></div>
+        <div class="field"><label for="admin-token">Admin token</label><input id="admin-token" data-admin-token type="password" autocomplete="current-password" placeholder="Paste the owner or editor token" /></div>
+        <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary" data-action="admin-sign-in">Sign in</button></div>
+        ${state.adminError ? `<p class="card-sub admin-error">${escapeHtml(state.adminError)}</p>` : ""}
+        <p class="card-sub" style="margin-top:14px">The owner token is set as the <code>ADMIN_API_TOKEN</code> secret on the Worker. Only an authenticated admin can write; reading the public site never needs a token.</p>
+      </section>
+    </div>`;
+  }
+
+  if (state.adminStatus === "error") {
+    return `<div class="page page-admin">
+      <div class="page-head"><div class="page-head-text"><h2 class="page-title">Admin</h2><p class="page-sub">The admin API did not accept this session.</p></div><div class="page-actions"><button class="btn btn-sm" data-action="admin-sign-out">Sign out</button></div></div>
+      <section class="card">${emptyState("🔐", "Admin session expired", state.adminError || "Sign in again with a valid token. Nothing was changed.", `<button class="btn btn-primary" data-action="admin-sign-out">Sign in again</button>`)}</section>
+    </div>`;
+  }
+
+  if (state.adminStatus === "loading" || !state.adminData) {
+    return `<div class="page page-admin"><div class="page-head"><div class="page-head-text"><h2 class="page-title">Admin</h2><p class="page-sub">Checking the content store…</p></div></div><section class="card"><p class="card-sub">Loading the admin workspace…</p></section></div>`;
+  }
+
+  const tabs = ADMIN_TABS.filter((tab) => tab.id !== "editors" || state.adminData?.role === "owner");
+  const active = tabs.find((tab) => tab.id === state.adminTab) || tabs[0];
+  const meta = state.adminData?.meta;
+  return `<div class="page page-admin">
+    <div class="page-head">
+      <div class="page-head-text"><h2 class="page-title">Admin</h2><p class="page-sub">Signed in as <strong>${escapeHtml(state.adminData?.role || "editor")}</strong>. Published content appears on the site and in Ask Compass immediately.</p></div>
+      <div class="page-actions">
+        <span class="badge">Revision ${escapeHtml(String(meta?.revision || 0))}</span>
+        <span class="badge ${state.adminData?.configured ? "badge-accent" : "badge-warn"}">${state.adminData?.configured ? "Store connected" : "Store not configured"}</span>
+        <button class="btn btn-sm" data-action="admin-refresh">Refresh</button>
+        <button class="btn btn-sm" data-action="admin-sign-out">Sign out</button>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <div class="chip-row" role="tablist" aria-label="Admin sections">
+        ${tabs.map((tab) => `<button class="chip chip-button ${active.id === tab.id ? "is-active" : ""}" data-action="admin-tab" data-tab="${tab.id}" role="tab" aria-selected="${active.id === tab.id}">${escapeHtml(tab.title)}${ADMIN_SCHEMAS[tab.id] ? ` ${adminItems(tab.id).length}` : ""}</button>`).join("")}
+      </div>
+    </div>
+    ${renderAdminForm()}
+    ${renderAdminList()}
+    <section class="card" style="margin-top:14px">
+      <div class="card-head"><div><h2 class="card-title">Upload a file</h2><p class="card-sub">PNG, JPEG, WebP, GIF or PDF up to 1.5 MB. Files are stored in the content store and served from this Worker.</p></div></div>
+      <div class="admin-upload-row">
+        <label class="btn btn-sm admin-file-label">Choose file<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" data-admin-file data-standalone="true" /></label>
+        <span class="card-sub" id="admin-upload-status">Nothing uploaded in this session.</span>
+      </div>
+    </section>
+    <p class="card-sub" style="margin-top:12px">Every write is validated, bounded and recorded. Undo restores the previous version of a collection. The public site only ever reads published items.</p>
+  </div>`;
+}
+
+async function adminUpload(file, input) {
+  if (!file) return;
+  const status = $("#admin-upload-status");
+  if (file.size > ADMIN_MAX_FILE) {
+    toast("Choose a file smaller than 1.5 MB.", "error");
+    if (status) status.textContent = "That file is larger than 1.5 MB.";
+    return;
+  }
+  if (status) status.textContent = `Uploading ${file.name}…`;
+  try {
+    const response = await fetch(`/api/admin/upload?name=${encodeURIComponent(file.name)}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${state.adminToken}`, "Content-Type": file.type || "application/octet-stream" },
+      body: file
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.error || "Upload failed.");
+    const absolute = new URL(data.url, location.origin).toString();
+    const form = input?.closest("form");
+    const urlField = form?.querySelector('[data-admin-field="url"]');
+    if (urlField) urlField.value = absolute;
+    if (status) {
+      status.innerHTML = `Uploaded · <a href="${escapeHtml(data.url)}" target="_blank" rel="noopener noreferrer">open file ↗</a> · ${Math.max(1, Math.round(Number(data.size || file.size) / 1024))} KB`;
+    }
+    toast("File uploaded. Paste the link into any item.", "success");
+  } catch (error) {
+    const message = String(error.message || "Upload failed.");
+    if (status) status.textContent = message;
+    toast(message, "error");
+  } finally {
+    if (input) input.value = "";
+  }
+}
+
+async function adminSave() {
+  const editing = state.adminEditing;
+  const form = $("#admin-form");
+  if (!editing || !form) return;
+  const item = { ...(editing.item || {}) };
+  for (const field of $$("[data-admin-field]", form)) {
+    item[field.dataset.adminField] = field.type === "checkbox" ? field.checked : field.value.trim();
+  }
+  state.adminBusy = true;
+  try {
+    await adminRequest("/api/admin/content", {
+      method: "POST",
+      body: { action: "upsert", collection: editing.collection, item }
+    });
+    state.adminEditing = null;
+    toast("Saved. It is live on Compass.", "success");
+    await adminLoad({ silent: true });
+  } catch (error) {
+    toast(String(error.message || "Could not save."), "error");
+  } finally {
+    state.adminBusy = false;
+    render();
+  }
+}
+
+async function adminDelete(collection, id) {
+  const item = adminItems(collection).find((row) => row.id === id);
+  if (!item) return;
+  if (!window.confirm(`Delete “${adminItemTitle(collection, item)}” from ${ADMIN_SCHEMAS[collection]?.title || collection}? This can be undone with Undo last change.`)) return;
+  try {
+    await adminRequest("/api/admin/content", { method: "POST", body: { action: "delete", collection, id } });
+    toast("Deleted. Undo is available.", "success");
+    await adminLoad({ silent: true });
+  } catch (error) {
+    toast(String(error.message || "Could not delete."), "error");
+  }
+}
+
+async function adminToggle(collection, id) {
+  const item = adminItems(collection).find((row) => row.id === id);
+  if (!item) return;
+  try {
+    await adminRequest("/api/admin/content", {
+      method: "POST",
+      body: { action: "upsert", collection, item: { ...item, published: item.published === false } }
+    });
+    toast(item.published === false ? "Published." : "Unpublished.", "success");
+    await adminLoad({ silent: true });
+  } catch (error) {
+    toast(String(error.message || "Could not update."), "error");
+  }
+}
+
+async function adminRestore(collection) {
+  if (!window.confirm(`Undo the last change to ${ADMIN_SCHEMAS[collection]?.title || collection}?`)) return;
+  try {
+    await adminRequest("/api/admin/content", { method: "POST", body: { action: "restore", collection } });
+    toast("Previous version restored.", "success");
+    await adminLoad({ silent: true });
+  } catch (error) {
+    toast(String(error.message || "Nothing to restore."), "error");
+  }
+}
 
 function directoryMatches() {
   const query = state.directoryQuery.trim().toLowerCase();
@@ -1464,6 +2181,11 @@ function currentAnswerContext() {
     now: now(),
     metadata: state.metadata,
     datesheet: state.datesheet,
+    notices: allNotices(),
+    papers: allPapers(),
+    syllabus: allSyllabus(),
+    holidays: holidayOverrides(),
+    departments: state.campus.departments,
     clock: v("timetable.clock"),
     showTeacher: v("timetable.showTeacher"),
     showRoom: v("timetable.showRoom"),
@@ -1649,19 +2371,39 @@ function renderFlagRow(flag) {
 function renderVersionCard() {
   const version = state.version;
   const snapshots = state.snapshots || [];
+  const previous = version?.previous || null;
   return `<div class="card version-card" style="margin:14px 0">
-    <div class="card-head"><div><h2 class="card-title">Version & rollback</h2><p class="card-sub">The new app, the classic layout and the frozen legacy build are separate on purpose.</p></div></div>
+    <div class="card-head"><div><h2 class="card-title">Version & rollback</h2><p class="card-sub">Every generation stays reachable. The new app, the previous 2.0 generation and the frozen legacy build are separate on purpose.</p></div></div>
     <div class="version-grid">
-      <dl class="version-cell"><dt>App</dt><dd>v${escapeHtml(version?.app?.version || APP_VERSION)} · ${escapeHtml(version?.app?.channel || "stable")}</dd></dl>
+      <dl class="version-cell"><dt>This app</dt><dd>v${escapeHtml(version?.app?.version || APP_VERSION)} · ${escapeHtml(version?.app?.channel || "stable")}</dd></dl>
       <dl class="version-cell"><dt>Build</dt><dd>${escapeHtml(version?.app?.build || "2026-11-09")}</dd></dl>
       <dl class="version-cell"><dt>Data release</dt><dd>${escapeHtml(state.metadata?.version || "not loaded")}</dd></dl>
       <dl class="version-cell"><dt>Verified</dt><dd>${escapeHtml(shortDate(state.metadata?.checkedAt || state.lastSync))}</dd></dl>
+      <dl class="version-cell"><dt>Content store</dt><dd>${version?.content?.store ? "connected" : "not configured"}</dd></dl>
+      <dl class="version-cell"><dt>Admin</dt><dd>${version?.content?.admin ? "token configured" : "token missing"}</dd></dl>
+    </div>
+    <div class="build-switch">
+      <div class="build-card is-current">
+        <span class="badge badge-accent">Current</span>
+        <strong>Compass 2.1 · this app</strong>
+        <small>Notices, papers, syllabus, calendar, admin and the deterministic Brain.</small>
+      </div>
+      <button class="build-card" data-action="open-previous" ${v("experience.previousBuild") ? "" : "hidden"}>
+        <span class="badge">v2.0</span>
+        <strong>${escapeHtml(previous?.label || "Previous generation")}</strong>
+        <small>${escapeHtml(previous?.note || "A separate Worker opened in a new tab.")}</small>
+      </button>
+      <button class="build-card" data-action="open-legacy">
+        <span class="badge">v1 · frozen</span>
+        <strong>${escapeHtml(version?.legacy?.label || "Legacy Compass build")}</strong>
+        <small>The current production build, kept untouched with its own cache scope.</small>
+      </button>
     </div>
     <div class="chip-row" style="margin-top:14px">
-      <button class="btn btn-primary btn-sm" data-action="open-legacy">Open legacy build ↗</button>
       <button class="btn btn-sm" data-action="refresh-data">Check for updates</button>
       <button class="btn btn-sm" data-action="export-data">Export data</button>
       <button class="btn btn-sm" data-action="import-data">Import data</button>
+      <button class="btn btn-sm" data-action="open-admin" ${v("experience.adminLink") ? "" : "hidden"}>Admin & publishing</button>
     </div>
     <p class="card-sub" style="margin-top:10px">Legacy URL: <code>${escapeHtml(state.legacyUrl)}</code></p>
     <div class="snapshot-list">
@@ -1782,6 +2524,12 @@ function openLegacy() {
   else location.href = url;
 }
 
+function openPreviousBuild() {
+  const url = state.version?.previous?.url;
+  if (!url) { toast("The previous build URL was not published by the Worker.", "error"); return; }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 function toggleTheme() {
   const current = v("appearance.theme");
   const index = THEME_ORDER.indexOf(current);
@@ -1827,8 +2575,114 @@ async function handleAction(action, element) {
   switch (action) {
     case "retry-notices":
       state.noticesStatus = "idle";
+      state.contentStatus = "idle";
+      state.campusStatus = "idle";
+      render();
+      ensureLiveContent();
+      break;
+    case "retry-papers":
+      state.papersStatus = "idle";
+      render();
+      ensureLiveContent();
+      break;
+    case "retry-syllabus":
+      state.contentStatus = "idle";
+      state.campusStatus = "idle";
+      render();
+      ensureLiveContent();
+      break;
+    case "notice-category":
+      state.noticeCategory = element.dataset.category || "";
       render();
       break;
+    case "syllabus-department":
+      state.syllabusDepartment = element.dataset.department || "";
+      render();
+      break;
+    case "open-admin":
+      navigate("admin");
+      break;
+    case "open-previous":
+      openPreviousBuild();
+      break;
+    case "admin-sign-in": {
+      const token = ($("[data-admin-token]")?.value || "").trim();
+      if (!token) { toast("Paste the admin token first.", "error"); break; }
+      setAdminToken(token);
+      await adminLoad();
+      break;
+    }
+    case "admin-sign-out":
+      setAdminToken("");
+      state.adminData = null;
+      state.adminStatus = "signed-out";
+      state.adminEditing = null;
+      state.adminError = "";
+      render();
+      toast("Signed out of admin.");
+      break;
+    case "admin-refresh":
+      await adminLoad();
+      break;
+    case "admin-tab":
+      state.adminTab = element.dataset.tab || "notices";
+      state.adminEditing = null;
+      render();
+      break;
+    case "admin-new":
+      state.adminTab = element.dataset.collection || state.adminTab;
+      state.adminEditing = { collection: state.adminTab, item: {} };
+      render();
+      break;
+    case "admin-edit": {
+      const collection = element.dataset.collection;
+      const item = adminItems(collection).find((row) => row.id === element.dataset.id);
+      if (!item) { toast("That item is no longer in the store.", "error"); break; }
+      state.adminTab = collection;
+      state.adminEditing = { collection, item: { ...item } };
+      render();
+      break;
+    }
+    case "admin-cancel":
+      state.adminEditing = null;
+      render();
+      break;
+    case "admin-save":
+      await adminSave();
+      break;
+    case "admin-delete":
+      await adminDelete(element.dataset.collection, element.dataset.id);
+      break;
+    case "admin-toggle":
+      await adminToggle(element.dataset.collection, element.dataset.id);
+      break;
+    case "admin-restore":
+      await adminRestore(element.dataset.collection);
+      break;
+    case "admin-editor-add": {
+      const name = ($("#admin-editor-name")?.value || "").trim();
+      const token = $("#admin-editor-token")?.value || "";
+      try {
+        await adminRequest("/api/admin/editors", { method: "POST", body: { name, token } });
+        toast(`Editor “${name}” added.`, "success");
+        await adminLoad({ silent: true });
+      } catch (error) {
+        toast(String(error.message || "Could not add the editor."), "error");
+      }
+      break;
+    }
+    case "admin-editor-remove": {
+      const name = element.dataset.name || "";
+      if (!window.confirm(`Remove editor “${name}”? Their token stops working immediately.`)) break;
+      try {
+        await adminRequest("/api/admin/editors", { method: "DELETE", body: { name } });
+        toast("Editor removed.", "success");
+        await adminLoad({ silent: true });
+      } catch (error) {
+        toast(String(error.message || "Could not remove the editor."), "error");
+      }
+      break;
+    }
     case "retry-directory":
       state.directoryStatus = "idle";
       render();
@@ -2250,6 +3104,17 @@ function bindEvents() {
   });
 
   document.addEventListener("change", (event) => {
+    const paperDepartment = event.target.closest("[data-paper-department]");
+    if (paperDepartment) {
+      state.paperDepartment = paperDepartment.value;
+      render();
+      return;
+    }
+    const adminFile = event.target.closest("[data-admin-file]");
+    if (adminFile) {
+      adminUpload(adminFile.files?.[0], adminFile);
+      return;
+    }
     const setting = event.target.closest("[data-setting]");
     if (setting) {
       const flag = getFlag(setting.dataset.setting);
@@ -2315,6 +3180,42 @@ function bindEvents() {
       state.searchTimer = setTimeout(() => {
         render();
         const input = $("[data-directory-search]");
+        if (input) { input.focus(); input.setSelectionRange(caret, caret); }
+      }, 200);
+      return;
+    }
+    const noticeSearch = event.target.closest("[data-notice-search]");
+    if (noticeSearch) {
+      state.noticeQuery = noticeSearch.value;
+      const caret = noticeSearch.selectionStart;
+      clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(() => {
+        render();
+        const input = $("[data-notice-search]");
+        if (input) { input.focus(); input.setSelectionRange(caret, caret); }
+      }, 200);
+      return;
+    }
+    const paperSearch = event.target.closest("[data-paper-search]");
+    if (paperSearch) {
+      state.paperQuery = paperSearch.value;
+      const caret = paperSearch.selectionStart;
+      clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(() => {
+        render();
+        const input = $("[data-paper-search]");
+        if (input) { input.focus(); input.setSelectionRange(caret, caret); }
+      }, 200);
+      return;
+    }
+    const syllabusSearch = event.target.closest("[data-syllabus-search]");
+    if (syllabusSearch) {
+      state.syllabusQuery = syllabusSearch.value;
+      const caret = syllabusSearch.selectionStart;
+      clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(() => {
+        render();
+        const input = $("[data-syllabus-search]");
         if (input) { input.focus(); input.setSelectionRange(caret, caret); }
       }, 200);
       return;
@@ -2391,6 +3292,8 @@ function startTimers() {
 async function init() {
   loadAllSettings();
   loadChat();
+  setAdminToken(adminStoredToken());
+  state.adminStatus = state.adminToken ? "idle" : "signed-out";
   state.day = "";
   bindEvents();
   setupInstallPrompt();
