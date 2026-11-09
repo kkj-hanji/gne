@@ -1,0 +1,30 @@
+{
+  // Frozen legacy build.
+  //
+  // This config deploys the exact current app (public/ + src/worker.js) under
+  // a separate Worker name so the new app can keep pointing at the live
+  // production origin while an untouched rollback copy stays deployable.
+  //
+  // It intentionally does NOT declare crons: the production Worker keeps doing
+  // scheduled source verification, and two writers to the same KV registry
+  // would race. Deploy this only when you need an independent rollback origin.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gndec-compass-legacy",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-11",
+  "secrets": {
+    "required": ["MY_NVIDIA_API_KEY", "ADMIN_API_TOKEN"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SOURCE_REGISTRY",
+      "id": "bc362ddd3c40427a9e182490f1c35432"
+    }
+  ],
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "single-page-application"
+  }
+}

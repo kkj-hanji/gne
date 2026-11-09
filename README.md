@@ -117,6 +117,29 @@ The browser-side Kaushik profile check only controls the interface. The Worker r
 
 When special student features need real protection, add verified sign-in first (for example Cloudflare Access with an email allowlist/group). Then the Worker can trust a signed identity and grant roles such as `owner`, `special`, and `student`. Until that identity layer exists, all students receive the same safe public features.
 
+## GNDEC Compass Next
+
+A second, fully static-first app lives in `next/` and deploys as its own Worker,
+`gndec-compass-next`. The current app in `public/` stays deployed and untouched
+as the frozen legacy build; the two run on separate origins and service-worker
+scopes, and Settings links to the legacy build at any time.
+
+```powershell
+npm run dev:next        # http://localhost:8788
+npm run build:seo       # regenerate static college pages + sitemap
+npm run deploy:next
+npm run deploy:legacy   # frozen rollback origin, no cron
+```
+
+It adds Notices, Directory (faculty/students/syllabus), Compare, a 104-flag
+settings system with 6 presets, per-route SEO metadata and JSON-LD, 270
+pre-rendered college pages, a sitemap, an installable offline PWA and a
+deterministic multilingual Ask Compass that reuses the verified Brain engines
+and keeps `legacyAnswerWithoutAi()` as its fallback. See
+[docs/compass-next.md](docs/compass-next.md) for the architecture, allow-listed
+legacy proxy, SEO generation, settings precedence, rollback and the CI/refresh
+workflows.
+
 ## Verify
 
 ```powershell
@@ -148,6 +171,9 @@ Known catalogue facts are verified again at the application boundary. A model ca
 - `public/app.js` — browser-only student setup, FET parser, timetable engine, and deterministic question routing.
 - `src/worker.js` — source discovery, validation, fallback registry, public source proxy, AI proxy and limits.
 - `public/index.html` — neutral first-visit UI.
+- `next/` — the new static-first app (shell, routes, settings, engines, PWA service worker).
+- `src/next-worker.js`, `src/next-core.js` — new Worker entrypoint, SEO injection, allow-listed legacy proxy.
+- `wrangler.next.jsonc`, `wrangler.legacy.jsonc` — new and frozen legacy deployment configs.
 - `wrangler.jsonc` — Worker assets and automatic source-check schedule.
 - `scripts/stress-probe.mjs`, `scripts/stress-probe-2.mjs` — 113 end-to-end pipeline probes across four languages; run directly with node, not part of `npm test`.
 

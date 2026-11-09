@@ -1,10 +1,12 @@
 node_modules
 .wrangler
+.wrangler-*
 dist
 .env
 .env.*
 .dev.vars
 .dev.vars.*
+.cache-next/
 preview-*.png
 /android/.gradle/
 /android/local.properties

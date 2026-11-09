@@ -1,0 +1,73 @@
+{
+  "id": "/",
+  "name": "GNDEC Compass",
+  "short_name": "Compass",
+  "description": "Verified GNDEC timetable, free rooms, exam datesheet and a deterministic Ask Compass. Works offline and never guesses.",
+  "start_url": "./today",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#06110e",
+  "theme_color": "#06110e",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "description": "Your next class and today's free rooms",
+      "url": "./today",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Timetable",
+      "short_name": "Timetable",
+      "description": "The official weekly timetable",
+      "url": "./timetable",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ask Compass",
+      "short_name": "Ask",
+      "description": "Ask a verified timetable question",
+      "url": "./ask",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Free rooms",
+      "short_name": "Rooms",
+      "description": "Find a free room right now",
+      "url": "./rooms",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

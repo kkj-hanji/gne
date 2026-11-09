@@ -1,0 +1,2449 @@
+/**
+ * GNDEC Compass Next — application shell.
+ *
+ * Single small module, no framework. The verified Brain engines are loaded
+ * lazily from the frozen legacy build; if they are unavailable the local
+ * deterministic engine still answers every factual question.
+ */
+
+import {
+  APP_VERSION, CATEGORIES, FLAGS, PRESETS, SETTINGS_KEY,
+  getFlag, isMapFlagEnabled
+} from "./settings-registry.js";
+import {
+  applyPreset, coerceValue, defaultValues, exportBundle, importBundle,
+  isFlagAvailable, loadProfile, loadUserValues, resetValues, resolveValues,
+  saveProfile, saveUserValues
+} from "./settings-store.js";
+import {
+  DAY_NAMES, STUDY_DAYS, addDays, formatDuration, getIndiaNow, humanTime,
+  nextStudyDay, relativeStartLabel, resolveQuestionDay
+} from "./engine/datetime.js";
+import { mergeSchedules, readVerifiedFetTimetable } from "./engine/fet-parser.js";
+import { computeFreeRooms, formatFreeWindow, groupRooms, roomZone, zoneFromQuestion } from "./engine/free-rooms.js";
+import { answerLocally, buildAnswerContext, escapeHtml, FALLBACK_REFUSAL, classesFor } from "./engine/answer.js";
+import { brainSuggestions, loadBrainScripts, runBrain } from "./engine/brain-bridge.js";
+import {
+  clearAppCaches, clearSnapshots, deleteSnapshot, getSnapshot, listSnapshots,
+  pruneSnapshots, requestPersistentStorage, saveSnapshot, storageEstimate, formatBytes
+} from "./engine/storage.js";
+import { digestCopy, dueReminder, isQuietTime, notificationCopy } from "./engine/reminders.js";
+import { buildIcs, downloadIcs } from "./engine/ics.js";
+import { ROUTES as SEO_ROUTES, headTags, routeFromPath } from "./seo-meta.js";
+
+const CHAT_KEY = "gndec-compass-next-chat-v1";
+const SELECTION_KEY = "gndec-compass-next-selection-v1";
+const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
+const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
+const DEVICE_KEY = "gndec-compass-next-device-v1";
+const REMINDER_KEY = "gndec-compass-next-reminders-v1";
+const DIGEST_KEY = "gndec-compass-next-digest-v1";
+const THEME_ORDER = ["system", "light", "dark", "oled"];
+
+const BRANCHES = Object.freeze([
+  ["BARCH", "Architecture"], ["BBA", "Business Administration"], ["BCA", "Computer Applications"],
+  ["BCOM", "Commerce"], ["BVOC", "Vocational Studies"], ["MCA", "Master of Computer Applications"],
+  ["RAI", "Robotics and Artificial Intelligence"], ["CS", "Computer Science Engineering"],
+  ["EC", "Electronics and Communication Engineering"], ["EE", "Electrical Engineering"],
+  ["IT", "Information Technology"], ["CE", "Civil Engineering"], ["ME", "Mechanical Engineering"]
+]);
+
+const state = {
+  route: "today",
+  schedule: [],
+  roomSchedule: [],
+  groups: [],
+  group: "",
+  subgroup: "",
+  metadata: null,
+  profile: {},
+  values: {},
+  sources: {},
+  adminValues: {},
+  version: null,
+  datesheet: null,
+  notices: [],
+  noticesStatus: "idle",
+  directoryTab: "faculty",
+  directoryQuery: "",
+  directoryStatus: "idle",
+  faculty: [],
+  students: [],
+  syllabus: null,
+  compareA: "",
+  compareB: "",
+  compareDay: "",
+  compareStatus: "idle",
+  chat: [],
+  busy: false,
+  brainState: "idle",
+  dataStatus: "loading",
+  lastSync: "",
+  online: typeof navigator === "undefined" ? true : navigator.onLine !== false,
+  day: "",
+  settingsCategory: "experience",
+  settingsQuery: "",
+  roomDay: "",
+  roomTime: "",
+  roomZone: "",
+  debug: { attempts: [], last: null },
+  installPrompt: null,
+  notified: new Set(),
+  legacyUrl: "https://gndec-compass.koush3069.workers.dev",
+  refreshTimer: 0,
+  reminderTimer: 0,
+  renderedAt: 0,
+  snapshots: [],
+  reloading: false,
+  listening: false,
+  searchTimer: 0
+};
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+function storageGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch { return false; }
+}
+function storageRemove(key) {
+  try { localStorage.removeItem(key); } catch { /* private mode */ }
+}
+
+function toast(message, kind = "") {
+  const root = $("#toast-root");
+  if (!root) return;
+  const node = document.createElement("div");
+  node.className = `toast${kind ? ` is-${kind}` : ""}`;
+  node.textContent = message;
+  root.appendChild(node);
+  setTimeout(() => node.remove(), 4200);
+}
+
+function sanitizeHtml(html) {
+  const template = document.createElement("template");
+  template.innerHTML = String(html || "");
+  template.content.querySelectorAll("script,iframe,object,embed,style,form,input,textarea,select,link,meta,video,audio").forEach((node) => node.remove());
+  template.content.querySelectorAll("*").forEach((node) => {
+    for (const attribute of [...node.attributes]) {
+      const name = attribute.name.toLowerCase();
+      if (name.startsWith("on")) node.removeAttribute(attribute.name);
+      if ((name === "href" || name === "src") && /^\s*javascript:/i.test(attribute.value)) node.removeAttribute(attribute.name);
+      if (name === "style" && /expression|url\s*\(/i.test(attribute.value)) node.removeAttribute(attribute.name);
+    }
+  });
+  return template.innerHTML;
+}
+
+function subjectColor(subject) {
+  if (!state.values["appearance.timetableColors"]) return "";
+  let hash = 0;
+  const text = String(subject || "");
+  for (let index = 0; index < text.length; index += 1) hash = (hash * 31 + text.charCodeAt(index)) % 360;
+  return `style="--subject-color: hsl(${hash} 62% 58%)"`;
+}
+
+function branchForGroup(group) {
+  const base = String(group || "").replace(/^D[23]/, "");
+  return BRANCHES.find(([prefix]) => base.startsWith(prefix))?.[1] || "Programme timetable";
+}
+
+function groupLabel(group) {
+  return `${group} · ${branchForGroup(group)}`;
+}
+
+function selectionLabel() {
+  return `${state.group || "No section"}${state.subgroup ? ` · ${state.subgroup}` : ""}`;
+}
+
+function now() {
+  return getIndiaNow();
+}
+
+function subgroupsFor(group) {
+  return [...new Set(state.schedule
+    .filter((entry) => entry.group === group)
+    .flatMap((entry) => String(entry.cohorts || "").split(/\s*,\s*/).filter(Boolean))
+    .filter((cohort) => cohort !== group && String(cohort).startsWith(group)))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function classesForDay(day) {
+  return classesFor(state.schedule, state.group, day, state.subgroup);
+}
+
+function preferredGroup(groups) {
+  return groups.find((group) => /^ECB(?:\d|$)/.test(group))
+    || groups.find((group) => /^EC(?:\d|[A-Z])/.test(group))
+    || groups[0] || "";
+}
+
+function isOpenQuestion(question) {
+  const text = String(question || "").toLowerCase();
+  if (/\b(?:class|timetable|schedule|room|teacher|faculty|section|exam|datesheet|syllabus|result|attendance|mentor|profile)\b/.test(text)) return false;
+  return /\b(?:explain|why|how|write|summar|translate|plan|help me|study|understand|difference|example|essay|email|letter)\b/.test(text) || text.split(/\s+/).length > 14;
+}
+
+/* ── Settings ──────────────────────────────────────────────────────────── */
+
+function v(id) {
+  return state.values[id];
+}
+
+function loadAllSettings() {
+  const loaded = loadUserValues(localStorage);
+  const user = loaded && loaded.values ? loaded.values : loaded;
+  const attendanceTarget = loaded?.attendanceTarget;
+  const resolved = resolveValues({ user, admin: state.adminValues, search: location.search });
+  state.values = resolved.values;
+  state.sources = resolved.sources;
+  state.profile = loadProfile(localStorage);
+  if (state.profile.migratedFromLegacy) delete state.profile.migratedFromLegacy;
+  if (attendanceTarget && state.profile.attendanceTarget === 76) state.profile.attendanceTarget = attendanceTarget;
+  if (loaded?.migratedFromLegacy) {
+    saveUserValues(localStorage, state.values);
+    saveProfile(localStorage, state.profile);
+    toast("Imported your legacy Compass settings. Nothing was deleted.");
+  }
+  applyAppearance();
+}
+
+function persistSettings() {
+  saveUserValues(localStorage, state.values);
+}
+
+function applyAppearance() {
+  const root = document.documentElement;
+  const theme = v("appearance.theme") === "system"
+    ? (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark")
+    : v("appearance.theme");
+  root.dataset.theme = theme;
+  root.dataset.accent = v("appearance.accent");
+  root.dataset.density = v("appearance.density");
+  root.dataset.experience = v("experience.mode");
+  root.dataset.bottomItems = v("nav.bottomItems");
+  const scale = v("a11y.largeText") ? Math.max(125, v("appearance.fontScale")) : v("appearance.fontScale");
+  root.style.setProperty("--font-scale", (scale / 100).toFixed(2));
+  root.classList.toggle("is-reduced-motion", Boolean(v("appearance.reduceMotion")) || v("experience.mode") === "safe");
+  root.classList.toggle("is-high-contrast", Boolean(v("appearance.highContrast")));
+  root.classList.toggle("is-colorblind", Boolean(v("appearance.colorBlindPalette")));
+  root.classList.toggle("is-square", !v("appearance.rounded"));
+  root.classList.toggle("is-glassless", !v("appearance.glass") || v("experience.mode") === "safe");
+  root.classList.toggle("is-dyslexic", Boolean(v("a11y.dyslexiaFont")));
+  root.classList.toggle("is-strong-focus", Boolean(v("a11y.strongFocus")));
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && theme !== "light") meta.setAttribute("content", theme === "oled" ? "#000000" : "#071310");
+}
+
+function setFlag(id, raw) {
+  const flag = getFlag(id);
+  if (!flag) return;
+  state.values[id] = coerceValue(flag, raw);
+  persistSettings();
+  applyAppearance();
+}
+
+/* ── Data loading ──────────────────────────────────────────────────────── */
+
+async function fetchJson(url, options = {}, timeout = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchText(url, timeout = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { signal: controller.signal, cache: "no-cache" });
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    const text = await response.text();
+    if (!text || text.length < 100) throw new Error("The official timetable response was empty.");
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function resolveSelection() {
+  const saved = (() => {
+    try { return JSON.parse(storageGet(SELECTION_KEY) || "null"); } catch { return null; }
+  })();
+  const candidates = [
+    state.profile.section,
+    saved?.group,
+    storageGet(LEGACY_GROUP_KEY),
+    new URLSearchParams(location.search).get("section")
+  ].filter(Boolean);
+  state.group = candidates.find((value) => state.groups.includes(value)) || preferredGroup(state.groups);
+  const subgroups = subgroupsFor(state.group);
+  const subgroupCandidates = [state.profile.subsection, saved?.subgroup, storageGet(LEGACY_SUBGROUP_KEY)].filter(Boolean);
+  state.subgroup = subgroupCandidates.find((value) => subgroups.includes(value)) || "";
+  persistSelection();
+}
+
+function persistSelection() {
+  storageSet(SELECTION_KEY, JSON.stringify({ group: state.group, subgroup: state.subgroup }));
+}
+
+function applySchedule(schedule, roomSchedule, metadata, { fromCache = false } = {}) {
+  state.schedule = Array.isArray(schedule) ? schedule : [];
+  state.roomSchedule = Array.isArray(roomSchedule) ? roomSchedule : [];
+  state.groups = [...new Set(state.schedule.map((entry) => entry.group))].sort((a, b) => a.localeCompare(b));
+  state.metadata = metadata || state.metadata;
+  state.dataStatus = fromCache ? "cached" : "ready";
+  resolveSelection();
+}
+
+async function loadSnapshots() {
+  try {
+    state.snapshots = await listSnapshots();
+    return state.snapshots;
+  } catch {
+    state.snapshots = [];
+    return [];
+  }
+}
+
+async function loadCachedData() {
+  const snapshots = await loadSnapshots();
+  if (!snapshots.length) return false;
+  const latest = await getSnapshot(snapshots[0].id);
+  if (!latest?.schedule?.length) return false;
+  applySchedule(latest.schedule, latest.roomSchedule, {
+    version: latest.version,
+    checkedAt: latest.checkedAt,
+    source: "device snapshot"
+  }, { fromCache: true });
+  state.lastSync = latest.createdAt;
+  return true;
+}
+
+async function loadLiveData({ manual = false } = {}) {
+  if (manual) toast("Checking the official GNDEC sources…");
+  state.dataStatus = state.dataStatus === "ready" ? "ready" : "loading";
+  try {
+    const [groupsHtml, roomsHtml] = await Promise.all([
+      fetchText("/api/legacy/api/timetable?source=groups"),
+      fetchText("/api/legacy/api/timetable?source=rooms")
+    ]);
+    const schedule = readVerifiedFetTimetable(groupsHtml, "groups");
+    const roomSchedule = readVerifiedFetTimetable(roomsHtml, "rooms");
+    const metadata = await loadSourceMetadata();
+    applySchedule(schedule, roomSchedule, metadata);
+    state.lastSync = new Date().toISOString();
+    await saveSnapshot({
+      id: `snap-${Date.now()}`,
+      createdAt: state.lastSync,
+      version: metadata?.version || "unknown",
+      checkedAt: metadata?.checkedAt || "",
+      groups: state.groups.length,
+      schedule,
+      roomSchedule
+    });
+    await pruneSnapshots(v("data.snapshots"));
+    state.snapshots = await listSnapshots();
+    state.dataStatus = "ready";
+    if (manual) toast("Official timetable verified and refreshed.", "success");
+    render();
+    return true;
+  } catch (error) {
+    state.dataStatus = state.schedule.length ? "cached" : "error";
+    if (manual) toast(error?.message || "Could not refresh the official timetable.", "error");
+    render();
+    return false;
+  }
+}
+
+async function loadSourceMetadata() {
+  try {
+    const data = await fetchJson("/api/legacy/api/sources", {}, 15000);
+    return {
+      version: data.version || "",
+      checkedAt: data.checkedAt || "",
+      updatedAt: data.updatedAt || "",
+      sources: Array.isArray(data.sources) ? data.sources : []
+    };
+  } catch {
+    return state.metadata;
+  }
+}
+
+async function loadVersion() {
+  try {
+    const data = await fetchJson("/api/version", {}, 8000);
+    state.version = data;
+    if (data?.legacy?.url) state.legacyUrl = data.legacy.url;
+    updateLegacyCards();
+  } catch {
+    state.version = null;
+  }
+}
+
+async function loadDatesheet() {
+  try {
+    state.datesheet = await fetchJson("/api/legacy/data/end-sem-datesheet.json", {}, 20000);
+  } catch {
+    state.datesheet = null;
+  }
+}
+
+async function loadNotices() {
+  state.noticesStatus = "loading";
+  try {
+    const data = await fetchJson("/api/legacy/data/notices.json", {}, 12000);
+    state.notices = Array.isArray(data?.value) ? data.value : Array.isArray(data) ? data : [];
+    state.noticesStatus = "ready";
+  } catch {
+    state.notices = [];
+    state.noticesStatus = "error";
+  }
+}
+
+/* ── Directory data (faculty, students, syllabus) ──────────────────────── */
+
+function ensureDirectoryData() {
+  const tab = state.directoryTab;
+  const loaded = tab === "faculty" ? state.faculty.length > 0 : tab === "students" ? state.students.length > 0 : Boolean(state.syllabus);
+  if (loaded) {
+    if (state.directoryStatus !== "ready") {
+      state.directoryStatus = "ready";
+      render();
+    }
+    return;
+  }
+  if (state.directoryStatus !== "idle") return;
+  if (tab === "faculty") loadFaculty();
+  else if (tab === "students") loadStudents();
+  else loadSyllabusIndex();
+}
+
+async function loadFaculty() {
+  state.directoryStatus = "loading";
+  render();
+  try {
+    let records = [];
+    try {
+      const data = await fetchJson("/api/legacy/data/faculty-directory-index.json", {}, 20000);
+      records = Array.isArray(data?.records) ? data.records : [];
+    } catch { /* fall back to the smaller live endpoint */ }
+    if (!records.length) {
+      const data = await fetchJson("/api/legacy/api/faculty", {}, 20000);
+      records = Array.isArray(data?.records) ? data.records : [];
+    }
+    state.faculty = records.filter((record) => record && record.name);
+    state.directoryStatus = "ready";
+  } catch {
+    state.faculty = [];
+    state.directoryStatus = "error";
+  }
+  if (state.route === "directory" && state.directoryTab === "faculty") render();
+}
+
+async function loadStudents() {
+  state.directoryStatus = "loading";
+  render();
+  try {
+    const data = await fetchJson("/api/legacy/data/student-roster-index.json", {}, 25000);
+    state.students = Array.isArray(data?.records) ? data.records : [];
+    state.directoryStatus = "ready";
+  } catch {
+    state.students = [];
+    state.directoryStatus = "error";
+  }
+  if (state.route === "directory" && state.directoryTab === "students") render();
+}
+
+async function loadSyllabusIndex() {
+  state.directoryStatus = "loading";
+  render();
+  try {
+    const data = await fetchJson("/api/legacy/data/first-year-syllabus-index.json", {}, 25000);
+    state.syllabus = data && Array.isArray(data.pages) ? data : null;
+    state.directoryStatus = state.syllabus ? "ready" : "error";
+  } catch {
+    state.syllabus = null;
+    state.directoryStatus = "error";
+  }
+  if (state.route === "directory" && state.directoryTab === "syllabus") render();
+}
+
+/* ── Calendar / exam helpers ───────────────────────────────────────────── */
+
+function nextExam() {
+  if (!state.datesheet?.tabs) return null;
+  const today = now().dateISO;
+  const entries = state.datesheet.tabs
+    .flatMap((tab) => (tab.entries || []).map((entry) => ({ ...entry, tab: tab.label })))
+    .filter((entry) => entry.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return entries[0] || null;
+}
+
+function nextClassInfo() {
+  const clock = now();
+  const classes = classesForDay(clock.day);
+  const current = classes.find((entry) => entry.start <= clock.minutes && clock.minutes < entry.end) || null;
+  const next = classes.find((entry) => entry.start > clock.minutes) || null;
+  if (current) return { kind: "current", entry: current, clock };
+  if (next) return { kind: "next", entry: next, clock };
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const candidate = addDays(clock, offset);
+    if (!STUDY_DAYS.includes(candidate.day)) continue;
+    const future = classesFor(state.schedule, state.group, candidate.day, state.subgroup);
+    if (future.length) return { kind: "later", entry: future[0], clock, day: candidate };
+  }
+  return { kind: "none", clock };
+}
+
+/* ── Rendering: shell + shared ─────────────────────────────────────────── */
+
+const ROUTES = {
+  today: { title: "Today", eyebrow: "Verified college data" },
+  timetable: { title: "Timetable", eyebrow: "Official weekly pattern" },
+  rooms: { title: "Rooms", eyebrow: "Published room timetable" },
+  ask: { title: "Ask Compass", eyebrow: "Deterministic, never guesses" },
+  notices: { title: "Notices", eyebrow: "Official college updates" },
+  directory: { title: "Directory", eyebrow: "Faculty, students and syllabus" },
+  compare: { title: "Compare", eyebrow: "Two sections, side by side" },
+  settings: { title: "Settings", eyebrow: "Controls, data and rollback" }
+};
+
+function parseRoute() {
+  const resolved = routeFromPath(location.pathname, location.hash);
+  const raw = String(location.hash || "").replace(/^#\/?/, "");
+  const [, category] = raw.split("/");
+  if (resolved.route === "settings" && category) state.settingsCategory = CATEGORIES.some((item) => item.id === category) ? category : state.settingsCategory;
+  // A legacy hash route always wins over the path so old links keep working.
+  if (ROUTES[resolved.route]) return resolved.route;
+  return v("nav.landing") || "today";
+}
+
+/** Clean path navigation on the web, hash navigation for file:// previews. */
+function supportsPathRouting() {
+  return location.protocol === "http:" || location.protocol === "https:";
+}
+
+function navigate(route, { replace = false } = {}) {
+  const target = ROUTES[route] ? route : "today";
+  const path = `/${target}`;
+  const usingPath = supportsPathRouting() && location.pathname !== "/index.html";
+  if (usingPath) {
+    if (location.pathname === path && !location.hash) {
+      state.route = target;
+      render();
+      return;
+    }
+    if (replace) history.replaceState({ route: target }, "", path);
+    else history.pushState({ route: target }, "", path);
+    state.route = target;
+    render();
+    return;
+  }
+  const hash = `#/${target}`;
+  if (location.hash === hash) {
+    state.route = target;
+    render();
+    return;
+  }
+  if (replace) history.replaceState({ route: target }, "", hash);
+  else location.hash = hash;
+}
+
+/**
+ * Keep the document head in sync after client-side navigation. The Worker
+ * already injects the same tags for a cold crawler request; this keeps the
+ * title, canonical and JSON-LD correct for share sheets and history.
+ */
+function syncSeoHead() {
+  if (typeof document === "undefined") return;
+  const route = ROUTES[state.route] ? state.route : "today";
+  const section = route === "timetable" ? state.group || "" : "";
+  const origin = /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/i.test(location.hostname)
+    ? location.origin
+    : undefined;
+  const tags = headTags({ origin, route, section, query: new URLSearchParams(location.search).get("q") || "" });
+  const head = document.head;
+  if (!head) return;
+  const start = [...head.childNodes].find((node) => node.nodeType === 8 && node.data === "COMPASS_SEO");
+  const end = [...head.childNodes].find((node) => node.nodeType === 8 && node.data === "/COMPASS_SEO");
+  if (start && end) {
+    let node = start.nextSibling;
+    while (node && node !== end) {
+      const next = node.nextSibling;
+      node.remove();
+      node = next;
+    }
+    const template = document.createElement("template");
+    template.innerHTML = tags;
+    [...template.content.childNodes].forEach((child) => head.insertBefore(child, end));
+    return;
+  }
+  document.title = SEO_ROUTES[route]?.title || document.title;
+  const description = head.querySelector('meta[name="description"]');
+  if (description) description.setAttribute("content", SEO_ROUTES[route]?.description || "");
+}
+
+function updateChrome() {
+  const meta = ROUTES[state.route] || ROUTES.today;
+  $("#topbar-title").textContent = meta.title;
+  $("#topbar-eyebrow").textContent = meta.eyebrow;
+  document.title = `${meta.title} · GNDEC Compass`;
+  $$(".nav-item, .bottom-item").forEach((item) => {
+    const active = item.dataset.route === state.route;
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
+  const initials = (state.profile.name || "G").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "G";
+  $("#avatar-initials").textContent = initials;
+  $("#build-line").textContent = `v${state.version?.app?.version || APP_VERSION} · ${state.version?.app?.channel || "stable"}`;
+  $("#build-line").hidden = !v("experience.showBuildChannel") && state.route !== "settings";
+  syncSeoHead();
+}
+
+function render() {
+  state.route = parseRoute();
+  updateChrome();
+  const view = $("#view");
+  if (!view) return;
+  const skeleton = $("#boot-skeleton");
+  if (skeleton) skeleton.remove();
+  let html = "";
+  switch (state.route) {
+    case "timetable": html = renderTimetable(); break;
+    case "rooms": html = renderRooms(); break;
+    case "ask": html = renderAsk(); break;
+    case "notices": html = renderNotices(); break;
+    case "directory": html = renderDirectory(); break;
+    case "compare": html = renderCompare(); break;
+    case "settings": html = renderSettings(); break;
+    default: html = renderToday();
+  }
+  view.innerHTML = html;
+  ensureRouteData();
+  state.renderedAt = Date.now();
+  if (state.route === "ask") {
+    renderChatMessages();
+    const input = $("#question-input");
+    const prefill = new URLSearchParams(location.search).get("q");
+    if (input && prefill && !input.value) input.value = prefill.slice(0, 500);
+    if (input && window.matchMedia?.("(min-width: 981px)").matches) input.focus({ preventScroll: true });
+  }
+  if (state.route === "settings") refreshStorageSummary();
+}
+
+function ensureRouteData() {
+  if (state.route === "notices" && state.noticesStatus === "idle") {
+    state.noticesStatus = "loading";
+    loadNotices().then(() => { if (state.route === "notices") render(); });
+  }
+  if (state.route === "directory") ensureDirectoryData();
+}
+
+function dataChip() {
+  if (state.dataStatus === "ready") return `<span class="sync-dot" aria-hidden="true"></span> Verified ${escapeHtml(shortDate(state.metadata?.checkedAt || state.lastSync))}`;
+  if (state.dataStatus === "cached") return `<span class="sync-dot is-stale" aria-hidden="true"></span> Cached release ${escapeHtml(state.metadata?.version || "")}`;
+  if (state.dataStatus === "error") return `<span class="sync-dot is-offline" aria-hidden="true"></span> No verified data`;
+  return `<span class="sync-dot is-stale" aria-hidden="true"></span> Loading official data…`;
+}
+
+function shortDate(value) {
+  if (!value) return "just now";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+/** Short day + month for dense timelines, without a timezone shift. */
+function dayMonth(value) {
+  if (!value) return "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+  if (!match) return String(value).slice(0, 10);
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(date);
+}
+
+/** Calendar-date only, without a timezone shift on a YYYY-MM-DD value. */
+function dateOnly(value) {
+  if (!value) return "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+  if (match) {
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+    return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function emptyState(icon, title, text, action = "") {
+  return `<div class="empty"><div class="empty-icon" aria-hidden="true">${icon}</div><p class="empty-title">${escapeHtml(title)}</p><p class="empty-text">${escapeHtml(text)}</p>${action ? `<p style="margin-top:14px">${action}</p>` : ""}</div>`;
+}
+
+function classCard(entry, clock = v("timetable.clock"), { highlight = false } = {}) {
+  const tags = [];
+  if (v("timetable.showCode") && entry.type) tags.push(`<span class="tag">${escapeHtml(entry.type === "L" ? "Lecture" : entry.type === "P" ? "Practical" : entry.type === "T" ? "Tutorial" : entry.type)}</span>`);
+  const meta = [];
+  if (v("timetable.showTeacher")) meta.push(escapeHtml(entry.teacher));
+  if (v("timetable.showRoom")) meta.push(escapeHtml(entry.room));
+  return `<article class="class-card${highlight ? " is-now" : ""}" data-subject ${subjectColor(entry.subject)}>
+    <div class="class-time">${escapeHtml(humanTime(entry.start, clock))}<br />${escapeHtml(humanTime(entry.end, clock))}</div>
+    <div class="class-body">
+      <div class="class-subject">${escapeHtml(entry.subject)}</div>
+      ${meta.length ? `<div class="class-meta">${meta.join(" · ")}</div>` : ""}
+      ${tags.length ? `<div class="class-tags">${tags.join("")}</div>` : ""}
+    </div>
+  </article>`;
+}
+
+/* ── Today ─────────────────────────────────────────────────────────────── */
+
+function renderToday() {
+  const clock = now();
+  const info = nextClassInfo();
+  const exam = nextExam();
+  const free = computeFreeRooms({
+    roomSchedule: state.roomSchedule,
+    day: clock.day,
+    minutes: clock.minutes,
+    duration: 60,
+    includeLabs: v("rooms.includeLabs"),
+    includeLectureHalls: v("rooms.includeLectureHalls")
+  });
+  const today = classesForDay(clock.day);
+  const greeting = clock.hour < 12 ? "Good morning" : clock.hour < 17 ? "Good afternoon" : "Good evening";
+  const name = state.profile.name ? `, ${state.profile.name.split(/\s+/)[0]}` : "";
+  const hero = renderHero(info, clock, greeting + name);
+  const freeRooms = v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
+  const timeline = v("today.hero") === "timeline" ? "" : renderTodayTimeline(today, clock);
+  const notices = v("today.noticesCard") && state.notices.length ? renderNoticesCard() : "";
+  const examCard = v("today.examCountdown") && exam ? renderExamCard(exam) : "";
+
+  return `<div class="page page-today">
+    ${hero}
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-label">Classes today</div><div class="stat-value">${today.length}</div><div class="stat-sub">${escapeHtml(clock.day)}</div></div>
+      <div class="stat"><div class="stat-label">Free rooms now</div><div class="stat-value">${free.error ? "—" : free.rooms.length}</div><div class="stat-sub">${free.error ? "Room data loading" : `for the next hour`}</div></div>
+      <div class="stat"><div class="stat-label">Next exam</div><div class="stat-value">${exam ? escapeHtml(shortExamDate(exam.date)) : "—"}</div><div class="stat-sub">${exam ? escapeHtml(exam.subject) : "No published date"}</div></div>
+    </div>
+    <div class="dashboard-grid">
+      <div class="stack">
+        ${timeline}
+        ${examCard}
+        ${notices}
+      </div>
+      <div class="stack">
+        ${freeRooms}
+        ${v("today.quickAsk") ? renderQuickAsk() : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderHero(info, clock, greeting) {
+  if (v("today.hero") === "minimal") {
+    return `<section class="hero-card">
+      <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(clock.date)}</span></div>
+      <h2 class="hero-title">${escapeHtml(selectionLabel())}</h2>
+      <p class="hero-meta">${todaySummary(info)}</p>
+      <div class="hero-actions">${heroActions()}</div>
+      <div class="hero-side">${dataChip()}</div>
+    </section>`;
+  }
+  if (v("today.hero") === "timeline") {
+    return `<section class="hero-card">
+      <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(clock.date)}</span></div>
+      <h2 class="hero-title">${escapeHtml(selectionLabel())}</h2>
+      <p class="hero-meta">${todaySummary(info)}</p>
+      <div class="hero-actions">${heroActions()}</div>
+      <div class="hero-side">${dataChip()}</div>
+    </section>`;
+  }
+  if (!state.schedule.length) {
+    return `<section class="hero-card">
+      <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span></div>
+      <h2 class="hero-title">Loading your verified timetable…</h2>
+      <p class="hero-meta">Compass is reading the official GNDEC release. It will never show a guessed class.</p>
+      <div class="hero-actions"><button class="btn" data-action="refresh-data">Check now</button><button class="btn btn-ghost" data-route="settings">Open settings</button></div>
+      <div class="hero-side">${dataChip()}</div>
+    </section>`;
+  }
+
+  let eyebrow = "Next class";
+  let title = "";
+  let meta = "";
+  let actions = heroActions();
+  if (info.kind === "current") {
+    eyebrow = "In class now";
+    title = info.entry.subject;
+    meta = `${humanTime(info.entry.start, v("timetable.clock"))} – ${humanTime(info.entry.end, v("timetable.clock"))} · ${info.entry.room} · ${info.entry.teacher} · ends in ${formatDuration(info.entry.end - info.clock.minutes)}`;
+  } else if (info.kind === "next") {
+    const delta = info.entry.start - info.clock.minutes;
+    eyebrow = delta <= 15 ? "Starting soon" : "Next class";
+    title = info.entry.subject;
+    meta = `${humanTime(info.entry.start, v("timetable.clock"))} – ${humanTime(info.entry.end, v("timetable.clock"))} · ${info.entry.room} · ${info.entry.teacher}`;
+    if (v("today.leaveNow") && delta <= 25 && !/not listed/i.test(info.entry.room)) meta += ` · leave in ${formatDuration(delta)}`;
+  } else if (info.kind === "later") {
+    eyebrow = "No more classes today";
+    title = `${info.entry.subject} on ${info.day.day}`;
+    meta = `${humanTime(info.entry.start, v("timetable.clock"))} · ${info.entry.room} · ${info.entry.teacher}`;
+  } else {
+    eyebrow = "No classes published";
+    title = "A clear day";
+    meta = "No class is published for your section in the loaded release.";
+  }
+  if (v("today.leaveNow") && info.kind === "next" && info.entry.start - info.clock.minutes <= 25) {
+    actions = `<button class="btn btn-primary" data-action="open-rooms">Find a room nearby</button>${actions}`;
+  }
+  return `<section class="hero-card">
+    <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge badge-accent">${escapeHtml(eyebrow)}</span><span class="badge">${escapeHtml(clock.date)}</span></div>
+    <h2 class="hero-title">${escapeHtml(title)}</h2>
+    <p class="hero-meta">${escapeHtml(meta)}</p>
+    <div class="hero-actions">${actions}</div>
+    <div class="hero-side">${v("today.freshnessBadge") ? dataChip() : ""}<span>·</span><span>${escapeHtml(selectionLabel())}</span></div>
+  </section>`;
+}
+
+function todaySummary(info) {
+  if (info.kind === "current") return `You are in ${info.entry.subject} until ${humanTime(info.entry.end)}.`;
+  if (info.kind === "next") return `${info.entry.subject} at ${humanTime(info.entry.start)} in ${info.entry.room}.`;
+  if (info.kind === "later") return `Next published class is on ${info.day.day}.`;
+  return "No class is published for your section today.";
+}
+
+function heroActions() {
+  return `<button class="btn btn-primary" data-route="ask">Ask Compass</button>
+    <button class="btn" data-route="timetable">Timetable</button>
+    <button class="btn btn-ghost" data-route="rooms">Free rooms</button>`;
+}
+
+function renderTodayTimeline(classes, clock) {
+  const rows = [];
+  const slots = classes.map((entry) => ({ ...entry, free: false }));
+  if (v("timetable.showEmpty")) {
+    const bells = [
+      { start: 510, end: 570 }, { start: 570, end: 630 }, { start: 630, end: 690 }, { start: 690, end: 750 },
+      { start: 750, end: 810 }, { start: 810, end: 870 }, { start: 870, end: 930 }, { start: 930, end: 980 }
+    ];
+    for (const bell of bells) {
+      if (!classes.some((entry) => entry.start < bell.end && entry.end > bell.start)) slots.push({ ...bell, free: true, subject: "Free", id: `free-${bell.start}` });
+    }
+  }
+  slots.sort((a, b) => a.start - b.start);
+  const visible = slots.filter((entry) => entry.end > clock.minutes).slice(0, 8);
+  const list = visible.length ? visible : slots.slice(0, 8);
+  if (!list.length) return `<section class="card"><div class="card-head"><div><h2 class="card-title">Today</h2><p class="card-sub">No class published for ${escapeHtml(clock.day)}.</p></div></div>${emptyState("☕", "Nothing scheduled", "The official weekly timetable has no class for your section today.", `<button class="btn btn-sm" data-route="timetable">Open timetable</button>`)}</section>`;
+  for (const entry of list) {
+    const isNow = entry.start <= clock.minutes && clock.minutes < entry.end;
+    rows.push(`<div class="timeline-item${isNow ? " is-now" : ""}${entry.free ? " is-free" : ""}">
+      <div class="timeline-time">${escapeHtml(humanTime(entry.start, v("timetable.clock")))}</div>
+      <span class="timeline-dot" aria-hidden="true"></span>
+      <div class="timeline-body">
+        <div class="timeline-subject">${escapeHtml(entry.subject)}</div>
+        <div class="timeline-meta">${entry.free ? "Free slot" : `${escapeHtml(entry.room)} · ${escapeHtml(entry.teacher)}`}</div>
+      </div>
+    </div>`);
+  }
+  return `<section class="card">
+    <div class="card-head"><div><h2 class="card-title">Today · ${escapeHtml(clock.day)}</h2><p class="card-sub">${classes.length} published class${classes.length === 1 ? "" : "es"} · ${escapeHtml(selectionLabel())}</p></div><div class="card-actions"><button class="btn btn-sm" data-route="timetable">Full view</button></div></div>
+    <div class="timeline">${rows.join("")}</div>
+  </section>`;
+}
+
+function renderFreeRoomsCard(result, clock) {
+  if (result.error) {
+    return `<section class="card"><div class="card-head"><div><h2 class="card-title">Free rooms</h2><p class="card-sub">${escapeHtml(result.error)}</p></div></div>${emptyState("🚪", "Room data not ready", "Compass needs the official room timetable before it can show free rooms.", `<button class="btn btn-sm" data-route="rooms">Open rooms</button>`)}</section>`;
+  }
+  const top = result.rooms.slice(0, 6);
+  return `<section class="card">
+    <div class="card-head"><div><h2 class="card-title">Free rooms right now</h2><p class="card-sub">${result.rooms.length} published room${result.rooms.length === 1 ? "" : "s"} free for the next hour</p></div><div class="card-actions"><button class="btn btn-sm" data-route="rooms">All rooms</button></div></div>
+    ${top.length ? `<div class="room-grid">${top.map((item) => `<article class="room-card"><div class="room-name">${escapeHtml(item.room)}</div><div class="room-zone">${escapeHtml(item.zone)}</div><div class="room-free">${escapeHtml(formatFreeWindow(item, v("timetable.clock")))}</div></article>`).join("")}</div>` : emptyState("⌛", "All rooms are busy", `Every published room has a class at ${humanTime(clock.minutes)}.`)}
+  </section>`;
+}
+
+function renderExamCard(exam) {
+  return `<section class="card">
+    <div class="card-head"><div><h2 class="card-title">Next published exam</h2><p class="card-sub">Tentative ESE datesheet · verify the official notice before travelling</p></div><div class="card-actions"><button class="btn btn-sm" data-ask-question="Show my ESE datesheet">Ask</button></div></div>
+    <div class="timeline-item"><div class="timeline-time">${escapeHtml(shortExamDate(exam.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.subject)}</div><div class="timeline-meta">${escapeHtml(exam.tab || "")}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : ""}</div></div></div>
+  </section>`;
+}
+
+function shortExamDate(iso) {
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
+}
+
+function renderNoticesCard() {
+  const notices = state.notices.slice(0, 3);
+  return `<section class="card">
+    <div class="card-head"><div><h2 class="card-title">Official college links</h2><p class="card-sub">Published by GNDEC, newest first</p></div></div>
+    <div class="timeline">${notices.map((notice) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(dayMonth(notice.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject"><a href="${escapeHtml(notice.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a></div></div></div>`).join("")}</div>
+  </section>`;
+}
+
+function renderQuickAsk() {
+  const chips = suggestedQuestions().slice(0, 4);
+  return `<section class="card">
+    <div class="card-head"><div><h2 class="card-title">Ask Compass</h2><p class="card-sub">Verified answers from your active section and timetable.</p></div></div>
+    <div class="chip-row">${chips.map((chip) => `<button class="chip" data-ask-question="${escapeHtml(chip)}">${escapeHtml(chip)}</button>`).join("")}</div>
+  </section>`;
+}
+
+function suggestedQuestions() {
+  const info = nextClassInfo();
+  const list = [];
+  if (info.kind === "current") list.push("Where is my current class?");
+  else list.push("What is my next class?");
+  list.push("Which rooms are free now?");
+  list.push("Show tomorrow's timetable");
+  if (nextExam()) list.push("When is my ESE exam?");
+  const subjects = [...new Set(classesForDay(now().day).map((entry) => entry.subject))].slice(0, 2);
+  subjects.forEach((subject) => list.push(`When is ${subject}?`));
+  return [...new Set(list)];
+}
+
+/* ── Timetable ─────────────────────────────────────────────────────────── */
+
+function renderTimetable() {
+  const clock = now();
+  const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
+  if (!state.day || !days.includes(state.day)) state.day = days.includes(clock.day) ? clock.day : days[0];
+  const view = v("timetable.view");
+  return `<div class="page page-timetable">
+    <div class="page-head">
+      <div class="page-head-text">
+        <h2 class="page-title">Timetable</h2>
+        <p class="page-sub">Official FET release${state.metadata?.version ? ` · ${escapeHtml(state.metadata.version)}` : ""}. Choose a section once; Today and Ask Compass follow it.</p>
+      </div>
+      <div class="page-actions">
+        <select class="btn btn-sm" data-select-group aria-label="Section">${state.groups.map((group) => `<option value="${escapeHtml(group)}" ${group === state.group ? "selected" : ""}>${escapeHtml(group === state.group ? groupLabel(group) : group)}</option>`).join("")}</select>
+        <select class="btn btn-sm" data-select-subgroup aria-label="Sub-group"><option value="">Whole section</option>${subgroupsFor(state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === state.subgroup ? "selected" : ""}>${escapeHtml(subgroup)}</option>`).join("")}</select>
+        ${v("timetable.icsExport") ? `<button class="btn btn-sm" data-action="export-ics">Export .ics</button>` : ""}
+      </div>
+    </div>
+    ${!state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see your week.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : `
+    <div class="card" style="padding:14px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <div class="segmented" role="tablist" aria-label="Timetable view">
+          <button class="segment ${view === "day" ? "is-active" : ""}" data-action="tt-view" data-view="day" role="tab" aria-selected="${view === "day"}">Day</button>
+          <button class="segment ${view === "week" ? "is-active" : ""}" data-action="tt-view" data-view="week" role="tab" aria-selected="${view === "week"}">Week</button>
+          <button class="segment ${view === "agenda" ? "is-active" : ""}" data-action="tt-view" data-view="agenda" role="tab" aria-selected="${view === "agenda"}">Agenda</button>
+        </div>
+        <span class="badge badge-accent">${escapeHtml(selectionLabel())}</span>
+      </div>
+      <div class="day-tabs" style="margin-top:12px" role="tablist" aria-label="Day">
+        ${days.map((day) => `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${classesFor(state.schedule, state.group, day, state.subgroup).length} class${classesFor(state.schedule, state.group, day, state.subgroup).length === 1 ? "" : "es"}</small></button>`).join("")}
+      </div>
+      <div style="margin-top:14px">${view === "week" ? renderWeekGrid(clock) : view === "agenda" ? renderAgenda() : renderDayView(state.day, clock)}</div>
+    </div>`}
+  </div>`;
+}
+
+function renderDayView(day, clock) {
+  const classes = classesFor(state.schedule, state.group, day, state.subgroup);
+  if (!classes.length) return emptyState("☕", `No class on ${day}`, "The official release has no class for this section on this day.", `<button class="btn btn-sm" data-route="rooms">Find a free room</button>`);
+  let blocks = classes.map((entry) => classCard(entry, v("timetable.clock"), { highlight: v("timetable.highlightNow") && day === clock.day && entry.start <= clock.minutes && clock.minutes < entry.end })).join("");
+  if (v("timetable.showEmpty")) {
+    const bells = [
+      { start: 510, end: 570 }, { start: 570, end: 630 }, { start: 630, end: 690 }, { start: 690, end: 750 },
+      { start: 750, end: 810 }, { start: 810, end: 870 }, { start: 870, end: 930 }, { start: 930, end: 980 }
+    ];
+    const free = bells.filter((bell) => !classes.some((entry) => entry.start < bell.end && entry.end > bell.start));
+    if (free.length) blocks += `<div class="card" style="margin-top:12px;padding:12px"><p class="card-sub">Free bell slots</p><div class="chip-row" style="margin-top:8px">${free.map((slot) => `<span class="chip">${escapeHtml(humanTime(slot.start, v("timetable.clock")))} – ${escapeHtml(humanTime(slot.end, v("timetable.clock")))}</span>`).join("")}</div></div>`;
+  }
+  return blocks;
+}
+
+function renderAgenda() {
+  return STUDY_DAYS.map((day) => {
+    const classes = classesFor(state.schedule, state.group, day, state.subgroup);
+    if (!classes.length) return "";
+    return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${classes.length}</span></p>${classes.map((entry) => classCard(entry, v("timetable.clock"))).join("")}</div>`;
+  }).join("") || emptyState("▦", "No classes published", "The official release has no class for this section.");
+}
+
+function renderWeekGrid(clock) {
+  const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
+  const starts = [...new Set([510, 570, 630, 690, 750, 810, 870, 930, ...state.schedule.filter((entry) => entry.group === state.group).map((entry) => entry.start)])].sort((a, b) => a - b);
+  const rows = starts.map((start) => {
+    const end = start + 60;
+    return `<tr><th scope="row">${escapeHtml(humanTime(start, v("timetable.clock")))}</th>${days.map((day) => {
+      const entries = classesFor(state.schedule, state.group, day, state.subgroup).filter((entry) => entry.start < end && entry.end > start);
+      return `<td>${entries.map((entry) => `<div class="week-slot"><strong>${escapeHtml(entry.subject)}</strong><span>${escapeHtml(entry.room)}</span></div>`).join("")}</td>`;
+    }).join("")}</tr>`;
+  }).join("");
+  return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => `<th scope="col">${escapeHtml(day)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ── Rooms ─────────────────────────────────────────────────────────────── */
+
+function renderRooms() {
+  const clock = now();
+  if (!state.roomDay) state.roomDay = clock.day;
+  const minutes = state.roomTime ? timeToMinutes(state.roomTime) : clock.minutes;
+  const duration = Number(v("rooms.defaultDuration")) || 60;
+  const result = computeFreeRooms({
+    roomSchedule: state.roomSchedule,
+    day: state.roomDay,
+    minutes,
+    duration,
+    zone: state.roomZone,
+    includeLabs: v("rooms.includeLabs"),
+    includeLectureHalls: v("rooms.includeLectureHalls")
+  });
+  const groups = result.error ? [] : groupRooms(result.rooms.map((item) => item.room)).groups;
+  const zoneOptions = ["", "F block", "G block", "S block", "A block", "Labs and named rooms", "Other published rooms"];
+  return `<div class="page page-rooms">
+    <div class="page-head">
+      <div class="page-head-text">
+        <h2 class="page-title">Free rooms</h2>
+        <p class="page-sub">Computed from the official room timetable. “Free” means no published class overlaps the window.</p>
+      </div>
+      <div class="page-actions"><span class="badge">${escapeHtml(state.roomSchedule.length ? `${new Set(state.roomSchedule.map((entry) => entry.group)).size} published rooms` : "Room data loading")}</span></div>
+    </div>
+    <div class="card">
+      <div class="rooms-toolbar">
+        <div class="field"><label for="room-day">Day</label><select id="room-day" data-room-day>${STUDY_DAYS.map((day) => `<option value="${day}" ${day === state.roomDay ? "selected" : ""}>${day}</option>`).join("")}</select></div>
+        <div class="field"><label for="room-time">From</label><input id="room-time" type="time" value="${escapeHtml(state.roomTime || `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`)}" data-room-time /></div>
+        <div class="field"><label for="room-duration">For</label><select id="room-duration" data-room-duration>${[30, 60, 90, 120].map((value) => `<option value="${value}" ${String(duration) === String(value) ? "selected" : ""}>${formatDuration(value)}</option>`).join("")}</select></div>
+        <button class="btn btn-sm" data-action="room-now">Now</button>
+      </div>
+      <div class="chip-row" style="margin-top:12px">
+        ${zoneOptions.map((zone) => `<button class="chip ${state.roomZone === zone ? "is-active" : ""}" data-action="room-zone" data-zone="${escapeHtml(zone)}">${escapeHtml(zone || "All areas")}</button>`).join("")}
+      </div>
+      <p class="card-sub" style="margin-top:12px">${result.error ? escapeHtml(result.error) : `${result.rooms.length} free room${result.rooms.length === 1 ? "" : "s"} on ${escapeHtml(state.roomDay)} at ${escapeHtml(humanTime(minutes, v("timetable.clock")))} for ${escapeHtml(formatDuration(duration))}.`}</p>
+    </div>
+    ${result.error ? emptyState("🚪", "No verified availability", result.error, `<button class="btn btn-sm" data-action="refresh-data">Load room data</button>`) : groups.length ? `<div class="stack" style="margin-top:14px">${groups.map((group) => `<section class="card"><div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} free room${group.count === 1 ? "" : "s"}</p></div></div><div class="room-grid">${group.rooms.map((room) => {
+      const item = result.rooms.find((entry) => entry.room === room);
+      return `<article class="room-card"><div style="display:flex;align-items:flex-start"><div class="room-name">${escapeHtml(room)}</div></div><div class="room-zone">${escapeHtml(roomZone(room))}</div>${v("rooms.showFreeUntil") ? `<div class="room-free">${escapeHtml(formatFreeWindow(item, v("timetable.clock")))}</div>` : ""}${v("rooms.showNextClass") && item?.nextClass ? `<div class="room-next">Next: ${escapeHtml(item.nextClass.subject)} at ${escapeHtml(humanTime(item.nextClass.start, v("timetable.clock")))}</div>` : ""}</article>`;
+    }).join("")}</div></section>`).join("")}</div>` : emptyState("✅", "No free room in this window", "Every published room in this area has a class. Try a shorter window or another area.")}
+    ${v("rooms.heatmap") ? renderHeatmap() : ""}
+  </div>`;
+}
+
+function timeToMinutes(value) {
+  const [hours, mins] = String(value || "").split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(mins)) return null;
+  return hours * 60 + mins;
+}
+
+function renderHeatmap() {
+  const hours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+  const rows = hours.map((hour) => {
+    const result = computeFreeRooms({
+      roomSchedule: state.roomSchedule, day: state.roomDay, minutes: hour * 60, duration: 60,
+      includeLabs: v("rooms.includeLabs"), includeLectureHalls: v("rooms.includeLectureHalls")
+    });
+    const ratio = result.checked ? Math.round((result.rooms.length / result.checked) * 100) : 0;
+    return `<div class="timeline-item"><div class="timeline-time">${escapeHtml(humanTime(hour * 60, v("timetable.clock")))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${result.rooms.length} free</div><div class="timeline-meta">${ratio}% of published rooms</div></div></div>`;
+  }).join("");
+  return `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Hour-by-room heatmap</h2><p class="card-sub">Free room counts per hour. Computed locally.</p></div></div><div class="timeline">${rows}</div></section>`;
+}
+
+/* ── Notices ───────────────────────────────────────────────────────────── */
+
+function renderNotices() {
+  const loading = state.noticesStatus === "loading" || (state.noticesStatus === "idle" && !state.notices.length);
+  const failed = state.noticesStatus === "error";
+  const notices = [...state.notices].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  const next = nextExam();
+  return `<div class="page page-notices">
+    <div class="page-head">
+      <div class="page-head-text">
+        <h2 class="page-title">Notices and updates</h2>
+        <p class="page-sub">Published by GNDEC, newest first. Compass links to the official page and never rewrites a notice.</p>
+      </div>
+      <div class="page-actions"><span class="badge">${notices.length ? `${notices.length} published` : loading ? "Loading" : "No notices loaded"}</span></div>
+    </div>
+    ${next ? `<section class="card" style="margin-bottom:14px">
+      <div class="card-head"><div><h2 class="card-title">Next published exam</h2><p class="card-sub">Tentative end-semester datesheet · confirm the official notice before travelling.</p></div><a class="btn btn-sm" href="/college/exam-datesheet/">Full datesheet</a></div>
+      <div class="stat-grid"><div class="stat"><span class="stat-label">Date</span><strong>${escapeHtml(dateOnly(next.date))}</strong></div><div class="stat"><span class="stat-label">Subject</span><strong>${escapeHtml(next.subject || "")}</strong></div><div class="stat"><span class="stat-label">Programme</span><strong>${escapeHtml(next.tab || "")}</strong></div></div>
+    </section>` : ""}
+    <section class="card">
+      <div class="card-head"><div><h2 class="card-title">Official notice board</h2><p class="card-sub">External links open on gndec.ac.in and related official sites.</p></div>${failed ? `<button class="btn btn-sm" data-action="retry-notices">Retry</button>` : ""}</div>
+      ${loading ? `<p class="card-sub">Loading the official notice list…</p>` : notices.length ? `<div class="timeline notices-timeline">${notices.map((notice) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(dayMonth(notice.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject"><a href="${escapeHtml(notice.link || "#")}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title || "Notice")}</a></div><div class="timeline-meta">${escapeHtml(dateOnly(notice.date))} · official GNDEC page</div></div></div>`).join("")}</div>` : emptyState("📌", "No notices available", "The verified notice feed is unavailable right now. The official college site still has every notice.", `<a class="btn btn-primary" href="https://gndec.ac.in/" target="_blank" rel="noopener noreferrer">Open gndec.ac.in</a>`)}
+    </section>
+  </div>`;
+}
+
+/* ── Directory: faculty, students, syllabus ────────────────────────────── */
+
+function directoryMatches() {
+  const query = state.directoryQuery.trim().toLowerCase();
+  if (state.directoryTab === "faculty") {
+    const records = state.faculty.filter((record) => !query || [record.name, record.designation, record.department, record.email, record.qualifications].some((value) => String(value || "").toLowerCase().includes(query)));
+    return { records, total: state.faculty.length, query };
+  }
+  if (state.directoryTab === "students") {
+    if (query.length < 2) return { records: [], total: state.students.length, query };
+    const records = state.students.filter((record) => [record.name, record.crn, record.registrationNo, record.section, record.subsection, record.mentor, record.serialNo, record.currentSerialNo].some((value) => String(value || "").toLowerCase().includes(query)));
+    return { records, total: state.students.length, query };
+  }
+  return { records: [], total: 0, query };
+}
+
+function facultyCard(record) {
+  const meta = [record.designation, record.department].filter(Boolean).join(" · ");
+  return `<article class="card directory-card">
+    <div class="directory-card-head">
+      ${record.photoUrl && record.profileId ? `<img class="directory-photo" src="/api/legacy/api/faculty/photo?id=${encodeURIComponent(record.profileId)}" alt="" loading="lazy" width="48" height="48" referrerpolicy="no-referrer" />` : `<span class="directory-initials" aria-hidden="true">${escapeHtml(String(record.name || "?").replace(/^DR\.?\s+/i, "").split(/\s+/).map((part) => part[0]).slice(0, 2).join(""))}</span>`}
+      <div><h3 class="directory-name">${escapeHtml(record.name)}</h3><p class="directory-meta">${escapeHtml(meta || "GNDEC faculty")}</p></div>
+    </div>
+    ${record.qualifications ? `<p class="directory-detail">${escapeHtml(String(record.qualifications).replace(/\s+/g, " ").slice(0, 180))}${String(record.qualifications).length > 180 ? "…" : ""}</p>` : ""}
+    <div class="chip-row">
+      ${record.email ? `<a class="chip" href="mailto:${escapeHtml(record.email)}">${escapeHtml(record.email)}</a>` : ""}
+      ${record.experience ? `<span class="chip">${escapeHtml(record.experience)} experience</span>` : ""}
+      ${record.profileUrl ? `<a class="chip" href="${escapeHtml(record.profileUrl)}" target="_blank" rel="noopener noreferrer">Official profile ↗</a>` : ""}
+    </div>
+  </article>`;
+}
+
+function studentRow(record) {
+  return `<tr>
+    <td><strong>${escapeHtml(record.name || "")}</strong><br /><small>${escapeHtml(record.crn || record.registrationNo || "")}</small></td>
+    <td>${escapeHtml(record.section || "")}${record.subsection ? ` · ${escapeHtml(record.subsection)}` : ""}</td>
+    <td>${escapeHtml(record.branch || "")}</td>
+    <td>${escapeHtml(record.mentor || "—")}${record.mentorVenue || record.venue ? `<br /><small>${escapeHtml(record.mentorVenue || record.venue)}</small>` : ""}</td>
+  </tr>`;
+}
+
+function syllabusResults() {
+  const query = state.directoryQuery.trim().toLowerCase();
+  if (!state.syllabus || query.length < 3) return [];
+  return state.syllabus.pages
+    .map((page) => {
+      const text = String(page.text || "").replace(/\s+/g, " ");
+      const index = text.toLowerCase().indexOf(query);
+      if (index < 0) return null;
+      const from = Math.max(0, index - 160);
+      return { number: page.number, excerpt: `${from > 0 ? "…" : ""}${text.slice(from, index + 260)}${index + 260 < text.length ? "…" : ""}` };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function renderDirectory() {
+  const tab = state.directoryTab;
+  const loading = state.directoryStatus === "loading";
+  const failed = state.directoryStatus === "error";
+  const { records, total, query } = directoryMatches();
+  const placeholder = tab === "faculty" ? "Search name, department, designation or email…" : tab === "students" ? "Type at least 2 letters of a name, CRN or registration number…" : "Search the first-year syllabus, e.g. Mathematics, ESC101, credits…";
+  const tabs = [["faculty", "Faculty", state.faculty.length], ["students", "Students", state.students.length], ["syllabus", "Syllabus", state.syllabus?.pages?.length || 0]];
+  return `<div class="page page-directory">
+    <div class="page-head">
+      <div class="page-head-text">
+        <h2 class="page-title">College directory</h2>
+        <p class="page-sub">Faculty, student sections and the published first-year syllabus. Searches run on this device only.</p>
+      </div>
+      <div class="page-actions"><span class="badge">${escapeHtml(total ? `${total} published records` : "On-device search")}</span></div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Directory section">
+      ${tabs.map(([id, label, count]) => `<button class="tab ${tab === id ? "is-active" : ""}" role="tab" aria-selected="${tab === id}" data-directory-tab="${id}">${escapeHtml(label)}${count ? ` <small>${count}</small>` : ""}</button>`).join("")}
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="field"><label for="directory-search" class="visually-hidden">Search ${escapeHtml(tab)}</label>
+        <input id="directory-search" type="search" value="${escapeHtml(state.directoryQuery)}" placeholder="${escapeHtml(placeholder)}" data-directory-search autocomplete="off" />
+      </div>
+      <p class="card-sub" style="margin-top:8px">${tab === "faculty" ? "Names and public contact details come from the official GNDEC faculty directory." : tab === "students" ? "Student records stay in this browser. Compass never uploads a name, CRN or registration number." : "Text is extracted from the official first-year syllabus PDF. Always confirm the authoritative PDF before relying on a page."}</p>
+    </div>
+    ${loading ? `<section class="card" style="margin-top:14px"><p class="card-sub">Loading the verified ${escapeHtml(tab)} data…</p></section>` : ""}
+    ${failed ? emptyState("⚠", "Directory unavailable", "The official record could not be loaded. Nothing was guessed or stored.", `<button class="btn btn-primary" data-action="retry-directory">Try again</button>`) : ""}
+    ${!loading && !failed && tab === "faculty" ? `<p class="card-sub" style="margin:14px 0 8px">${records.length} of ${total} faculty${query ? ` matching “${escapeHtml(state.directoryQuery)}”` : ""}.</p><div class="directory-grid">${records.slice(0, 60).map(facultyCard).join("")}</div>${records.length > 60 ? `<p class="card-sub" style="margin-top:10px">Showing the first 60. Narrow the search to see more.</p>` : ""}` : ""}
+    ${!loading && !failed && tab === "students" ? (query.length < 2 ? emptyState("🔎", "Search a student", "Enter at least 2 letters of a name, CRN or registration number. Results are computed on this device and never sent anywhere.") : records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} match${records.length === 1 ? "" : "es"}</h2><p class="card-sub">Showing at most 50 records from the published roster. Mentor details are published by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Student</th><th>Section</th><th>Branch</th><th>Mentor</th></tr></thead><tbody>${records.slice(0, 50).map(studentRow).join("")}</tbody></table></div></section>` : emptyState("🗂", "No matching student", `Nothing in the published roster matches “${state.directoryQuery}”. Check the CRN or spelling.`)) : ""}
+    ${!loading && !failed && tab === "syllabus" ? (state.syllabus ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">First-year syllabus</h2><p class="card-sub">${state.syllabus.pages.length} extracted pages · <a href="${escapeHtml(state.syllabus.source)}" target="_blank" rel="noopener noreferrer">official PDF ↗</a></p></div></div>${query.length < 3 ? `<p class="card-sub">Type at least 3 characters to search inside the published syllabus text.</p>` : syllabusResults().length ? syllabusResults().map((page) => `<article class="syllabus-hit"><h3>Page ${page.number}</h3><p>${escapeHtml(page.excerpt)}</p></article>`).join("") : `<p class="card-sub">No page contains “${escapeHtml(state.directoryQuery)}”. Try a subject name or code such as ESC101.</p>`}</section>` : "") : ""}
+  </div>`;
+}
+
+/* ── Compare two sections ──────────────────────────────────────────────── */
+
+function sectionDayEntries(group, day) {
+  return classesFor(state.schedule, group, day, "", { includeWeekends: true });
+}
+
+function freeBounds(entries, start = 8 * 60, end = 17 * 60) {
+  const busy = [...entries].sort((a, b) => a.start - b.start);
+  const gaps = [];
+  let cursor = start;
+  for (const entry of busy) {
+    if (entry.start > cursor) gaps.push([cursor, Math.min(entry.start, end)]);
+    cursor = Math.max(cursor, entry.end);
+  }
+  if (cursor < end) gaps.push([cursor, end]);
+  return gaps.filter(([from, to]) => to - from >= 20);
+}
+
+function intersection(a, b) {
+  const out = [];
+  for (const [fromA, toA] of a) {
+    for (const [fromB, toB] of b) {
+      const from = Math.max(fromA, fromB);
+      const to = Math.min(toA, toB);
+      if (to - from >= 20) out.push([from, to]);
+    }
+  }
+  return out.sort((x, y) => x[0] - y[0]);
+}
+
+function compareDay() {
+  const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
+  if (!state.compareDay || !days.includes(state.compareDay)) state.compareDay = days.includes(now().day) ? now().day : days[0];
+  return state.compareDay;
+}
+
+function compareColumn(group, entries, label) {
+  return `<section class="card compare-column">
+    <div class="card-head"><div><h2 class="card-title">${escapeHtml(group)}</h2><p class="card-sub">${entries.length} published class${entries.length === 1 ? "" : "es"} · ${escapeHtml(label)}</p></div><a class="btn btn-sm" href="/timetable?section=${encodeURIComponent(group)}">Open</a></div>
+    ${entries.length ? `<div class="stack">${entries.map((entry) => `<article class="compare-class"><time>${escapeHtml(humanTime(entry.start, v("timetable.clock")))}–${escapeHtml(humanTime(entry.end, v("timetable.clock")))}</time><div><strong>${escapeHtml(entry.subject)}</strong><small>${escapeHtml(entry.teacher || "")}${entry.room ? ` · ${escapeHtml(entry.room)}` : ""}</small></div></article>`).join("")}</div>` : `<p class="card-sub">No class is published for this section on ${escapeHtml(label)}.</p>`}
+  </section>`;
+}
+
+function renderCompare() {
+  const groups = state.groups;
+  if (!groups.length) return `<div class="page page-compare"><div class="page-head"><div class="page-head-text"><h2 class="page-title">Compare sections</h2><p class="page-sub">Load the verified timetable to compare any two sections.</p></div></div>${emptyState("⚖", "Timetable not loaded", "Compare needs the official section timetable. It is loaded from the verified release.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`)}</div>`;
+  if (!groups.includes(state.compareA)) state.compareA = state.group && groups.includes(state.group) ? state.group : groups[0];
+  if (!groups.includes(state.compareB)) state.compareB = groups.find((group) => group !== state.compareA) || state.compareA;
+  const day = compareDay();
+  const a = sectionDayEntries(state.compareA, day);
+  const b = sectionDayEntries(state.compareB, day);
+  const sharedSubjects = [...new Set(a.map((entry) => entry.subject))].filter((subject) => b.some((entry) => entry.subject === subject));
+  const sharedTeachers = [...new Set(a.map((entry) => entry.teacher).filter(Boolean))].filter((teacher) => b.some((entry) => entry.teacher === teacher));
+  const common = state.compareA === state.compareB ? [] : intersection(freeBounds(a), freeBounds(b));
+  const sameSubject = state.compareA === state.compareB;
+  return `<div class="page page-compare">
+    <div class="page-head">
+      <div class="page-head-text"><h2 class="page-title">Compare sections</h2><p class="page-sub">Two official section timetables, the free windows both share, and the subjects or teachers they have in common. Nothing is estimated.</p></div>
+    </div>
+    <div class="card">
+      <div class="rooms-toolbar">
+        <div class="field"><label for="compare-a">Section A</label><select id="compare-a" data-compare-a>${groups.map((group) => `<option value="${escapeHtml(group)}" ${group === state.compareA ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></div>
+        <div class="field"><label for="compare-b">Section B</label><select id="compare-b" data-compare-b>${groups.map((group) => `<option value="${escapeHtml(group)}" ${group === state.compareB ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></div>
+        <div class="field"><label for="compare-day">Day</label><select id="compare-day" data-compare-day>${(v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS).map((name) => `<option value="${name}" ${name === day ? "selected" : ""}>${name}</option>`).join("")}</select></div>
+        <button class="btn btn-sm" data-action="swap-compare">Swap</button>
+      </div>
+    </div>
+    ${sameSubject ? `<p class="card-sub" style="margin-top:10px">Both selectors show ${escapeHtml(state.compareA)}. Pick a different section to see shared free time.</p>` : ""}
+    <div class="compare-grid" style="margin-top:14px">
+      ${compareColumn(state.compareA, a, day)}
+      ${compareColumn(state.compareB, b, day)}
+    </div>
+    <div class="dashboard-grid" style="margin-top:14px">
+      <section class="card"><div class="card-head"><div><h2 class="card-title">Both free</h2><p class="card-sub">Windows of at least 20 minutes with no published class in either section.</p></div></div>
+        ${common.length ? `<div class="chip-row">${common.map(([from, to]) => `<span class="chip">${escapeHtml(humanTime(from, v("timetable.clock")))} – ${escapeHtml(humanTime(to, v("timetable.clock")))}</span>`).join("")}</div>` : `<p class="card-sub">No shared free window was found on ${escapeHtml(day)} between 8:00 AM and 5:00 PM.</p>`}
+      </section>
+      <section class="card"><div class="card-head"><div><h2 class="card-title">Shared on ${escapeHtml(day)}</h2><p class="card-sub">Only subjects and teachers published for both sections.</p></div></div>
+        <p class="card-sub"><strong>Subjects:</strong> ${sharedSubjects.length ? sharedSubjects.map(escapeHtml).join(", ") : "none on this day"}</p>
+        <p class="card-sub" style="margin-top:6px"><strong>Teachers:</strong> ${sharedTeachers.length ? sharedTeachers.map(escapeHtml).join(", ") : "none on this day"}</p>
+      </section>
+    </div>
+  </div>`;
+}
+
+/* ── Ask Compass ───────────────────────────────────────────────────────── */
+
+function renderAsk() {
+  return `<div class="page page-ask">
+    <div class="chat-shell">
+      <div class="chat-head">
+        <span class="brand-mark" style="width:36px;height:36px;border-radius:11px" aria-hidden="true"><svg viewBox="0 0 48 48" width="22" height="22"><path d="M24 4 31 24 24 44 17 24Z" fill="currentColor"/><circle cx="24" cy="24" r="4.5" fill="var(--bg)"/></svg></span>
+        <div class="chat-head-title"><strong>Ask Compass</strong><small>${escapeHtml(engineBadge())}</small></div>
+        <div class="chat-head-actions">
+          <button class="btn btn-sm" data-action="toggle-engine" title="Switch engine">${v("ask.engine") === "auto" ? "Auto" : "Local"}</button>
+          <button class="btn btn-sm" data-action="clear-chat">Clear</button>
+        </div>
+      </div>
+      <div class="chat-window" id="chat-window" aria-live="polite" aria-label="Conversation"></div>
+      <div class="composer">
+        <div class="composer-row">
+          <textarea class="composer-input" id="question-input" rows="1" placeholder="Ask about your next class, a room, a teacher, free rooms or exams…" aria-label="Question"></textarea>
+          ${v("ask.voice") ? `<button class="mic-button" id="mic-button" data-action="voice" aria-label="Dictate a question"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>` : ""}
+          <button class="send-button" id="send-button" data-action="send" aria-label="Send question"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 12 20 4l-4 16-4-6-8-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="composer-hint"><span>Enter to send · Shift+Enter for a new line</span><span>${v("ask.confidence") ? "Confidence shown" : ""}</span><span>Facts never use AI</span></div>
+      </div>
+    </div>
+    ${state.chat.length ? "" : `<div style="margin-top:14px" class="chip-row">${suggestedQuestions().map((question) => `<button class="chip" data-ask-question="${escapeHtml(question)}">${escapeHtml(question)}</button>`).join("")}</div>`}
+  </div>`;
+}
+
+function engineBadge() {
+  if (v("privacy.localOnly")) return "Local-only mode · no external calls";
+  if (v("ask.engine") === "local") return "Local deterministic engine";
+  if (state.brainState === "ready") return "Brain 2.2 + 1.2 + local fallback";
+  if (state.brainState === "loading") return "Loading verified Brain…";
+  return "Deterministic Brain + local fallback";
+}
+
+function renderChatMessages() {
+  const windowEl = $("#chat-window");
+  if (!windowEl) return;
+  if (!state.chat.length) {
+    state.chat.push(welcomeMessage());
+    saveChat();
+  }
+  windowEl.innerHTML = state.chat.map((message, index) => chatMessageHtml(message, index)).join("");
+  if (v("ask.autoScroll")) windowEl.scrollTop = windowEl.scrollHeight;
+}
+
+function welcomeMessage() {
+  return {
+    role: "assistant",
+    html: `<p><strong>Ask me anything about your college day.</strong></p><p>I read the official timetable, room release, your saved section and the published datesheet. I answer from that data only — I never guess a class, teacher, room or date.</p>`,
+    createdAt: new Date().toISOString(),
+    meta: { intent: "WELCOME", confidence: 1, engine: "local", source: "" }
+  };
+}
+
+function chatMessageHtml(message, index) {
+  const meta = message.meta || {};
+  const badges = [];
+  if (meta.engine && meta.engine !== "welcome") badges.push(`<span class="badge">${escapeHtml(engineLabel(meta.engine))}</span>`);
+  if (v("ask.confidence") && Number.isFinite(meta.confidence) && meta.confidence < 1) badges.push(`<span class="badge">${Math.round(meta.confidence * 100)}% confidence</span>`);
+  if (meta.cached) badges.push(`<span class="badge">cached</span>`);
+  const why = v("ask.why") && Array.isArray(meta.plan) && meta.plan.length
+    ? `<details class="answer-meta"><summary>Why this answer</summary><ol>${meta.plan.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></details>` : "";
+  return `<article class="msg ${message.role}" data-message-index="${index}">
+    <div class="msg-bubble">${sanitizeHtml(message.html)}</div>
+    <div class="msg-meta">${badges.join("")}<time>${escapeHtml(messageTime(message.createdAt))}</time></div>
+    ${why}
+    <div class="msg-actions">${message.role === "assistant" ? `<button class="msg-action" data-action="copy-message" data-index="${index}">Copy</button>` : ""}<button class="msg-action" data-action="ask-again" data-index="${index}">Ask again</button></div>
+  </article>`;
+}
+
+function engineLabel(engine) {
+  if (engine === "brain-2.2") return "Brain 2.2";
+  if (engine === "brain-1.2") return "Brain 1.2";
+  if (engine === "brain-2.0") return "Brain 2.0";
+  if (engine === "ai") return "AI relay · open-ended";
+  return "Local engine";
+}
+
+function messageTime(iso) {
+  const date = new Date(iso || Date.now());
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function saveChat() {
+  if (!v("ask.history")) { storageRemove(CHAT_KEY); return; }
+  try {
+    storageSet(CHAT_KEY, JSON.stringify(state.chat.slice(-40)));
+  } catch { /* storage full */ }
+}
+
+function loadChat() {
+  try {
+    const saved = JSON.parse(storageGet(CHAT_KEY) || "[]");
+    if (!Array.isArray(saved)) return;
+    state.chat = saved
+      .filter((message) => message && typeof message.html === "string" && ["user", "assistant"].includes(message.role))
+      .slice(-40)
+      .map((message) => ({ ...message, html: sanitizeHtml(message.html) }));
+  } catch { state.chat = []; }
+}
+
+/** Bounded wait so a question typed during the first load can still be answered. */
+async function waitForVerifiedSchedule(maxMs = 4000) {
+  if (state.schedule.length) return true;
+  const started = Date.now();
+  while (Date.now() - started < maxMs) {
+    if (state.schedule.length) return true;
+    if (state.dataStatus === "error") return false;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return state.schedule.length > 0;
+}
+
+async function sendQuestion(rawQuestion) {
+  const question = String(rawQuestion || "").trim().slice(0, 800);
+  if (!question || state.busy) return;
+  state.busy = true;
+  state.chat.push({ role: "user", html: `<p>${escapeHtml(question)}</p>`, createdAt: new Date().toISOString() });
+  saveChat();
+  const thinking = { role: "assistant", html: `<div class="thinking"><span class="dots"><span></span><span></span><span></span></span> Checking verified data…</div>`, createdAt: new Date().toISOString(), meta: { intent: "THINKING", engine: "local" } };
+  state.chat.push(thinking);
+  renderChatMessages();
+  const thinkingIndex = state.chat.length - 1;
+
+  try {
+    if (!state.schedule.length) await waitForVerifiedSchedule();
+    const ctx = currentAnswerContext();
+    let answer = null;
+    let engine = "local";
+
+    if (v("ask.engine") === "auto" && !v("privacy.localOnly")) {
+      if (state.brainState !== "ready") {
+        state.brainState = "loading";
+        updateChatHead();
+        const loaded = await loadBrainScripts();
+        state.brainState = loaded ? "ready" : "failed";
+        updateChatHead();
+      }
+      if (state.brainState === "ready") {
+        const brain = runBrain(question, ctx);
+        state.debug.attempts = brain.attempts;
+        if (brain.result) {
+          answer = { html: brain.result.answer, intent: brain.result.intent, confidence: brain.result.confidence, plan: brain.result.plan || [], source: "" };
+          engine = brain.result.engine;
+        }
+      }
+    }
+
+    if (!answer) {
+      const local = answerLocally(question, ctx);
+      if (local) answer = local;
+    }
+
+    if (!answer && isOpenQuestion(question) && canUseExternalAi()) {
+      const ai = await askExternalAi(question, thinkingIndex);
+      if (ai) {
+        answer = ai.answer;
+        engine = "ai";
+      }
+    }
+
+    if (!answer) {
+      answer = {
+        html: FALLBACK_REFUSAL + `<div class="chip-row" style="margin-top:10px">${suggestedQuestions().slice(0, 3).map((chip) => `<button class="chip" data-ask-question="${escapeHtml(chip)}">${escapeHtml(chip)}</button>`).join("")}</div>`,
+        intent: "REFUSAL",
+        confidence: 0,
+        plan: ["no verified local match", "no factual guess", "offer supported topics"]
+      };
+    }
+
+    state.chat[thinkingIndex] = {
+      role: "assistant",
+      html: answer.html,
+      createdAt: new Date().toISOString(),
+      meta: {
+        intent: answer.intent,
+        confidence: answer.confidence,
+        plan: answer.plan,
+        engine,
+        source: answer.source || "",
+        cached: Boolean(answer.cached)
+      }
+    };
+    state.debug.last = state.chat[thinkingIndex].meta;
+  } catch (error) {
+    state.chat[thinkingIndex] = {
+      role: "assistant",
+      html: `<p><strong>Something went wrong while preparing the answer.</strong></p><p>Your saved data is unchanged. Please try again or use the legacy build.</p>`,
+      createdAt: new Date().toISOString(),
+      meta: { intent: "ERROR", engine: "local", confidence: 0 }
+    };
+    console.error("[Compass] answer failed", error);
+  } finally {
+    state.busy = false;
+    saveChat();
+    renderChatMessages();
+    updateChatHead();
+  }
+}
+
+function updateChatHead() {
+  const small = $(".chat-head-title small");
+  if (small) small.textContent = engineBadge();
+}
+
+function currentAnswerContext() {
+  const context = buildAnswerContext({
+    schedule: state.schedule,
+    roomSchedule: state.roomSchedule,
+    group: state.group,
+    subgroup: state.subgroup,
+    profile: state.profile,
+    now: now(),
+    metadata: state.metadata,
+    datesheet: state.datesheet,
+    clock: v("timetable.clock"),
+    showTeacher: v("timetable.showTeacher"),
+    showRoom: v("timetable.showRoom"),
+    showCode: v("timetable.showCode"),
+    roomDuration: Number(v("rooms.defaultDuration")) || 60,
+    includeLabs: v("rooms.includeLabs"),
+    includeLectureHalls: v("rooms.includeLectureHalls")
+  });
+  context.conversation = null;
+  return context;
+}
+
+function canUseExternalAi() {
+  if (v("privacy.localOnly") || !v("ask.externalAi")) return false;
+  if (!state.online) return false;
+  const limit = Number(storageGet("gndec-compass-next-ai-day") || "");
+  const used = Number(storageGet("gndec-compass-next-ai-count") || "");
+  return !(limit === todayKey() && used >= 12);
+}
+
+function todayKey() {
+  return now().dateISO;
+}
+
+function aiContextPayload() {
+  const clock = now();
+  return {
+    profileLabel: selectionLabel(),
+    datasetVersion: state.metadata?.version || "",
+    now: { day: clock.day, minutes: clock.minutes, date: clock.date, dateISO: clock.dateISO, time: humanTime(clock.minutes, v("timetable.clock")) },
+    classes: classesForDay(clock.day).slice(0, 12).map((entry) => ({
+      subject: entry.subject, teacher: entry.teacher, room: entry.room,
+      day: entry.day, start: humanTime(entry.start), end: humanTime(entry.end), type: entry.type
+    }))
+  };
+}
+
+async function askExternalAi(question, thinkingIndex) {
+  const device = compassDeviceId();
+  try {
+    const response = await fetch("/api/legacy/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Compass-Device": device },
+      body: JSON.stringify({ question, context: aiContextPayload(), stream: true, heavy: false })
+    });
+    if (!response.ok) return null;
+    const count = Number(storageGet("gndec-compass-next-ai-count") || 0);
+    storageSet("gndec-compass-next-ai-day", todayKey());
+    storageSet("gndec-compass-next-ai-count", String(limitReset(count) + 1));
+    const type = response.headers.get("content-type") || "";
+    if (!type.includes("text/event-stream")) {
+      const data = await response.json().catch(() => null);
+      if (!data?.answer) return null;
+      return { answer: { html: textToHtml(data.answer), intent: "AI", confidence: 0.7, plan: ["open-ended question", "verified timetable context only", "no student identifiers"] } };
+    }
+    return await consumeSse(response, thinkingIndex);
+  } catch {
+    return null;
+  }
+}
+
+function limitReset(count) {
+  const day = storageGet("gndec-compass-next-ai-day");
+  return day === todayKey() ? count : 0;
+}
+
+function textToHtml(text) {
+  return String(text || "").split(/\n{2,}/).map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`).join("");
+}
+
+async function consumeSse(response, thinkingIndex) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let text = "";
+  let model = "";
+  const bubble = document.querySelector(`[data-message-index="${thinkingIndex}"] .msg-bubble`);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newline;
+    while ((newline = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (!line.startsWith("data:")) continue;
+      let payload;
+      try { payload = JSON.parse(line.slice(5).trim()); } catch { continue; }
+      if (payload.model) model = payload.model;
+      if (payload.error) return null;
+      if (typeof payload.delta === "string") text += payload.delta;
+      else if (typeof payload.answer === "string") text = payload.answer;
+      else if (typeof payload.token === "string") text += payload.token;
+      if (bubble && text) bubble.innerHTML = sanitizeHtml(textToHtml(text));
+    }
+  }
+  if (!text.trim()) return null;
+  return {
+    answer: {
+      html: textToHtml(text) + `<p class="answer-source">Open-ended answer from the college AI relay${model ? ` · ${escapeHtml(model.split("/").pop())}` : ""}. Factual timetable answers always use the deterministic engine.</p>`,
+      intent: "AI",
+      confidence: 0.7,
+      plan: ["open-ended question", "redacted context", "factual data never delegated"]
+    }
+  };
+}
+
+function compassDeviceId() {
+  let id = storageGet(DEVICE_KEY);
+  if (!id) {
+    id = `nx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    storageSet(DEVICE_KEY, id);
+  }
+  return id;
+}
+
+/* ── Settings ──────────────────────────────────────────────────────────── */
+
+function renderSettings() {
+  const query = state.settingsQuery.trim().toLowerCase();
+  const matches = (flag) => !query || `${flag.title} ${flag.description} ${flag.keywords} ${flag.id} ${flag.category}`.toLowerCase().includes(query);
+  const visibleCategories = CATEGORIES.filter((category) => !query || FLAGS.some((flag) => flag.category === category.id && matches(flag)));
+  const active = visibleCategories.find((category) => category.id === state.settingsCategory) || visibleCategories[0];
+  const flags = FLAGS.filter((flag) => (query ? matches(flag) : flag.category === active?.id));
+
+  return `<div class="page page-settings">
+    <div class="page-head">
+      <div class="page-head-text"><h2 class="page-title">Settings</h2><p class="page-sub">${FLAGS.length} controls across ${CATEGORIES.length} sections. Presets set a known combination; every control stays reversible.</p></div>
+      <div class="page-actions"><input type="search" class="btn btn-sm" style="min-width:220px;text-align:left" placeholder="Search settings…" value="${escapeHtml(state.settingsQuery)}" data-settings-search aria-label="Search settings" /></div>
+    </div>
+    <div class="preset-row" style="margin-bottom:16px">
+      ${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}
+    </div>
+    <div class="settings-layout">
+      <nav class="settings-side" aria-label="Settings sections">
+        ${visibleCategories.map((category) => `<button class="settings-nav-item ${category.id === active?.id ? "is-active" : ""}" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)}</button>`).join("")}
+      </nav>
+      <div class="settings-content">
+        ${query ? `<p class="card-sub">${flags.length} matching control${flags.length === 1 ? "" : "s"}</p>` : ""}
+        ${active ? `<section class="setting-section card" id="settings-${active.id}">
+          <div class="setting-section-head"><div><h2>${escapeHtml(active.title)}</h2><p>${escapeHtml(active.description)}</p></div><button class="btn btn-sm" data-action="reset-section" data-category="${active.id}">Reset section</button></div>
+          ${active.id === "experience" ? renderVersionCard() + renderProfileCard() : ""}
+          ${active.id === "data" ? renderStorageCard() : ""}
+          ${flags.length ? flags.map((flag) => renderFlagRow(flag)).join("") : `<p class="card-sub">No control matches “${escapeHtml(query)}”.</p>`}
+          ${active.id === "labs" && v("labs.flagInspector") ? renderFlagInspector() : ""}
+          ${active.id === "labs" ? renderDangerZone() : ""}
+        </section>` : `<div class="card">${emptyState("⚙", "No matching setting", `Nothing matches “${escapeHtml(state.settingsQuery)}”.`)}</div>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderFlagRow(flag) {
+  if (flag.type === "action") {
+    return `<div class="setting-row" id="setting-${flag.id}">
+      <div class="setting-text"><div class="setting-label">${escapeHtml(flag.title)}${flag.badge ? ` <span class="badge">${escapeHtml(flag.badge)}</span>` : ""}</div><div class="setting-desc">${escapeHtml(flag.description)}</div></div>
+      <div class="setting-control"><button class="btn btn-sm ${flag.risk === "high" ? "btn-danger" : ""}" data-action="flag-action" data-flag="${flag.id}">Run</button></div>
+    </div>`;
+  }
+  const available = isFlagAvailable(flag, state.values);
+  const value = state.values[flag.id];
+  const source = state.sources[flag.id];
+  let control = "";
+  if (flag.type === "boolean") {
+    control = `<label class="switch"><input type="checkbox" data-setting="${flag.id}" ${value ? "checked" : ""} ${available ? "" : "disabled"} aria-label="${escapeHtml(flag.title)}" /><span class="switch-track"></span></label>`;
+  } else if (flag.type === "select") {
+    control = `<select data-setting="${flag.id}" ${available ? "" : "disabled"} aria-label="${escapeHtml(flag.title)}">${flag.values.map((option) => `<option value="${escapeHtml(option.value)}" ${String(value) === String(option.value) ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select>`;
+  } else if (flag.type === "range") {
+    control = `<div class="range-wrap"><input type="range" data-setting="${flag.id}" data-range="${flag.id}" min="${flag.min}" max="${flag.max}" step="${flag.step}" value="${value}" ${available ? "" : "disabled"} aria-label="${escapeHtml(flag.title)}" /><output id="out-${flag.id}">${value} ${escapeHtml(flag.unit || "")}</output></div>`;
+  }
+  const managed = source === "admin" ? `<div class="setting-note">Managed by the college admin. Your device value is kept but overridden.</div>` : "";
+  return `<div class="setting-row${available ? "" : " is-disabled"}" id="setting-${flag.id}">
+    <div class="setting-text">
+      <div class="setting-label">${escapeHtml(flag.title)}${flag.badge ? ` <span class="badge${flag.status === "experimental" ? " badge-warn" : ""}">${escapeHtml(flag.badge)}</span>` : ""}${flag.requiresRestart ? ` <span class="badge">Restart</span>` : ""}</div>
+      <div class="setting-desc">${escapeHtml(flag.description)}</div>
+      ${flag.note ? `<div class="setting-note">${escapeHtml(flag.note)}</div>` : ""}
+      ${managed}
+    </div>
+    <div class="setting-control">${control}</div>
+  </div>`;
+}
+
+function renderVersionCard() {
+  const version = state.version;
+  const snapshots = state.snapshots || [];
+  return `<div class="card version-card" style="margin:14px 0">
+    <div class="card-head"><div><h2 class="card-title">Version & rollback</h2><p class="card-sub">The new app, the classic layout and the frozen legacy build are separate on purpose.</p></div></div>
+    <div class="version-grid">
+      <dl class="version-cell"><dt>App</dt><dd>v${escapeHtml(version?.app?.version || APP_VERSION)} · ${escapeHtml(version?.app?.channel || "stable")}</dd></dl>
+      <dl class="version-cell"><dt>Build</dt><dd>${escapeHtml(version?.app?.build || "2026-11-09")}</dd></dl>
+      <dl class="version-cell"><dt>Data release</dt><dd>${escapeHtml(state.metadata?.version || "not loaded")}</dd></dl>
+      <dl class="version-cell"><dt>Verified</dt><dd>${escapeHtml(shortDate(state.metadata?.checkedAt || state.lastSync))}</dd></dl>
+    </div>
+    <div class="chip-row" style="margin-top:14px">
+      <button class="btn btn-primary btn-sm" data-action="open-legacy">Open legacy build ↗</button>
+      <button class="btn btn-sm" data-action="refresh-data">Check for updates</button>
+      <button class="btn btn-sm" data-action="export-data">Export data</button>
+      <button class="btn btn-sm" data-action="import-data">Import data</button>
+    </div>
+    <p class="card-sub" style="margin-top:10px">Legacy URL: <code>${escapeHtml(state.legacyUrl)}</code></p>
+    <div class="snapshot-list">
+      ${snapshots.length ? snapshots.map((snapshot) => `<div class="snapshot-row"><span><strong>${escapeHtml(snapshot.version || "release")}</strong> <time>${escapeHtml(shortDate(snapshot.createdAt))}</time> · ${snapshot.entries || snapshot.scheduleCount || 0} entries</span><button class="btn btn-sm" data-action="restore-snapshot" data-id="${escapeHtml(snapshot.id)}">Restore</button><button class="btn btn-sm btn-ghost" data-action="delete-snapshot" data-id="${escapeHtml(snapshot.id)}">Delete</button></div>`).join("") : `<p class="card-sub">No device snapshot yet. One is saved after every verified release.</p>`}
+    </div>
+  </div>`;
+}
+
+function renderProfileCard() {
+  const profile = state.profile;
+  return `<div class="card" style="margin:14px 0">
+    <div class="card-head"><div><h2 class="card-title">Your profile</h2><p class="card-sub">Saved on this device only. Used for personalised answers and timetable selection.</p></div></div>
+    <div class="profile-grid">
+      <div class="field"><label for="profile-name">Name</label><input id="profile-name" data-profile="name" value="${escapeHtml(profile.name || "")}" autocomplete="name" /></div>
+      <div class="field"><label for="profile-crn">CRN</label><input id="profile-crn" data-profile="crn" value="${escapeHtml(profile.crn || "")}" inputmode="numeric" /></div>
+      <div class="field"><label for="profile-registration">Registration no.</label><input id="profile-registration" data-profile="registrationNo" value="${escapeHtml(profile.registrationNo || "")}" /></div>
+      <div class="field"><label for="profile-section">Section</label><select id="profile-section" data-profile="section"><option value="">Not set</option>${state.groups.map((group) => `<option value="${escapeHtml(group)}" ${group === profile.section ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></div>
+      <div class="field"><label for="profile-subsection">Sub-group</label><select id="profile-subsection" data-profile="subsection"><option value="">Whole section</option>${subgroupsFor(profile.section || state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === profile.subsection ? "selected" : ""}>${escapeHtml(subgroup)}</option>`).join("")}</select></div>
+      <div class="field"><label for="profile-branch">Branch</label><input id="profile-branch" data-profile="branch" value="${escapeHtml(profile.branch || "")}" /></div>
+      <div class="field"><label for="profile-mentor">Mentor</label><input id="profile-mentor" data-profile="mentor" value="${escapeHtml(profile.mentor || "")}" /></div>
+      <div class="field"><label for="profile-attendance">Attendance target (%)</label><input id="profile-attendance" data-profile="attendanceTarget" type="number" min="0" max="100" value="${Number(profile.attendanceTarget) || 76}" /></div>
+    </div>
+    <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="save-profile">Save profile</button><button class="btn btn-sm" data-action="use-profile-section">Use profile section</button></div>
+  </div>`;
+}
+
+function renderStorageCard() {
+  return `<div class="card" style="margin:14px 0">
+    <div class="card-head"><div><h2 class="card-title">Device storage</h2><p class="card-sub" id="storage-summary">Checking…</p></div></div>
+    <div class="chip-row">
+      <button class="btn btn-sm" data-action="persist-storage">Make offline storage persistent</button>
+      <button class="btn btn-sm" data-action="clear-cache">Clear app cache</button>
+      <button class="btn btn-sm" data-action="download-offline">Download offline data</button>
+    </div>
+  </div>`;
+}
+
+function renderFlagInspector() {
+  const rows = FLAGS.filter((flag) => flag.type !== "action").slice(0, 40).map((flag) => `<tr><td>${escapeHtml(flag.id)}</td><td>${escapeHtml(String(state.values[flag.id]))}</td><td>${escapeHtml(state.sources[flag.id] || "default")}</td></tr>`).join("");
+  return `<div class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Flag inspector</h2><p class="card-sub">Effective value and source for every control.</p></div></div><div class="week-wrap"><table class="week-table" style="min-width:520px"><thead><tr><th>Flag</th><th>Value</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+
+function renderDangerZone() {
+  return `<div class="card danger-zone" style="margin-top:14px">
+    <div class="card-head"><div><h2 class="card-title">Danger zone</h2><p class="card-sub">These actions only touch this device.</p></div></div>
+    <div class="chip-row">
+      <button class="btn btn-sm btn-danger" data-action="delete-all">Delete everything</button>
+      <button class="btn btn-sm" data-action="reset-all">Reset all settings</button>
+    </div>
+  </div>`;
+}
+
+/* ── Command palette ───────────────────────────────────────────────────── */
+
+function commandItems() {
+  const items = [
+    ...Object.entries(ROUTES).map(([route, meta]) => ({ label: `Go to ${meta.title}`, kind: "page", action: () => navigate(route) })),
+    { label: "Open legacy build", kind: "action", action: openLegacy },
+    { label: "Check for official updates", kind: "action", action: () => loadLiveData({ manual: true }) },
+    { label: "Toggle light / dark theme", kind: "action", action: toggleTheme },
+    { label: "Export timetable as .ics", kind: "action", action: exportIcs },
+    { label: "Clear app cache", kind: "action", action: clearCache },
+    { label: "Ask: What is my next class?", kind: "ask", action: () => askFromAnywhere("What is my next class?") },
+    ...CATEGORIES.map((category) => ({ label: `Settings · ${category.title}`, kind: "setting", action: () => navigate(`settings/${category.id}`) }))
+  ];
+  return items;
+}
+
+function renderCommandResults(query = "") {
+  const root = $("#command-results");
+  if (!root) return;
+  const text = query.trim().toLowerCase();
+  const items = commandItems().filter((item) => !text || item.label.toLowerCase().includes(text));
+  // Universal find: the same palette searches verified timetable entities.
+  const entityItems = [];
+  if (text.length >= 2) {
+    const seen = new Set();
+    const push = (label, question) => {
+      const key = question.toLowerCase();
+      if (seen.has(key) || entityItems.length >= 6) return;
+      seen.add(key);
+      entityItems.push({ label, kind: "find", action: () => askFromAnywhere(question) });
+    };
+    for (const entry of state.schedule) {
+      if (!entry) continue;
+      if (entry.subject && entry.subject.toLowerCase().includes(text)) push(`Ask: where is ${entry.subject}?`, `where is ${entry.subject}`);
+      if (entry.teacher && entry.teacher.toLowerCase().includes(text)) push(`Ask: ${entry.teacher} timetable`, `${entry.teacher} timetable`);
+      if (entry.group && entry.group.toLowerCase().includes(text)) push(`Ask: ${entry.group} timetable`, `${entry.group} timetable`);
+    }
+    for (const entry of state.roomSchedule) {
+      if (entry?.room && entry.room.toLowerCase().includes(text)) push(`Ask: is ${entry.room} free now?`, `is ${entry.room} free now`);
+    }
+  }
+  const visible = [...items, ...entityItems].slice(0, 12);
+  root.dataset.active = "0";
+  root.innerHTML = visible.length ? visible.map((item, index) => `<button class="command-item ${index === 0 ? "is-active" : ""}" data-command-index="${index}"><span>${escapeHtml(item.label)}</span><span class="cmd-kind">${escapeHtml(item.kind)}</span></button>`).join("") : `<div class="empty" style="padding:24px"><p class="empty-text">No command matches that.</p></div>`;
+  root._items = visible;
+}
+
+function toggleCommand(open = undefined) {
+  const palette = $("#command-palette");
+  if (!palette) return;
+  const shouldOpen = open ?? palette.hidden;
+  palette.hidden = !shouldOpen;
+  $("#scrim").hidden = !shouldOpen;
+  if (shouldOpen) {
+    renderCommandResults("");
+    const input = $("#command-input");
+    if (input) { input.value = ""; input.focus(); }
+  }
+}
+
+/* ── Actions ───────────────────────────────────────────────────────────── */
+
+function openLegacy() {
+  const url = state.legacyUrl;
+  if (v("experience.legacyNewTab")) window.open(url, "_blank", "noopener,noreferrer");
+  else location.href = url;
+}
+
+function toggleTheme() {
+  const current = v("appearance.theme");
+  const index = THEME_ORDER.indexOf(current);
+  const next = THEME_ORDER[(index + 1) % THEME_ORDER.length];
+  setFlag("appearance.theme", next);
+  render();
+  toast(`Theme: ${next}`);
+}
+
+function exportIcs() {
+  try {
+    const ics = buildIcs({ schedule: state.schedule, group: state.group, subgroup: state.subgroup, version: state.metadata?.version, startDate: now().dateISO });
+    downloadIcs(`gndec-${state.group}${state.subgroup ? `-${state.subgroup}` : ""}.ics`, ics);
+    toast("Calendar exported.", "success");
+  } catch (error) {
+    toast(error.message || "Could not export the calendar.", "error");
+  }
+}
+
+async function clearCache() {
+  const removed = await clearAppCaches();
+  toast(`Cleared ${removed} cache${removed === 1 ? "" : "s"}. Your settings and profile are unchanged.`, "success");
+}
+
+async function refreshStorageSummary() {
+  const summary = $("#storage-summary");
+  if (!summary) return;
+  const estimate = await storageEstimate();
+  const snapshots = state.snapshots.length;
+  summary.textContent = estimate.supported
+    ? `${formatBytes(estimate.usage)} used of ${formatBytes(estimate.quota)} available · ${snapshots} snapshot${snapshots === 1 ? "" : "s"}`
+    : `${snapshots} snapshot${snapshots === 1 ? "" : "s"} stored on this device`;
+}
+
+function askFromAnywhere(question) {
+  toggleCommand(false);
+  toggleSidebar(false);
+  if (state.route !== "ask") navigate("ask");
+  setTimeout(() => sendQuestion(question), 60);
+}
+
+async function handleAction(action, element) {
+  switch (action) {
+    case "retry-notices":
+      state.noticesStatus = "idle";
+      render();
+      break;
+    case "retry-directory":
+      state.directoryStatus = "idle";
+      render();
+      break;
+    case "swap-compare": {
+      const first = state.compareA;
+      state.compareA = state.compareB;
+      state.compareB = first;
+      render();
+      break;
+    }
+    case "refresh-data":
+      await loadLiveData({ manual: true });
+      await loadSnapshots();
+      break;
+    case "tt-view":
+      setFlag("timetable.view", element.dataset.view);
+      render();
+      break;
+    case "tt-day":
+      state.day = element.dataset.day;
+      render();
+      break;
+    case "room-zone":
+      state.roomZone = element.dataset.zone || "";
+      render();
+      break;
+    case "room-now":
+      state.roomTime = "";
+      state.roomDay = now().day;
+      render();
+      break;
+    case "open-rooms":
+      navigate("rooms");
+      break;
+    case "open-legacy":
+      openLegacy();
+      break;
+    case "preset": {
+      const preset = element.dataset.preset;
+      state.values = applyPreset(state.values, preset);
+      persistSettings();
+      applyAppearance();
+      render();
+      toast(`Preset applied: ${preset.replace(/-/g, " ")}`, "success");
+      break;
+    }
+    case "settings-category":
+      state.settingsCategory = element.dataset.category;
+      history.replaceState(null, "", `#/settings/${state.settingsCategory}`);
+      state.route = "settings";
+      render();
+      break;
+    case "reset-section":
+      state.values = resetValues(state.values, element.dataset.category);
+      persistSettings();
+      applyAppearance();
+      render();
+      toast("Section reset to defaults.");
+      break;
+    case "reset-all":
+      state.values = defaultValues();
+      persistSettings();
+      applyAppearance();
+      render();
+      toast("All settings reset.");
+      break;
+    case "toggle-engine":
+      setFlag("ask.engine", v("ask.engine") === "auto" ? "local" : "auto");
+      render();
+      break;
+    case "clear-chat":
+      state.chat = [];
+      saveChat();
+      render();
+      toast("Conversation cleared.");
+      break;
+    case "copy-message": {
+      const message = state.chat[Number(element.dataset.index)];
+      if (message) {
+        const text = message.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        navigator.clipboard?.writeText(text).then(() => toast("Copied.")).catch(() => toast("Copy failed.", "error"));
+      }
+      break;
+    }
+    case "ask-again": {
+      const message = state.chat[Number(element.dataset.index)];
+      if (message) sendQuestion(message.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300));
+      break;
+    }
+    case "send": {
+      const input = $("#question-input");
+      const question = input?.value || "";
+      if (input) input.value = "";
+      sendQuestion(question);
+      break;
+    }
+    case "voice":
+      startVoice();
+      break;
+    case "export-ics":
+      exportIcs();
+      break;
+    case "export-data":
+      exportData();
+      break;
+    case "import-data":
+      importData();
+      break;
+    case "save-profile":
+      saveProfileFromForm();
+      break;
+    case "use-profile-section":
+      if (state.profile.section && state.groups.includes(state.profile.section)) {
+        state.group = state.profile.section;
+        state.subgroup = subgroupsFor(state.group).includes(state.profile.subsection) ? state.profile.subsection : "";
+        persistSelection();
+        render();
+        toast("Timetable selection updated.");
+      } else toast("Set a section in your profile first.", "error");
+      break;
+    case "restore-snapshot":
+      restoreSnapshot(element.dataset.id);
+      break;
+    case "delete-snapshot":
+      await deleteSnapshot(element.dataset.id);
+      state.snapshots = await listSnapshots();
+      render();
+      toast("Snapshot deleted.");
+      break;
+    case "persist-storage": {
+      const ok = await requestPersistentStorage();
+      toast(ok ? "Offline storage is persistent." : "The browser did not grant persistent storage.", ok ? "success" : "error");
+      break;
+    }
+    case "clear-cache":
+      await clearCache();
+      await refreshStorageSummary();
+      break;
+    case "download-offline": {
+      if (!state.schedule.length) { toast("Load the timetable first.", "error"); break; }
+      await requestPersistentStorage();
+      await saveSnapshot({ id: `snap-${Date.now()}`, createdAt: new Date().toISOString(), version: state.metadata?.version || "unknown", checkedAt: state.metadata?.checkedAt || "", schedule: state.schedule, roomSchedule: state.roomSchedule });
+      toast("Offline data saved on this device.", "success");
+      break;
+    }
+    case "delete-all":
+      if (window.confirm("Delete settings, profile, chat history and snapshots from this device? The legacy build stays untouched.")) {
+        storageRemove(SETTINGS_KEY);
+        storageRemove(CHAT_KEY);
+        storageRemove(SELECTION_KEY);
+        storageRemove("gndec-compass-next-profile-v1");
+        await clearSnapshots();
+        await clearAppCaches();
+        state.chat = [];
+        state.values = defaultValues();
+        state.profile = { name: "", crn: "", registrationNo: "", branch: "", section: "", subsection: "", mentor: "", mentorPhone: "", mentorVenue: "", batch: "2026", attendanceTarget: 76 };
+        applyAppearance();
+        render();
+        toast("Deleted from this device.", "success");
+      }
+      break;
+    case "flag-action":
+      await handleFlagAction(element.dataset.flag);
+      break;
+    case "test-notification":
+      await testNotification();
+      break;
+    default:
+      break;
+  }
+}
+
+async function handleFlagAction(flagId) {
+  if (flagId === "notifications.test") { await testNotification(); return; }
+  if (flagId === "privacy.export") { exportData(); return; }
+  if (flagId === "privacy.clearData") { await clearCache(); return; }
+  if (flagId === "privacy.deleteAll") { await handleAction("delete-all", document.body); return; }
+}
+
+function saveProfileFromForm() {
+  const profile = { ...state.profile };
+  $$("[data-profile]").forEach((input) => {
+    profile[input.dataset.profile] = input.value;
+  });
+  state.profile = saveProfile(localStorage, profile) || profile;
+  if (profile.section && state.groups.includes(profile.section)) {
+    state.group = profile.section;
+    state.subgroup = subgroupsFor(profile.section).includes(profile.subsection) ? profile.subsection : "";
+    persistSelection();
+  }
+  render();
+  toast("Profile saved on this device.", "success");
+}
+
+function exportData() {
+  const bundle = exportBundle({ values: state.values, profile: state.profile, snapshots: state.snapshots, chat: state.chat });
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `gndec-compass-export-${now().dateISO}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast("Export downloaded.", "success");
+}
+
+function importData() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const bundle = importBundle(payload);
+      if (!bundle) throw new Error("This file is not a Compass export.");
+      state.values = bundle.values;
+      persistSettings();
+      if (bundle.profile) { state.profile = saveProfile(localStorage, bundle.profile) || bundle.profile; }
+      applyAppearance();
+      render();
+      toast("Import complete.", "success");
+    } catch (error) {
+      toast(error.message || "Import failed.", "error");
+    }
+  };
+  input.click();
+}
+
+async function restoreSnapshot(id) {
+  const snapshot = await getSnapshot(id);
+  if (!snapshot?.schedule?.length) { toast("Snapshot is missing.", "error"); return; }
+  applySchedule(snapshot.schedule, snapshot.roomSchedule, { version: snapshot.version, checkedAt: snapshot.checkedAt, source: "device snapshot" }, { fromCache: true });
+  state.lastSync = snapshot.createdAt;
+  render();
+  toast(`Restored release ${snapshot.version || ""}.`, "success");
+}
+
+async function testNotification() {
+  if (!("Notification" in window)) { toast("This browser does not support notifications.", "error"); return; }
+  let permission = Notification.permission;
+  if (permission === "default") permission = await Notification.requestPermission();
+  if (permission !== "granted") { toast("Notification permission was not granted.", "error"); return; }
+  const copy = { title: "Compass notifications work", body: "You will get class reminders when they are enabled." };
+  const registration = await navigator.serviceWorker?.getRegistration();
+  if (registration?.showNotification) await registration.showNotification(copy.title, { body: copy.body, icon: "./icons/icon-192.png", badge: "./icons/icon-192.png" });
+  else new Notification(copy.title, { body: copy.body });
+  toast("Test notification sent.", "success");
+}
+
+/* ── Voice ─────────────────────────────────────────────────────────────── */
+
+function startVoice() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) { toast("Voice input is not available in this browser.", "error"); return; }
+  if (state.listening) return;
+  try {
+    const recognition = new Recognition();
+    recognition.lang = v("ask.language") === "hi" ? "hi-IN" : v("ask.language") === "pa" ? "pa-IN" : "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      state.listening = true;
+      $("#mic-button")?.classList.add("is-listening");
+    };
+    recognition.onend = () => {
+      state.listening = false;
+      $("#mic-button")?.classList.remove("is-listening");
+    };
+    recognition.onerror = () => {
+      state.listening = false;
+      $("#mic-button")?.classList.remove("is-listening");
+      toast("Voice input stopped.", "error");
+    };
+    recognition.onresult = (event) => {
+      const text = event.results?.[0]?.[0]?.transcript || "";
+      const input = $("#question-input");
+      if (input && text) { input.value = text; input.focus(); }
+    };
+    recognition.start();
+  } catch {
+    toast("Voice input could not start.", "error");
+  }
+}
+
+/* ── Reminders ─────────────────────────────────────────────────────────── */
+
+async function checkReminders() {
+  if (!v("notifications.classReminders") || !("Notification" in window) || Notification.permission !== "granted") return;
+  const clock = now();
+  if (v("notifications.quietHours") && isQuietTime(clock.minutes, v("notifications.quietStart"), v("notifications.quietEnd"))) return;
+  const classes = classesForDay(clock.day);
+  const entry = dueReminder(classes, clock, Number(v("notifications.leadMinutes")), state.notified);
+  if (!entry) return;
+  state.notified.add(entry.id);
+  const copy = notificationCopy(entry, Number(v("notifications.leadMinutes")));
+  const registration = await navigator.serviceWorker?.getRegistration();
+  const options = { body: copy.body, icon: "./icons/icon-192.png", badge: "./icons/icon-192.png", tag: entry.id, silent: !v("notifications.sound") };
+  if (registration?.showNotification) await registration.showNotification(copy.title, options);
+  else new Notification(copy.title, options);
+}
+
+async function checkDigest() {
+  if (!v("notifications.dailyDigest") || !("Notification" in window) || Notification.permission !== "granted") return;
+  const clock = now();
+  const target = timeToMinutes(v("notifications.digestTime")) ?? 480;
+  if (clock.minutes < target || clock.minutes > target + 5) return;
+  if (storageGet(DIGEST_KEY) === clock.dateISO) return;
+  storageSet(DIGEST_KEY, clock.dateISO);
+  if (v("notifications.quietHours") && isQuietTime(clock.minutes, v("notifications.quietStart"), v("notifications.quietEnd"))) return;
+  const copy = digestCopy(classesForDay(clock.day), clock.day);
+  const registration = await navigator.serviceWorker?.getRegistration();
+  if (registration?.showNotification) await registration.showNotification(copy.title, { body: copy.body, icon: "./icons/icon-192.png", tag: "digest" });
+}
+
+/* ── PWA ───────────────────────────────────────────────────────────────── */
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((registration) => {
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) showUpdateBanner(worker);
+      });
+    });
+  }).catch(() => { /* offline shell still works from HTTP cache */ });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (state.reloading) return;
+    state.reloading = true;
+    location.reload();
+  });
+}
+
+function showUpdateBanner(worker) {
+  const banner = $("#update-banner");
+  if (!banner) return;
+  banner.hidden = false;
+  $("#update-reload").onclick = () => worker.postMessage({ type: "SKIP_WAITING" });
+  $("#update-dismiss").onclick = () => { banner.hidden = true; };
+}
+
+function setupInstallPrompt() {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    state.installPrompt = event;
+    $("#install-button")?.removeAttribute("hidden");
+    $("#install-side")?.removeAttribute("hidden");
+  });
+  const install = async () => {
+    if (!state.installPrompt) { toast("Use your browser menu → Install app."); return; }
+    state.installPrompt.prompt();
+    await state.installPrompt.userChoice;
+    state.installPrompt = null;
+    $("#install-button")?.setAttribute("hidden", "");
+    $("#install-side")?.setAttribute("hidden", "");
+  };
+  $("#install-button")?.addEventListener("click", install);
+  $("#install-side")?.addEventListener("click", install);
+}
+
+/* ── Sidebar / mobile ──────────────────────────────────────────────────── */
+
+function toggleSidebar(open = undefined) {
+  const sidebar = $("#sidebar");
+  if (!sidebar) return;
+  const shouldOpen = open ?? !sidebar.classList.contains("is-open");
+  sidebar.classList.toggle("is-open", shouldOpen);
+  $("#scrim").hidden = !shouldOpen;
+  $("#menu-button")?.setAttribute("aria-expanded", String(shouldOpen));
+}
+
+/* ── Boot ──────────────────────────────────────────────────────────────── */
+
+function bindEvents() {
+  document.addEventListener("click", (event) => {
+    const routeTarget = event.target.closest("[data-route]");
+    if (routeTarget) {
+      toggleSidebar(false);
+      navigate(routeTarget.dataset.route);
+      return;
+    }
+    const directoryTab = event.target.closest("[data-directory-tab]");
+    if (directoryTab) {
+      const nextTab = directoryTab.dataset.directoryTab;
+      if (nextTab !== state.directoryTab) {
+        state.directoryTab = nextTab;
+        state.directoryQuery = "";
+        state.directoryStatus = "idle";
+        render();
+      }
+      return;
+    }
+    const askChip = event.target.closest("[data-ask-question]");
+    if (askChip) {
+      askFromAnywhere(askChip.dataset.askQuestion);
+      return;
+    }
+    const actionTarget = event.target.closest("[data-action]");
+    if (actionTarget) {
+      handleAction(actionTarget.dataset.action, actionTarget);
+      return;
+    }
+    if (event.target.closest("#menu-button")) { toggleSidebar(); return; }
+    if (event.target.closest("#command-button")) { toggleCommand(true); return; }
+    if (event.target.closest("#scrim")) { toggleSidebar(false); toggleCommand(false); return; }
+    if (event.target.closest("#avatar-button")) { navigate("settings"); return; }
+    if (event.target.closest("#install-button") || event.target.closest("#install-side")) return;
+    if (event.target.closest("#close-command")) { toggleCommand(false); return; }
+    if (event.target.closest("#update-dismiss")) { $("#update-banner").hidden = true; return; }
+    if (event.target.closest("#update-reload")) return;
+    if (event.target.closest("#open-legacy-side")) { openLegacy(); return; }
+  });
+
+  document.addEventListener("change", (event) => {
+    const setting = event.target.closest("[data-setting]");
+    if (setting) {
+      const flag = getFlag(setting.dataset.setting);
+      setFlag(flag.id, flag.type === "boolean" ? setting.checked : setting.value);
+      if (flag.id === "labs.experiments" || flag.id === "experience.mode") render();
+      else if (flag.category === "timetable" || flag.category === "rooms" || flag.category === "today") render();
+      return;
+    }
+    const group = event.target.closest("[data-select-group]");
+    if (group) {
+      state.group = group.value;
+      state.subgroup = subgroupsFor(state.group).includes(state.subgroup) ? state.subgroup : "";
+      persistSelection();
+      state.day = "";
+      render();
+      return;
+    }
+    const subgroup = event.target.closest("[data-select-subgroup]");
+    if (subgroup) {
+      state.subgroup = subgroup.value;
+      persistSelection();
+      render();
+      return;
+    }
+    const roomDay = event.target.closest("[data-room-day]");
+    if (roomDay) { state.roomDay = roomDay.value; render(); return; }
+    const roomDuration = event.target.closest("[data-room-duration]");
+    if (roomDuration) { setFlag("rooms.defaultDuration", roomDuration.value); render(); return; }
+    const roomTime = event.target.closest("[data-room-time]");
+    if (roomTime) { state.roomTime = roomTime.value; render(); return; }
+    const compareA = event.target.closest("[data-compare-a]");
+    if (compareA) { state.compareA = compareA.value; render(); return; }
+    const compareB = event.target.closest("[data-compare-b]");
+    if (compareB) { state.compareB = compareB.value; render(); return; }
+    const compareDaySelect = event.target.closest("[data-compare-day]");
+    if (compareDaySelect) { state.compareDay = compareDaySelect.value; render(); return; }
+  });
+
+  document.addEventListener("input", (event) => {
+    const range = event.target.closest("[data-range]");
+    if (range) {
+      const output = document.getElementById(`out-${range.dataset.range}`);
+      const flag = getFlag(range.dataset.range);
+      if (output) output.textContent = `${range.value} ${flag?.unit || ""}`;
+      return;
+    }
+    const search = event.target.closest("[data-settings-search]");
+    if (search) {
+      state.settingsQuery = search.value;
+      clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(() => {
+        render();
+        const input = $("[data-settings-search]");
+        if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      }, 220);
+      return;
+    }
+    const directorySearch = event.target.closest("[data-directory-search]");
+    if (directorySearch) {
+      state.directoryQuery = directorySearch.value;
+      const caret = directorySearch.selectionStart;
+      clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(() => {
+        render();
+        const input = $("[data-directory-search]");
+        if (input) { input.focus(); input.setSelectionRange(caret, caret); }
+      }, 200);
+      return;
+    }
+    const commandInput = event.target.closest("#command-input");
+    if (commandInput) renderCommandResults(commandInput.value);
+    const question = event.target.closest("#question-input");
+    if (question) {
+      question.style.height = "auto";
+      question.style.height = `${Math.min(160, question.scrollHeight)}px`;
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      toggleCommand();
+      return;
+    }
+    if (event.key === "Escape") {
+      toggleCommand(false);
+      toggleSidebar(false);
+      return;
+    }
+    const commandInput = event.target.closest("#command-input");
+    if (commandInput) {
+      const root = $("#command-results");
+      const items = root?._items || [];
+      if (!items.length) return;
+      let active = Number(root.dataset.active || 0);
+      if (event.key === "ArrowDown") { event.preventDefault(); active = (active + 1) % items.length; }
+      else if (event.key === "ArrowUp") { event.preventDefault(); active = (active - 1 + items.length) % items.length; }
+      else if (event.key === "Enter") { event.preventDefault(); items[active]?.action(); return; }
+      else return;
+      root.dataset.active = String(active);
+      $$(".command-item", root).forEach((item, index) => item.classList.toggle("is-active", index === active));
+      return;
+    }
+    const question = event.target.closest("#question-input");
+    if (question && event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      const value = question.value;
+      question.value = "";
+      sendQuestion(value);
+    }
+  });
+
+  window.addEventListener("hashchange", () => render());
+  window.addEventListener("popstate", () => render());
+  window.addEventListener("online", () => { state.online = true; toast("Back online."); });
+  window.addEventListener("offline", () => { state.online = false; toast("Offline. Showing the last verified release."); });
+  window.addEventListener("storage", (event) => {
+    if (event.key === SETTINGS_KEY) { loadAllSettings(); render(); }
+  });
+}
+
+function startTimers() {
+  clearInterval(state.reminderTimer);
+  state.reminderTimer = setInterval(() => {
+    checkReminders();
+    checkDigest();
+    if (state.route === "today") render();
+  }, 30000);
+
+  clearInterval(state.refreshTimer);
+  const minutes = Number(v("data.autoRefreshMinutes")) || 0;
+  if (v("data.autoUpdate") && minutes > 0) {
+    state.refreshTimer = setInterval(() => {
+      if (!document.hidden) loadLiveData({ manual: false });
+    }, minutes * 60000);
+  }
+}
+
+async function init() {
+  loadAllSettings();
+  loadChat();
+  state.day = "";
+  bindEvents();
+  setupInstallPrompt();
+  registerServiceWorker();
+  bindStaticActions();
+
+  const route = parseRoute();
+  state.route = route;
+  updateChrome();
+
+  const cached = await loadCachedData();
+  if (cached) render();
+
+  await loadVersion();
+  render();
+
+  loadDatesheet().then(() => { if (["ask", "today", "notices"].includes(state.route)) render(); });
+  loadNotices().then(() => { if (state.route === "today" || state.route === "notices") render(); });
+
+  await loadLiveData();
+  await loadSnapshots();
+  updateLegacyCards();
+  startTimers();
+  if (state.route === "settings") render();
+}
+
+function bindStaticActions() {
+  $("#open-legacy-side")?.addEventListener("click", openLegacy);
+  $("#update-dismiss")?.addEventListener("click", () => { $("#update-banner").hidden = true; });
+  $("#update-reload")?.addEventListener("click", () => {
+    navigator.serviceWorker?.getRegistration().then((registration) => registration?.waiting?.postMessage({ type: "SKIP_WAITING" }));
+  });
+  const banner = $("#update-banner");
+  if (banner) banner.hidden = true;
+}
+
+function updateLegacyCards() {
+  $("#open-legacy-side")?.toggleAttribute("hidden", !v("experience.legacyCard") || !state.legacyUrl);
+  const install = $("#install-side");
+  if (install) install.hidden = !state.installPrompt;
+}
+
+init().catch((error) => {
+  console.error("[Compass] boot failed", error);
+  const view = $("#view");
+  if (view) view.innerHTML = `<div class="card" style="margin-top:24px">${emptyState("⚠", "Compass could not start", "The verified data could not be loaded. Your legacy build is still available.", `<button class="btn btn-primary" data-action="open-legacy">Open legacy build</button>`)}</div>`;
+});
+
+// Expose a tiny diagnostic surface for tests and the Labs panel.
+globalThis.CompassNext = Object.freeze({
+  version: APP_VERSION,
+  state,
+  settings: { FLAGS, CATEGORIES, PRESETS },
+  answer: answerLocally,
+  mapEnabled: () => isMapFlagEnabled(state.values)
+});

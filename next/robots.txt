@@ -1,0 +1,6 @@
+# GNDEC Compass
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://gndec-compass-next.koush3069.workers.dev/sitemap.xml

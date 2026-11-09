@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="GNDEC Compass — verified timetable, free rooms and exam datesheet">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#04120d"/><stop offset="1" stop-color="#0b2b22"/></linearGradient><linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#6ee7b7"/></linearGradient></defs>
+<rect width="1200" height="630" fill="url(#bg)"/>
+<circle cx="1010" cy="120" r="220" fill="#34d399" opacity=".08"/>
+<circle cx="120" cy="560" r="180" fill="#34d399" opacity=".06"/>
+<g transform="translate(84 84)"><rect width="76" height="76" rx="20" fill="#34d399" opacity=".16"/><path d="M38 12 50 38 38 64 26 38Z" fill="url(#accent)"/><circle cx="38" cy="38" r="6" fill="#04120d"/></g>
+<text x="186" y="132" font-family="system-ui,Segoe UI,Roboto,Arial,sans-serif" font-size="34" font-weight="800" fill="#e7f5ef">GNDEC <tspan fill="#34d399">Compass</tspan></text>
+<text x="84" y="270" font-family="system-ui,Segoe UI,Roboto,Arial,sans-serif" font-size="64" font-weight="800" fill="#e7f5ef">Verified timetable.</text>
+<text x="84" y="348" font-family="system-ui,Segoe UI,Roboto,Arial,sans-serif" font-size="64" font-weight="800" fill="url(#accent)">Free rooms. Real answers.</text>
+<text x="84" y="416" font-family="system-ui,Segoe UI,Roboto,Arial,sans-serif" font-size="26" fill="#9fc2b5">Classes · teachers · rooms · free periods · end-sem datesheet</text>
+<g font-family="system-ui,Segoe UI,Roboto,Arial,sans-serif" font-size="22" font-weight="600" fill="#c9efe2">
+<rect x="84" y="462" width="196" height="54" rx="27" fill="#0f2c23" stroke="#1d4a3a"/><text x="182" y="497" text-anchor="middle">18 sections</text>
+<rect x="296" y="462" width="196" height="54" rx="27" fill="#0f2c23" stroke="#1d4a3a"/><text x="394" y="497" text-anchor="middle">Free rooms</text>
+<rect x="508" y="462" width="236" height="54" rx="27" fill="#0f2c23" stroke="#1d4a3a"/><text x="626" y="497" text-anchor="middle">Hinglish + Punjabi</text>
+</g>
+<text x="84" y="576" font-family="system-ui,Segoe UI,Roboto,Arial,sans-serif" font-size="20" fill="#6f968a">Guru Nanak Dev Engineering College, Ludhiana · Works offline · Never guesses</text>
+</svg>
