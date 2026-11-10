@@ -105,6 +105,7 @@ const state = {
   directoryQuery: "",
   directoryStatus: "idle",
   faculty: [],
+  facultyStatus: "idle",
   students: [],
   rosterGeneratedAt: "",
   profileLookupQuery: "",
@@ -180,6 +181,10 @@ function sanitizeHtml(html) {
       if (name.startsWith("on")) node.removeAttribute(attribute.name);
       if ((name === "href" || name === "src") && /^\s*javascript:/i.test(attribute.value)) node.removeAttribute(attribute.name);
       if (name === "style" && /expression|url\s*\(/i.test(attribute.value)) node.removeAttribute(attribute.name);
+    }
+    if (node.tagName === "IMG") {
+      const source = node.getAttribute("src") || "";
+      if (/^\/api\/faculty\/photo(?:\?|$)/i.test(source)) node.setAttribute("src", `/api/legacy${source}`);
     }
   });
   return template.innerHTML;
@@ -686,6 +691,13 @@ function ensureDirectoryData() {
     }
     return;
   }
+  if (tab === "faculty" && state.facultyStatus === "error") {
+    if (state.directoryStatus !== "error") {
+      state.directoryStatus = "error";
+      render();
+    }
+    return;
+  }
   if (state.directoryStatus !== "idle") return;
   if (tab === "faculty") loadFaculty();
   else if (tab === "students" || tab === "mentoring") loadStudents();
@@ -693,8 +705,12 @@ function ensureDirectoryData() {
 }
 
 async function loadFaculty() {
-  state.directoryStatus = "loading";
-  render();
+  if (state.facultyStatus !== "idle") return;
+  state.facultyStatus = "loading";
+  if (state.route === "directory" && state.directoryTab === "faculty") {
+    state.directoryStatus = "loading";
+    render();
+  }
   try {
     let records = [];
     try {
@@ -706,12 +722,15 @@ async function loadFaculty() {
       records = Array.isArray(data?.records) ? data.records : [];
     }
     state.faculty = records.filter((record) => record && record.name);
-    state.directoryStatus = "ready";
+    state.facultyStatus = state.faculty.length ? "ready" : "error";
   } catch {
     state.faculty = [];
-    state.directoryStatus = "error";
+    state.facultyStatus = "error";
   }
-  if (state.route === "directory" && state.directoryTab === "faculty") render();
+  if (state.route === "directory" && state.directoryTab === "faculty") {
+    state.directoryStatus = state.facultyStatus === "ready" ? "ready" : "error";
+    render();
+  } else if (state.route === "teachers") render();
 }
 
 async function loadStudents({ quiet = false } = {}) {
@@ -1082,6 +1101,7 @@ function ensureRouteData() {
     state.adminStatus = "loading";
     adminLoad().catch(() => {});
   }
+  if (state.route === "teachers" && state.facultyStatus === "idle") loadFaculty();
   if (state.route === "directory") ensureDirectoryData();
 }
 
@@ -1556,6 +1576,27 @@ function teacherEntries(name) {
     .sort((a, b) => STUDY_DAYS.indexOf(a.day) - STUDY_DAYS.indexOf(b.day) || a.start - b.start);
 }
 
+function facultyNameKey(value) {
+  return String(value || "").toLocaleUpperCase().replace(/^(?:DR|ER|MS|MR|MRS|PROF)\.?\s+/, "").replace(/[^A-Z0-9]+/g, " ").trim();
+}
+
+function facultyRecordForTeacher(name) {
+  const key = facultyNameKey(name);
+  return state.faculty.find((record) => facultyNameKey(record.name) === key && record.profileId && record.photoUrl) || null;
+}
+
+function facultyInitials(name) {
+  return String(name || "?").replace(/^(?:DR|ER|MS|MR|MRS|PROF)\.?\s+/i, "").split(/\s+/).filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase() || "?";
+}
+
+function facultyAvatar(record, name = record?.name || "") {
+  const initials = facultyInitials(name);
+  if (record?.profileId && record.photoUrl) {
+    return `<img class="directory-photo" src="/api/legacy/api/faculty/photo?id=${encodeURIComponent(record.profileId)}" data-faculty-initials="${escapeHtml(initials)}" alt="Photo of ${escapeHtml(name)}" loading="lazy" decoding="async" width="72" height="72" referrerpolicy="no-referrer" />`;
+  }
+  return `<span class="directory-initials" aria-hidden="true">${escapeHtml(initials)}</span>`;
+}
+
 function renderTeachers() {
   const clock = now();
   if (state.teacherSelected && !state.schedule.some((entry) => entry.teacher === state.teacherSelected)) state.teacherSelected = "";
@@ -1582,11 +1623,12 @@ function renderTeachers() {
       <div class="field"><label for="teacher-search">Search a teacher</label><input id="teacher-search" type="search" value="${escapeHtml(state.teacherQuery)}" placeholder="Type a teacher name, e.g. Sharma…" data-teacher-search autocomplete="off" /></div>
       <p class="card-sub" style="margin-top:8px">${query ? `${matches.length} of ${all.length} teachers match “${escapeHtml(state.teacherQuery)}”.` : "Choose a teacher to open their full weekly timetable."}</p>
     </div>
-    ${selected ? `<div class="card" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 class="card-title">${escapeHtml(selected)}</h2><p class="card-sub">${entries.length} published class${entries.length === 1 ? "" : "es"} across ${new Set(entries.map((entry) => entry.group)).size} section${new Set(entries.map((entry) => entry.group)).size === 1 ? "" : "s"}</p></div><button class="btn btn-sm btn-ghost" data-action="clear-teacher">Clear</button></div>${dayRows || emptyState("▦", "No classes published", "The official release has no class for this teacher.")}` : ""}
+    ${selected ? `<div class="card" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div class="directory-card-head">${facultyAvatar(facultyRecordForTeacher(selected), selected)}<div><h2 class="card-title">${escapeHtml(selected)}</h2><p class="card-sub">${entries.length} published class${entries.length === 1 ? "" : "es"} across ${new Set(entries.map((entry) => entry.group)).size} section${new Set(entries.map((entry) => entry.group)).size === 1 ? "" : "s"}</p></div></div><button class="btn btn-sm btn-ghost" data-action="clear-teacher">Clear</button></div>${dayRows || emptyState("▦", "No classes published", "The official release has no class for this teacher.")}` : ""}
     ${!selected && !state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see teacher timetables.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : ""}
     ${!selected && state.schedule.length ? (matches.length ? `<div class="directory-grid" style="margin-top:14px">${matches.slice(0, 120).map((name) => {
       const count = teacherEntries(name).length;
-      return `<button class="card directory-card" data-teacher="${escapeHtml(name)}" style="text-align:left"><div class="directory-card-head"><span class="directory-initials" aria-hidden="true">${escapeHtml(name.replace(/^(?:DR|ER|MS|MR|MRS|PROF)\.?\s+/i, "").split(/\s+/).map((part) => part[0]).slice(0, 2).join(""))}</span><div><h3 class="directory-name">${escapeHtml(name)}</h3><p class="directory-meta">${count} published class${count === 1 ? "" : "es"}</p></div></div></button>`;
+      const faculty = facultyRecordForTeacher(name);
+      return `<button class="card directory-card" data-teacher="${escapeHtml(name)}" style="text-align:left"><div class="directory-card-head">${facultyAvatar(faculty, name)}<div><h3 class="directory-name">${escapeHtml(name)}</h3><p class="directory-meta">${count} published class${count === 1 ? "" : "es"}</p></div></div></button>`;
     }).join("")}</div>${matches.length > 120 ? `<p class="card-sub" style="margin-top:10px">Showing the first 120 teachers. Narrow the search to see more.</p>` : ""}` : emptyState("🔎", "No matching teacher", `No published teacher name contains “${escapeHtml(state.teacherQuery)}”.`)) : ""}
   </div>`;
 }
@@ -2242,7 +2284,7 @@ function facultyCard(record) {
   const meta = [record.designation, record.department].filter(Boolean).join(" · ");
   return `<article class="card directory-card">
     <div class="directory-card-head">
-      ${record.photoUrl && record.profileId ? `<img class="directory-photo" src="/api/legacy/api/faculty/photo?id=${encodeURIComponent(record.profileId)}" alt="" loading="lazy" width="48" height="48" referrerpolicy="no-referrer" />` : `<span class="directory-initials" aria-hidden="true">${escapeHtml(String(record.name || "?").replace(/^DR\.?\s+/i, "").split(/\s+/).map((part) => part[0]).slice(0, 2).join(""))}</span>`}
+      ${facultyAvatar(record)}
       <div><h3 class="directory-name">${escapeHtml(record.name)}</h3><p class="directory-meta">${escapeHtml(meta || "GNDEC faculty")}</p></div>
     </div>
     ${record.qualifications ? `<p class="directory-detail">${escapeHtml(String(record.qualifications).replace(/\s+/g, " ").slice(0, 180))}${String(record.qualifications).length > 180 ? "…" : ""}</p>` : ""}
@@ -3860,6 +3902,17 @@ function toggleSidebar(open = undefined) {
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 
 function bindEvents() {
+  $("#view")?.addEventListener("error", (event) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement) || !image.matches("img[data-faculty-initials], img[data-faculty-photo-fallback]")) return;
+    const placeholder = document.createElement("span");
+    const name = image.alt.replace(/^official gndec profile photo of\s+/i, "").replace(/^photo of\s+/i, "");
+    placeholder.className = image.classList.contains("directory-photo") ? "directory-initials" : "faculty-profile-placeholder";
+    placeholder.textContent = image.dataset.facultyInitials || facultyInitials(name);
+    placeholder.setAttribute("role", "img");
+    placeholder.setAttribute("aria-label", `Photo unavailable for ${name || "faculty member"}`);
+    image.replaceWith(placeholder);
+  }, true);
   document.addEventListener("click", (event) => {
     const routeTarget = event.target.closest("[data-route]");
     if (routeTarget) {

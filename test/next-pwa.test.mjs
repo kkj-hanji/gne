@@ -68,6 +68,11 @@ test("the manifest and directory keep every URL on the app origin", async () => 
   const app = await read("../next/app.js");
   assert.match(app, /\/api\/legacy\/api\/faculty\/photo\?id=/);
   assert.doesNotMatch(app, /src="\$\{escapeHtml\(record\.photoUrl\)\}"/);
+  assert.match(app, /function facultyRecordForTeacher\(/);
+  assert.match(app, /function facultyAvatar\(/);
+  assert.match(app, /data-faculty-initials/);
+  assert.match(app, /state\.route === "teachers" && state\.facultyStatus === "idle"/);
+  assert.match(app, /setAttribute\("src", `\/api\/legacy\$\{source\}`\)/);
 });
 
 test("the service worker precaches the real shell and isolates the legacy origin", async () => {
@@ -156,7 +161,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.1.8");
+  assert.equal(next.vars.APP_VERSION, "2.1.9");
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");

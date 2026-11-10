@@ -838,12 +838,13 @@ kbd { font-family: var(--font-mono); font-size: .66rem; border: 1px solid var(--
 .directory-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
 .directory-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
 .directory-card-head { display: flex; gap: 12px; align-items: center; min-width: 0; }
-.directory-photo { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex: none; }
+.directory-photo { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex: none; }
 .directory-initials {
-  width: 48px; height: 48px; border-radius: 50%; flex: none;
+  width: 64px; height: 64px; border-radius: 50%; flex: none;
   display: grid; place-items: center; font-weight: 800; color: var(--accent-ink);
   background: color-mix(in srgb, var(--accent) 26%, var(--surface-2));
 }
+.faculty-profile-placeholder { width: 120px; height: 140px; flex: 0 0 120px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 13px; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 18%, var(--surface-2)); font-size: 1.5rem; font-weight: 800; }
 .directory-name { font-size: .96rem; font-weight: 800; letter-spacing: -.02em; overflow-wrap: anywhere; }
 .directory-meta { color: var(--muted); font-size: .78rem; margin-top: 2px; }
 .directory-detail { color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
