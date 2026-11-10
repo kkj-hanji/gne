@@ -148,7 +148,7 @@ export function migrateLegacy(legacy = {}, legacyBrainEnabled = null) {
   if (!legacy || typeof legacy !== "object") return values;
 
   const accent = String(legacy.themeAccent || "");
-  if (["emerald", "azure", "amber", "rose", "violet"].includes(accent)) values["appearance.accent"] = accent;
+  if (FLAG_MAP["appearance.accent"]?.values?.some((option) => option.value === accent)) values["appearance.accent"] = accent;
 
   if (legacy.compactTimetable) {
     values["appearance.density"] = "compact";
@@ -319,6 +319,8 @@ export function importBundle(payload) {
 export const APPEARANCE_KEYS = Object.freeze([
   "appearance.theme",
   "appearance.accent",
+  "appearance.palette",
+  "appearance.background",
   "appearance.density",
   "appearance.fontScale",
   "appearance.reduceMotion",

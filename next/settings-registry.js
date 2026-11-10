@@ -22,11 +22,11 @@ export const LEGACY_PROFILE_KEY = "gndec-compass-student-v1";
 export const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 export const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 
-export const APP_VERSION = "2.1.5";
+export const APP_VERSION = "2.1.6";
 export const APP_CHANNEL = "stable";
 
 export const THEMES = ["system", "light", "dark", "oled"];
-export const ACCENTS = ["emerald", "azure", "amber", "rose", "violet"];
+export const ACCENTS = ["emerald", "azure", "amber", "rose", "violet", "teal", "indigo", "coral", "lime"];
 export const DENSITIES = ["comfortable", "compact"];
 export const EXPERIENCES = ["new", "classic", "safe"];
 
@@ -98,8 +98,8 @@ export const FLAGS = Object.freeze([
   }),
 
   // ── Appearance ───────────────────────────────────────────────────────────
-  flag("appearance.theme", "Theme", "System follows your device. OLED uses true black on supported screens.", {
-    category: "appearance", type: "select", default: "system", values: [
+  flag("appearance.theme", "Theme", "Dark is the default. Choose light, follow your device, or use true-black OLED.", {
+    category: "appearance", type: "select", default: "dark", values: [
       { value: "system", label: "System" },
       { value: "light", label: "Light" },
       { value: "dark", label: "Dark" },
@@ -112,7 +112,11 @@ export const FLAGS = Object.freeze([
       { value: "azure", label: "Azure" },
       { value: "amber", label: "Amber" },
       { value: "rose", label: "Rose" },
-      { value: "violet", label: "Violet" }
+      { value: "violet", label: "Violet" },
+      { value: "teal", label: "Teal" },
+      { value: "indigo", label: "Indigo" },
+      { value: "coral", label: "Coral" },
+      { value: "lime", label: "Lime" }
     ], keywords: "colour accent green blue"
   }),
   flag("appearance.palette", "Colour palette", "Choose the overall surface colours for both light and dark themes.", {
@@ -120,13 +124,17 @@ export const FLAGS = Object.freeze([
       { value: "forest", label: "Forest green" },
       { value: "ocean", label: "Ocean blue" },
       { value: "sand", label: "Warm sand" },
-      { value: "graphite", label: "Graphite" }
+      { value: "graphite", label: "Graphite" },
+      { value: "lavender", label: "Lavender" },
+      { value: "slate", label: "Blue slate" }
     ], keywords: "colour combination background surfaces palette"
   }),
   flag("appearance.background", "Background style", "Use a quiet solid background or a subtle colour wash.", {
     category: "appearance", type: "select", default: "solid", values: [
       { value: "solid", label: "Quiet solid" },
-      { value: "wash", label: "Soft colour wash" }
+      { value: "wash", label: "Soft colour wash" },
+      { value: "aurora", label: "Aurora glow" },
+      { value: "mist", label: "Layered mist" }
     ], keywords: "gradient background colour"
   }),
   flag("appearance.density", "Density", "Compact reduces vertical spacing for small screens and long timetables.", {

@@ -64,6 +64,7 @@ test("every category is declared, ordered and populated", () => {
 
 test("settings open on a simple overview and keep technical controls under More settings", async () => {
   const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
+  const core = await readFile(new URL("../src/next-core.js", import.meta.url), "utf8");
   assert.match(app, /settingsCategory: "overview"/);
   assert.match(app, /Everyday preferences/);
   assert.match(app, /<strong>More settings<\/strong>/);
@@ -85,7 +86,13 @@ test("settings open on a simple overview and keep technical controls under More 
   assert.match(app, /appearance\.palette/);
   assert.match(app, /appearance\.background/);
   assert.match(app, /function subgroupDisplay\(group, subgroup\)/);
-  assert.match(app, /subgroupDisplay\(state\.group, subgroup\)/);
+  assert.match(app, /subgroupDisplay\(profile\.section \|\| state\.group, subgroup\)/);
+  assert.match(app, /data-select-cohort/);
+  assert.doesNotMatch(app, /data-select-group|data-select-subgroup/);
+  assert.match(app, /branchSelections/);
+  assert.match(app, /profile-mentoring-title/);
+  assert.doesNotMatch(app, /profile-branch|data-profile="branch"/);
+  assert.match(core, /requestHeaders\.set\("CF-Connecting-IP", clientIp\)/);
 });
 
 test("appearance enums stay in sync with the stylesheet", async () => {
@@ -121,6 +128,7 @@ test("the map is never bundled and starts disabled", async () => {
 
 test("defaults contain every interactive flag and no action flags", () => {
   const values = defaultValues();
+  assert.equal(values["appearance.theme"], "dark");
   for (const flag of FLAGS) {
     if (flag.type === "action" || flag.type === "info") {
       assert.equal(flag.id in values, false, `${flag.id} must not be stored`);
@@ -134,8 +142,8 @@ test("defaults contain every interactive flag and no action flags", () => {
 test("coercion rejects malformed values and clamps ranges", () => {
   const theme = getFlag("appearance.theme");
   assert.equal(coerceValue(theme, "dark"), "dark");
-  assert.equal(coerceValue(theme, "neon"), "system");
-  assert.equal(coerceValue(theme, null), "system");
+  assert.equal(coerceValue(theme, "neon"), "dark");
+  assert.equal(coerceValue(theme, null), "dark");
 
   const toggle = getFlag("appearance.reduceMotion");
   assert.equal(coerceValue(toggle, "true"), true);
@@ -162,7 +170,7 @@ test("URL overrides are parsed defensively", () => {
     "appearance.theme": "dark",
     "ask.engine": "local"
   });
-  assert.deepEqual(parseUrlOverrides("?ff=appearance.theme=neon"), { "appearance.theme": "system" });
+  assert.deepEqual(parseUrlOverrides("?ff=appearance.theme=neon"), { "appearance.theme": "dark" });
   assert.deepEqual(parseUrlOverrides("?ff=privacy.deleteAll=1"), {});
   assert.deepEqual(parseUrlOverrides("?ff=unknown.flag=1"), {});
   assert.deepEqual(parseUrlOverrides("?other=1"), {});
@@ -187,7 +195,7 @@ test("precedence is URL > admin > device > default", () => {
   assert.equal(onlyUser.sources["appearance.theme"], "device");
 
   const fallback = resolveValues({});
-  assert.equal(fallback.values["appearance.theme"], "system");
+  assert.equal(fallback.values["appearance.theme"], "dark");
   assert.equal(fallback.sources["appearance.theme"], "default");
 });
 
@@ -251,7 +259,7 @@ test("saved settings survive an invalid schema and are sanitised", () => {
   assert.equal(values["appearance.fontScale"], 130);
 
   const broken = memoryStorage({ "gndec-compass-next-settings-v2": "{not json" });
-  assert.equal(loadUserValues(broken).values["appearance.theme"], "system");
+  assert.equal(loadUserValues(broken).values["appearance.theme"], "dark");
 });
 
 test("saveUserValues round-trips through storage", () => {
@@ -345,11 +353,11 @@ test("presets apply on top of current values and remain reversible", () => {
 test("resetValues resets one category or everything", () => {
   const values = { ...defaultValues(), "appearance.theme": "dark", "ask.engine": "local" };
   const appearanceReset = resetValues(values, "appearance");
-  assert.equal(appearanceReset["appearance.theme"], "system");
+  assert.equal(appearanceReset["appearance.theme"], "dark");
   assert.equal(appearanceReset["ask.engine"], "local");
 
   const all = resetValues(values);
-  assert.equal(all["appearance.theme"], "system");
+  assert.equal(all["appearance.theme"], "dark");
   assert.equal(all["ask.engine"], "auto");
   assert.equal(changedFlags(all).length, 0);
 });
@@ -372,10 +380,10 @@ test("export and import are explicit and validated", () => {
   assert.equal(importBundle({ values: "nope" }), null);
 
   const hostile = importBundle({ app: "GNDEC Compass Next", values: { "appearance.theme": "<script>alert(1)</script>" } });
-  assert.equal(hostile.values["appearance.theme"], "system");
+  assert.equal(hostile.values["appearance.theme"], "dark");
 });
 
 test("appearance keys are real flags", () => {
   for (const id of APPEARANCE_KEYS) assert.ok(FLAG_MAP[id], `${id} is not a declared flag`);
-  assert.equal(APPEARANCE_KEYS.length, 14);
+  assert.equal(APPEARANCE_KEYS.length, 16);
 });

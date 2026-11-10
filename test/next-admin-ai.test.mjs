@@ -45,6 +45,7 @@ test("KKJ enrollment checks the owner profile and stores only device, IP and pro
       legacyCalls += 1;
       assert.equal(url, "https://legacy.compass.test/api/admin/ai/unlock");
       assert.equal(init.headers.get("X-Compass-Device"), DEVICE);
+      assert.equal(init.headers.get("CF-Connecting-IP"), "203.0.113.8");
       return Response.json({ ok: true, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() });
     }
   };
@@ -95,14 +96,19 @@ test("chat relay passes the owner profile only when the server-bound device, pro
   const env = { CONTENT, LEGACY_ORIGIN: "https://legacy.compass.test" };
   const deps = {
     cache: null,
-    fetch: async (url) => url.endsWith("/api/admin/ai/unlock")
-      ? Response.json({ ok: true, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() })
-      : new Response("data: {\"delta\":\"ok\"}\n\n", { headers: { "Content-Type": "text/event-stream" } })
+    fetch: async (url, init) => {
+      if (url.endsWith("/api/admin/ai/unlock")) {
+        assert.equal(init.headers.get("CF-Connecting-IP"), "203.0.113.8");
+        return Response.json({ ok: true, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() });
+      }
+      return new Response("data: {\"delta\":\"ok\"}\n\n", { headers: { "Content-Type": "text/event-stream" } });
+    }
   };
   const enrolled = await handleRequest(request("/api/admin/ai/unlock"), env, {}, deps);
   assert.equal(enrolled.status, 200);
 
   let sentBody;
+  let chatIp;
   const chat = await handleRequest(new Request(`${ORIGIN}/api/legacy/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.8", "X-Compass-Device": DEVICE },
@@ -111,11 +117,13 @@ test("chat relay passes the owner profile only when the server-bound device, pro
     ...deps,
     fetch: async (url, init) => {
       if (url.endsWith("/api/admin/ai/unlock")) return deps.fetch(url, init);
+      chatIp = init.headers.get("CF-Connecting-IP");
       sentBody = JSON.parse(init.body);
       return deps.fetch(url, init);
     }
   });
   assert.equal(chat.status, 200);
+  assert.equal(chatIp, "203.0.113.8");
   assert.deepEqual(sentBody.adminProfile, PROFILE);
   assert.deepEqual(sentBody.selection, SELECTION);
 });

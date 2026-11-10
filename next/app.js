@@ -373,18 +373,25 @@ function resolveSelection() {
   const candidates = [
     state.profile.section,
     saved?.group,
+    saved?.branchSelections?.[groupBranchCode(saved?.group)]?.group,
     storageGet(LEGACY_GROUP_KEY),
     new URLSearchParams(location.search).get("section")
   ].filter(Boolean);
   state.group = candidates.find((value) => state.groups.includes(value)) || preferredGroup(state.groups);
   const subgroups = subgroupsFor(state.group);
-  const subgroupCandidates = [state.profile.subsection, saved?.subgroup, storageGet(LEGACY_SUBGROUP_KEY)].filter(Boolean);
+  const branchSaved = saved?.branchSelections?.[groupBranchCode(state.group)];
+  const subgroupCandidates = [state.profile.subsection, saved?.group === state.group ? saved?.subgroup : "", branchSaved?.group === state.group ? branchSaved?.subgroup : "", storageGet(LEGACY_SUBGROUP_KEY)].filter(Boolean);
   state.subgroup = subgroupCandidates.find((value) => subgroups.includes(value)) || "";
   persistSelection();
 }
 
 function persistSelection() {
-  storageSet(SELECTION_KEY, JSON.stringify({ group: state.group, subgroup: state.subgroup }));
+  let saved = {};
+  try { saved = JSON.parse(storageGet(SELECTION_KEY) || "{}") || {}; } catch { saved = {}; }
+  const branchSelections = saved.branchSelections && typeof saved.branchSelections === "object" ? saved.branchSelections : {};
+  const branch = groupBranchCode(state.group);
+  if (branch && state.group) branchSelections[branch] = { group: state.group, subgroup: state.subgroup || "" };
+  storageSet(SELECTION_KEY, JSON.stringify({ group: state.group, subgroup: state.subgroup, branchSelections }));
 }
 
 function applySchedule(schedule, roomSchedule, metadata, subgroupSchedule = [], { fromCache = false } = {}) {
@@ -1376,7 +1383,6 @@ function renderTimetable() {
   const branches = timetableBranches();
   const activeBranch = groupBranchCode(state.group) || branches[0] || "";
   const sections = rankedGroups(state.groups.filter((group) => groupBranchCode(group) === activeBranch));
-  const subgroups = rankedSubgroups(state.group);
   const todayExamSittings = state.day === clock.day ? examsForDate(clock.dateISO) : [];
   const dayContent = view === "week" ? renderWeekGrid(clock)
     : view === "agenda" ? renderAgenda()
@@ -1390,8 +1396,10 @@ function renderTimetable() {
       </div>
       <div class="page-actions">
         <select class="btn btn-sm" data-select-branch aria-label="Branch">${branches.map((branch) => `<option value="${escapeHtml(branch)}" ${branch === activeBranch ? "selected" : ""}>${escapeHtml(branchLabel(branch))}</option>`).join("")}</select>
-        <select class="btn btn-sm" data-select-group aria-label="Section">${sections.map((group) => `<option value="${escapeHtml(group)}" ${group === state.group ? "selected" : ""}>${escapeHtml(sectionDisplay(group, activeBranch))}</option>`).join("")}</select>
-        <select class="btn btn-sm" data-select-subgroup aria-label="Sub-section"><option value="">Whole section</option>${subgroups.map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === state.subgroup ? "selected" : ""}>${escapeHtml(subgroupDisplay(state.group, subgroup))}</option>`).join("")}</select>
+        <select class="btn btn-sm" data-select-cohort aria-label="Section or subsection">
+          <optgroup label="Sections">${sections.map((group) => `<option value="${escapeHtml(group)}|" ${group === state.group && !state.subgroup ? "selected" : ""}>${escapeHtml(sectionDisplay(group, activeBranch))} · whole section</option>`).join("")}</optgroup>
+          ${sections.some((group) => subgroupsFor(group).length) ? `<optgroup label="Subsections">${sections.flatMap((group) => rankedSubgroups(group).map((subgroup) => `<option value="${escapeHtml(group)}|${escapeHtml(subgroup)}" ${group === state.group && subgroup === state.subgroup ? "selected" : ""}>${escapeHtml(subgroupDisplay(group, subgroup))}</option>`)).join("")}</optgroup>` : ""}
+        </select>
       </div>
     </div>
     ${!state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see your week.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : `
@@ -2888,6 +2896,7 @@ function timetableBranches() {
 
 function sectionDisplay(group, branch) {
   const code = String(group || "").replace(/^D[23]/, "").toUpperCase();
+  if (branch === "EC") return code;
   const suffix = code.slice(branch.length);
   return suffix ? `Section ${suffix} (${code})` : code;
 }
@@ -3033,19 +3042,23 @@ function renderProfileCard() {
     <div class="profile-lookup"><label class="visually-hidden" for="profile-lookup">Your name, CRN, registration, or serial number</label><input id="profile-lookup" data-profile-lookup-query value="${escapeHtml(state.profileLookupQuery || profile.name || profile.crn || "")}" placeholder="Start with your name, CRN, registration, or serial" autocomplete="off" /><button class="btn btn-primary" data-action="lookup-profile">Find my profile</button></div>
     <div data-profile-lookup-results aria-live="polite">${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}</div>
     ${profile.rosterVersion ? `<p class="profile-verified"><span class="badge badge-accent">Roster matched</span> ${escapeHtml(profile.name || "Student")} · ${escapeHtml([profile.section, profile.subsection].filter(Boolean).join(" / ") || "Section not listed")}${profile.mentor ? ` · Mentor ${escapeHtml(profile.mentor)}` : ""}${state.rosterGeneratedAt ? ` · roster ${escapeHtml(shortDate(state.rosterGeneratedAt))}` : ""}</p>` : `<p class="profile-verified">Your profile stays on this device. A name is applied only when the roster match is unambiguous.</p>`}
-    <div class="profile-grid">
+    <div class="profile-grid profile-main-grid">
       <div class="field"><label for="profile-name">Name</label><input id="profile-name" data-profile="name" value="${escapeHtml(profile.name || "")}" autocomplete="name" /></div>
       <div class="field"><label for="profile-crn">CRN</label><input id="profile-crn" data-profile="crn" value="${escapeHtml(profile.crn || "")}" inputmode="numeric" /></div>
       <div class="field"><label for="profile-registration">Registration no.</label><input id="profile-registration" data-profile="registrationNo" value="${escapeHtml(profile.registrationNo || "")}" /></div>
       <div class="field"><label for="profile-serial">Serial number</label><input id="profile-serial" value="${escapeHtml(profile.serialNo || "Not published")}" readonly aria-readonly="true" /></div>
-      <div class="field"><label for="profile-section">Section</label><select id="profile-section" data-profile="section"><option value="">Not set</option>${state.groups.map((group) => `<option value="${escapeHtml(group)}" ${group === profile.section ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></div>
-      <div class="field"><label for="profile-subsection">Sub-group</label><select id="profile-subsection" data-profile="subsection"><option value="">Whole section</option>${subgroupsFor(profile.section || state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === profile.subsection ? "selected" : ""}>${escapeHtml(subgroupDisplay(profile.section || state.group, subgroup))}</option>`).join("")}</select></div>
-      <div class="field"><label for="profile-branch">Branch</label><input id="profile-branch" data-profile="branch" value="${escapeHtml(profile.branch || "")}" /></div>
+      <div class="field"><label for="profile-section">Section</label><select id="profile-section" data-profile="section"><option value="">Not set</option>${rankedGroups(state.groups).map((group) => `<option value="${escapeHtml(group)}" ${group === profile.section ? "selected" : ""}>${escapeHtml(sectionDisplay(group, groupBranchCode(group)))}</option>`).join("")}</select></div>
+      <div class="field"><label for="profile-subsection">Sub-group</label><select id="profile-subsection" data-profile="subsection"><option value="">Whole section</option>${rankedSubgroups(profile.section || state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === profile.subsection ? "selected" : ""}>${escapeHtml(subgroupDisplay(profile.section || state.group, subgroup))}</option>`).join("")}</select></div>
+    </div>
+    <section class="profile-mentoring" aria-labelledby="profile-mentoring-title">
+      <div class="profile-mentoring-head"><h3 id="profile-mentoring-title">Mentoring details</h3><p>Official roster details take priority.</p></div>
+      <div class="profile-grid">
       <div class="field"><label for="profile-mentor">Mentor</label><input id="profile-mentor" data-profile="mentor" value="${escapeHtml(profile.mentor || "")}" /></div>
       <div class="field"><label for="profile-mentor-phone">Mentor phone</label><input id="profile-mentor-phone" data-profile="mentorPhone" value="${escapeHtml(profile.mentorPhone || "")}" inputmode="tel" /></div>
       <div class="field"><label for="profile-mentor-venue">Mentoring venue</label><input id="profile-mentor-venue" data-profile="mentorVenue" value="${escapeHtml(profile.mentorVenue || "")}" /></div>
       <div class="field"><label for="profile-academic-group">Mentoring group</label><input id="profile-academic-group" data-profile="academicGroup" list="academic-group-options" value="${escapeHtml(profile.academicGroup || "")}" placeholder="e.g. ECB1-M1" /><datalist id="academic-group-options">${academicGroups().map((group) => `<option value="${escapeHtml(group)}"></option>`).join("")}</datalist></div>
-    </div>
+      </div>
+    </section>
     <p class="card-sub" style="margin-top:10px">Manual mentor details apply only when the official timetable leaves those fields blank. Verified roster details take precedence.</p>
     <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="save-profile">Save profile</button><button class="btn btn-sm" data-action="use-profile-section">Use profile section</button></div>
   </div>`;
@@ -3596,6 +3609,7 @@ async function saveProfileFromForm() {
   $$("[data-profile]").forEach((input) => {
     profile[input.dataset.profile] = input.value;
   });
+  if (profile.section && state.groups.includes(profile.section)) profile.branch = groupBranchCode(profile.section);
   state.profile = saveProfile(localStorage, profile) || profile;
   state.profileLookupQuery = state.profile.name || state.profile.crn || "";
   if (!state.students.length && (state.profile.name || state.profile.crn || state.profile.registrationNo)) await loadStudents();
@@ -3868,34 +3882,45 @@ function bindEvents() {
       else if (flag.category === "timetable" || flag.category === "rooms" || flag.category === "today") render();
       return;
     }
+    const profileSection = event.target.closest('[data-profile="section"]');
+    if (profileSection) {
+      const subsection = $("#profile-subsection");
+      const group = profileSection.value;
+      const current = subsection?.value || "";
+      const choices = group ? subgroupsFor(group) : [];
+      if (subsection) {
+        subsection.innerHTML = '<option value="">Whole section</option>' + rankedSubgroups(group).map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(subgroupDisplay(group, value))}</option>`).join("");
+        subsection.value = choices.includes(current) ? current : "";
+      }
+      return;
+    }
     const branch = event.target.closest("[data-select-branch]");
     if (branch) {
       const candidates = rankedGroups(state.groups.filter((group) => groupBranchCode(group) === branch.value));
-      if (candidates.length && !candidates.includes(state.group)) {
-        state.group = candidates[0];
-        state.subgroup = "";
+      if (candidates.length && groupBranchCode(state.group) !== branch.value) {
+        const saved = (() => { try { return JSON.parse(storageGet(SELECTION_KEY) || "{}"); } catch { return {}; } })();
+        const branchChoice = saved?.branchSelections?.[branch.value];
+        const nextGroup = candidates.includes(branchChoice?.group) ? branchChoice.group : candidates[0];
+        state.group = nextGroup;
+        state.subgroup = subgroupsFor(nextGroup).includes(branchChoice?.subgroup) ? branchChoice.subgroup : "";
         recordGroupSelection(state.group);
+        recordSubgroupSelection(state.group, state.subgroup);
         persistSelection();
         state.day = "";
       }
       render();
       return;
     }
-    const group = event.target.closest("[data-select-group]");
-    if (group) {
-      if (state.group !== group.value) recordGroupSelection(group.value);
-      state.group = group.value;
-      state.subgroup = subgroupsFor(state.group).includes(state.subgroup) ? state.subgroup : "";
+    const cohort = event.target.closest("[data-select-cohort]");
+    if (cohort) {
+      const [group, subgroup = ""] = cohort.value.split("|");
+      if (!state.groups.includes(group)) return;
+      if (state.group !== group) recordGroupSelection(group);
+      if (state.group !== group || state.subgroup !== subgroup) recordSubgroupSelection(group, subgroup);
+      state.group = group;
+      state.subgroup = subgroupsFor(group).includes(subgroup) ? subgroup : "";
       persistSelection();
       state.day = "";
-      render();
-      return;
-    }
-    const subgroup = event.target.closest("[data-select-subgroup]");
-    if (subgroup) {
-      if (state.subgroup !== subgroup.value) recordSubgroupSelection(state.group, subgroup.value);
-      state.subgroup = subgroup.value;
-      persistSelection();
       render();
       return;
     }

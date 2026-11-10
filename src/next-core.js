@@ -27,7 +27,7 @@ import {
 } from "./content-store.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.1.5";
+export const APP_VERSION = "2.1.6";
 export const BUILD_DATE = "2026-11-10";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
@@ -202,6 +202,8 @@ async function proxyRequest(request, env, ctx, deps = {}) {
   if (accept) requestHeaders.set("Accept", accept.slice(0, 200));
   const device = request.headers.get("X-Compass-Device");
   if (device && /^[a-zA-Z0-9._:-]{1,120}$/.test(device)) requestHeaders.set("X-Compass-Device", device);
+  const clientIp = request.headers.get("CF-Connecting-IP");
+  if ((isChat || decoded === "api/admin/ai/unlock") && clientIp && clientIp.length <= 80) requestHeaders.set("CF-Connecting-IP", clientIp);
   if (method === "POST") {
     requestHeaders.set("Content-Type", "application/json");
   }
@@ -328,7 +330,7 @@ async function adminAiIdentity(request) {
   const ip = request.headers.get("CF-Connecting-IP") || "";
   if (!/^[a-z0-9][a-z0-9_-]{15,127}$/i.test(deviceId) || !ip || ip.length > 80) return null;
   const digest = async (value) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return { deviceId, deviceHash: await digest(deviceId), ipHash: await digest(ip) };
+  return { deviceId, ip, deviceHash: await digest(deviceId), ipHash: await digest(ip) };
 }
 
 async function adminProfileHash(profile, selection) {
@@ -372,7 +374,7 @@ async function adminAiRequest(request, env, ctx, deps = {}) {
 
   const unlockRequest = new Request(new URL("/api/legacy/api/admin/ai/unlock", request.url), {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Compass-Device": identity.deviceId },
+    headers: { "Content-Type": "application/json", "X-Compass-Device": identity.deviceId, "CF-Connecting-IP": identity.ip },
     body: JSON.stringify({ profile })
   });
   const unlockResponse = await proxyRequest(unlockRequest, env, ctx, deps);

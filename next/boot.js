@@ -15,12 +15,14 @@
     return Object.prototype.hasOwnProperty.call(values, id) ? values[id] : fallback;
   }
 
-  var theme = String(pick("appearance.theme", "system"));
+  var theme = String(pick("appearance.theme", "dark"));
   if (theme === "system") {
     theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
   root.dataset.theme = theme === "light" ? "light" : theme === "oled" ? "oled" : "dark";
   root.dataset.accent = String(pick("appearance.accent", "emerald"));
+  root.dataset.palette = String(pick("appearance.palette", "forest"));
+  root.dataset.background = String(pick("appearance.background", "solid"));
   root.dataset.density = String(pick("appearance.density", "comfortable"));
   root.dataset.experience = String(pick("experience.mode", "new"));
 
