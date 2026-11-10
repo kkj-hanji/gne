@@ -12,12 +12,14 @@ function normalizedIdentifier(value = "") {
 export function matchProfileRecord(records = [], profile = {}) {
   const crn = normalizedIdentifier(profile.crn);
   const registration = normalizedIdentifier(profile.registrationNo);
+  const serial = normalizedIdentifier(profile.serialNo || profile.currentSerialNo);
   const name = normalizeRosterName(profile.name);
   const matches = records.filter((record) => {
-    if (crn || registration) {
+    if (crn || registration || serial) {
       const recordCrn = normalizedIdentifier(record?.crn);
       const recordRegistration = normalizedIdentifier(record?.registrationNo);
-      return (crn && recordCrn === crn) || (registration && recordRegistration === registration);
+      const recordSerial = normalizedIdentifier(record?.serialNo || record?.currentSerialNo);
+      return (crn && recordCrn === crn) || (registration && recordRegistration === registration) || (serial && recordSerial === serial);
     }
     return name && normalizeRosterName(record?.name) === name;
   });
@@ -28,11 +30,17 @@ export function matchProfileRecord(records = [], profile = {}) {
 export function findProfileRosterMatches(records = [], query = "") {
   const text = String(query).trim();
   const digits = normalizedIdentifier(text);
-  if (digits.length >= 5 && digits.length === text.replace(/\s/g, "").length) {
-    return records.filter((record) => [record?.crn, record?.registrationNo].some((value) => normalizedIdentifier(value) === digits)).slice(0, 8);
+  if (digits.length >= 2 && digits.length === text.replace(/\s/g, "").length) {
+    const ranked = records.map((record, index) => {
+      const ids = [record?.crn, record?.registrationNo, record?.serialNo, record?.currentSerialNo].map(normalizedIdentifier).filter(Boolean);
+      const exact = ids.some((value) => value === digits);
+      const prefix = ids.some((value) => value.startsWith(digits));
+      return { record, index, rank: exact ? 0 : prefix ? 1 : 2 };
+    }).filter((item) => item.rank < 2).sort((a, b) => a.rank - b.rank || a.index - b.index);
+    return ranked.slice(0, 8).map((item) => item.record);
   }
   const normalized = normalizeRosterName(text);
-  if (normalized.length < 3) return [];
+  if (normalized.length < 2) return [];
   const exact = records.filter((record) => normalizeRosterName(record?.name) === normalized);
   if (exact.length) return exact.slice(0, 8);
   const terms = normalized.split(" ").filter(Boolean);

@@ -22,7 +22,7 @@ export const LEGACY_PROFILE_KEY = "gndec-compass-student-v1";
 export const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 export const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 
-export const APP_VERSION = "2.1.3";
+export const APP_VERSION = "2.1.4";
 export const APP_CHANNEL = "stable";
 
 export const THEMES = ["system", "light", "dark", "oled"];
@@ -114,6 +114,20 @@ export const FLAGS = Object.freeze([
       { value: "rose", label: "Rose" },
       { value: "violet", label: "Violet" }
     ], keywords: "colour accent green blue"
+  }),
+  flag("appearance.palette", "Colour palette", "Choose the overall surface colours for both light and dark themes.", {
+    category: "appearance", type: "select", default: "forest", values: [
+      { value: "forest", label: "Forest green" },
+      { value: "ocean", label: "Ocean blue" },
+      { value: "sand", label: "Warm sand" },
+      { value: "graphite", label: "Graphite" }
+    ], keywords: "colour combination background surfaces palette"
+  }),
+  flag("appearance.background", "Background style", "Use a quiet solid background or a subtle colour wash.", {
+    category: "appearance", type: "select", default: "solid", values: [
+      { value: "solid", label: "Quiet solid" },
+      { value: "wash", label: "Soft colour wash" }
+    ], keywords: "gradient background colour"
   }),
   flag("appearance.density", "Density", "Compact reduces vertical spacing for small screens and long timetables.", {
     category: "appearance", type: "select", default: "comfortable", values: [
@@ -250,9 +264,6 @@ export const FLAGS = Object.freeze([
   }),
   flag("timetable.examOverlay", "Exam overlay", "Mark published exam days on the timetable.", {
     category: "timetable", default: true, badge: "Beta", keywords: "exam overlay"
-  }),
-  flag("timetable.icsExport", "Calendar export", "Allow exporting the selected section to an .ics file.", {
-    category: "timetable", default: true, keywords: "calendar ics export"
   }),
   flag("timetable.showWeekends", "Show weekends", "Include Saturday and Sunday in the week grid.", {
     category: "timetable", default: false, keywords: "weekend saturday sunday"

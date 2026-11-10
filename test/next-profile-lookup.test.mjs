@@ -17,8 +17,10 @@ test("profile lookup matches CRN exactly and only auto-matches a unique exact na
 
 test("interactive profile search offers exact or partial choices without changing the profile", () => {
   assert.deepEqual(findProfileRosterMatches(roster, "2621101"), [roster[0]]);
+  assert.deepEqual(findProfileRosterMatches(roster, "26"), roster);
   assert.deepEqual(findProfileRosterMatches(roster, "Lovepreet Singh"), roster.slice(0, 2));
   assert.deepEqual(findProfileRosterMatches(roster, "Lovepreet"), roster.slice(0, 2));
-  assert.deepEqual(findProfileRosterMatches(roster, "Lo"), []);
+  assert.deepEqual(findProfileRosterMatches(roster, "Lo"), roster.slice(0, 2));
+  assert.deepEqual(findProfileRosterMatches([{ name: "Serial Student", serialNo: "68" }], "68"), [{ name: "Serial Student", serialNo: "68" }]);
   assert.equal(normalizeRosterName("  GURPREET—KAUR  "), "gurpreet kaur");
 });

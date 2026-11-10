@@ -28,7 +28,6 @@ import {
   pruneSnapshots, requestPersistentStorage, saveSnapshot, storageEstimate, formatBytes
 } from "./engine/storage.js";
 import { digestCopy, dueReminder, isQuietTime, notificationCopy } from "./engine/reminders.js";
-import { buildIcs, downloadIcs } from "./engine/ics.js";
 import { ROUTES as SEO_ROUTES, headTags, routeFromPath } from "./seo-meta.js";
 import { academicOverlayFromSchedule, applyMentoringOverride, classesWithOverlay, MENTORING_SUBJECT, profileAppliesToSelection } from "./engine/mentoring.js";
 import {
@@ -48,6 +47,7 @@ const SELECTION_KEY = "gndec-compass-next-selection-v1";
 const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 const DEVICE_KEY = "gndec-compass-next-device-v1";
+const GROUP_USAGE_KEY = "gndec-compass-next-group-usage-v1";
 const REMINDER_KEY = "gndec-compass-next-reminders-v1";
 const DIGEST_KEY = "gndec-compass-next-digest-v1";
 const THEME_ORDER = ["system", "light", "dark", "oled"];
@@ -108,6 +108,7 @@ const state = {
   profileLookupQuery: "",
   profileLookupMessage: "",
   profileLookupMatches: [],
+  profileLookupTimer: 0,
   syllabus: null,
   compareA: "",
   compareB: "",
@@ -309,6 +310,8 @@ function applyAppearance() {
     : v("appearance.theme");
   root.dataset.theme = theme;
   root.dataset.accent = v("appearance.accent");
+  root.dataset.palette = v("appearance.palette");
+  root.dataset.background = v("appearance.background");
   root.dataset.density = v("appearance.density");
   root.dataset.experience = v("experience.mode");
   root.dataset.bottomItems = v("nav.bottomItems");
@@ -322,7 +325,7 @@ function applyAppearance() {
   root.classList.toggle("is-dyslexic", Boolean(v("a11y.dyslexiaFont")));
   root.classList.toggle("is-strong-focus", Boolean(v("a11y.strongFocus")));
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta && theme !== "light") meta.setAttribute("content", theme === "oled" ? "#000000" : "#071310");
+  if (meta) meta.setAttribute("content", theme === "light" ? "#f2f6f8" : theme === "oled" ? "#000000" : "#0d1219");
 }
 
 function setFlag(id, raw) {
@@ -696,26 +699,27 @@ async function loadFaculty() {
   if (state.route === "directory" && state.directoryTab === "faculty") render();
 }
 
-async function loadStudents() {
+async function loadStudents({ quiet = false } = {}) {
   state.directoryStatus = "loading";
-  render();
+  if (!quiet) render();
   try {
     const data = await fetchJson("/api/legacy/data/student-roster-index.json", {}, 25000);
     state.students = Array.isArray(data?.records) ? data.records : [];
     state.rosterGeneratedAt = String(data?.generatedAt || data?.schemaVersion || "");
     state.directoryStatus = "ready";
-    syncProfileFromRoster({ silent: state.route !== "directory" });
+    syncProfileFromRoster({ silent: quiet || state.route !== "directory", renderOnChange: !quiet });
   } catch {
     state.students = [];
     state.directoryStatus = "error";
   }
-  if (state.route === "directory" && (state.directoryTab === "students" || state.directoryTab === "mentoring")) render();
+  if (!quiet && state.route === "directory" && (state.directoryTab === "students" || state.directoryTab === "mentoring")) render();
 }
 
 function rosterIdentity() {
   const crn = String(state.profile?.crn || "").replace(/\D/g, "");
   const registration = String(state.profile?.registrationNo || "").replace(/\D/g, "");
-  return { crn, registration };
+  const serial = String(state.profile?.serialNo || "").replace(/\D/g, "");
+  return { crn, registration, serial };
 }
 
 /** Use exact identifiers first; a name auto-fills only when it is an exact unique match. */
@@ -727,15 +731,15 @@ async function lookupProfileFromSettings() {
   const query = $("[data-profile-lookup-query]")?.value.trim() || "";
   state.profileLookupQuery = query;
   state.profileLookupMatches = [];
-  if (query.length < 3) {
-    state.profileLookupMessage = "Enter your full name or CRN (at least 3 characters).";
+  if (query.length < 2) {
+    state.profileLookupMessage = "Type at least 2 characters to see roster suggestions.";
     render();
     return;
   }
   if (!state.students.length) {
     state.profileLookupMessage = "Checking the published student roster…";
     render();
-    await loadStudents();
+    await loadStudents({ quiet: true });
   }
   if (!state.students.length) {
     state.profileLookupMessage = "The published roster could not be loaded. Your saved profile was not changed.";
@@ -756,6 +760,41 @@ async function lookupProfileFromSettings() {
   render();
 }
 
+function renderProfileLookupResults() {
+  const root = $("[data-profile-lookup-results]");
+  if (!root) return;
+  root.innerHTML = `${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}`;
+}
+
+function queueProfileSuggestions(query) {
+  state.profileLookupQuery = String(query || "").trim();
+  state.profileLookupMatches = [];
+  clearTimeout(state.profileLookupTimer);
+  const currentQuery = state.profileLookupQuery;
+  if (currentQuery.length < 2) {
+    state.profileLookupMessage = "Start typing your name, CRN, registration number, or serial number.";
+    renderProfileLookupResults();
+    return;
+  }
+  state.profileLookupMessage = "Searching the published roster on this device…";
+  renderProfileLookupResults();
+  state.profileLookupTimer = setTimeout(async () => {
+    if (!state.students.length) await loadStudents({ quiet: true });
+    const input = $("[data-profile-lookup-query]");
+    if (!input || input.value.trim() !== currentQuery) return;
+    if (!state.students.length) {
+      state.profileLookupMessage = "The published roster could not be loaded. You can retry with Find my profile.";
+      renderProfileLookupResults();
+      return;
+    }
+    state.profileLookupMatches = findProfileRosterMatches(state.students, currentQuery);
+    state.profileLookupMessage = state.profileLookupMatches.length
+      ? "Choose your name from the suggestions to fill your profile."
+      : "No suggestions yet. Try another name or enter your full CRN.";
+    renderProfileLookupResults();
+  }, 180);
+}
+
 function applyRosterRecordToProfile(record) {
   if (!record) return false;
   state.profile = saveProfile(localStorage, {
@@ -763,6 +802,7 @@ function applyRosterRecordToProfile(record) {
     name: record.name || "",
     crn: record.crn || "",
     registrationNo: record.registrationNo || "",
+    serialNo: record.currentSerialNo || record.serialNo || "",
     branch: record.branch || "",
     section: record.section || state.profile.section,
     subsection: record.subsection || "",
@@ -786,7 +826,7 @@ function applyRosterRecordToProfile(record) {
  * section, sub-group, mentor and mentoring group once CRN/registration matches.
  * A name-only profile is never guessed; a manual profile is left untouched.
  */
-function syncProfileFromRoster({ silent = true } = {}) {
+function syncProfileFromRoster({ silent = true, renderOnChange = true } = {}) {
   if (!state.students.length) return false;
   const record = rosterRecordForProfile();
   if (!record) return false;
@@ -796,6 +836,7 @@ function syncProfileFromRoster({ silent = true } = {}) {
     name: record.name || state.profile.name,
     crn: record.crn || state.profile.crn,
     registrationNo: record.registrationNo || state.profile.registrationNo,
+    serialNo: record.currentSerialNo || record.serialNo || state.profile.serialNo,
     branch: record.branch || state.profile.branch,
     section: record.section || state.profile.section,
     subsection: record.subsection || state.profile.subsection,
@@ -816,7 +857,7 @@ function syncProfileFromRoster({ silent = true } = {}) {
   }
   refreshAcademicOverlay();
   if (changed && !silent) toast(`Profile verified against the current official roster: ${saved.name || saved.crn}.`, "success");
-  if (changed) render();
+  if (changed && renderOnChange) render();
   return changed;
 }
 
@@ -837,11 +878,19 @@ async function loadSyllabusIndex() {
 /* ── Calendar / exam helpers ───────────────────────────────────────────── */
 
 function nextExam() {
-  return nextUpcomingExam(examEventsForSelection({ datesheet: state.datesheet, group: state.group }), now());
+  return nextUpcomingExam(importantExamEvents(), now());
 }
 
 function examsForDate(dateISO) {
-  return examsOnDate(examEventsForSelection({ datesheet: state.datesheet, group: state.group }), dateISO);
+  return examsOnDate(importantExamEvents(), dateISO);
+}
+
+function importantExamEvents() {
+  return examEventsForSelection({ datesheet: state.datesheet, group: state.group }).filter((exam) => {
+    const label = `${exam.category || ""} ${exam.title || ""}`.toLowerCase();
+    if (/workshop|practical|lab/.test(label)) return false;
+    return /\bmse\b|end[- ]?sem(?:ester)?|\bfinal\b|\btentative\b|\bese\b/.test(label);
+  });
 }
 
 function nextClassInfo() {
@@ -1322,6 +1371,10 @@ function renderTimetable() {
   const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
   if (!state.day || !days.includes(state.day)) state.day = days.includes(clock.day) ? clock.day : days[0];
   const view = v("timetable.view");
+  const branches = timetableBranches();
+  const activeBranch = groupBranchCode(state.group) || branches[0] || "";
+  const sections = rankedGroups(state.groups.filter((group) => groupBranchCode(group) === activeBranch));
+  const subgroups = rankedSubgroups(state.group);
   const todayExamSittings = state.day === clock.day ? examsForDate(clock.dateISO) : [];
   const dayContent = view === "week" ? renderWeekGrid(clock)
     : view === "agenda" ? renderAgenda()
@@ -1334,9 +1387,9 @@ function renderTimetable() {
         <p class="page-sub">Official FET release${state.metadata?.version ? ` · ${escapeHtml(state.metadata.version)}` : ""}. Choose a section once; Today and Ask Compass follow it.</p>
       </div>
       <div class="page-actions">
-        <select class="btn btn-sm" data-select-group aria-label="Section">${state.groups.map((group) => `<option value="${escapeHtml(group)}" ${group === state.group ? "selected" : ""}>${escapeHtml(group === state.group ? groupLabel(group) : group)}</option>`).join("")}</select>
-        <select class="btn btn-sm" data-select-subgroup aria-label="Sub-group"><option value="">Whole section</option>${subgroupsFor(state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === state.subgroup ? "selected" : ""}>${escapeHtml(subgroup)}</option>`).join("")}</select>
-        ${v("timetable.icsExport") ? `<button class="btn btn-sm" data-action="export-ics">Export .ics</button>` : ""}
+        <select class="btn btn-sm" data-select-branch aria-label="Branch">${branches.map((branch) => `<option value="${escapeHtml(branch)}" ${branch === activeBranch ? "selected" : ""}>${escapeHtml(branchLabel(branch))}</option>`).join("")}</select>
+        <select class="btn btn-sm" data-select-group aria-label="Section">${sections.map((group) => `<option value="${escapeHtml(group)}" ${group === state.group ? "selected" : ""}>${escapeHtml(sectionDisplay(group, activeBranch))}</option>`).join("")}</select>
+        <select class="btn btn-sm" data-select-subgroup aria-label="Sub-section"><option value="">Whole section</option>${subgroups.map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === state.subgroup ? "selected" : ""}>${escapeHtml(subgroupDisplay(state.group, subgroup))}</option>`).join("")}</select>
       </div>
     </div>
     ${!state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see your week.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : `
@@ -2461,6 +2514,16 @@ async function sendQuestion(rawQuestion) {
   const thinkingIndex = state.chat.length - 1;
 
   try {
+    if (question.toUpperCase() === "KKJ") {
+      const answer = "In the classic Compass, KKJ is the legacy Admin AI enrollment command. Compass Next does not use it to unlock settings or publishing. Open Admin and sign in with your owner or editor token to access privileged tools.";
+      state.chat[thinkingIndex] = {
+        role: "assistant",
+        html: textToHtml(answer),
+        createdAt: new Date().toISOString(),
+        meta: { intent: "ADMIN_HELP", confidence: 1, plan: ["explain legacy command", "no admin access granted"], engine: "local" }
+      };
+      return;
+    }
     if (!state.schedule.length) await waitForVerifiedSchedule();
     const ctx = currentAnswerContext();
     let answer = null;
@@ -2674,16 +2737,89 @@ function compassDeviceId() {
   return id;
 }
 
+function hasAdminMode() {
+  return state.adminStatus === "ready" && Boolean(state.adminData);
+}
+
+function groupBranchCode(group) {
+  const code = String(group || "").replace(/^D[23]/, "").toUpperCase();
+  const prefixes = [...BRANCHES.map(([prefix]) => prefix), "CS", "EC"].sort((a, b) => b.length - a.length);
+  return prefixes.find((prefix) => code.startsWith(prefix)) || "";
+}
+
+function branchLabel(code) {
+  if (code === "EC") return "ECE · Electronics and Communication Engineering";
+  if (code === "CS") return "CSE · Computer Science Engineering";
+  const branch = BRANCHES.find(([prefix]) => prefix === code);
+  return branch ? `${code} · ${branch[1]}` : code;
+}
+
+function sectionUsage() {
+  try {
+    const saved = JSON.parse(storageGet(GROUP_USAGE_KEY) || "{}");
+    return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+  } catch { return {}; }
+}
+
+function rankedGroups(groups) {
+  const usage = sectionUsage();
+  return [...groups].sort((a, b) => (Number(usage[b]) || 0) - (Number(usage[a]) || 0) || a.localeCompare(b));
+}
+
+function rankedSubgroups(group) {
+  const usage = sectionUsage();
+  return subgroupsFor(group).sort((a, b) => (Number(usage[`sub:${group}:${b}`]) || 0) - (Number(usage[`sub:${group}:${a}`]) || 0) || a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function recordGroupSelection(group) {
+  const usage = sectionUsage();
+  usage[group] = Math.min(999, (Number(usage[group]) || 0) + 1);
+  storageSet(GROUP_USAGE_KEY, JSON.stringify(usage));
+}
+
+function recordSubgroupSelection(group, subgroup) {
+  if (!subgroup) return;
+  const usage = sectionUsage();
+  const key = `sub:${group}:${subgroup}`;
+  usage[key] = Math.min(999, (Number(usage[key]) || 0) + 1);
+  storageSet(GROUP_USAGE_KEY, JSON.stringify(usage));
+}
+
+function branchUsage(code) {
+  const usage = sectionUsage();
+  return state.groups.filter((group) => groupBranchCode(group) === code).reduce((total, group) => total + (Number(usage[group]) || 0), 0);
+}
+
+function timetableBranches() {
+  return [...new Set(state.groups.map(groupBranchCode).filter(Boolean))]
+    .sort((a, b) => branchUsage(b) - branchUsage(a) || branchLabel(a).localeCompare(branchLabel(b)));
+}
+
+function sectionDisplay(group, branch) {
+  const code = String(group || "").replace(/^D[23]/, "").toUpperCase();
+  const suffix = code.slice(branch.length);
+  return suffix ? `Section ${suffix} (${code})` : code;
+}
+
+function subgroupDisplay(group, subgroup) {
+  const value = String(subgroup || "").toUpperCase();
+  return groupBranchCode(group) === "EC" ? value.replace(/^EC/, "ECE") : value;
+}
+
 /* ── Settings ──────────────────────────────────────────────────────────── */
 
 function renderSettings() {
   const query = state.settingsQuery.trim().toLowerCase();
   const matches = (flag) => !query || `${flag.title} ${flag.description} ${flag.keywords} ${flag.id} ${flag.category}`.toLowerCase().includes(query);
-  const visibleCategories = CATEGORIES.filter((category) => !query || FLAGS.some((flag) => flag.category === category.id && matches(flag)));
+  const adminMode = hasAdminMode();
+  const adminOnly = new Set(["data", "privacy", "labs"]);
+  const allowedCategories = CATEGORIES.filter((category) => adminMode || !adminOnly.has(category.id));
+  const visibleCategories = allowedCategories.filter((category) => !query || FLAGS.some((flag) => flag.category === category.id && matches(flag)));
   const overview = !query && state.settingsCategory === "overview";
-  const active = visibleCategories.find((category) => category.id === state.settingsCategory) || visibleCategories[0];
-  const flags = FLAGS.filter((flag) => (query ? matches(flag) : flag.category === active?.id));
-  const everydayIds = ["appearance.theme", "appearance.accent", "appearance.density", "timetable.view", "timetable.clock", "ask.language"];
+  const accessDenied = !adminMode && adminOnly.has(state.settingsCategory);
+  const active = accessDenied ? null : visibleCategories.find((category) => category.id === state.settingsCategory) || visibleCategories[0];
+  const flags = FLAGS.filter((flag) => (adminMode || !adminOnly.has(flag.category)) && (query ? matches(flag) : flag.category === active?.id));
+  const everydayIds = ["appearance.theme", "appearance.accent", "appearance.palette", "appearance.background", "appearance.density", "timetable.view", "timetable.clock", "ask.language"];
   const everydayFlags = everydayIds.map((id) => FLAGS.find((flag) => flag.id === id)).filter(Boolean);
 
   return `<div class="page page-settings">
@@ -2692,12 +2828,13 @@ function renderSettings() {
       <div class="page-actions"><input type="search" class="btn btn-sm" style="min-width:220px;text-align:left" placeholder="Search all settings…" value="${escapeHtml(state.settingsQuery)}" data-settings-search aria-label="Search all settings" /></div>
     </div>
     ${overview ? `<div class="settings-overview">
-      <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">The few controls most students change. Everything else is optional.</p></div></div>${everydayFlags.map(renderFlagRow).join("")}</section>
       ${renderProfileCard()}
-      ${renderVersionCard()}
-      <details class="card settings-advanced"><summary><span><strong>More settings</strong><small>${FLAGS.length - everydayFlags.length} optional controls · notifications, privacy, offline data and accessibility</small></span><span aria-hidden="true">＋</span></summary>
+      <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">Theme, colours, timetable and language.</p></div></div>${everydayFlags.map(renderFlagRow).join("")}</section>
+      <details class="card settings-advanced"><summary><span><strong>More settings</strong><small>Optional controls and additional app tools</small></span><span aria-hidden="true">＋</span></summary>
         <div class="preset-row">${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}</div>
-        <nav class="settings-category-grid" aria-label="Advanced settings categories">${CATEGORIES.map((category) => `<button class="settings-nav-item" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)} <span aria-hidden="true">›</span></button>`).join("")}</nav>
+        ${!adminMode ? `<p class="settings-admin-hint">Privacy, Data & offline, and Advanced & Labs appear after you sign in to the Admin page with an owner or editor token.</p>` : `<p class="settings-admin-hint is-active">Admin session active · privileged settings are visible on this device.</p>`}
+        <nav class="settings-category-grid" aria-label="Additional settings">${allowedCategories.map((category) => `<button class="settings-nav-item" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)} <span aria-hidden="true">›</span></button>`).join("")}</nav>
+        <details class="settings-special"><summary>Special option · App versions & backups</summary>${renderVersionCard()}</details>
       </details>
     </div>` : `<div class="settings-layout">
       <nav class="settings-side" aria-label="Settings sections">
@@ -2709,12 +2846,11 @@ function renderSettings() {
         ${query ? `<p class="card-sub">${flags.length} matching control${flags.length === 1 ? "" : "s"}</p>` : ""}
         ${active ? `<section class="setting-section card" id="settings-${active.id}">
           <div class="setting-section-head"><div><h2>${escapeHtml(active.title)}</h2><p>${escapeHtml(active.description)}</p></div><button class="btn btn-sm" data-action="reset-section" data-category="${active.id}">Reset section</button></div>
-          ${active.id === "experience" ? renderVersionCard() + renderProfileCard() : ""}
           ${active.id === "data" ? renderStorageCard() : ""}
           ${flags.length ? flags.map((flag) => renderFlagRow(flag)).join("") : `<p class="card-sub">No control matches “${escapeHtml(query)}”.</p>`}
           ${active.id === "labs" && v("labs.flagInspector") ? renderFlagInspector() : ""}
           ${active.id === "labs" ? renderDangerZone() : ""}
-        </section>` : `<div class="card">${emptyState("⚙", "No matching setting", `Nothing matches “${escapeHtml(state.settingsQuery)}”.`)}</div>`}
+        </section>` : accessDenied ? `<div class="card">${emptyState("🔒", "Admin sign-in required", `Sign in on the Admin page with an owner or editor token to open ${escapeHtml(CATEGORIES.find((category) => category.id === state.settingsCategory)?.title || "this section")}.`)}</div>` : `<div class="card">${emptyState("⚙", "No matching setting", `Nothing matches “${escapeHtml(state.settingsQuery)}”.`)}</div>`}
       </div>
     </div>`}
   </div>`;
@@ -2802,28 +2938,25 @@ function renderVersionCard() {
 function renderProfileCard() {
   const profile = state.profile;
   return `<div class="card" style="margin:14px 0">
-    <div class="card-head"><div><h2 class="card-title">Find your student profile</h2><p class="card-sub">Enter your name or CRN. Compass checks the published roster and fills your section, subgroup and mentor on this device.</p></div></div>
-    <div class="profile-lookup"><label class="visually-hidden" for="profile-lookup">Your name or CRN</label><input id="profile-lookup" data-profile-lookup-query value="${escapeHtml(state.profileLookupQuery || profile.name || profile.crn || "")}" placeholder="Your full name or CRN" autocomplete="name" /><button class="btn btn-primary" data-action="lookup-profile">Find my profile</button></div>
-    ${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}
-    ${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}
+    <div class="card-head"><div><h2 class="card-title">Find your student profile</h2><p class="card-sub">Start typing your name, CRN, registration number, or serial number. Choose a roster suggestion to fill your section, subgroup and mentor on this device.</p></div></div>
+    <div class="profile-lookup"><label class="visually-hidden" for="profile-lookup">Your name, CRN, registration, or serial number</label><input id="profile-lookup" data-profile-lookup-query value="${escapeHtml(state.profileLookupQuery || profile.name || profile.crn || "")}" placeholder="Start with your name, CRN, registration, or serial" autocomplete="off" /><button class="btn btn-primary" data-action="lookup-profile">Find my profile</button></div>
+    <div data-profile-lookup-results aria-live="polite">${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}</div>
     ${profile.rosterVersion ? `<p class="profile-verified"><span class="badge badge-accent">Roster matched</span> ${escapeHtml(profile.name || "Student")} · ${escapeHtml([profile.section, profile.subsection].filter(Boolean).join(" / ") || "Section not listed")}${profile.mentor ? ` · Mentor ${escapeHtml(profile.mentor)}` : ""}${state.rosterGeneratedAt ? ` · roster ${escapeHtml(shortDate(state.rosterGeneratedAt))}` : ""}</p>` : `<p class="profile-verified">Your profile stays on this device. A name is applied only when the roster match is unambiguous.</p>`}
-    <details class="profile-edit"><summary>Edit profile and mentoring details</summary>
     <div class="profile-grid">
       <div class="field"><label for="profile-name">Name</label><input id="profile-name" data-profile="name" value="${escapeHtml(profile.name || "")}" autocomplete="name" /></div>
       <div class="field"><label for="profile-crn">CRN</label><input id="profile-crn" data-profile="crn" value="${escapeHtml(profile.crn || "")}" inputmode="numeric" /></div>
       <div class="field"><label for="profile-registration">Registration no.</label><input id="profile-registration" data-profile="registrationNo" value="${escapeHtml(profile.registrationNo || "")}" /></div>
+      <div class="field"><label for="profile-serial">Serial number</label><input id="profile-serial" value="${escapeHtml(profile.serialNo || "Not published")}" readonly aria-readonly="true" /></div>
       <div class="field"><label for="profile-section">Section</label><select id="profile-section" data-profile="section"><option value="">Not set</option>${state.groups.map((group) => `<option value="${escapeHtml(group)}" ${group === profile.section ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></div>
-      <div class="field"><label for="profile-subsection">Sub-group</label><select id="profile-subsection" data-profile="subsection"><option value="">Whole section</option>${subgroupsFor(profile.section || state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === profile.subsection ? "selected" : ""}>${escapeHtml(subgroup)}</option>`).join("")}</select></div>
+      <div class="field"><label for="profile-subsection">Sub-group</label><select id="profile-subsection" data-profile="subsection"><option value="">Whole section</option>${subgroupsFor(profile.section || state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === profile.subsection ? "selected" : ""}>${escapeHtml(subgroupDisplay(profile.section || state.group, subgroup))}</option>`).join("")}</select></div>
       <div class="field"><label for="profile-branch">Branch</label><input id="profile-branch" data-profile="branch" value="${escapeHtml(profile.branch || "")}" /></div>
       <div class="field"><label for="profile-mentor">Mentor</label><input id="profile-mentor" data-profile="mentor" value="${escapeHtml(profile.mentor || "")}" /></div>
       <div class="field"><label for="profile-mentor-phone">Mentor phone</label><input id="profile-mentor-phone" data-profile="mentorPhone" value="${escapeHtml(profile.mentorPhone || "")}" inputmode="tel" /></div>
       <div class="field"><label for="profile-mentor-venue">Mentoring venue</label><input id="profile-mentor-venue" data-profile="mentorVenue" value="${escapeHtml(profile.mentorVenue || "")}" /></div>
       <div class="field"><label for="profile-academic-group">Mentoring group</label><input id="profile-academic-group" data-profile="academicGroup" list="academic-group-options" value="${escapeHtml(profile.academicGroup || "")}" placeholder="e.g. ECB1-M1" /><datalist id="academic-group-options">${academicGroups().map((group) => `<option value="${escapeHtml(group)}"></option>`).join("")}</datalist></div>
-      <div class="field"><label for="profile-attendance">Attendance target (%)</label><input id="profile-attendance" data-profile="attendanceTarget" type="number" min="0" max="100" value="${Number(profile.attendanceTarget) || 76}" /></div>
     </div>
     <p class="card-sub" style="margin-top:10px">Manual mentor details apply only when the official timetable leaves those fields blank. Verified roster details take precedence.</p>
     <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="save-profile">Save profile</button><button class="btn btn-sm" data-action="use-profile-section">Use profile section</button></div>
-    </details>
   </div>`;
 }
 
@@ -3000,16 +3133,6 @@ function toggleTheme() {
   setFlag("appearance.theme", next);
   render();
   toast(`Theme: ${next}`);
-}
-
-function exportIcs() {
-  try {
-    const ics = buildIcs({ schedule: effectiveSchedule(), group: state.group, subgroup: state.subgroup, version: state.metadata?.version, startDate: now().dateISO });
-    downloadIcs(`gndec-${state.group}${state.subgroup ? `-${state.subgroup}` : ""}.ics`, ics);
-    toast("Calendar exported.", "success");
-  } catch (error) {
-    toast(error.message || "Could not export the calendar.", "error");
-  }
 }
 
 async function clearCache() {
@@ -3246,9 +3369,6 @@ async function handleAction(action, element) {
     case "voice":
       startVoice();
       break;
-    case "export-ics":
-      exportIcs();
-      break;
     case "export-data":
       exportData();
       break;
@@ -3356,7 +3476,7 @@ async function handleAction(action, element) {
         await clearAppCaches();
         state.chat = [];
         state.values = defaultValues();
-        state.profile = { name: "", crn: "", registrationNo: "", branch: "", section: "", subsection: "", mentor: "", mentorPhone: "", mentorVenue: "", batch: "2026", attendanceTarget: 76 };
+        state.profile = { name: "", crn: "", registrationNo: "", serialNo: "", branch: "", section: "", subsection: "", mentor: "", mentorPhone: "", mentorVenue: "", batch: "2026", attendanceTarget: 76 };
         applyAppearance();
         render();
         toast("Deleted from this device.", "success");
@@ -3657,8 +3777,22 @@ function bindEvents() {
       else if (flag.category === "timetable" || flag.category === "rooms" || flag.category === "today") render();
       return;
     }
+    const branch = event.target.closest("[data-select-branch]");
+    if (branch) {
+      const candidates = rankedGroups(state.groups.filter((group) => groupBranchCode(group) === branch.value));
+      if (candidates.length && !candidates.includes(state.group)) {
+        state.group = candidates[0];
+        state.subgroup = "";
+        recordGroupSelection(state.group);
+        persistSelection();
+        state.day = "";
+      }
+      render();
+      return;
+    }
     const group = event.target.closest("[data-select-group]");
     if (group) {
+      if (state.group !== group.value) recordGroupSelection(group.value);
       state.group = group.value;
       state.subgroup = subgroupsFor(state.group).includes(state.subgroup) ? state.subgroup : "";
       persistSelection();
@@ -3668,6 +3802,7 @@ function bindEvents() {
     }
     const subgroup = event.target.closest("[data-select-subgroup]");
     if (subgroup) {
+      if (state.subgroup !== subgroup.value) recordSubgroupSelection(state.group, subgroup.value);
       state.subgroup = subgroup.value;
       persistSelection();
       render();
@@ -3688,6 +3823,11 @@ function bindEvents() {
   });
 
   document.addEventListener("input", (event) => {
+    const profileLookup = event.target.closest("[data-profile-lookup-query]");
+    if (profileLookup) {
+      queueProfileSuggestions(profileLookup.value);
+      return;
+    }
     const range = event.target.closest("[data-range]");
     if (range) {
       const output = document.getElementById(`out-${range.dataset.range}`);
@@ -3866,7 +4006,7 @@ async function init() {
   loadNotices().then(() => { if (state.route === "today" || state.route === "notices") render(); });
 
   await loadLiveData();
-  if (rosterIdentity().crn || rosterIdentity().registration || state.profile.name) {
+  if (rosterIdentity().crn || rosterIdentity().registration || rosterIdentity().serial || state.profile.name) {
     loadStudents().catch(() => {});
   }
   await loadSnapshots();

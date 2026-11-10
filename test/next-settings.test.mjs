@@ -67,13 +67,28 @@ test("settings open on a simple overview and keep technical controls under More 
   assert.match(app, /settingsCategory: "overview"/);
   assert.match(app, /Everyday preferences/);
   assert.match(app, /<strong>More settings<\/strong>/);
-  assert.match(app, /Find my profile/);
+  assert.match(app, /Find your student profile/);
+  assert.match(app, /renderProfileCard\(\)\}\s*<section class="card quick-settings"/);
+  assert.match(app, /Admin session active/);
+  assert.match(app, /Sign in on the Admin page with an owner or editor token/);
+  assert.doesNotMatch(app, /unlockAdminMode|data-action="export-ics"|Export \.ics/);
+  assert.match(app, /legacy Admin AI enrollment command/);
+  assert.match(app, /no admin access granted/);
+  assert.match(app, /data-profile-lookup-query/);
+  assert.match(app, /data-profile="serialNo"|profile-serial/);
+  assert.doesNotMatch(app, /Attendance target \(%\)/);
   assert.doesNotMatch(app, /controls across \$\{CATEGORIES\.length\} sections/);
   assert.match(app, /Technical details/);
+  assert.match(app, /Special option · App versions & backups/);
+  assert.match(app, /appearance\.palette/);
+  assert.match(app, /appearance\.background/);
+  assert.match(app, /function subgroupDisplay\(group, subgroup\)/);
+  assert.match(app, /subgroupDisplay\(state\.group, subgroup\)/);
 });
 
 test("appearance enums stay in sync with the stylesheet", async () => {
   const css = await readFile(new URL("../next/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.sidebar[\s\S]*?background: var\(--surface-solid\);[\s\S]*?backdrop-filter: none/);
   for (const theme of THEMES) {
     if (theme === "system") continue;
     assert.match(css, new RegExp(`\\[data-theme="${theme}"\\]`), `missing theme ${theme}`);
@@ -254,6 +269,7 @@ test("profiles are local, bounded and never invented", () => {
   const saved = saveProfile(storage, {
     name: "  Test Student  ",
     crn: "12345",
+    serialNo: "68",
     section: "CEA",
     subsection: "CEA2",
     mentor: "DR MENTOR",
@@ -264,6 +280,7 @@ test("profiles are local, bounded and never invented", () => {
     extra: "ignored"
   });
   assert.equal(saved.name, "Test Student");
+  assert.equal(saved.serialNo, "68");
   assert.equal(saved.mentor, "DR MENTOR");
   assert.equal(saved.mentorPhone, "9876543210");
   assert.equal(saved.academicGroup, "CEA-M1");

@@ -23,6 +23,7 @@ export const EMPTY_PROFILE = Object.freeze({
   name: "",
   crn: "",
   registrationNo: "",
+  serialNo: "",
   branch: "",
   section: "",
   subsection: "",

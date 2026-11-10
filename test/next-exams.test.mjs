@@ -14,13 +14,14 @@ const ese = {
   }]
 };
 
-test("next exam combines the selected student's MSE-II workshop, theory, and ESE dates in date order", () => {
+test("important exam countdown skips earlier practical workshops and keeps theory and ESE dates in date order", () => {
   const events = examEventsForSelection({ datesheet: ese, group: "MEB" });
-  assert.equal(nextUpcomingExam(events, { dateISO: "2026-11-10", minutes: 600 }).id, "mse2-workshop-meb");
-  assert.equal(nextUpcomingExam(events, { dateISO: "2026-11-18", minutes: 600 }).id, "mse2-workshop-meb");
+  const important = events.filter((event) => !/workshop|practical|lab/i.test(`${event.category} ${event.title}`));
+  assert.equal(nextUpcomingExam(important, { dateISO: "2026-11-10", minutes: 600 }).id, "mse2-phy-math");
+  assert.equal(nextUpcomingExam(important, { dateISO: "2026-11-18", minutes: 600 }).id, "mse2-phy-math");
   assert.equal(nextUpcomingExam(events, { dateISO: "2026-11-18", minutes: 630 }).id, "mse2-phy-math");
-  assert.equal(nextUpcomingExam(events, { dateISO: "2026-11-23", minutes: 555 }).id, "mse2-phy-pps");
-  assert.equal(nextUpcomingExam(events, { dateISO: "2026-11-29", minutes: 1000 }).title, "Mathematics 1");
+  assert.equal(nextUpcomingExam(important, { dateISO: "2026-11-23", minutes: 555 }).id, "mse2-phy-pps");
+  assert.equal(nextUpcomingExam(important, { dateISO: "2026-11-29", minutes: 1000 }).title, "Mathematics 1");
 });
 
 test("MSE-II exam day view contains only the selected section's published sittings", () => {
@@ -45,10 +46,14 @@ test("official ESE datesheet narrows chemistry and physics group rows by the sel
   assert.equal(examEventsForSelection({ datesheet: ese, group: "ITC" }).filter((event) => event.category === "End-semester exam").length, 1);
 });
 
-test("exam-day timetable view replaces the normal class timeline when this section has a date-sheet sitting today", async () => {
+test("only important theory/final date-sheets replace the timetable; workshops remain notice items", async () => {
   const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
   assert.match(app, /const examAgenda = examsForDate\(clock\.dateISO\)/);
+  assert.match(app, /function importantExamEvents\(\)/);
+  assert.match(app, /if \(\/workshop\|practical\|lab\/\.test\(label\)\) return false/);
   assert.match(app, /renderExamDayCard\(examAgenda, clock\.dateISO\)/);
   assert.match(app, /todayExamSittings\.length \? renderExamDayCard\(todayExamSittings, clock\.dateISO\)/);
   assert.match(app, /Today's exam date sheet/);
+  const notices = await readFile(new URL("../next/engine/notices.js", import.meta.url), "utf8");
+  assert.match(notices, /mse2-workshops-2026-11/);
 });

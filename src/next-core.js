@@ -27,7 +27,7 @@ import {
 } from "./content-store.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.1.3";
+export const APP_VERSION = "2.1.4";
 export const BUILD_DATE = "2026-11-10";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 

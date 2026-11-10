@@ -80,6 +80,13 @@
   color-scheme: light;
 }
 
+[data-palette="ocean"][data-theme="dark"] { --bg:#0a1422; --bg-deep:#060d18; --surface:rgba(220,235,255,.045); --surface-2:rgba(220,235,255,.075); --surface-solid:#101e31; --surface-raised:#172841; --border:rgba(190,215,250,.12); --border-strong:rgba(190,215,250,.2); --text:#edf4ff; --text-soft:#c0d0e7; --muted:#91a7c4; }
+[data-palette="ocean"][data-theme="light"] { --bg:#f0f5fb; --bg-deep:#e7eef7; --surface:#fff; --surface-2:#f5f8fc; --surface-solid:#fff; --surface-raised:#fff; --border:rgba(25,55,95,.12); --border-strong:rgba(25,55,95,.22); --text:#152943; --text-soft:#405976; --muted:#607995; }
+[data-palette="sand"][data-theme="dark"] { --bg:#191712; --bg-deep:#100f0c; --surface:rgba(255,245,220,.045); --surface-2:rgba(255,245,220,.075); --surface-solid:#211e17; --surface-raised:#2b261c; --border:rgba(240,220,175,.12); --border-strong:rgba(240,220,175,.2); --text:#f7f0df; --text-soft:#d8cdb3; --muted:#afa184; }
+[data-palette="sand"][data-theme="light"] { --bg:#faf6ed; --bg-deep:#f1eadb; --surface:#fffdf8; --surface-2:#f8f2e6; --surface-solid:#fffdf8; --surface-raised:#fff; --border:rgba(85,65,30,.12); --border-strong:rgba(85,65,30,.22); --text:#302818; --text-soft:#62533a; --muted:#7c6b4c; }
+[data-palette="graphite"][data-theme="dark"] { --bg:#14161b; --bg-deep:#0d0f13; --surface:rgba(240,242,248,.045); --surface-2:rgba(240,242,248,.075); --surface-solid:#1b1e25; --surface-raised:#252932; --border:rgba(220,225,240,.12); --border-strong:rgba(220,225,240,.2); --text:#f1f2f6; --text-soft:#c5c8d2; --muted:#999eac; }
+[data-palette="graphite"][data-theme="light"] { --bg:#f3f4f6; --bg-deep:#e9ebef; --surface:#fff; --surface-2:#f6f7f8; --surface-solid:#fff; --surface-raised:#fff; --border:rgba(35,40,55,.12); --border-strong:rgba(35,40,55,.22); --text:#20232b; --text-soft:#4b505c; --muted:#696f7d; }
+
 [data-accent="emerald"] { --accent: #34d399; --accent-strong: #10b981; --accent-soft: rgba(52, 211, 153, .14); --accent-ink: #6ee7b7; }
 [data-accent="azure"]   { --accent: #38bdf8; --accent-strong: #0ea5e9; --accent-soft: rgba(56, 189, 248, .14); --accent-ink: #7dd3fc; }
 [data-accent="amber"]   { --accent: #fbbf24; --accent-strong: #f59e0b; --accent-soft: rgba(251, 191, 36, .14); --accent-ink: #fcd34d; }
@@ -98,7 +105,8 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   color: var(--text);
-  background:
+  background-color: var(--bg);
+  background-image:
     radial-gradient(1100px 600px at 82% -10%, var(--accent-soft), transparent 62%),
     radial-gradient(900px 520px at -10% 20%, rgba(56, 189, 248, .08), transparent 60%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
@@ -108,6 +116,13 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
+html[data-background="solid"] body { background-image: none; }
+html[data-background="wash"] body { background-image: radial-gradient(900px 520px at 88% -12%, var(--accent-soft), transparent 68%), linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%); }
+html[data-background="solid"] .hero-card { background: var(--surface-solid); }
+html[data-background="solid"] .hero-card::after { display: none; }
+html[data-background="solid"] .btn-primary, html[data-background="solid"] .brand-mark, html[data-background="solid"] .msg.user .msg-bubble { background: var(--accent-strong); color: #fff; box-shadow: none; }
+html[data-background="solid"] .nav-item.is-active { background: var(--accent-soft); }
+html[data-background="solid"] .class-card.is-now { background: var(--surface-solid); }
 body.is-dyslexic { font-family: "Atkinson Hyperlegible", "Verdana", ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; }
 
 h1, h2, h3, h4, p { margin: 0; }
@@ -731,7 +746,8 @@ kbd { font-family: var(--font-mono); font-size: .66rem; border: 1px solid var(--
   .sidebar {
     position: fixed; left: 0; top: 0; bottom: 0; width: min(300px, 84vw);
     transform: translateX(-104%); transition: transform 260ms var(--ease);
-    z-index: 65; box-shadow: var(--shadow-2);
+    z-index: 65; box-shadow: var(--shadow-2); background: var(--surface-solid);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
   }
   .sidebar.is-open { transform: none; }
   .topbar { grid-column: 1; padding-left: 10px; padding-right: 10px; }
