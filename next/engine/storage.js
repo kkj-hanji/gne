@@ -53,6 +53,7 @@ export async function saveSnapshot(snapshot) {
     id: String(snapshot.id || `snap-${Date.now()}`),
     createdAt: snapshot.createdAt || new Date().toISOString(),
     version: String(snapshot.version || "unknown"),
+    releaseKey: String(snapshot.releaseKey || snapshot.id || ""),
     checkedAt: String(snapshot.checkedAt || ""),
     groups: Number(snapshot.groups) || 0,
     entries: snapshot.schedule.length,

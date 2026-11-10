@@ -36,6 +36,7 @@ import {
 } from "./engine/notices.js";
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
 import { buildSyllabusIndex, groupSyllabus, searchSyllabus } from "./engine/syllabus.js";
+import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
@@ -103,6 +104,9 @@ const state = {
   faculty: [],
   students: [],
   rosterGeneratedAt: "",
+  profileLookupQuery: "",
+  profileLookupMessage: "",
+  profileLookupMatches: [],
   syllabus: null,
   compareA: "",
   compareB: "",
@@ -116,7 +120,7 @@ const state = {
   lastSync: "",
   online: typeof navigator === "undefined" ? true : navigator.onLine !== false,
   day: "",
-  settingsCategory: "experience",
+  settingsCategory: "overview",
   settingsQuery: "",
   roomDay: "",
   roomTime: "",
@@ -453,8 +457,10 @@ async function loadLiveData({ manual = false } = {}) {
     state.dataFallback = bundled;
     applySchedule(schedule, roomSchedule, metadata, subgroupSchedule);
     state.lastSync = new Date().toISOString();
+    const releaseKey = snapshotReleaseKey(metadata, schedule, roomSchedule, subgroupSchedule);
     await saveSnapshot({
-      id: `snap-${Date.now()}`,
+      id: releaseKey,
+      releaseKey,
       createdAt: state.lastSync,
       version: metadata?.version || "unknown",
       checkedAt: metadata?.checkedAt || "",
@@ -476,6 +482,14 @@ async function loadLiveData({ manual = false } = {}) {
     render();
     return false;
   }
+}
+
+function snapshotReleaseKey(metadata, schedule, roomSchedule, subgroupSchedule) {
+  const sourceRevision = (metadata?.sources || []).map((source) => `${source?.id || ""}:${source?.contentHash || source?.sourceFooter || ""}`).sort();
+  const payload = JSON.stringify([metadata?.version || "unknown", sourceRevision, schedule, roomSchedule, subgroupSchedule]);
+  let hash = 2166136261;
+  for (let index = 0; index < payload.length; index += 1) hash = Math.imul(hash ^ payload.charCodeAt(index), 16777619);
+  return `release-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
 async function loadSourceMetadata() {
@@ -703,16 +717,67 @@ function rosterIdentity() {
   return { crn, registration };
 }
 
-/** Exact CRN or registration match only. Names are never used for automatic matching. */
+/** Use exact identifiers first; a name auto-fills only when it is an exact unique match. */
 function rosterRecordForProfile() {
-  const { crn, registration } = rosterIdentity();
-  if (!crn && !registration) return null;
-  const matches = state.students.filter((record) => {
-    const recordCrn = String(record?.crn || "").replace(/\D/g, "");
-    const recordReg = String(record?.registrationNo || "").replace(/\D/g, "");
-    return (crn && recordCrn === crn) || (registration && recordReg === registration);
-  });
-  return matches.length === 1 ? matches[0] : null;
+  return matchProfileRecord(state.students, state.profile);
+}
+
+async function lookupProfileFromSettings() {
+  const query = $("[data-profile-lookup-query]")?.value.trim() || "";
+  state.profileLookupQuery = query;
+  state.profileLookupMatches = [];
+  if (query.length < 3) {
+    state.profileLookupMessage = "Enter your full name or CRN (at least 3 characters).";
+    render();
+    return;
+  }
+  if (!state.students.length) {
+    state.profileLookupMessage = "Checking the published student roster…";
+    render();
+    await loadStudents();
+  }
+  if (!state.students.length) {
+    state.profileLookupMessage = "The published roster could not be loaded. Your saved profile was not changed.";
+    render();
+    return;
+  }
+  const matches = findProfileRosterMatches(state.students, query);
+  if (!matches.length) {
+    state.profileLookupMessage = "No match in the currently published roster. Check the spelling or CRN; your profile was not changed.";
+  } else if (matches.length === 1) {
+    applyRosterRecordToProfile(matches[0]);
+    state.profileLookupQuery = matches[0].name || query;
+    state.profileLookupMessage = "Profile matched to the published roster. Review the section and subgroup below.";
+  } else {
+    state.profileLookupMatches = matches;
+    state.profileLookupMessage = `${matches.length} possible matches. Choose your record to fill your profile.`;
+  }
+  render();
+}
+
+function applyRosterRecordToProfile(record) {
+  if (!record) return false;
+  state.profile = saveProfile(localStorage, {
+    ...state.profile,
+    name: record.name || "",
+    crn: record.crn || "",
+    registrationNo: record.registrationNo || "",
+    branch: record.branch || "",
+    section: record.section || state.profile.section,
+    subsection: record.subsection || "",
+    mentor: record.mentor || "",
+    mentorPhone: record.mentorPhone || "",
+    academicGroup: record.academicGroup || "",
+    mentorVenue: record.mentorVenue || record.venue || "",
+    rosterVersion: state.rosterGeneratedAt || "published"
+  }) || state.profile;
+  if (state.profile.section && state.groups.includes(state.profile.section)) {
+    state.group = state.profile.section;
+    state.subgroup = subgroupsFor(state.group).includes(state.profile.subsection) ? state.profile.subsection : "";
+    persistSelection();
+  }
+  refreshAcademicOverlay();
+  return true;
 }
 
 /**
@@ -2597,22 +2662,32 @@ function renderSettings() {
   const query = state.settingsQuery.trim().toLowerCase();
   const matches = (flag) => !query || `${flag.title} ${flag.description} ${flag.keywords} ${flag.id} ${flag.category}`.toLowerCase().includes(query);
   const visibleCategories = CATEGORIES.filter((category) => !query || FLAGS.some((flag) => flag.category === category.id && matches(flag)));
+  const overview = !query && state.settingsCategory === "overview";
   const active = visibleCategories.find((category) => category.id === state.settingsCategory) || visibleCategories[0];
   const flags = FLAGS.filter((flag) => (query ? matches(flag) : flag.category === active?.id));
+  const everydayIds = ["appearance.theme", "appearance.accent", "appearance.density", "timetable.view", "timetable.clock", "ask.language"];
+  const everydayFlags = everydayIds.map((id) => FLAGS.find((flag) => flag.id === id)).filter(Boolean);
 
   return `<div class="page page-settings">
     <div class="page-head">
-      <div class="page-head-text"><h2 class="page-title">Settings</h2><p class="page-sub">${FLAGS.length} controls across ${CATEGORIES.length} sections. Presets set a known combination; every control stays reversible.</p></div>
-      <div class="page-actions"><input type="search" class="btn btn-sm" style="min-width:220px;text-align:left" placeholder="Search settings…" value="${escapeHtml(state.settingsQuery)}" data-settings-search aria-label="Search settings" /></div>
+      <div class="page-head-text"><h2 class="page-title">Settings</h2><p class="page-sub">Personalise Compass, verify your student profile, or open the classic app.</p></div>
+      <div class="page-actions"><input type="search" class="btn btn-sm" style="min-width:220px;text-align:left" placeholder="Search all settings…" value="${escapeHtml(state.settingsQuery)}" data-settings-search aria-label="Search all settings" /></div>
     </div>
-    <div class="preset-row" style="margin-bottom:16px">
-      ${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}
-    </div>
-    <div class="settings-layout">
+    ${overview ? `<div class="settings-overview">
+      <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">The few controls most students change. Everything else is optional.</p></div></div>${everydayFlags.map(renderFlagRow).join("")}</section>
+      ${renderProfileCard()}
+      ${renderVersionCard()}
+      <details class="card settings-advanced"><summary><span><strong>More settings</strong><small>${FLAGS.length - everydayFlags.length} optional controls · notifications, privacy, offline data and accessibility</small></span><span aria-hidden="true">＋</span></summary>
+        <div class="preset-row">${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}</div>
+        <nav class="settings-category-grid" aria-label="Advanced settings categories">${CATEGORIES.map((category) => `<button class="settings-nav-item" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)} <span aria-hidden="true">›</span></button>`).join("")}</nav>
+      </details>
+    </div>` : `<div class="settings-layout">
       <nav class="settings-side" aria-label="Settings sections">
+        <button class="settings-nav-item" data-action="settings-category" data-category="overview">Settings home</button>
         ${visibleCategories.map((category) => `<button class="settings-nav-item ${category.id === active?.id ? "is-active" : ""}" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)}</button>`).join("")}
       </nav>
       <div class="settings-content">
+        <div class="preset-row">${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}</div>
         ${query ? `<p class="card-sub">${flags.length} matching control${flags.length === 1 ? "" : "s"}</p>` : ""}
         ${active ? `<section class="setting-section card" id="settings-${active.id}">
           <div class="setting-section-head"><div><h2>${escapeHtml(active.title)}</h2><p>${escapeHtml(active.description)}</p></div><button class="btn btn-sm" data-action="reset-section" data-category="${active.id}">Reset section</button></div>
@@ -2623,7 +2698,7 @@ function renderSettings() {
           ${active.id === "labs" ? renderDangerZone() : ""}
         </section>` : `<div class="card">${emptyState("⚙", "No matching setting", `Nothing matches “${escapeHtml(state.settingsQuery)}”.`)}</div>`}
       </div>
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -2659,33 +2734,31 @@ function renderFlagRow(flag) {
 
 function renderVersionCard() {
   const version = state.version;
-  const snapshots = state.snapshots || [];
+  const uniqueSnapshots = new Map();
+  for (const snapshot of state.snapshots || []) {
+    const key = snapshot.releaseKey || `older:${snapshot.version || "release"}`;
+    const previousSnapshot = uniqueSnapshots.get(key);
+    if (!previousSnapshot || String(snapshot.createdAt) > String(previousSnapshot.createdAt)) uniqueSnapshots.set(key, snapshot);
+  }
+  const snapshots = [...uniqueSnapshots.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   const previous = version?.previous || null;
   return `<div class="card version-card" style="margin:14px 0">
-    <div class="card-head"><div><h2 class="card-title">Version & rollback</h2><p class="card-sub">Every generation stays reachable. The new app, the previous 2.0 generation and the frozen legacy build are separate on purpose.</p></div></div>
-    <div class="version-grid">
-      <dl class="version-cell"><dt>This app</dt><dd>v${escapeHtml(version?.app?.version || APP_VERSION)} · ${escapeHtml(version?.app?.channel || "stable")}</dd></dl>
-      <dl class="version-cell"><dt>Build</dt><dd>${escapeHtml(version?.app?.build || "2026-11-10")}</dd></dl>
-      <dl class="version-cell"><dt>Data release</dt><dd>${escapeHtml(state.metadata?.version || "not loaded")}</dd></dl>
-      <dl class="version-cell"><dt>Verified</dt><dd>${escapeHtml(shortDate(state.metadata?.checkedAt || state.lastSync))}</dd></dl>
-      <dl class="version-cell"><dt>Content store</dt><dd>${version?.content?.store ? "connected" : "not configured"}</dd></dl>
-      <dl class="version-cell"><dt>Admin</dt><dd>${version?.content?.admin ? "token configured" : "token missing"}</dd></dl>
-    </div>
+    <div class="card-head"><div><h2 class="card-title">App versions & backups</h2><p class="card-sub">Open the classic app if you prefer it, or restore a saved timetable for offline use.</p></div></div>
     <div class="build-switch">
       <div class="build-card is-current">
         <span class="badge badge-accent">Current</span>
-        <strong>Compass 2.1 · this app</strong>
-        <small>Notices, papers, syllabus, calendar, admin and the deterministic Brain.</small>
+        <strong>Compass Next · v${escapeHtml(version?.app?.version || APP_VERSION)}</strong>
+        <small>This is the app you are using now.</small>
       </div>
       <button class="build-card" data-action="open-previous" ${v("experience.previousBuild") ? "" : "hidden"}>
-        <span class="badge">v2.0</span>
+        <span class="badge">Previous</span>
         <strong>${escapeHtml(previous?.label || "Previous generation")}</strong>
-        <small>${escapeHtml(previous?.note || "A separate Worker opened in a new tab.")}</small>
+        <small>${escapeHtml(previous?.note || "Opens separately; its saved settings are not shared.")}</small>
       </button>
       <button class="build-card" data-action="open-legacy">
-        <span class="badge">v1 · frozen</span>
-        <strong>${escapeHtml(version?.legacy?.label || "Legacy Compass build")}</strong>
-        <small>The current production build, kept untouched with its own cache scope.</small>
+        <span class="badge">Classic app</span>
+        <strong>GNDEC Compass</strong>
+        <small>Opens the classic site separately. It has its own saved data.</small>
       </button>
     </div>
     <div class="chip-row" style="margin-top:14px">
@@ -2694,9 +2767,16 @@ function renderVersionCard() {
       <button class="btn btn-sm" data-action="import-data">Import data</button>
       <button class="btn btn-sm" data-action="open-admin" ${v("experience.adminLink") ? "" : "hidden"}>Admin & publishing</button>
     </div>
-    <p class="card-sub" style="margin-top:10px">Legacy URL: <code>${escapeHtml(state.legacyUrl)}</code></p>
+    <details class="version-details"><summary>Technical details</summary><div class="version-grid">
+      <dl class="version-cell"><dt>Build date</dt><dd>${escapeHtml(version?.app?.build || "not available")}</dd></dl>
+      <dl class="version-cell"><dt>Timetable revision</dt><dd>${escapeHtml(state.metadata?.version || "not loaded")}</dd></dl>
+      <dl class="version-cell"><dt>Last verified</dt><dd>${escapeHtml(shortDate(state.metadata?.checkedAt || state.lastSync))}</dd></dl>
+      <dl class="version-cell"><dt>Shared content</dt><dd>${version?.content?.store ? "Available" : "Not configured"}</dd></dl>
+      <dl class="version-cell"><dt>Admin service</dt><dd>${version?.content?.admin ? "Available" : "Not configured"}</dd></dl>
+    </div><p class="card-sub">Classic app address: <code>${escapeHtml(state.legacyUrl)}</code></p></details>
     <div class="snapshot-list">
-      ${snapshots.length ? snapshots.map((snapshot) => `<div class="snapshot-row"><span><strong>${escapeHtml(snapshot.version || "release")}</strong> <time>${escapeHtml(shortDate(snapshot.createdAt))}</time> · ${snapshot.entries || snapshot.scheduleCount || 0} entries</span><button class="btn btn-sm" data-action="restore-snapshot" data-id="${escapeHtml(snapshot.id)}">Restore</button><button class="btn btn-sm btn-ghost" data-action="delete-snapshot" data-id="${escapeHtml(snapshot.id)}">Delete</button></div>`).join("") : `<p class="card-sub">No device snapshot yet. One is saved after every verified release.</p>`}
+      <strong class="snapshot-heading">Offline timetable backups</strong>
+      ${snapshots.length ? snapshots.map((snapshot) => `<div class="snapshot-row"><span><strong>Revision ${escapeHtml(snapshot.version || "unknown")}</strong> <time>saved ${escapeHtml(shortDate(snapshot.createdAt))}</time> · ${snapshot.entries || snapshot.scheduleCount || 0} classes</span><button class="btn btn-sm" data-action="restore-snapshot" data-id="${escapeHtml(snapshot.id)}">Restore</button><button class="btn btn-sm btn-ghost" data-action="delete-snapshot" data-id="${escapeHtml(snapshot.id)}" aria-label="Delete backup saved ${escapeHtml(shortDate(snapshot.createdAt))}">Delete</button></div>`).join("") : `<p class="card-sub">No offline backup yet. Compass saves a verified timetable here when it updates.</p>`}
     </div>
   </div>`;
 }
@@ -2704,7 +2784,12 @@ function renderVersionCard() {
 function renderProfileCard() {
   const profile = state.profile;
   return `<div class="card" style="margin:14px 0">
-    <div class="card-head"><div><h2 class="card-title">Your profile</h2><p class="card-sub">Saved on this device only. Used for personalised answers and timetable selection.</p></div></div>
+    <div class="card-head"><div><h2 class="card-title">Find your student profile</h2><p class="card-sub">Enter your name or CRN. Compass checks the published roster and fills your section, subgroup and mentor on this device.</p></div></div>
+    <div class="profile-lookup"><label class="visually-hidden" for="profile-lookup">Your name or CRN</label><input id="profile-lookup" data-profile-lookup-query value="${escapeHtml(state.profileLookupQuery || profile.name || profile.crn || "")}" placeholder="Your full name or CRN" autocomplete="name" /><button class="btn btn-primary" data-action="lookup-profile">Find my profile</button></div>
+    ${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}
+    ${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}
+    ${profile.rosterVersion ? `<p class="profile-verified"><span class="badge badge-accent">Roster matched</span> ${escapeHtml(profile.name || "Student")} · ${escapeHtml([profile.section, profile.subsection].filter(Boolean).join(" / ") || "Section not listed")}${profile.mentor ? ` · Mentor ${escapeHtml(profile.mentor)}` : ""}${state.rosterGeneratedAt ? ` · roster ${escapeHtml(shortDate(state.rosterGeneratedAt))}` : ""}</p>` : `<p class="profile-verified">Your profile stays on this device. A name is applied only when the roster match is unambiguous.</p>`}
+    <details class="profile-edit"><summary>Edit profile and mentoring details</summary>
     <div class="profile-grid">
       <div class="field"><label for="profile-name">Name</label><input id="profile-name" data-profile="name" value="${escapeHtml(profile.name || "")}" autocomplete="name" /></div>
       <div class="field"><label for="profile-crn">CRN</label><input id="profile-crn" data-profile="crn" value="${escapeHtml(profile.crn || "")}" inputmode="numeric" /></div>
@@ -2718,9 +2803,9 @@ function renderProfileCard() {
       <div class="field"><label for="profile-academic-group">Mentoring group</label><input id="profile-academic-group" data-profile="academicGroup" list="academic-group-options" value="${escapeHtml(profile.academicGroup || "")}" placeholder="e.g. ECB1-M1" /><datalist id="academic-group-options">${academicGroups().map((group) => `<option value="${escapeHtml(group)}"></option>`).join("")}</datalist></div>
       <div class="field"><label for="profile-attendance">Attendance target (%)</label><input id="profile-attendance" data-profile="attendanceTarget" type="number" min="0" max="100" value="${Number(profile.attendanceTarget) || 76}" /></div>
     </div>
-    <p class="card-sub" style="margin-top:10px">Mentor name and venue fill the official mentoring class only when the timetable leaves them blank. The mentoring group pulls your verified subgroup (academic) rows from the official subgroup timetable.</p>
-    ${profile.rosterVersion ? `<p class="card-sub" style="margin-top:6px"><span class="badge badge-accent">Roster verified</span> Matched to the published roster${state.rosterGeneratedAt ? ` generated ${escapeHtml(shortDate(state.rosterGeneratedAt))}` : ""}. Section, sub-group and mentor follow the official record.</p>` : `<p class="card-sub" style="margin-top:6px">Add your CRN or registration number to match the published roster automatically.</p>`}
+    <p class="card-sub" style="margin-top:10px">Manual mentor details apply only when the official timetable leaves those fields blank. Verified roster details take precedence.</p>
     <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="save-profile">Save profile</button><button class="btn btn-sm" data-action="use-profile-section">Use profile section</button></div>
+    </details>
   </div>`;
 }
 
@@ -3155,6 +3240,20 @@ async function handleAction(action, element) {
     case "save-profile":
       saveProfileFromForm();
       break;
+    case "lookup-profile":
+      await lookupProfileFromSettings();
+      break;
+    case "choose-profile-match": {
+      const record = state.profileLookupMatches[Number(element.dataset.profileIndex)];
+      if (!record) { toast("That roster match is no longer available. Search again.", "error"); break; }
+      applyRosterRecordToProfile(record);
+      state.profileLookupQuery = record.name || "";
+      state.profileLookupMatches = [];
+      state.profileLookupMessage = "Profile matched to the published roster. Review the section and subgroup below.";
+      render();
+      toast(`Profile filled from the official roster: ${record.name || "student"}.`, "success");
+      break;
+    }
     case "clear-teacher":
       state.teacherSelected = "";
       state.teacherQuery = "";
@@ -3202,7 +3301,12 @@ async function handleAction(action, element) {
       restoreSnapshot(element.dataset.id);
       break;
     case "delete-snapshot":
-      await deleteSnapshot(element.dataset.id);
+      {
+        const selected = state.snapshots.find((snapshot) => snapshot.id === element.dataset.id);
+        const key = selected ? (selected.releaseKey || `older:${selected.version || "release"}`) : "";
+        const duplicates = selected ? state.snapshots.filter((snapshot) => (snapshot.releaseKey || `older:${snapshot.version || "release"}`) === key) : [];
+        for (const snapshot of duplicates.length ? duplicates : [{ id: element.dataset.id }]) await deleteSnapshot(snapshot.id);
+      }
       state.snapshots = await listSnapshots();
       render();
       toast("Snapshot deleted.");
@@ -3219,7 +3323,8 @@ async function handleAction(action, element) {
     case "download-offline": {
       if (!state.schedule.length) { toast("Load the timetable first.", "error"); break; }
       await requestPersistentStorage();
-      await saveSnapshot({ id: `snap-${Date.now()}`, createdAt: new Date().toISOString(), version: state.metadata?.version || "unknown", checkedAt: state.metadata?.checkedAt || "", schedule: state.schedule, roomSchedule: state.roomSchedule, subgroupSchedule: state.subgroupSchedule });
+      const releaseKey = snapshotReleaseKey(state.metadata, state.schedule, state.roomSchedule, state.subgroupSchedule);
+      await saveSnapshot({ id: releaseKey, releaseKey, createdAt: new Date().toISOString(), version: state.metadata?.version || "unknown", checkedAt: state.metadata?.checkedAt || "", schedule: state.schedule, roomSchedule: state.roomSchedule, subgroupSchedule: state.subgroupSchedule });
       toast("Offline data saved on this device.", "success");
       break;
     }
@@ -3257,13 +3362,21 @@ async function handleFlagAction(flagId) {
   if (flagId === "privacy.deleteAll") { await handleAction("delete-all", document.body); return; }
 }
 
-function saveProfileFromForm() {
+async function saveProfileFromForm() {
   const profile = { ...state.profile };
   $$("[data-profile]").forEach((input) => {
     profile[input.dataset.profile] = input.value;
   });
   state.profile = saveProfile(localStorage, profile) || profile;
-  const verified = state.students.length ? syncProfileFromRoster({ silent: true }) : false;
+  state.profileLookupQuery = state.profile.name || state.profile.crn || "";
+  if (!state.students.length && (state.profile.name || state.profile.crn || state.profile.registrationNo)) await loadStudents();
+  const verified = Boolean(rosterRecordForProfile());
+  if (verified) {
+    syncProfileFromRoster({ silent: true });
+    state.profileLookupMessage = "Profile matched to the published roster.";
+  } else if (state.profile.name || state.profile.crn || state.profile.registrationNo) {
+    state.profileLookupMessage = "No unique match was found. Use Find my profile to choose a matching roster record.";
+  }
   if (state.profile.section && state.groups.includes(state.profile.section)) {
     state.group = state.profile.section;
     state.subgroup = subgroupsFor(state.profile.section).includes(state.profile.subsection) ? state.profile.subsection : "";
@@ -3271,7 +3384,7 @@ function saveProfileFromForm() {
   }
   refreshAcademicOverlay();
   render();
-  toast(verified ? "Profile saved and verified against the current official roster." : "Profile saved on this device. Add your CRN to match the official roster automatically.", "success");
+  toast(verified ? "Profile saved and matched to the published roster." : "Profile saved on this device. Enter your name or CRN to check the published roster.", "success");
 }
 
 function exportData() {
@@ -3646,6 +3759,11 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.closest("[data-profile-lookup-query]")) {
+      event.preventDefault();
+      lookupProfileFromSettings();
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       toggleCommand();
@@ -3730,7 +3848,7 @@ async function init() {
   loadNotices().then(() => { if (state.route === "today" || state.route === "notices") render(); });
 
   await loadLiveData();
-  if (rosterIdentity().crn || rosterIdentity().registration) {
+  if (rosterIdentity().crn || rosterIdentity().registration || state.profile.name) {
     loadStudents().catch(() => {});
   }
   await loadSnapshots();

@@ -169,7 +169,7 @@ export const TRANSCRIBED_NOTICES = Object.freeze([
   Object.freeze({
     id: "mse2-theory-2026-11",
     title: "MSE-II Semester I theory date sheet · November 2026",
-    url: "/api/legacy/notices/mse2-theory-2026.html",
+    url: "/notices/mse2-theory-2026.html",
     date: "2026-11-03",
     category: "Examination",
     author: "Department of Applied Sciences",
@@ -180,7 +180,7 @@ export const TRANSCRIBED_NOTICES = Object.freeze([
   Object.freeze({
     id: "mse2-workshops-2026-11",
     title: "MSE-II workshops (MP) date sheet · November 2026",
-    url: "/api/legacy/notices/mse2-workshops-2026.html",
+    url: "/notices/mse2-workshops-2026.html",
     date: "2026-11-03",
     category: "Examination",
     author: "Workshops",
@@ -190,7 +190,7 @@ export const TRANSCRIBED_NOTICES = Object.freeze([
   Object.freeze({
     id: "hod-meeting-2026-11-03",
     title: "HOD meeting minutes: MST-2, end-semester exams and working Saturdays",
-    url: "/api/legacy/notices/hod-meeting-2026-11-03.html",
+    url: "/notices/hod-meeting-2026-11-03.html",
     date: "2026-11-03",
     category: "Academic",
     author: "Principal Office",

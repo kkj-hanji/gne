@@ -514,6 +514,29 @@ main {
 /* ── Settings ─────────────────────────────────────────────────────────── */
 
 .settings-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; align-items: start; }
+.settings-overview { display: flex; flex-direction: column; gap: 12px; max-width: 980px; margin: 0 auto; }
+.settings-overview > .card { margin: 0 !important; }
+.quick-settings { padding: 16px 20px; }
+.settings-advanced { padding: 0 18px 16px; }
+.settings-advanced > summary, .version-details > summary, .profile-edit > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; color: var(--text); font-weight: 750; }
+.settings-advanced > summary { padding: 16px 0 0; }
+.settings-advanced > summary::-webkit-details-marker, .version-details > summary::-webkit-details-marker, .profile-edit > summary::-webkit-details-marker { display: none; }
+.settings-advanced > summary strong, .settings-advanced > summary small { display: block; }
+.settings-advanced > summary small { color: var(--muted); font-size: .75rem; font-weight: 500; margin-top: 3px; }
+.settings-category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 5px; margin-top: 14px; }
+.settings-category-grid .settings-nav-item { justify-content: space-between; border: 1px solid var(--border); }
+.version-details { margin-top: 12px; }
+.version-details > summary, .profile-edit > summary { justify-content: flex-start; color: var(--accent-ink); font-size: .83rem; padding: 10px 0; }
+.snapshot-heading { display: block; margin: 12px 0 4px; font-size: .82rem; }
+.profile-lookup { display: flex; gap: 8px; margin-top: 4px; }
+.profile-lookup input { flex: 1; min-width: 0; padding: 11px 13px; border: 1px solid var(--border-strong); border-radius: 11px; color: var(--text); background: var(--surface-solid); }
+.profile-lookup-message, .profile-verified { margin-top: 9px; color: var(--muted); font-size: .78rem; }
+.profile-verified .badge { margin-right: 5px; }
+.profile-match-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 7px; margin-top: 10px; }
+.profile-match { display: grid; gap: 3px; text-align: left; padding: 11px 12px; border: 1px solid var(--border); border-radius: 11px; color: var(--text); background: var(--surface-2); }
+.profile-match:hover { border-color: var(--accent); }
+.profile-match span, .profile-match small { color: var(--muted); font-size: .72rem; }
+.profile-edit { margin-top: 12px; border-top: 1px solid var(--border); }
 .settings-side { position: sticky; top: calc(var(--topbar-h) + 16px); display: flex; flex-direction: column; gap: 2px; }
 .settings-nav-item {
   display: flex; align-items: center; gap: 9px; text-align: left;
@@ -584,7 +607,9 @@ input[type="range"] { accent-color: var(--accent); width: 140px; }
 .snapshot-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .snapshot-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font-size: .8rem; }
 .snapshot-row time { color: var(--muted); font-size: .72rem; }
+.snapshot-row > span { flex: 1; min-width: 0; }
 .snapshot-row .btn { margin-left: auto; }
+.snapshot-row .btn + .btn { margin-left: 0; }
 
 .danger-zone { border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
 
@@ -909,6 +934,12 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
   .composer-input { min-height: 44px; padding: 11px 12px; }
   .send-button, .mic-button { width: 44px; height: 44px; }
   .settings-side { margin: 0 -12px; padding: 0 12px 6px; }
+  .profile-lookup { flex-wrap: wrap; }
+  .profile-lookup input, .profile-lookup button { width: 100%; max-width: none; }
+  .snapshot-row { flex-wrap: wrap; }
+  .snapshot-row > span { flex-basis: 100%; }
+  .snapshot-row .btn:first-of-type { margin-left: auto; }
+  .settings-category-grid { grid-template-columns: minmax(0, 1fr); }
   .command-palette { padding-top: 8vh; }
   .command-box { width: min(640px, 96vw); }
 }

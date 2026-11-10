@@ -62,6 +62,16 @@ test("every category is declared, ordered and populated", () => {
   assert.equal(CATEGORIES.length, 12);
 });
 
+test("settings open on a simple overview and keep technical controls under More settings", async () => {
+  const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
+  assert.match(app, /settingsCategory: "overview"/);
+  assert.match(app, /Everyday preferences/);
+  assert.match(app, /<strong>More settings<\/strong>/);
+  assert.match(app, /Find my profile/);
+  assert.doesNotMatch(app, /controls across \$\{CATEGORIES\.length\} sections/);
+  assert.match(app, /Technical details/);
+});
+
 test("appearance enums stay in sync with the stylesheet", async () => {
   const css = await readFile(new URL("../next/styles.css", import.meta.url), "utf8");
   for (const theme of THEMES) {
