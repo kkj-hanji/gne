@@ -37,6 +37,7 @@ import {
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
 import { buildSyllabusIndex, groupSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
+import { examEventsForSelection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
@@ -836,13 +837,11 @@ async function loadSyllabusIndex() {
 /* ── Calendar / exam helpers ───────────────────────────────────────────── */
 
 function nextExam() {
-  if (!state.datesheet?.tabs) return null;
-  const today = now().dateISO;
-  const entries = state.datesheet.tabs
-    .flatMap((tab) => (tab.entries || []).map((entry) => ({ ...entry, tab: tab.label })))
-    .filter((entry) => entry.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  return entries[0] || null;
+  return nextUpcomingExam(examEventsForSelection({ datesheet: state.datesheet, group: state.group }), now());
+}
+
+function examsForDate(dateISO) {
+  return examsOnDate(examEventsForSelection({ datesheet: state.datesheet, group: state.group }), dateISO);
 }
 
 function nextClassInfo() {
@@ -1084,6 +1083,7 @@ function renderToday() {
   const clock = now();
   const info = nextClassInfo();
   const exam = nextExam();
+  const examAgenda = examsForDate(clock.dateISO);
   const free = computeFreeRooms({
     roomSchedule: state.roomSchedule,
     day: clock.day,
@@ -1101,7 +1101,9 @@ function renderToday() {
   const hero = renderHero(info, clock, greeting + name);
   const freeRooms = v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
   const timelineClock = lookAhead ? { ...clock, day: timelineDay, minutes: 0 } : clock;
-  const timeline = v("today.hero") === "timeline" ? "" : renderTodayTimeline(timelineClasses, timelineClock, { lookAhead });
+  const timeline = v("today.hero") === "timeline" ? "" : examAgenda.length
+    ? renderExamDayCard(examAgenda, clock.dateISO)
+    : renderTodayTimeline(timelineClasses, timelineClock, { lookAhead });
   const notices = v("today.noticesCard") ? renderNoticesCard() : "";
   const examCard = v("today.examCountdown") && exam ? renderExamCard(exam) : "";
   const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
@@ -1257,9 +1259,20 @@ function renderFreeRoomsCard(result, clock) {
 }
 
 function renderExamCard(exam) {
+  const action = exam.sourceUrl
+    ? `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open date sheet</a>`
+    : `<button class="btn btn-sm" data-ask-question="Show my next exam date sheet">Ask Compass</button>`;
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Next published exam</h2><p class="card-sub">Tentative ESE datesheet · verify the official notice before travelling</p></div><div class="card-actions"><button class="btn btn-sm" data-ask-question="Show my ESE datesheet">Ask</button></div></div>
-    <div class="timeline-item"><div class="timeline-time">${escapeHtml(shortExamDate(exam.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.subject)}</div><div class="timeline-meta">${escapeHtml(exam.tab || "")}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : ""}</div></div></div>
+    <div class="card-head"><div><h2 class="card-title">Next published exam</h2><p class="card-sub">${escapeHtml(exam.category)} · ${escapeHtml(exam.sourceLabel || "published date sheet")}</p></div><div class="card-actions">${action}</div></div>
+    <div class="timeline-item"><div class="timeline-time">${escapeHtml(shortExamDate(exam.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.title)}</div><div class="timeline-meta">${escapeHtml(exam.tab || exam.sourceNote || "")}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</div></div></div>
+  </section>`;
+}
+
+function renderExamDayCard(exams, dateISO) {
+  const sources = [...new Map(exams.filter((exam) => exam.sourceUrl).map((exam) => [exam.sourceUrl, exam])).values()];
+  return `<section class="card exam-day-card">
+    <div class="card-head"><div><h2 class="card-title">Today's exam date sheet</h2><p class="card-sub">${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(selectionLabel())} · use this published schedule for today</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(exam.category.includes("workshop") ? "Workshop sheet" : exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
+    <div class="timeline">${exams.map((exam) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(examTimeLabel(exam, humanTime))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.title)}</div><div class="timeline-meta">${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionNote ? ` · ${escapeHtml(exam.sessionNote)}` : ""}</div></div></div>`).join("")}</div>
   </section>`;
 }
 
@@ -1293,7 +1306,7 @@ function suggestedQuestions() {
   else list.push("What is my next class?");
   list.push("Which rooms are free now?");
   list.push("Show tomorrow's timetable");
-  if (nextExam()) list.push("When is my ESE exam?");
+  if (nextExam()) list.push("When is my next exam?");
   const subjects = [...new Set(classesForDay(now().day).map((entry) => entry.subject))].slice(0, 2);
   subjects.forEach((subject) => list.push(`When is ${subject}?`));
   list.push("Show latest notices");
@@ -1309,6 +1322,11 @@ function renderTimetable() {
   const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
   if (!state.day || !days.includes(state.day)) state.day = days.includes(clock.day) ? clock.day : days[0];
   const view = v("timetable.view");
+  const todayExamSittings = state.day === clock.day ? examsForDate(clock.dateISO) : [];
+  const dayContent = view === "week" ? renderWeekGrid(clock)
+    : view === "agenda" ? renderAgenda()
+      : todayExamSittings.length ? renderExamDayCard(todayExamSittings, clock.dateISO)
+        : renderDayView(state.day, clock);
   return `<div class="page page-timetable">
     <div class="page-head">
       <div class="page-head-text">
@@ -1334,7 +1352,7 @@ function renderTimetable() {
       <div class="day-tabs" style="margin-top:12px" role="tablist" aria-label="Day">
         ${days.map((day) => `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${classesForDay(day).length} class${classesForDay(day).length === 1 ? "" : "es"}</small></button>`).join("")}
       </div>
-      <div style="margin-top:14px">${view === "week" ? renderWeekGrid(clock) : view === "agenda" ? renderAgenda() : renderDayView(state.day, clock)}</div>
+      <div style="margin-top:14px">${dayContent}</div>
     </div>`}
   </div>`;
 }
