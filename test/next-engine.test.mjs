@@ -12,7 +12,7 @@ import {
   parseFetTimetable, readVerifiedFetTimetable, sanitizeSchedule, mergeSchedules
 } from "../next/engine/fet-parser.js";
 import {
-  compareRooms, computeFreeRooms, freeRoomSummary, groupRooms, isLabRoom,
+  compareRooms, computeFreeRooms, freeRoomSummary, groupRooms, isLabRoom, nextFreeRoomSlot,
   isRoomFree, roomZone, zoneFromQuestion
 } from "../next/engine/free-rooms.js";
 import {
@@ -272,6 +272,22 @@ test("free-room computation respects the window, filters and published days", ()
   assert.equal(isRoomFree(roomSchedule, "F101", "Monday", 570, 60), true);
   assert.equal(isRoomFree(roomSchedule, "F102", "Monday", 570, 60), false);
   assert.match(freeRoomSummary(monday), /free rooms/);
+});
+
+test("next free room slot starts at the next published boundary and respects duration and filters", () => {
+  const rows = [
+    { group: "F101", day: "Monday", start: 510, end: 540, subject: "MATH" },
+    { group: "F101", day: "Monday", start: 600, end: 660, subject: "PPS" },
+    { group: "F102", day: "Monday", start: 540, end: 600, subject: "PHYSICS" },
+    { group: "G101", day: "Monday", start: 510, end: 570, subject: "CHEMISTRY" },
+    { group: "COMP LAB CSE DEPT", day: "Monday", start: 570, end: 630, subject: "LAB" }
+  ];
+  const next = nextFreeRoomSlot({ roomSchedule: rows, day: "Monday", after: 510, duration: 60 });
+  assert.equal(next.start, 540);
+  assert.equal(next.end, 600);
+  assert.deepEqual(next.rooms.map((item) => item.room), ["F101"]);
+  assert.equal(nextFreeRoomSlot({ roomSchedule: rows, day: "Monday", after: 510, duration: 60, includeLabs: false }).rooms.some((item) => item.room.includes("LAB")), false);
+  assert.equal(nextFreeRoomSlot({ roomSchedule: rows, day: "Monday", after: 16 * 60, duration: 60 }), null);
 });
 
 /* ── local answers ─────────────────────────────────────────────────────── */

@@ -457,6 +457,11 @@ main {
 
 .rooms-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .rooms-toolbar .field { min-width: 140px; }
+.room-duration-field { flex: 1 1 210px; }
+.room-duration-help { display: block; margin-top: 5px; color: var(--muted); font-size: .78rem; line-height: 1.35; }
+.room-live-note { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--text-soft); font-size: .88rem; }
+.room-live-note .sync-dot { flex: 0 0 8px; }
+.room-upcoming-card { margin-top: 14px; border-color: color-mix(in srgb, var(--accent) 34%, var(--border)); }
 
 /* ── Chat ─────────────────────────────────────────────────────────────── */
 
@@ -988,6 +993,9 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
   .hero-actions .btn { flex: 1 1 100%; }
   .status-grid, .stat-grid { gap: 8px; }
   .room-grid { grid-template-columns: minmax(0, 1fr); }
+  .rooms-toolbar .field { flex: 1 1 130px; min-width: 0; }
+  .rooms-toolbar .room-duration-field { flex-basis: 100%; }
+  .rooms-toolbar > button { flex: 1 1 100%; }
   .day-tab { min-width: 60px; padding: 8px 10px; }
   .msg-bubble { font-size: .86rem; padding: 10px 12px; }
   .toast-root { left: 8px; right: 8px; }

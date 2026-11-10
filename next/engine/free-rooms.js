@@ -143,6 +143,47 @@ export function computeFreeRooms({
   };
 }
 
+/** Find the next later published time when rooms are free for the full window. */
+export function nextFreeRoomSlot({
+  roomSchedule = [], day, after, duration = 60, includeLabs = true,
+  includeLectureHalls = true, zone = "", until = 17 * 60
+} = {}) {
+  const current = Number(after);
+  const window = Math.max(5, Number(duration) || 60);
+  if (!Number.isFinite(current)) return null;
+  const schedule = Array.isArray(roomSchedule) ? roomSchedule : [];
+  const rows = schedule.filter((entry) =>
+    entry && entry.day === day && Number.isFinite(entry.start) && Number.isFinite(entry.end) && entry.end > entry.start
+  );
+  const byRoom = new Map();
+  const allRooms = [...new Set(schedule.map((entry) => cleanRoom(entry?.group)).filter(Boolean))];
+  for (const room of allRooms) byRoom.set(room, []);
+  for (const entry of rows) {
+    const room = cleanRoom(entry.group);
+    if (room) byRoom.get(room).push(entry);
+  }
+  const rooms = allRooms.filter((room) =>
+    (includeLabs || !isLabRoom(room)) && (includeLectureHalls || isLabRoom(room)) && (!zone || roomZone(room) === zone)
+  );
+  const boundaries = [...new Set(rows.flatMap((entry) => [entry.start, entry.end]))]
+    .filter((time) => time > current && time + window <= Number(until))
+    .sort((a, b) => a - b)
+    .slice(0, 120);
+  for (const start of boundaries) {
+    const end = start + window;
+    const available = [];
+    for (const room of rooms) {
+      const entries = byRoom.get(room) || [];
+      if (entries.some((entry) => entry.start < end && start < entry.end)) continue;
+      const nextClass = entries.filter((entry) => entry.start >= end).sort((a, b) => a.start - b.start)[0] || null;
+      const lastClass = entries.filter((entry) => entry.end <= start).sort((a, b) => b.end - a.end)[0] || null;
+      available.push({ room, zone: roomZone(room), freeFrom: start, freeUntil: nextClass?.start ?? null, nextClass, lastClass });
+    }
+    if (available.length) return { day, start, end, duration: window, rooms: available.sort((a, b) => compareRooms(a.room, b.room)) };
+  }
+  return null;
+}
+
 /** True when a room has no class overlapping the window. */
 export function isRoomFree(roomSchedule, room, day, start, duration = 60) {
   return !(Array.isArray(roomSchedule) ? roomSchedule : []).some((entry) =>

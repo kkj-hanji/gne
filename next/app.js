@@ -20,7 +20,7 @@ import {
   nextStudyDay, relativeStartLabel, resolveQuestionDay, shouldLookAheadAtFive
 } from "./engine/datetime.js";
 import { mergeSchedules, readVerifiedFetTimetable } from "./engine/fet-parser.js";
-import { computeFreeRooms, formatFreeWindow, groupRooms, roomZone, zoneFromQuestion } from "./engine/free-rooms.js";
+import { computeFreeRooms, formatFreeWindow, groupRooms, nextFreeRoomSlot, roomZone, zoneFromQuestion } from "./engine/free-rooms.js";
 import { answerLocally, buildAnswerContext, escapeHtml, FALLBACK_REFUSAL, classesFor } from "./engine/answer.js";
 import { brainSuggestions, loadBrainScripts, runBrain } from "./engine/brain-bridge.js";
 import {
@@ -129,6 +129,7 @@ const state = {
   settingsCategory: "overview",
   settingsQuery: "",
   roomDay: "",
+  roomDayAuto: true,
   roomTime: "",
   roomZone: "",
   teacherQuery: "",
@@ -1475,44 +1476,48 @@ function renderWeekGrid(clock) {
 
 function renderRooms() {
   const clock = now();
-  if (!state.roomDay) state.roomDay = clock.day;
+  if (state.roomDayAuto || !state.roomDay) state.roomDay = clock.day;
   const minutes = state.roomTime ? timeToMinutes(state.roomTime) : clock.minutes;
   const duration = Number(v("rooms.defaultDuration")) || 60;
+  const filters = { zone: state.roomZone, includeLabs: v("rooms.includeLabs"), includeLectureHalls: v("rooms.includeLectureHalls") };
   const result = computeFreeRooms({
     roomSchedule: state.roomSchedule,
     day: state.roomDay,
     minutes,
     duration,
-    zone: state.roomZone,
-    includeLabs: v("rooms.includeLabs"),
-    includeLectureHalls: v("rooms.includeLectureHalls")
+    ...filters
   });
+  const nextSlot = result.error ? null : nextFreeRoomSlot({ roomSchedule: state.roomSchedule, day: state.roomDay, after: minutes, duration, ...filters });
   const groups = result.error ? [] : groupRooms(result.rooms.map((item) => item.room)).groups;
   const zoneOptions = ["", "F block", "G block", "S block", "A block", "Labs and named rooms", "Other published rooms"];
+  const currentTimeLabel = humanTime(minutes, v("timetable.clock"));
+  const nextSlotGroups = nextSlot ? groupRooms(nextSlot.rooms.map((item) => item.room)).groups : [];
   return `<div class="page page-rooms">
     <div class="page-head">
       <div class="page-head-text">
         <h2 class="page-title">Free rooms</h2>
-        <p class="page-sub">Computed from the official room timetable. “Free” means no published class overlaps the window.</p>
+        <p class="page-sub">From the published room timetable. A room counts as free only when no listed class overlaps your full chosen time window.</p>
       </div>
       <div class="page-actions"><span class="badge">${escapeHtml(state.roomSchedule.length ? `${new Set(state.roomSchedule.map((entry) => entry.group)).size} published rooms` : "Room data loading")}</span></div>
     </div>
     <div class="card">
       <div class="rooms-toolbar">
-        <div class="field"><label for="room-day">Day</label><select id="room-day" data-room-day>${STUDY_DAYS.map((day) => `<option value="${day}" ${day === state.roomDay ? "selected" : ""}>${day}</option>`).join("")}</select></div>
-        <div class="field"><label for="room-time">From</label><input id="room-time" type="time" value="${escapeHtml(state.roomTime || `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`)}" data-room-time /></div>
-        <div class="field"><label for="room-duration">For</label><select id="room-duration" data-room-duration>${[30, 60, 90, 120].map((value) => `<option value="${value}" ${String(duration) === String(value) ? "selected" : ""}>${formatDuration(value)}</option>`).join("")}</select></div>
-        <button class="btn btn-sm" data-action="room-now">Now</button>
+        <div class="field"><label for="room-day">Day</label><select id="room-day" data-room-day>${DAY_NAMES.map((day) => `<option value="${day}" ${day === state.roomDay ? "selected" : ""}>${day}${day === clock.day && state.roomDayAuto ? " · Today" : ""}</option>`).join("")}</select></div>
+        <div class="field"><label for="room-time">Start time</label><input id="room-time" type="time" value="${escapeHtml(state.roomTime || `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`)}" data-room-time /></div>
+        <div class="field room-duration-field"><label for="room-duration">Keep free for</label><select id="room-duration" data-room-duration>${[30, 60, 90, 120].map((value) => `<option value="${value}" ${String(duration) === String(value) ? "selected" : ""}>${formatDuration(value)}</option>`).join("")}</select><small class="room-duration-help">Only rooms free for this whole duration appear.</small></div>
+        <button class="btn btn-sm" data-action="room-now">Use current time</button>
       </div>
+      <p class="room-live-note" role="status"><span class="sync-dot is-live" aria-hidden="true"></span>${state.roomTime ? `Checking ${escapeHtml(state.roomDay)} at ${escapeHtml(currentTimeLabel)} · custom time` : `Using current time · ${escapeHtml(currentTimeLabel)} · updates every 30 seconds while this page is open`}</p>
       <div class="chip-row" style="margin-top:12px">
         ${zoneOptions.map((zone) => `<button class="chip ${state.roomZone === zone ? "is-active" : ""}" data-action="room-zone" data-zone="${escapeHtml(zone)}">${escapeHtml(zone || "All areas")}</button>`).join("")}
       </div>
-      <p class="card-sub" style="margin-top:12px">${result.error ? escapeHtml(result.error) : `${result.rooms.length} free room${result.rooms.length === 1 ? "" : "s"} on ${escapeHtml(state.roomDay)} at ${escapeHtml(humanTime(minutes, v("timetable.clock")))} for ${escapeHtml(formatDuration(duration))}.`}</p>
+      <p class="card-sub" style="margin-top:12px">${result.error ? escapeHtml(result.error) : `${result.rooms.length} room${result.rooms.length === 1 ? "" : "s"} free on ${escapeHtml(state.roomDay)} at ${escapeHtml(currentTimeLabel)} for at least ${escapeHtml(formatDuration(duration))}.`}</p>
     </div>
     ${result.error ? emptyState("🚪", "No verified availability", result.error, `<button class="btn btn-sm" data-action="refresh-data">Load room data</button>`) : groups.length ? `<div class="stack" style="margin-top:14px">${groups.map((group) => `<section class="card"><div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} free room${group.count === 1 ? "" : "s"}</p></div></div><div class="room-grid">${group.rooms.map((room) => {
       const item = result.rooms.find((entry) => entry.room === room);
       return `<article class="room-card"><div style="display:flex;align-items:flex-start"><div class="room-name">${escapeHtml(room)}</div></div><div class="room-zone">${escapeHtml(roomZone(room))}</div>${v("rooms.showFreeUntil") ? `<div class="room-free">${escapeHtml(formatFreeWindow(item, v("timetable.clock")))}</div>` : ""}${v("rooms.showNextClass") && item?.nextClass ? `<div class="room-next">Next: ${escapeHtml(item.nextClass.subject)} at ${escapeHtml(humanTime(item.nextClass.start, v("timetable.clock")))}</div>` : ""}</article>`;
     }).join("")}</div></section>`).join("")}</div>` : emptyState("✅", "No free room in this window", "Every published room in this area has a class. Try a shorter window or another area.")}
+    ${!result.error ? nextSlot ? `<section class="card room-upcoming-card" aria-label="Next free room slot"><div class="card-head"><div><h2 class="card-title">Next free slot</h2><p class="card-sub">${escapeHtml(state.roomDay)} · ${escapeHtml(humanTime(nextSlot.start, v("timetable.clock")))}–${escapeHtml(humanTime(nextSlot.end, v("timetable.clock")))} · ${nextSlot.rooms.length} room${nextSlot.rooms.length === 1 ? "" : "s"} free for ${escapeHtml(formatDuration(duration))}</p></div><span class="badge">Upcoming</span></div><div class="room-grid">${nextSlotGroups.map((group) => group.rooms.map((room) => `<article class="room-card"><div class="room-name">${escapeHtml(room)}</div><div class="room-zone">${escapeHtml(roomZone(room))}</div></article>`).join("")).join("")}</div></section>` : `<section class="card room-upcoming-card"><h2 class="card-title">No later free slot found today</h2><p class="card-sub">${minutes >= 17 * 60 ? `Published room data ends at 5:00 PM, so no later window can be confirmed today.` : `No published room has a free window of ${escapeHtml(formatDuration(duration))} after ${escapeHtml(currentTimeLabel)} and before 5:00 PM.`} Choose another day or a shorter duration.</p></section>` : ""}
     ${v("rooms.heatmap") ? renderHeatmap() : ""}
   </div>`;
 }
@@ -3440,6 +3445,7 @@ async function handleAction(action, element) {
       break;
     case "room-now":
       state.roomTime = "";
+      state.roomDayAuto = true;
       state.roomDay = now().day;
       render();
       break;
@@ -3963,7 +3969,7 @@ function bindEvents() {
       return;
     }
     const roomDay = event.target.closest("[data-room-day]");
-    if (roomDay) { state.roomDay = roomDay.value; render(); return; }
+    if (roomDay) { state.roomDay = roomDay.value; state.roomDayAuto = false; render(); return; }
     const roomDuration = event.target.closest("[data-room-duration]");
     if (roomDuration) { setFlag("rooms.defaultDuration", roomDuration.value); render(); return; }
     const roomTime = event.target.closest("[data-room-time]");
@@ -4124,6 +4130,7 @@ function startTimers() {
     checkReminders();
     checkDigest();
     if (state.route === "today") render();
+    else if (state.route === "rooms" && !state.roomTime && !document.activeElement?.matches("[data-room-time]")) render();
   }, 30000);
 
   clearInterval(state.refreshTimer);
