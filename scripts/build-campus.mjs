@@ -3,18 +3,19 @@
 //   node scripts/build-campus.mjs
 //
 // The Worker refreshes the same data into KV on its own schedule. This script
-// keeps the first-load/offline fallback honest.
-import { writeFileSync } from "node:fs";
+// keeps the first-load/offline fallback honest: when a department page cannot
+// be read, the last verified HOD, contact and syllabus stay in place instead
+// of being replaced with blanks.
 import { buildCampus } from "../src/campus.js";
+import { readJsonIfPresent, writeJsonWhenChanged } from "./lib/stable-json.mjs";
 
-const snapshot = await buildCampus();
+const previous = readJsonIfPresent("public/data/campus.json");
+const snapshot = await buildCampus({ previous });
 snapshot.seededAt = new Date().toISOString();
 
-for (const path of ["src/data/campus-seed.json", "public/data/campus.json"]) {
-  writeFileSync(path, `${JSON.stringify(snapshot, null, 2)}\n`);
-}
+const written = writeJsonWhenChanged(["src/data/campus-seed.json", "public/data/campus.json"], snapshot);
 
-console.log(`Wrote ${snapshot.departments.length} departments, ${snapshot.notices.length} notices, ${snapshot.syllabus.length} syllabus documents.`);
+console.log(`${written ? "Wrote" : "Checked"} ${snapshot.departments.length} departments, ${snapshot.notices.length} notices, ${snapshot.syllabus.length} syllabus documents.`);
 for (const department of snapshot.departments) {
   console.log(`- ${department.short}: ${department.hod?.name || "HOD not found"}${department.hod?.email ? ` <${department.hod.email}>` : ""}`);
 }

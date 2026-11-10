@@ -1,0 +1,1134 @@
+{
+  "https://gndec-compass-next.koush3069.workers.dev/": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/today": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/timetable": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/rooms": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/teachers": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/ask": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/notices": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/papers": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/syllabus": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/calendar": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/directory": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/compare": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/settings": {
+    "hash": "c7924c3649cfb7f3d7d4e56146c78a9505043e0b2527230ea8e0c08ed9afebd4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/": {
+    "hash": "d91c90191d94f6379a74f4d579502537a372db33a3822be9a619fcb80bdfc116",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/barch/": {
+    "hash": "7837d61e7639b640a2cf18657bc425dbfa9ccd9389b49e51654adfde6c955b8f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/bba1/": {
+    "hash": "43197876ef04981f6d0028929a823b24e4f962256df5ee08b6c987db2ac8fbde",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/bca1a/": {
+    "hash": "668839a713c48caa070de4fc0728cf96002885ee00622eec6da6d0e2d3965c3f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/bca1b/": {
+    "hash": "01b3c1eab0d9d5d34d29e35590afb4bc3866b6c0f0b170afa378137caa6d347e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/bca1c/": {
+    "hash": "d39ce93db47052b2e173d02e2c33091e85c0ab390618376439d045a30c41c338",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/bcom1/": {
+    "hash": "db270c8b7c6ac8c01a2257cc14d05611a40a72458fae1ddb7c889afaea8ac50d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/bcom3/": {
+    "hash": "40255cbb57e55fcc0546a84585812e6348734d6a0060e3296d2ea3577afb6f23",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/bvoc/": {
+    "hash": "ded3a05a6f4b4ce465ee3cbc8fee4c55f293f3ab50b2e9fe4d803c8b77219b52",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/cea/": {
+    "hash": "d02da8c3661b5b14c64ddc3e1d43ea3514d773752edb36db00d25b56b22f7599",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/ceb/": {
+    "hash": "69c1ea28e2e8b73c14030f1bba14287fab46bd24a3d74e09926c766a019929ed",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/csa/": {
+    "hash": "cfd5f202f76fd78dc2299452bcee800a8be2de9f83454f1a67c402c0369a4999",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/csb/": {
+    "hash": "39c1f27e79a67147ff10fa4d6671273e26c63d970d26e14de1c78e5bd15c4027",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/csc/": {
+    "hash": "f604ac4ee7cec15596d4381a8685e5d44dbe6bebef12199e24c1b4ae63d2c54d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/csd/": {
+    "hash": "c113585d00acaf07129079fac4ad804f1aeb92f6b9f69cdc7af9d89c5d1242c1",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/cse/": {
+    "hash": "160203be4737215f002d8fb6f721d129bdfa322f5b296a21df1e2fa94969b831",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/csf/": {
+    "hash": "a9373b3417e0d6bf242b896769546314cb1203ccf859c7a5fc4c8afde94ba1ff",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2cea/": {
+    "hash": "b8c180a833e136ee39be9643d5e31c881e4bc0b881426abfc6649413ccdd5937",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2ceb/": {
+    "hash": "17b3987086f0e90cc03391b30a793f87d5362b6b4ef02d9fc773d76f678590ef",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2csa/": {
+    "hash": "47778793b20c67abccf08b8efbcca15682a09ad6dedb5318f728a2a1fa442d5f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2csb/": {
+    "hash": "3ed6fe7d0e091fb92c26c5862c83b3a265dc2c5508b1e6098ffe8ef8060b7e6a",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2csc/": {
+    "hash": "ad516038796eb6e9b8c29f5a12d3953cdcd44c4583b6afc183b2284e32d18f2b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2csd/": {
+    "hash": "c04dc5e8bcffc3a801a566273eb640971f6906fc322a2a76c8ff63f4a1b25865",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2cse/": {
+    "hash": "150176ee7b30f3e0a9f9beb1d5f2c31b1f17ed78efbcfacf19e8a9cdd4ef17cf",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2csf/": {
+    "hash": "7fe441c1623cfa18ebecb163db2e2ddf9bc6dbf43c35e6a9a4d3e6c81e263c17",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2eca/": {
+    "hash": "6fb222d127565a5ae076d3720b71baf4996c6f15d5e9610a2cf9a725d989f3d3",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2ecb/": {
+    "hash": "c81aba552e26fe23a9c60add761236e848f1c727971030fda03c0f1cccc142e7",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2eea/": {
+    "hash": "33aa5717408f1e98161202c52a2412fae234a7b0070bd5258d1855f4f42f298a",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2eeb/": {
+    "hash": "13ace7e9080fb080ffffaeef5f7d48ca5bfb734ba5e95eab0f4b564533019f4c",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2ita/": {
+    "hash": "1ab9cd3a674a8e4398a4c070096a2f9702ceff8b8dbc3d724fb3472d8981a398",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d2rai/": {
+    "hash": "c39987236234c3c4c5fe3902f590d4f19b8c199e560c5a6c4b6ce4be08c3f3ef",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3cea/": {
+    "hash": "f88223bdce782cecd421eaea070b76dab7ea4a67c18368d5c60acf84fa5ed45b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3ceb/": {
+    "hash": "b9873f36d442e022bfe5ecfd9eb8fba398dd19315362207a3468c68aac4aa4d9",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3csa/": {
+    "hash": "93215690e01370941ca527af74972facb6e2541a6035f49b83a0635f939fed0a",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3csb/": {
+    "hash": "69b4f214416fce2c188b8a55b507e565b8a52f40470050bc0c452549d37fa038",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3csc/": {
+    "hash": "60c400d09f1d80886e679fa0e63d69fc69c6c62fa416a3192f90c3db8aefc140",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3csd/": {
+    "hash": "801021f95cc5d73e23a616332f751f881429b9a2c7d0fb8a7239c599a5198336",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3cse/": {
+    "hash": "c27aacdb8c4fc7f1aebdc07a41f05fccfd957c220a413325790973053ba22960",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3csf/": {
+    "hash": "b8c3a599bd13079a9a216175db622a28f52d7508a8e152e4613ec4ef56410c78",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3ita/": {
+    "hash": "d9209b59e7ac78924bca18e53a37a692086a258b313f949b3e6bfb3008f68e64",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3itb/": {
+    "hash": "b055663156e22c37e84150ca0bddac33d7a3189eaf85483f2277ea82d8363e66",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3itc/": {
+    "hash": "a7e76037e12b164c357d1a35182639360a12e6da1b2a0b57609d3e00b6bd54ef",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3mea/": {
+    "hash": "bfc6c2e38f3c99c9115bc85523c3f1ce9416efb1bc20d9edad93c59e0e0f4b72",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/d3meb/": {
+    "hash": "65fbeb4dcfe2d512ff009e7148e6d57b49a28fc1fee9fdc7426a86bf0650348e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/eca/": {
+    "hash": "b8c45ef7a16a8c991b7d364e023b95d2631b4a47915d72f6b1ddf4f45d54d5b8",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/ecb/": {
+    "hash": "cee252dfa562bc53d2a2c2d5826e0978d0ff218207107403e12f6c64b8991572",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/eea/": {
+    "hash": "f3343038734caa698b4485a512365f61650fba56b363943f7a458258ab9a41f8",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/eeb/": {
+    "hash": "e0e6771c32d33e439f91261c2d41551d97f87a53494b5c2844420f247fc31654",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/ita/": {
+    "hash": "7690e70ce15615a5d7d3f15f6bc3df55fc9f47fbc2a42e0fb4fe470a9803513f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/itb/": {
+    "hash": "8c82423d4cd0695ea6d011a53043e3f180c0b94059c87095ef695b502104461d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/itc/": {
+    "hash": "bc2cb1582d5b250ff36a8761cfa73fc01e9929c5c07f848a90cab56a82572865",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/mca1/": {
+    "hash": "09b6ea9f9be97ea80bb34aef9c65ea9bd8133f3f11de1bb0767bb4f2998a0ffa",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/mea/": {
+    "hash": "25d26f35a566caba28673fbec6f80b0daa7fa52eea1cb5a85b4cc25efb02efa3",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/meb/": {
+    "hash": "32e660c19d8044dd61d9d795a145d31cad389f037ea06e3cad2e46eeaa2b83b6",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/section/rai/": {
+    "hash": "6dbaf385206d38575718f4940588a9d4415072d06814dfa15a8008e7b6804f4b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/app-math-cse/": {
+    "hash": "8237f0fc0f86e7952b33de3c4c90aa189f2e0bbc3fdeafdbde16882c49f5539b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/app-math-ee/": {
+    "hash": "c31e69fd6a68de77cfd1fc970125624afb4c147bb602e0539a116ba682b0f802",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/basic-electrical-and-electronics-engineering/": {
+    "hash": "c235ecbf8d44be84cce500ab19e19fa04b7c3d7297d01f89334b0ffac44b84ba",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/business-essentials-for-engineers/": {
+    "hash": "8e935ed3bdaef9f8b3ad0cac4cc06f234c3d5526a3bb00a810d53b9eed234e11",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/chemistry/": {
+    "hash": "0fa6042012e898f266e4b24d2fdf06ccd72108a22bf26fc982f462791e6e32e6",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/economics/": {
+    "hash": "7f50cd43891ff24728c2e98fd7337c82bba45e59abebeec2fb65a0a24c90221b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/effective-comm-for-entrepreneurs-i/": {
+    "hash": "31869939c50a3a4b0d2b450b5759199e5176ddbe36022e7b2e884c0e5d149336",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/effective-comm-for-entrepreneurs-ii/": {
+    "hash": "699a6cb5410151ddf1c12eb9bc6d12958352792d325bfce177f1aab1d87a0d28",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/eng-barch/": {
+    "hash": "78add21118d73f3b9639e3709216ca40e66f370c6a4d7aaa3addab07019a9b90",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/eng-bvoc/": {
+    "hash": "e653f35eeadd4b9d9378cd443ccd2289c07076668e2bc1c0411663f4850b4271",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/engg-drawing-and-graphics/": {
+    "hash": "85a7d55c32fc37ed96f13915f44c4b673b673c33d44efc60682f24248738d525",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/evs/": {
+    "hash": "fd15bc898c3dfc833ba93ba8cfd3d00efda3d2f9ed65a998bc9aa935acefb377",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/ge/": {
+    "hash": "2deb0604fb04508c1366f6aeff14ec217cae21055796672a4d3a35782ba53ae1",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/hvpe-bvoc/": {
+    "hash": "8661e13098596f07ec34626bcce2eccbdcb044117b2fa60fd025be49e2bcd332",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/hvpe-barch/": {
+    "hash": "33d255260827d9e1f5f650f3b4efa910b0bd22eee48823cef8a8f69960a41e42",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/ic/": {
+    "hash": "bbc1823305f70496f7926b9ef37a6566fc2f318365c92c2fc61903258cc61163",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/ind-iks/": {
+    "hash": "0875a2b4cee1c7f9bb453c0bc96778cdb5c5689a0ebb351756ed99fd9b068260",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/manufacturing-practices/": {
+    "hash": "4df08bc0ff32a29a182fd348b3f5eddb5a2c9c3dc5ea96f397594a9558fce0d8",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/math-i/": {
+    "hash": "2bc5d3e241c668b308ce0b6944554bf8373c1f5b2290d1a78e5fd6739813a11f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/math-iii-rai/": {
+    "hash": "61c4ed2c1ac05df7ca7c8bb4286c997ed0c044582d5d96fd847d2e2c0ea3aac9",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/mentoring-class-and-professional-development/": {
+    "hash": "fb3feefddce462678ce9af149b8c5ca76c98f9a8fffb396ce6d98989336333ea",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/mfcs/": {
+    "hash": "6aa6b9b5d90dcd0db811727f3b5c5127f667d4d24cbd5b14301b75779ea13272",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/physics/": {
+    "hash": "395c189f4b89a093266b28df3836b8094eaf7a2f0cd514ee458e6412c294cf7a",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/prob-n-stat-ce/": {
+    "hash": "7aebe45ce2c6e6e6116df87010505c3d96c4c246bfa72e65d2805f662e3e5c03",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/professional-english-communication/": {
+    "hash": "039e0e548ebf22dc20cb93cf90887dc3f74a3922cd6a78ddac5c1308eb1f1024",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/programming-for-problem-solving/": {
+    "hash": "585d1ecf35e9f7fe23b462f53659957ed2cbd7e72550294c40cf7f001ea9429e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/prp/": {
+    "hash": "5f52f99b18a64824dc34bbb165ec6287240769599d105513948269553949ceaf",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/subject/tc/": {
+    "hash": "e8e1b95cdcd9e752cdd5eaa4042b14cf81261b13718953a5718bf726ec771669",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/aastik-sharma/": {
+    "hash": "099316c048e8f9494a6f1fc6769092d7f68028bed25e34f8db2a665c3276b76c",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-amandeep-kaur/": {
+    "hash": "7a238486a43a948e2be66e3374c733aa505c78c04afbc48eaf4d59adba814d62",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-amarjot-kaur/": {
+    "hash": "93b2c2ed3bb319aca31f8f3ee14d4a6d0aaad3d5c3bca0b4db091d9e7bd5bd2b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-amarjot-kaur-dr-jasmeet-kaur/": {
+    "hash": "9a5d18f50be926206bc40f684baf6309ec9e8b42ab2b01fb4b9b9f0b0b41ca95",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-amarjot-kaur-dr-mohd-tauheed-ilyas/": {
+    "hash": "f0e579314b4c10d526dccb00d45c608774220411d8d5edb10c0ad1d8c5a14596",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-apk-sodhi/": {
+    "hash": "2cdbea7be5538895b873f6e7bd477a6f558aab8ef63a414213ee9987202a6ab0",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-d-s-pathania/": {
+    "hash": "e7fd06b101adda6c801524031566b0746ce88b12c48554fa013da250b6147f0d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-gagandeep-kaur-lotey/": {
+    "hash": "4b2cd83a315378eea772faa4e51b21b7c973501611fc9bcfbd318759b9ad1b19",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-harpreet-kaur-grewal-dr-randhir-singh/": {
+    "hash": "a234792bd8b81c77d5790405f891ef9fe412c82ec14c8c01062ee75739bcc5a0",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-isha-dudeja/": {
+    "hash": "38605e553f801760d83caee16c361467c12402cfaae96e7052707c1c5e65923a",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-jasmeet-kaur/": {
+    "hash": "e6c4906896d986dd1a0df78f3005dfcbfc4c493eb228e8d14c439374a2354bab",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-jasmeet-kaur-dr-amarjot-kaur/": {
+    "hash": "4d9049f60a766560a4c3ee412142e44c6be20cc95de3d4393271f24411ce7f50",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-jaspreet-singh/": {
+    "hash": "af80c1faa89c79e28498af0210c80734faeb01856f1f0c31e2381cdc5e2a634b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-jaspreet-singh-dr-jasmeet-kaur/": {
+    "hash": "cb7e490921ba930269472519f63ca064465a2cdee78dca787bad7179b29d3735",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-jaspreet-singh-ms-komalpreet-kaur/": {
+    "hash": "576f9bbc500291862ab79349a14efc774045c2bca221eca3733fbd76a5fbd9f0",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-paramjit-singh/": {
+    "hash": "287d6c76688d7e0efa8f9960e611598f1a09b05ed38010d9d6aec02cde337485",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-paramjit-singh-dr-mohd-tauheed-ilyas/": {
+    "hash": "00a7d46d6772a3ba026312ac2bc9070904e49c0f2ee3ba163b688cc7ed1ae3e5",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-puneet-narang/": {
+    "hash": "71013e3fde709aa1f3278164effaffab35a71304a273fa7ee73f0d68866d8a55",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-rajbir-kaur/": {
+    "hash": "d1553c65d65d3f02cea40da9504090f2f9cdf3e22e64a4d6a836771f612982b1",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-rajvir-kaur/": {
+    "hash": "aff2c9e3c2dd1f48654943a5f1ca3c07a24cc5d81d2b2b5586bec3286248e4f8",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-randhir-singh-dr-harpreet-kaur-grewal/": {
+    "hash": "90d26f07b34525d724c43b30a5a180bbc29b05de30747436c32c3247f69449bd",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-randhir-singh-ms-komalpreet-kaur/": {
+    "hash": "d08bee362e540d2933dde48600fbb6a5f328ab944b09fcef37c6bfa2b944d27e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-satwinderjit-kaur/": {
+    "hash": "f8342bec14a8cce596a6207ec05a28b46da473287f218fcea4e07d13eea1051e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-deepinder-singh/": {
+    "hash": "73c3a4f763984d8e431f3c7fd238a01585b2ed545f1b8bcd3d229d23af7a2d8c",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-gagandeep-singh-sodhi-ee/": {
+    "hash": "eb4ad74758aa8e605a105e145702eab3fe583aef9bfa56138c1016ee736581e4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-gulvir-singh/": {
+    "hash": "184a0d9ae9746f067fa28e0ed4353ca1abf31393c0af0df3e4f8f6dba0601e19",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-harnam-singh-farwaha/": {
+    "hash": "eb40a5e0a8b5ac4d85f646a840aa60bffb58195361c115d31a5925364f988219",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-harpuneet-singh/": {
+    "hash": "3ac27bfe3158d39623f1057893070da7c47856e0eca0fb63704741dc8c2e4dd9",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-harwinder-singh/": {
+    "hash": "226b84c119cf5f5fc5d66aae99597f85f1e2f671df9790d6180feedd2ba1054b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-jagdeep-singh/": {
+    "hash": "1e5dfba83610a38a7936f5cb5d55b675e7b1d1e0a908c2ad3db1d93ace2e4a20",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-kanwardeep-singh-ee/": {
+    "hash": "91b16343e974f6e6d8853206ce5f6e4240bbd3efc81e09c08fc73c64ad35c974",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-mandeep-kaur-ee/": {
+    "hash": "c33732c4015f904dbbdfc1639abc1ab8fcd139be89094b62f545c452f4079fc5",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-mohd-tauheed-ilyas/": {
+    "hash": "a7556567f0117b07471628ee132d295d1f645c812add6d744ccce8371f42158f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-mohd-tauheed-ilyas-ms-komalpreet-kaur/": {
+    "hash": "0de7f74f4e68d93b64b660e4ab22c7cd1b67727352c5014fd1cdcd77070a790c",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-navjot-singh-ec/": {
+    "hash": "272f5ac39384f8532bbba082ec8f57264abd806648bb92231a14bed50e9be5cb",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-prabhjot-singh-pannu/": {
+    "hash": "b90ce7aeb3e5470bcd5efebbcd69dae48adf85ebf7510622faa787f00b7e49e5",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-raman-kumar/": {
+    "hash": "93dbbc92d02623c0744f0179b861383f862f01902eebd91b20f524ba074f533e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-ranvir-kaur-ee/": {
+    "hash": "b027336b14c1fc4b86181f5eaae42c2d836de4492412335e39aaebc5f3caf1ef",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-satjot-singh-dhillon/": {
+    "hash": "d2974d709bb5ded03a9495d1374d08614f65a964f608f957eaf3251220c53dd8",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-sita-rani-er-khushi-dhunna/": {
+    "hash": "450b2f7a1c343313e7afed8e773f6c63716030bf841876454aa33b9ef669e72f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/dr-yuraj-singh-ce/": {
+    "hash": "9c6931e143d709ca46f0e912b5c7ab6947cad76c0db83286761d01c05770a73f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-goldendeep-kaur-er-kuljit-kaur/": {
+    "hash": "33607f85d041b1667259ae0193a0ecb0b6303fd9dcd12d733e1d718873344a02",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-harsimran-singh-ta/": {
+    "hash": "82c8ba291efee8ec69822cd45fa32c26367db6164ad2a01ab32b8effd3d0278f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-arshdeep-kaur-ee/": {
+    "hash": "8c2639da62094d7f855bea39b574626c69f980aba4c172f209715b56f307cd12",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-arshpreet-kaur/": {
+    "hash": "53d3343d63e37c58b6f1c1b5ef790aca05131b2909cc640257a5209cb22fe131",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-balihar-singh/": {
+    "hash": "022fa63176491f1c598dd4944ba7e97790d4f6d28f4290acc441e1dae618c493",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-balwinder-singh-ee/": {
+    "hash": "c4cb1a4e46d908ab6fd8b731dd702cd8ef7dc43977ac05ddabed22f21eedee36",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-bhawna-ee/": {
+    "hash": "451d3b4f9325d054c62b79a15af7ad49c8f0addc8f116a53fa5ddaa6f111d347",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-ekuspreet-singh-ta/": {
+    "hash": "b5b8836163bf5d636887db0b60034f5f411e8771c6f62ce42d529c6491d8e62d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-gulraj-singh/": {
+    "hash": "4abf7b78d3ea496b73a69a6493660e528c1af3d659fce250bd846d2f20e126ef",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-gurleen-kaur-ec/": {
+    "hash": "0929aa841a1da4715a27b6dc71f26b44674bc6cb0440d34ef7059f1e7616ac7e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-gurmeet-kaur/": {
+    "hash": "d86897a5543fa6b6ea2e3c9f7bb7710e48fa9fbd810cf5c1c7bef7ed1a3bfed2",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-gurpreet-singh/": {
+    "hash": "07f7cbfc62acc87e7c94777e4b6d7e7da82cb4730a7890206c97547326b415ae",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-gurwant-singh-gill/": {
+    "hash": "3c8345492dca93c6f18037646fe3a798f083991058ca900d6a50c9b9e226f3db",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-hardeepak-singh-it/": {
+    "hash": "dc5cd4e91551185a1591a8c5146bf3d25850d9d9d2dd06eb7ca4c53e9dc27551",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-harleen-kaur-ec/": {
+    "hash": "f50c84ae7351ad1cf9d30d33f5274a9385660114355a47ce3ec832b6b796a8a5",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-harminder-kaur/": {
+    "hash": "6d2509cd6bea2535c7c45f910fd881949ebd8d408e7885cb64487fe19df93fc4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-harminder-kaur-aulakh-ec/": {
+    "hash": "ab6fdfc7737a6d7a1e6ca9b56e36dabe3eaef50064a2ac91d304ff64d439a7ad",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-jagdeep-kaur/": {
+    "hash": "82fab2b02f5456b251a5a35701b4ae90894666e3095e49d82463f5d851c888e6",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-jashandeep-kaur-ta/": {
+    "hash": "643ebeacb13659df76777bbfdf87556aab4e6ccd15003c30526fe2b1a64da251",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-jasmine-kaur-cse-er-jaswant-singh-taur/": {
+    "hash": "7e7be5bf28dd0d0eb3a7ef95ddb3b3065dc5ff9765758efb2265f341dee164b1",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-jaswant-singh-taur/": {
+    "hash": "cda48515a7ea0a7199252f438b8ade20e7ad8fd3c57a7589496da5a8c9fe97cd",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-jaswinder-singh/": {
+    "hash": "de9d83408166fc80f535d610b1c10ef3be4daa4a49eb5d3255f0f31bf8c53f7b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-kajal-chugh/": {
+    "hash": "147d6e000d2cedd49058e6270423f7e3f24f60d6da50cdd62746e3065b157d25",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-kamalpreet-kaur-ec/": {
+    "hash": "c257b06d7801d75eecebfee76b1c2b008716366ead1eeb9aa17c842cd99d64dc",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-karanbir-singh-ee/": {
+    "hash": "c5cf91a8b70a4e74297d50848ea030f10ad512985a5dcfc99774ae83757e3901",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-khushi-dhunna/": {
+    "hash": "e9e38676934c1d30d57958e80d452120e35b0ff4206277817d75d2b276529bb0",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-lakhveer-singh/": {
+    "hash": "5617870e79b26fbc9ca8ae6eb4b8b438ea05bd8a7c2625062598cb0ce402125b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-lovejeet-singh/": {
+    "hash": "4892d881faf63228949f2a31c628cc45428ca53e8323083b53b950db8c591919",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-mani-bansal-ee/": {
+    "hash": "614e75882649b60fa49dd9af9d642e5428abb86443a5852df943824c3c728f51",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-maninder-kaur/": {
+    "hash": "9ed78407d34c3b8c782bf220106134967464771c15dfc150cc1c87d38b734061",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-manmohan-singh/": {
+    "hash": "9fd22030f6a58e87b992f61a3931f3cf1251dfd3d29e0e57695a850da5738be1",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-meetali/": {
+    "hash": "2e68cb835b224c3fba3c44e035aa2cde70514516f43bfa0adf697cd565da9312",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-meetali-er-jagdeep-kaur/": {
+    "hash": "f49cc43297caccb00afe8d07826fd701dc110938ab1cf557c30735c43669364b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-nancy-er-kawaljeet-kaur/": {
+    "hash": "d7cee67f1f505999073aa696de70bf51498352b9704cffdc2370bce7134fee1d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-parminder-kaur-ta/": {
+    "hash": "e9172a62de2674cd1f8c6fbff17a9bf2ea733d0f2532f3ca5e0b8863b8d8a2e4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-pushpinder-singh/": {
+    "hash": "7c67c5357c52c3717431dfd7a32ed4041d72f34929e44540af8330c9188fd8ad",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-rajbir-kaur-ta/": {
+    "hash": "5a96f9e755f2707a0e0cb714c4b17fb913bd79c7970d2b3ae509ffeea600766e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-ranjit-singh-ee/": {
+    "hash": "5cf2f3240f2103a9ef258da9762b3cd6a77b620d879c53928199f0410569e21f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-rupinder-singh/": {
+    "hash": "7605ca58236e4d02bc7e3c22985090a644add6891df3dd61c24a01a1203061c7",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-satwant-singh/": {
+    "hash": "2bc21bb4d5f94adc6a45ad3d6e63533059cd52a85b08a3ce76813a8debe686e0",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-savleen-takkar/": {
+    "hash": "8463975ac2872f81c0a71f0e61cc76f32d92b1943b53379d6bec3327f8f667bb",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-shehbaaz-singh-brar/": {
+    "hash": "6e5136897008c2da93510779312b94591071a4ed4ceabf382f75f0f62af996bb",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-sukhpal-singh-ee/": {
+    "hash": "86c148d4cdfb8ff163d8ecc89b325ac783b2de7e2eee14404151a04aead3d8cd",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-swapandeep-kaur-ee/": {
+    "hash": "55f04a176ac94928d56fbfacdd174bb722432e7583ce014b3d14a42b5340bd52",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/er-varinder-singh/": {
+    "hash": "8968b5249ef281ecd8074b7f9f150668161585200e01a7cc005b6c976b2c684c",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/harpreet-kaur-it/": {
+    "hash": "40fc949ab375f4b61eb2cac9c65aaa5512cfd1eadb9ff10419a85d78585717e4",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/karan-bhalla/": {
+    "hash": "f8023c3dc88f4cf51ca306a51bb698184096ef097c10a3e6aa7230970127a0a7",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-hitika-dhawan/": {
+    "hash": "d8990de1d3d1348957a2c73b56a14d61a35df381d96d461226fb4389abdee420",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-kiran/": {
+    "hash": "ffaf6f01b4b93c9d7591040094d772d6dabdf6f8871a7aff80c6b1ff81e0b3e2",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-komalpreet-kaur/": {
+    "hash": "34043f576cdb96a0ae5233510602dcd96b6ff4c5edb288f08523ae13db8618a6",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-komalpreet-kaur-dr-jaspreet-singh/": {
+    "hash": "6f7fd257d235422201c4620f25f87775c330d2d1eed789ac129dec60b50e0dc9",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-mandeep-kaur/": {
+    "hash": "43f83b6bb25497c92c2d8412641f5317b09f881b09efffc859658ab743d84e3a",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-manjot-kaur/": {
+    "hash": "32e42e70b5f27c6a376d3d7d7f2d69f03b19cba92069648d2da970e79cc392ab",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-manpreet-kaur/": {
+    "hash": "e8735114919783f80834be4462690443c61ac2f89b4c2675a1960f7371bf6201",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-nisha/": {
+    "hash": "62325bb6e1b1246990d46489b041d3b8a4f530ea80c7791e5c6f3537459d95c6",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-paramjit-kaur/": {
+    "hash": "7545c1e4c4156a1be84b58697d17d91683669af41314de907558062f6453bdb3",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-parneet-kaur/": {
+    "hash": "d493bb00c319167a6497a82e6c99d7425e2fe572a9847b8d452ad3b629b9d49b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-pragya/": {
+    "hash": "cc5cafbde25a4f937e03f7cede2fb5311e9730e080339caf27420fa6e7b23c65",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-sahil/": {
+    "hash": "07b3664ae7ef22d6536b6b76b4bffecd9b01fe91ac3092d8e11876f81251f67d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-sanjam-kaur-sidhu/": {
+    "hash": "4cb1826cc2ace71b7b63749ebb87d316fbd5657f6022f951cf8ade7300ba7dbe",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-shreya/": {
+    "hash": "37627473d1028cab684e7c5268f256aeaed8e5d817a44bd8f46a61ed8670204b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-sumanpreet-kaur/": {
+    "hash": "15b1a2b299dd936ff757f920ee45829c68c4c2de8523dd1a8bee0497461cfdd3",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/ms-upkarjit-kaur/": {
+    "hash": "301549b0ef461cf4117dbcbad9be431d578d4ac749293eb62db8ff598334b72f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/neeraj-kumar/": {
+    "hash": "c9c64a8a015405e88a0f22b467afd137135f34530644c7364015871cc19dd484",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/sukhminder-singh/": {
+    "hash": "7ee5619cba02e28f89a833c5b3b670193c3d8e34bc87e180de74c4ffe53c3824",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/teacher/sunil-kumar/": {
+    "hash": "a497cffe92657c693dd53f7e8cf3202d0794b420c1b7e097593a2e6d06195945",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/a6-automobile-block/": {
+    "hash": "6f02169d4812c9dc93156103f4e04e8f45e5e3d51b87a5f7eaccd5c7b3899384",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/a9-automobile-block/": {
+    "hash": "311d44955ca3f1a278b8208783a81af35940d7160c72bdfb5cd721f8bdffda3c",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/advance-measurement-lab/": {
+    "hash": "a6599014400fbc58f3c0eb9b511ac27338eb1e520b81bcaff8eb1a14026d5e89",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/bee-lab-1/": {
+    "hash": "6223f8403c47652783ec4bca96c32459678d50aeebc3f4c5b1fc63a934b3067f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/cgl-lab-me-dept/": {
+    "hash": "4f10398b57acd1d5a2fba1577ee4cc6ed52ecd91c2d3469df71f6b26d9c79b26",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/chem-lab-1/": {
+    "hash": "f54b4ed91488b924fe3292a66101c4f17cbfe5c87bb8e24888aa5f271714e9cd",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/chem-lab-2-material-science-lab/": {
+    "hash": "1c2bf13b9b2f0d8537e0709b72d361ab0ec6313c55acfc143cd2f83b5c5a9a41",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/comp-lab-ce/": {
+    "hash": "f395c5959cd2625931b14b4cd8bd2d9d92c157ed72b7945e19690663b9b6198e",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/comp-lab-ec/": {
+    "hash": "365c65ae6357e8545987859b4b4c724fa7eb3044a25ee95e42c872b200321947",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/comp-lab-ee/": {
+    "hash": "57ec3f9741190b642e98191213bb1efd8291f0a6f3f587bd87bd60be2132051f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/comp-lab-mba/": {
+    "hash": "3a9ab63f3111de2703aaf00d3429ab1972b70056a394b3599b30de9337c28765",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/dbms-lab/": {
+    "hash": "5eef24fa718ab19ae151b1fb305d74f3748dc39e70c2e24a1d8ef0067bdfa7ea",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/dbms-lab-it-dept/": {
+    "hash": "a2c2b4d98eb88e8c86b490d63ea2c1ec97b8ef8b21c357ee0b777ab65c5be129",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/eng-lab/": {
+    "hash": "8ea041ad875df871db6b21bc81c0e024982e7a57b1dd81a27d47aee13a95ab84",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f101/": {
+    "hash": "174400a188e78c9ddf75bb3e8de5e9a3a1619152eac624dfa1a98eaac2c35ddc",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f102/": {
+    "hash": "9a453fd4664ec0021a772adcec16cd63bf72d1c1d895d5254e80d69cdbfabcbe",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f103/": {
+    "hash": "c30e4a0cb773e397e2f90853ff73a443f2421cc28813902cac872ae4c142c1ae",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f104/": {
+    "hash": "2ee8077c3956fd4b359b26a410d11eba53105173c3e172bbf193cec7b02b8e91",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f105/": {
+    "hash": "cf0f9a486636d5decc20eeb16e493ba82c321e916f7542c760a6a5e0aa2a589b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f106/": {
+    "hash": "98c2262c5c538ce826cb75ca18dd4e8be1561eaca274cea34d995209818ea228",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f107/": {
+    "hash": "e09b8d1fee0a1a789d56364d1cae624a8540c2f8683f6c2390dea7114114dd31",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f108/": {
+    "hash": "b6bfffb3061abc6ce1bde7de425adf6929a2d59ca0e7f92ee7363ce9a6397d83",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f109/": {
+    "hash": "f229b59ee663a3d15d4854b3bac36d0ddbcd01cfe79c2e1a0bc002f130293c1d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f111/": {
+    "hash": "177c99db2f2c38be572e4d86d621f21816aaae26f9c8ab193bf95c78744410b6",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f112/": {
+    "hash": "2f0cef074f34d1ae0ef67008e585fb87b8dd516a6112070fb9e0dbe06a8d8dd9",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f113/": {
+    "hash": "599ea53f0054c5ad8c24bc24b8bcd799e1ce360816f5063e42f1659ef1b17587",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f114/": {
+    "hash": "e20b116198f76dc8430c27499742be26c09249ee1f05fe534d17370a12ab61bf",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/f119/": {
+    "hash": "25d2ca3b7c1d59401d0d4fd035ee069afe5217d55a4911df123c39aed3554484",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g1/": {
+    "hash": "d512329debe04d3b46733c3cfbcb54c31bc444ea0df7d13f7e34cc57ceea21cd",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g10/": {
+    "hash": "67e0537a49b53c96fd8b48572ed39ecc3676bfb86ef0818123f3aa446da63d2d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g11/": {
+    "hash": "19a28df3ae4e82675841e752b515cf6a1795a7d5e9f9dad4720659547de539f2",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g11a/": {
+    "hash": "ca6d972d32b4aa150be87d622e9b8116e5399735e668662f628ead6db4d7c3ee",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g11b/": {
+    "hash": "d0dabf0d1d141e4e58ad0f144c50df68b40137c25745ffe8e39d684fc766245d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g11c/": {
+    "hash": "a4e1444b3e98c54d2bf022749cdf9f9a539cf1a23ef9db9342f9da101303600b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g12/": {
+    "hash": "bec24968e55e0553d3550d629eec70dd36404554f456412fc3280d7eeae45712",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g13/": {
+    "hash": "191878288bc143fee08283e6b9146e7db7ab7dbc9794efc68e0d1963fdba7e84",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g14/": {
+    "hash": "d5c80f49714bfe4c0fa44fdec650daf66729edd0d457e3981facac3f7d5a24ca",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g15/": {
+    "hash": "984a8ed5eaa28acd01030f1098c459d0eb5f69c3bbcdcee1354acf75fd2f90ca",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g16/": {
+    "hash": "ba89de7085aa487bf1e1c5c9abda3eb3558fe82aace0d28595b3f7eea188b519",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g17/": {
+    "hash": "b946d7870ee44250eec3c9afaeccb35ca9575c30d751b98231c7feaed34f5bda",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g18/": {
+    "hash": "b79b3677889b91e204bfe42c1f0ce2d457041880a2603b3c1d50482a53d71c06",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g2/": {
+    "hash": "4e731f162669478c6e94c44c319c4c1fd308966b6253447be8e8bf76e1fc3b5b",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g3/": {
+    "hash": "a2a8d897ee8d9ec4d7570b9b55b4ff665cb8a8541ffed46775a923bb08d0a2a7",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g5/": {
+    "hash": "bbc83da94f899fa4ad83609f6b4c982035e8429633d5be1300379e37808785c1",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g6/": {
+    "hash": "8c923e8177e0937faede6fea3765aa060352d6d639619405e0ff35b23848b510",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g7/": {
+    "hash": "df8b07f66a568a167777fb632d21dbe7c75068cd457a3895d34a42e2101e06f0",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/g8/": {
+    "hash": "2a67d9500c6e3c54a15661c060448eb3cde4136113673a57338e183bf8946102",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/hpc-lab-it-dept/": {
+    "hash": "b45d380dd32b7dfddfef6fad3eeb0e3f1be72be393d0e6df934dd6b981819b58",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/hw-lab/": {
+    "hash": "c3b5809247475355c29bf360bbd7456e153c5da9d8da8b5ac9cffb7e0ef4b6f3",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/os-lab-cse-dept/": {
+    "hash": "2a8a9d5803486d1da7c5ced8f23781fddd1e0a6a238151c41fb570d1624d7424",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/os1-lab-it-dept/": {
+    "hash": "cfc836f77cdf145b5bc195e842a0803ae2cd2dabc8e32b7d192c41632f2d1918",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/pe-lab-bee-lab-2/": {
+    "hash": "bd739b1b7948bf75dbafae7dfb970f7faace413ded519e2172b2a74759dcca43",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/phy-lab/": {
+    "hash": "64be6ff438b7c61af3173ebb5cca6008289ac80b2ae59ce65444bfdc3eea2434",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/pl-lab-cse-dept/": {
+    "hash": "3cbc6fb61cbec06e1d940980bf5d3f042e7301c86a4b68e00fdc9d82a1bf58aa",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/pl1-lab-it-dept/": {
+    "hash": "cacf83c5d0831ac5223b7f179adeff78207c2635713c1c7fd99887d99c2a3638",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/r-lab-cse-dept/": {
+    "hash": "5f8e703c44602d5dbb3689e2d5308596913f6706c9e890fc279f95ea400f08f8",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s-220/": {
+    "hash": "528ffc60dbff06ef6160151c1fd1ab1709b6a186ee14677f92734d46c01d6e45",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s-221/": {
+    "hash": "eb65a61b2e55c52c986c1a354984d3a5abc0a8df7b1e4350ec4e17d1f10cef6f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s201/": {
+    "hash": "4faa9fe75d153c74f36706e88f14f9b4ac7ddfa8bffd3693563c89c0f38a838a",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s202/": {
+    "hash": "db8baa94aa3a1f273c1da16c0669158ca58802aa57f588f282451491c9bf59d1",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s203/": {
+    "hash": "29663f56eab6581dd043c499c2ad5449a70efaee0881c595750887cb9c9a735d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s204/": {
+    "hash": "add90265dff664786559fa7927f4501680480a1ad36807595092a9cd10615863",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s205/": {
+    "hash": "9e9830c0c713d0286027a40576b9b95aabcccd95a4c15bcaf0a0d9101c8ec00d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s213/": {
+    "hash": "b551b55211ee24ba697d65fe3bf422d36ac937e4469dcceab7650399deb87bd5",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s214/": {
+    "hash": "e59aeb63006610b888f56b2290f50e27a6d79757f2e4513e55d7f76d1c081c20",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s215/": {
+    "hash": "6a6316d32e5d2841823537809dd94a7510a16241f8ce0c8c18297e9b3c99e9b6",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s216/": {
+    "hash": "1ae9501a28be0b4c96129079854a6fd747cde49116efcd9226d15970c3eff344",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s217/": {
+    "hash": "3eb651c5323a2221e8a4afcff17a65aa5dffc536968772bd51177f244abf3c22",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s218/": {
+    "hash": "2bd39b2af71b1865b4250293205f44cf7514208dc75cda4a04d9042be9cdb311",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/s219/": {
+    "hash": "8046313d16e52d08908f25217c952f08066cecbc4b0d6ad07442da36421ab65f",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/seminar-hall-ba/": {
+    "hash": "01a3520fa87f60707cb6bfd94850d57d62fc86ead7c23cb96d0740eab0f7dca5",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/sl-i-lab/": {
+    "hash": "bad05249a0d8ca8a8a1ca067684fdcbb9e20f9aea425d9386ef9963027033775",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/sl-ii-lab-cse-dept/": {
+    "hash": "118c8aaf702b8d6dd8ae22a1b2e10ebfce081120fa021d75938fb877f5ea2d11",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/sl-iii-lab-cse/": {
+    "hash": "6610a405986d051b75ccab31de3d2182d2a509039bab4c5a33cc1e1858dc2445",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/sl-iv-lab-cse/": {
+    "hash": "d7774240c723da1efacc26686699a073ba17e2d18c5e8f31bef4291d6daa6e94",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/ti-l/": {
+    "hash": "b11cef062f3b744ae54553e087ff6a9661380dbedc8c6467409ad61be72ba98d",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/w-s-seminar-hall/": {
+    "hash": "84035a8d02cbaaa715393c72d0879f2d04159f0b7b2cf661c8e06ec2c3faf769",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/wd-lab-it-dept/": {
+    "hash": "58d818f6784bab39ea081aedafecdf46bd7fe93b576726e8d147087d9465fbbd",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/room/workshops/": {
+    "hash": "b5234e35c38b064dadbc33d0a534aea530ef9fc4d3301498c834872660e873e0",
+    "lastmod": "2026-11-10"
+  },
+  "https://gndec-compass-next.koush3069.workers.dev/college/exam-datesheet/": {
+    "hash": "45243267916c5f8d4150f47294841470928123b5307a9a252028d9300d44bd14",
+    "lastmod": "2026-11-10"
+  }
+}

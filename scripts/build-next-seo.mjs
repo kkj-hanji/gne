@@ -18,6 +18,7 @@
 
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DOMParser } from "linkedom";
@@ -28,6 +29,7 @@ import { SITE, ROUTE_ORDER, escapeAttr, escapeText, normalizeOrigin, collegeJson
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, "next");
 const CACHE = path.join(ROOT, ".cache-next");
+const STATE_FILE = path.join(ROOT, "src", "data", "seo-lastmod.json");
 const ORIGIN = normalizeOrigin(process.env.PUBLIC_ORIGIN || SITE.defaultOrigin);
 const LEGACY = process.env.LEGACY_ORIGIN || "https://gndec-compass.koush3069.workers.dev";
 
@@ -226,6 +228,38 @@ async function writePage(relative, html) {
   return target;
 }
 
+function relativeAsset(target) {
+  return path.relative(OUT, target).split(path.sep).join("/");
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * Read the previous sitemap freshness ledger. A page keeps its old lastmod
+ * while its bytes stay identical, so search engines see a real change date
+ * instead of an artificial one every night.
+ */
+async function readLastmodState() {
+  try {
+    const parsed = JSON.parse(await readFile(STATE_FILE, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Hash the application shell: a route page changes when the app itself changes. */
+async function shellHash() {
+  const parts = [];
+  for (const relative of ["index.html", "styles.css", "app.js", "manifest.webmanifest"]) {
+    const file = path.join(OUT, relative);
+    if (existsSync(file)) parts.push(relative, sha256(await readFile(file)));
+  }
+  return sha256(parts.join("|"));
+}
+
 async function main() {
   // Remove stale generated pages so a shrinking release cannot leave orphan URLs.
   await rm(path.join(OUT, "college"), { recursive: true, force: true });
@@ -248,7 +282,7 @@ async function main() {
   const rooms = [...new Set(roomSchedule.map((entry) => entry.room).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const release = schedule.find((entry) => entry.subject)?.group ? "" : "";
 
-  const urls = [{ loc: `${ORIGIN}/`, priority: "1.0" }, ...ROUTE_ORDER.map((slug) => ({ loc: `${ORIGIN}/${slug}`, priority: slug === "ask" || slug === "settings" ? "0.8" : "0.9" }))];
+  const urls = [{ loc: `${ORIGIN}/`, priority: "1.0", file: null }, ...ROUTE_ORDER.map((slug) => ({ loc: `${ORIGIN}/${slug}`, priority: slug === "ask" || slug === "settings" ? "0.8" : "0.9", file: null }))];
 
   /* ── directory hub ─────────────────────────────────────────────────── */
   const hubBody = `<h1>GNDEC Timetable Directory</h1>
@@ -259,7 +293,7 @@ async function main() {
 <h2>Rooms and labs</h2><div class="grid">${rooms.map((room) => `<a class="chip" href="${escapeAttr(`${ORIGIN}/college/room/${slugify(room)}/`)}"><strong>${escapeText(room)}</strong><small>${roomSchedule.filter((entry) => entry.room === room).length} scheduled slots</small></a>`).join("")}</div>
 <h2>Examinations</h2><div class="grid"><a class="chip" href="${escapeAttr(`${ORIGIN}/college/exam-datesheet/`)}"><strong>End-semester exam datesheet</strong><small>${datesheet?.tabs?.length || 0} branch tabs · official tentative sheet</small></a></div>`;
   const hubCanonical = `${ORIGIN}/college/`;
-  await writePage("college", layout({
+  const hubTarget = await writePage("college", layout({
     title: "GNDEC Timetable Directory — Every Section, Subject, Teacher and Room",
     description: "Browse every GNDEC section timetable, subject schedule, teacher timetable and room timetable. Verified from the official FET export. CEA, CEB, CSA, CSB, CSC, CSD, CSE, CSF, ECA, ECB, EEA, EEB, ITA, ITB, ITC, MEA, MEB, RAI and more.",
     canonical: hubCanonical,
@@ -286,7 +320,7 @@ async function main() {
     body: hubBody,
     pathLabel: "Directory"
   }));
-  urls.push({ loc: hubCanonical, priority: "0.9" });
+  urls.push({ loc: hubCanonical, priority: "0.9", file: relativeAsset(hubTarget) });
 
   /* ── section pages ─────────────────────────────────────────────────── */
   for (const group of groups) {
@@ -307,7 +341,7 @@ ${tableHtml(entries, { caption: `${group} · official FET release` })}
 <h2>Ask about this section</h2>
 <p>Ask Compass understands English, Hinglish and romanised Punjabi. Try “${escapeText(group)} da timetable”, “next class ${escapeText(group)}” or “${escapeText(group)} di class kadon hai”.</p>
 <p><a href="${escapeAttr(`${ORIGIN}/ask?q=${encodeURIComponent(`next class for ${group}`)}`)}">Ask Compass about ${escapeText(group)} →</a></p>`;
-    await writePage(`college/section/${slugify(group)}`, layout({
+    const target = await writePage(`college/section/${slugify(group)}`, layout({
       title, description, canonical, head: pageHead({
         title, description, canonical,
         keywords: [`${group} timetable`, `${group} time table`, `${group} class schedule`, "gndec timetable", "gndec class schedule", "gndec section timetable"],
@@ -324,7 +358,7 @@ ${tableHtml(entries, { caption: `${group} · official FET release` })}
       }),
       body, pathLabel: `Sections › ${group}`
     }));
-    urls.push({ loc: canonical, priority: "0.8" });
+    urls.push({ loc: canonical, priority: "0.8", file: relativeAsset(target) });
   }
 
   /* ── subject pages ─────────────────────────────────────────────────── */
@@ -339,7 +373,7 @@ ${tableHtml(entries, { caption: `${group} · official FET release` })}
 ${tableHtml(entries, { caption: `${subject} · all sections`, showSection: true })}
 <h2>Teachers</h2><div class="grid">${[...new Set(entries.map((entry) => entry.teacher).filter((value) => value && !/not listed/i.test(value)))].map((teacher) => `<a class="chip" href="${escapeAttr(`${ORIGIN}/college/teacher/${slugify(teacher)}/`)}"><strong>${escapeText(teacher)}</strong></a>`).join("")}</div>
 <h2>Sections</h2><div class="grid">${[...new Set(entries.map((entry) => entry.group))].map((group) => `<a class="chip" href="${escapeAttr(`${ORIGIN}/college/section/${slugify(group)}/`)}"><strong>${escapeText(group)}</strong></a>`).join("")}</div>`;
-    await writePage(`college/subject/${slugify(subject)}`, layout({
+    const target = await writePage(`college/subject/${slugify(subject)}`, layout({
       title, description, canonical, head: pageHead({
         title, description, canonical,
         keywords: [`${subject} gndec`, `${subject} timetable`, `${subject} teacher`, `${subject} room`, `${subject} syllabus gndec`],
@@ -347,7 +381,7 @@ ${tableHtml(entries, { caption: `${subject} · all sections`, showSection: true 
       }),
       body, pathLabel: `Subjects › ${subject}`
     }));
-    urls.push({ loc: canonical, priority: "0.7" });
+    urls.push({ loc: canonical, priority: "0.7", file: relativeAsset(target) });
   }
 
   /* ── teacher pages ─────────────────────────────────────────────────── */
@@ -361,7 +395,7 @@ ${tableHtml(entries, { caption: `${subject} · all sections`, showSection: true 
 <p class="lead">Published teaching schedule for ${escapeText(teacher)} at Guru Nanak Dev Engineering College. ${entries.length} classes across ${new Set(entries.map((entry) => entry.subject)).size} subjects. This page only shows entries the official timetable actually publishes.</p>
 ${tableHtml(entries, { caption: `${teacher} · published timetable`, showSection: true })}
 <h2>Subjects</h2><div class="grid">${[...new Set(entries.map((entry) => entry.subject))].map((subject) => `<a class="chip" href="${escapeAttr(`${ORIGIN}/college/subject/${slugify(subject)}/`)}"><strong>${escapeText(subject)}</strong></a>`).join("")}</div>`;
-    await writePage(`college/teacher/${slugify(teacher)}`, layout({
+    const target = await writePage(`college/teacher/${slugify(teacher)}`, layout({
       title, description, canonical, head: pageHead({
         title, description, canonical,
         keywords: [teacher, `${teacher} gndec`, `${teacher} timetable`, `${teacher} subjects`, `${teacher} classes`],
@@ -369,7 +403,7 @@ ${tableHtml(entries, { caption: `${teacher} · published timetable`, showSection
       }),
       body, pathLabel: `Teachers › ${teacher}`
     }));
-    urls.push({ loc: canonical, priority: "0.6" });
+    urls.push({ loc: canonical, priority: "0.6", file: relativeAsset(target) });
   }
 
   /* ── room pages ────────────────────────────────────────────────────── */
@@ -383,7 +417,7 @@ ${tableHtml(entries, { caption: `${teacher} · published timetable`, showSection
 <p class="lead">Official room timetable for ${escapeText(room)}. ${entries.length} scheduled slots for ${new Set(entries.map((entry) => entry.group)).size} sections. Compass calculates free windows from this grid; it never guesses.</p>
 ${tableHtml(entries, { caption: `${room} · room timetable` })}
 <p><a class="cta" href="${escapeAttr(`${ORIGIN}/rooms`)}">Check free rooms now</a></p>`;
-    await writePage(`college/room/${slugify(room)}`, layout({
+    const target = await writePage(`college/room/${slugify(room)}`, layout({
       title, description, canonical, head: pageHead({
         title, description, canonical,
         keywords: [room, `${room} gndec`, `${room} timetable`, `${room} free`, `${room} room`],
@@ -391,7 +425,7 @@ ${tableHtml(entries, { caption: `${room} · room timetable` })}
       }),
       body, pathLabel: `Rooms › ${room}`
     }));
-    urls.push({ loc: canonical, priority: "0.6" });
+    urls.push({ loc: canonical, priority: "0.6", file: relativeAsset(target) });
   }
 
   /* ── exam datesheet ────────────────────────────────────────────────── */
@@ -408,7 +442,7 @@ ${tableHtml(entries, { caption: `${room} · room timetable` })}
 <p class="lead">The official tentative end-semester examination datesheet. ${entries.length} published sittings across ${datesheet.tabs.length} programmes. Compass never invents a date, reporting time or room; always confirm on the official notice.</p>
 <p><a class="cta" href="${escapeAttr(`${ORIGIN}/ask?q=${encodeURIComponent("exam kab hai")}`)}">Ask when your exam is</a></p>
 ${byTab}`;
-    await writePage("college/exam-datesheet", layout({
+    const target = await writePage("college/exam-datesheet", layout({
       title, description, canonical, head: pageHead({
         title, description, canonical,
         keywords: ["gndec exam datesheet", "gndec end semester exam", "gndec ese datesheet", "gndec exam date", "gndec datesheet 2026"],
@@ -416,17 +450,31 @@ ${byTab}`;
       }),
       body, pathLabel: "Examinations › Datesheet"
     }));
-    urls.push({ loc: canonical, priority: "0.8" });
+    urls.push({ loc: canonical, priority: "0.8", file: relativeAsset(target) });
   }
 
   /* ── sitemap + robots ──────────────────────────────────────────────── */
-  const lastmod = new Date().toISOString().slice(0, 10);
+  const previousState = await readLastmodState();
+  const today = new Date().toISOString().slice(0, 10);
+  const routeHash = await shellHash();
+  const nextState = {};
+  const sitemapEntries = [];
+  for (const item of urls) {
+    const hash = item.file ? sha256(await readFile(path.join(OUT, item.file))) : routeHash;
+    const previous = previousState[item.loc];
+    const unchanged = previous && previous.hash === hash && /^\d{4}-\d{2}-\d{2}$/.test(previous.lastmod || "");
+    const lastmod = unchanged ? previous.lastmod : (previous?.lastmod && previous.lastmod > today ? previous.lastmod : today);
+    nextState[item.loc] = { hash, lastmod };
+    sitemapEntries.push(`  <url><loc>${escapeText(item.loc)}</loc><lastmod>${lastmod}</lastmod><changefreq>daily</changefreq><priority>${item.priority || "0.5"}</priority></url>`);
+  }
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((item) => `  <url><loc>${escapeText(item.loc)}</loc><lastmod>${lastmod}</lastmod><changefreq>daily</changefreq><priority>${item.priority || "0.5"}</priority></url>`).join("\n")}
+${sitemapEntries.join("\n")}
 </urlset>
 `;
   await writeFile(path.join(OUT, "sitemap.xml"), sitemap, "utf8");
+  await mkdir(path.dirname(STATE_FILE), { recursive: true });
+  await writeFile(STATE_FILE, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
   await writeFile(path.join(OUT, "robots.txt"), `# GNDEC Compass
 User-agent: *
 Allow: /

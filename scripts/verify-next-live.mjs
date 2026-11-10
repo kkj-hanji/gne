@@ -32,6 +32,12 @@ function fail(message) {
   process.exitCode = 1;
 }
 
+/** A temporary official-origin outage is not an integrity failure. */
+function isOfficialOutage(error) {
+  const message = String(error?.message || error);
+  return /fetch failed|network|timed out|timeout|aborted|ECONN|ENOTFOUND|EAI_AGAIN|HTTP 5\d\d/i.test(message);
+}
+
 async function get(url, init = {}) {
   const response = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}`);
@@ -83,12 +89,25 @@ async function checkNextOrigin() {
 async function main() {
   const byId = await checkLegacyRegistry();
   const results = [];
-  for (const id of REQUIRED_VIEWS) results.push(await checkView(id, byId.get(id)));
+  const outages = [];
+  for (const id of REQUIRED_VIEWS) {
+    try {
+      results.push(await checkView(id, byId.get(id)));
+    } catch (error) {
+      if (!isOfficialOutage(error)) throw error;
+      outages.push(id);
+      console.warn(`WARN ${id}: ${error.message}; keeping the last verified bundle.`);
+    }
+  }
 
   if (NEXT_ORIGIN) await checkNextOrigin();
   else console.log("next origin: skipped (set NEXT_ORIGIN to check the deployed Worker)");
 
   if (process.exitCode) return;
+  if (outages.length) {
+    console.log(`OK ${results.length}/${REQUIRED_VIEWS.length} official views verified; ${outages.length} unreachable (${outages.join(", ")}). Published bundles stay unchanged.`);
+    return;
+  }
   console.log(`OK ${results.length} official timetable views parsed without guessed data.`);
 }
 

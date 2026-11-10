@@ -211,7 +211,7 @@ export function parseSyllabusLinks(html, pageUrl, department) {
 }
 
 async function fetchText(fetchImpl, url, accept = "text/html") {
-  const response = await fetchImpl(url, { headers: { Accept: accept, "User-Agent": "GNDEC-Compass" } });
+  const response = await fetchImpl(url, { headers: { Accept: accept, "User-Agent": "GNDEC-Compass" }, signal: AbortSignal.timeout(20000) });
   if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}`);
   return response.text();
 }

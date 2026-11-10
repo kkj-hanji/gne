@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-11-09T14:44:18.622Z",
+  "builtAt": "2026-11-10T06:34:18.931Z",
   "note": "Official subject question banks published by a GNDEC department. Compass links the source PDF and never hosts a copy.",
   "sources": [
     {
@@ -7,8 +7,9 @@
       "departmentId": "it",
       "url": "https://it.gndec.ac.in/?q=sqb",
       "label": "Subject Question Bank",
-      "found": 81,
-      "error": ""
+      "found": 0,
+      "retained": 75,
+      "error": "fetch failed"
     }
   ],
   "total": 75,

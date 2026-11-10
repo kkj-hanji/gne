@@ -8,8 +8,11 @@
  * not indexed automatically.
  *
  *   node scripts/build-papers.mjs [--write]
+ *
+ * An unreachable department page keeps the last verified entries for that
+ * department. The index is never replaced with an empty list.
  */
-import { writeFile } from "node:fs/promises";
+import { readJsonIfPresent, writeJsonWhenChanged } from "./lib/stable-json.mjs";
 
 const SOURCES = [
   {
@@ -76,6 +79,8 @@ function isOfficialPdf(url) {
   }
 }
 
+const previous = readJsonIfPresent("next/data/papers-index.json");
+const previousPapers = Array.isArray(previous?.papers) ? previous.papers : [];
 const papers = [];
 const sourceReport = [];
 
@@ -104,8 +109,15 @@ for (const source of SOURCES) {
       found += 1;
     }
   }
-  sourceReport.push({ ...source, found, error });
-  console.log(`${source.departmentId.padEnd(6)} ${String(found).padStart(3)} papers${error ? `  (${error})` : ""}`);
+  let retained = 0;
+  if (!found) {
+    const kept = previousPapers.filter((paper) => paper.departmentId === source.departmentId);
+    papers.push(...kept);
+    retained = kept.length;
+    if (!error) error = "No question-bank links were found on the official page";
+  }
+  sourceReport.push({ ...source, found, retained, error });
+  console.log(`${source.departmentId.padEnd(6)} ${String(found).padStart(3)} papers${retained ? ` (+${retained} retained)` : ""}${error ? `  (${error})` : ""}`);
 }
 
 const seen = new Set();
@@ -126,6 +138,10 @@ const payload = {
 
 console.log(`\nTotal official question banks: ${unique.length}`);
 if (process.argv.includes("--write")) {
-  await writeFile("next/data/papers-index.json", `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-  console.log("Wrote next/data/papers-index.json");
+  if (!unique.length) {
+    console.warn("No verified question bank is available; keeping the previous index. Nothing was written.");
+    process.exit(0);
+  }
+  const written = writeJsonWhenChanged("next/data/papers-index.json", payload);
+  console.log(written ? "Wrote next/data/papers-index.json" : "next/data/papers-index.json unchanged");
 }
