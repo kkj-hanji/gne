@@ -1,0 +1,5 @@
+# Verified official documents are stored byte-for-byte so their published
+# SHA-256 content hash always matches what the app serves, on every platform.
+next/data/timetable-*.html -text
+public/data/*.json -text
+.cache-next/*.html -text
