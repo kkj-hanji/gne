@@ -8,6 +8,11 @@ export function cleanText(value) {
   return String(value == null ? "" : value).replace(/\s+/g, " ").trim();
 }
 
+function escapeHtml(value) {
+  return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 const SEMESTER_PATTERNS = [
   [/\b(?:sem(?:ester)?\s*[-–]?\s*1|1st\s*sem(?:ester)?|first\s*sem(?:ester)?)\b/i, "1"],
   [/\b(?:sem(?:ester)?\s*[-–]?\s*2|2nd\s*sem(?:ester)?|second\s*sem(?:ester)?)\b/i, "2"],
@@ -85,4 +90,70 @@ export function searchSyllabus(list = [], query = "", { department = "", limit =
       return tokens.every((token) => haystack.includes(token));
     })
     .slice(0, Math.max(1, Number(limit) || 40));
+}
+
+/** Parse course blocks from the official indexed first-year PDF text. */
+export function parseFirstYearSyllabus(pages = []) {
+  const text = (Array.isArray(pages) ? pages : []).map((page) => String(page?.text || "")).join("\n");
+  const starts = [...text.matchAll(/\bCourse\s+Code\s*:\s*([A-Z][A-Z\s]{1,8}\d[\d\s]*)\b/gi)];
+  const courses = [];
+  for (let index = 0; index < starts.length; index += 1) {
+    const block = text.slice(starts[index].index, starts[index + 1]?.index || text.length);
+    const code = starts[index][1].replace(/\s+/g, "").toUpperCase();
+    const title = cleanText(block.match(/Course\s+Title\s*:\s*([\s\S]*?)(?=\s+(?:Programme|Semester|L\s*:|Credits\s*:)|$)/i)?.[1] || "")
+      .replace(/\bEng\s+ineering\b/gi, "Engineering").replace(/\bP\s+rogramming\b/gi, "Programming");
+    if (!title) continue;
+    const contentsStart = block.search(/\bContents\b/i);
+    const contents = contentsStart >= 0 ? block.slice(contentsStart) : "";
+    const units = [...contents.matchAll(/U\s*ni\s*t\s*-\s*(\d+)\s+([\s\S]*?)(?=\s*U\s*ni\s*t\s*-\s*\d+|\s*(?:Laboratory Work|Text Books|Reference Books|Online Learning)|$)/gi)]
+      .map((match) => {
+        const raw = cleanText(match[2]);
+        const hours = raw.match(/\b\d+\s*\(L\)(?:\s*\+\s*\d+\s*\([PT]\))*\s*hrs?\b/i);
+        const titleEnd = hours?.index ?? raw.length;
+        const detailStart = hours ? titleEnd + hours[0].length : raw.length;
+        return { number: match[1], title: raw.slice(0, titleEnd).trim(), details: raw.slice(detailStart).trim().slice(0, 1200) };
+      }).filter((unit) => unit.title);
+    if (!units.length) continue;
+    courses.push({ code, title, semester: cleanText(block.match(/Semester\s*:\s*([^\n]{1,30}?)(?=\s+(?:Theory\s*\/\s*Practical|Teaching Hours|Total Max|Course Type)|$)/i)?.[1] || ""), units });
+  }
+  return [...new Map(courses.map((course) => [course.code, course])).values()];
+}
+
+/** Answer a syllabus query only from the extracted official first-year PDF text. */
+export function answerFirstYearSyllabus(question = "", courses = [], previousCourse = "") {
+  if (!Array.isArray(courses) || !courses.length) return null;
+  const normalized = cleanText(question).toLowerCase();
+  const aliases = [
+    ["programming for problem solving", ["pps", "programming", "problem solving"]],
+    ["engineering drawing and graphics", ["edg", "drawing", "graphics"]],
+    ["manufacturing practices", ["workshop", "mp", "manufacturing"]],
+    ["mathematics", ["math", "maths", "mathematics"]],
+    ["physics", ["physics", "phy"]], ["chemistry", ["chemistry", "chem"]],
+    ["professional english communication", ["english", "pec"]], ["economics", ["economics", "eco"]],
+    ["basic electrical and electronics engineering", ["bee", "beee", "electrical"]]
+  ];
+  const explicitCode = courses.find((course) => new RegExp(`\\b${course.code}\\b`, "i").test(normalized));
+  const mathLevel = normalized.match(/\b(?:math(?:ematics)?|maths)\s*[- ]?\s*(i{1,3}|1|2)\b/)?.[1];
+  const mathRoman = mathLevel === "1" ? "i" : mathLevel === "2" ? "ii" : mathLevel;
+  const explicit = explicitCode || courses.find((course) => {
+    const title = course.title.toLowerCase();
+    if (mathRoman && title.includes("mathematics")) return title.endsWith(` ${mathRoman}`);
+    return normalized.includes(title) || aliases.some(([canonical, words]) => title.includes(canonical) && words.some((word) => new RegExp(`\\b${word}\\b`, "i").test(normalized)));
+  });
+  const course = explicit || courses.find((item) => item.code === previousCourse);
+  if (!course) return null;
+  const asksSyllabus = /syllabus|unit|units|chapter|chapters|topic|topics|contents|course outline/i.test(normalized);
+  if (!asksSyllabus) return null;
+  const unitMatch = normalized.match(/\b(?:unit|u)\s*(?:-|number|no\.?\s*)?([1-9])\b/)
+    || normalized.match(/\b(unit|chapter)\s+(one|two|three|four|five|six|seven|eight|nine)\b/);
+  const unitNumber = unitMatch ? (Number(unitMatch[1]) || { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 }[unitMatch[2]]) : 0;
+  const units = unitNumber ? course.units.filter((unit) => Number(unit.number) === unitNumber) : course.units;
+  if (!units.length) return null;
+  return {
+    course,
+    html: `<p><strong>${escapeHtml(course.title)} · ${escapeHtml(course.code)}${course.semester ? ` · Semester ${escapeHtml(course.semester)}` : ""}</strong></p><ol>${units.map((unit) => `<li><strong>Unit ${escapeHtml(unit.number)}: ${escapeHtml(unit.title)}</strong>${unit.details ? `<p>${escapeHtml(unit.details)}</p>` : ""}</li>`).join("")}</ol><p class="answer-source">Extracted from the official GNDEC first-year syllabus. <a href="https://appsc.gndec.ac.in/sites/default/files/2026-03/ss%20and%20Syllabus%20sem1%2C2%20Dec%202025%20unsigned.pdf" target="_blank" rel="noopener noreferrer">Open the source PDF</a> to verify the full wording.</p>`,
+    intent: "SYLLABUS_CONTENT", confidence: 0.92,
+    plan: ["match the official indexed course", "read the requested unit from extracted PDF text", "include the official source limitation"],
+    entities: { syllabusCourseCode: course.code }
+  };
 }

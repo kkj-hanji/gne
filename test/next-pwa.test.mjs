@@ -156,7 +156,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.1.6");
+  assert.equal(next.vars.APP_VERSION, "2.1.7");
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");

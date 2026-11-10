@@ -34,7 +34,7 @@ import {
   NOTICE_CATEGORIES, TRANSCRIBED_NOTICES, filterNotices, isRecent, mergeNotices, noticeStats, slugify
 } from "./engine/notices.js";
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
-import { buildSyllabusIndex, groupSyllabus, searchSyllabus } from "./engine/syllabus.js";
+import { answerFirstYearSyllabus, buildSyllabusIndex, groupSyllabus, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
 import { examEventsForSelection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
 import {
@@ -112,6 +112,8 @@ const state = {
   profileLookupMatches: [],
   profileLookupTimer: 0,
   syllabus: null,
+  firstYearSyllabusCourses: [],
+  firstYearSyllabusPromise: null,
   compareA: "",
   compareB: "",
   compareDay: "",
@@ -291,6 +293,9 @@ function loadAllSettings() {
   state.values = resolved.values;
   state.sources = resolved.sources;
   state.profile = loadProfile(localStorage);
+  // Auto is the default for every student. Only the verified owner can opt
+  // into the local-only diagnostic path from the advanced settings.
+  if (!hasAdminMode()) state.values["ask.engine"] = "auto";
   if (state.profile.migratedFromLegacy) delete state.profile.migratedFromLegacy;
   if (attendanceTarget && state.profile.attendanceTarget === 76) state.profile.attendanceTarget = attendanceTarget;
   if (loaded?.migratedFromLegacy) {
@@ -2400,13 +2405,14 @@ function renderCompare() {
 /* ── Ask Compass ───────────────────────────────────────────────────────── */
 
 function renderAsk() {
+  const adminMode = hasAdminMode();
   return `<div class="page page-ask">
     <div class="chat-shell">
       <div class="chat-head">
         <span class="brand-mark" style="width:36px;height:36px;border-radius:11px" aria-hidden="true"><svg viewBox="0 0 48 48" width="22" height="22"><path d="M24 4 31 24 24 44 17 24Z" fill="currentColor"/><circle cx="24" cy="24" r="4.5" fill="var(--bg)"/></svg></span>
-        <div class="chat-head-title"><strong>Ask Compass</strong><small>${escapeHtml(engineBadge())}</small></div>
+        <div class="chat-head-title"><strong>Ask Compass</strong>${adminMode ? `<small>${escapeHtml(engineBadge())}</small>` : ""}</div>
         <div class="chat-head-actions">
-          <button class="btn btn-sm" data-action="toggle-engine" title="Switch engine">${v("ask.engine") === "auto" ? "Auto" : "Local"}</button>
+          ${adminMode ? `<button class="btn btn-sm" data-action="toggle-engine" title="Switch engine">${v("ask.engine") === "auto" ? "Auto" : "Local"}</button>` : ""}
           <button class="btn btn-sm" data-action="clear-chat">Clear</button>
         </div>
       </div>
@@ -2417,7 +2423,7 @@ function renderAsk() {
           ${v("ask.voice") ? `<button class="mic-button" id="mic-button" data-action="voice" aria-label="Dictate a question"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>` : ""}
           <button class="send-button" id="send-button" data-action="send" aria-label="Send question"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 12 20 4l-4 16-4-6-8-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
         </div>
-        <div class="composer-hint"><span>Enter to send · Shift+Enter for a new line</span><span>${v("ask.confidence") ? "Confidence shown" : ""}</span><span>Facts never use AI</span></div>
+        <div class="composer-hint"><span>Enter to send · Shift+Enter for a new line</span><span>Use a follow-up like “unit 2” or “what about tomorrow?”</span></div>
       </div>
     </div>
     ${state.chat.length ? "" : `<div style="margin-top:14px" class="chip-row">${suggestedQuestions().map((question) => `<button class="chip" data-ask-question="${escapeHtml(question)}">${escapeHtml(question)}</button>`).join("")}</div>`}
@@ -2454,11 +2460,12 @@ function welcomeMessage() {
 
 function chatMessageHtml(message, index) {
   const meta = message.meta || {};
+  const showDiagnostics = hasAdminMode();
   const badges = [];
-  if (meta.engine && meta.engine !== "welcome") badges.push(`<span class="badge">${escapeHtml(engineLabel(meta.engine))}</span>`);
-  if (v("ask.confidence") && Number.isFinite(meta.confidence) && meta.confidence < 1) badges.push(`<span class="badge">${Math.round(meta.confidence * 100)}% confidence</span>`);
-  if (meta.cached) badges.push(`<span class="badge">cached</span>`);
-  const why = v("ask.why") && Array.isArray(meta.plan) && meta.plan.length
+  if (showDiagnostics && meta.engine && meta.engine !== "welcome") badges.push(`<span class="badge">${escapeHtml(engineLabel(meta.engine))}</span>`);
+  if (showDiagnostics && v("ask.confidence") && Number.isFinite(meta.confidence) && meta.confidence < 1) badges.push(`<span class="badge">${Math.round(meta.confidence * 100)}% confidence</span>`);
+  if (showDiagnostics && meta.cached) badges.push(`<span class="badge">cached</span>`);
+  const why = showDiagnostics && v("ask.why") && Array.isArray(meta.plan) && meta.plan.length
     ? `<details class="answer-meta"><summary>Why this answer</summary><ol>${meta.plan.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></details>` : "";
   return `<article class="msg ${message.role}" data-message-index="${index}">
     <div class="msg-bubble">${sanitizeHtml(message.html)}</div>
@@ -2535,11 +2542,20 @@ async function sendQuestion(rawQuestion) {
       return;
     }
     if (!state.schedule.length) await waitForVerifiedSchedule();
+    if (/\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline)\b/i.test(question)) await loadFirstYearSyllabusKnowledge();
     const ctx = currentAnswerContext();
     let answer = null;
     let engine = "local";
 
-    if (v("ask.engine") === "auto" && !v("privacy.localOnly")) {
+    const previousSyllabusCode = [...state.chat.slice(0, thinkingIndex)].reverse()
+      .find((message) => message.role === "assistant" && message.meta?.entities?.syllabusCourseCode)?.meta.entities.syllabusCourseCode || "";
+    const syllabusAnswer = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, previousSyllabusCode);
+    if (syllabusAnswer) {
+      answer = syllabusAnswer;
+      engine = "local";
+    }
+
+    if (!answer && v("ask.engine") === "auto" && !v("privacy.localOnly")) {
       if (state.brainState !== "ready") {
         state.brainState = "loading";
         updateChatHead();
@@ -2587,6 +2603,7 @@ async function sendQuestion(rawQuestion) {
         intent: answer.intent,
         confidence: answer.confidence,
         plan: answer.plan,
+        entities: answer.entities || {},
         engine,
         source: answer.source || "",
         cached: Boolean(answer.cached)
@@ -2639,8 +2656,28 @@ function currentAnswerContext() {
     includeLabs: v("rooms.includeLabs"),
     includeLectureHalls: v("rooms.includeLectureHalls")
   });
-  context.conversation = null;
+  context.conversation = {
+    recentTurns: state.chat.slice(-10).filter((message) => message && ["user", "assistant"].includes(message.role)).map((message) => ({
+      role: message.role,
+      text: String(message.html || "").replace(/<[^>]*>/g, " ").replace(/&(?:amp|lt|gt|quot|#39);/g, " ").replace(/\s+/g, " ").trim().slice(0, 400),
+      intent: message.meta?.intent || ""
+    }))
+  };
   return context;
+}
+
+async function loadFirstYearSyllabusKnowledge() {
+  if (state.firstYearSyllabusCourses.length) return state.firstYearSyllabusCourses;
+  if (!state.firstYearSyllabusPromise) state.firstYearSyllabusPromise = (async () => {
+    try {
+      const data = await fetchJson("/api/legacy/data/first-year-syllabus-index.json", {}, 12000);
+      state.firstYearSyllabusCourses = parseFirstYearSyllabus(data?.pages || []);
+    } catch {
+      state.firstYearSyllabusCourses = [];
+    }
+    return state.firstYearSyllabusCourses;
+  })();
+  return state.firstYearSyllabusPromise;
 }
 
 function canUseExternalAi() {
@@ -2918,7 +2955,8 @@ function renderSettings() {
   const overview = !query && state.settingsCategory === "overview";
   const accessDenied = !adminMode && adminOnly.has(state.settingsCategory);
   const active = accessDenied ? null : visibleCategories.find((category) => category.id === state.settingsCategory) || visibleCategories[0];
-  const flags = FLAGS.filter((flag) => (adminMode || !adminOnly.has(flag.category)) && (query ? matches(flag) : flag.category === active?.id));
+  const askDiagnostics = new Set(["ask.engine", "ask.confidence", "ask.why"]);
+  const flags = FLAGS.filter((flag) => (adminMode || (!adminOnly.has(flag.category) && !askDiagnostics.has(flag.id))) && (query ? matches(flag) : flag.category === active?.id));
   const everydayIds = ["appearance.theme", "appearance.accent", "appearance.palette", "appearance.background", "appearance.density", "timetable.view", "timetable.clock", "ask.language"];
   const everydayFlags = everydayIds.map((id) => FLAGS.find((flag) => flag.id === id)).filter(Boolean);
 

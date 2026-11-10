@@ -20,6 +20,7 @@ import {
   currentAndNext, escapeHtml, freeBellSlots, keywordsOf, normalizeQuestion
 } from "../next/engine/answer.js";
 import { buildIcs, firstMonday } from "../next/engine/ics.js";
+import { answerFirstYearSyllabus, parseFirstYearSyllabus } from "../next/engine/syllabus.js";
 import {
   digestCopy, dueReminder, isQuietTime, notificationCopy, reminderWindow
 } from "../next/engine/reminders.js";
@@ -29,6 +30,22 @@ import {
 } from "../next/engine/brain-bridge.js";
 
 const IST = (iso) => getIndiaNow(new Date(iso));
+
+test("official first-year syllabus supports course and remembered unit follow-ups", async () => {
+  const index = JSON.parse(await readFile(new URL("../public/data/first-year-syllabus-index.json", import.meta.url), "utf8"));
+  const courses = parseFirstYearSyllabus(index.pages);
+  assert.ok(courses.length >= 8);
+  const pps = answerFirstYearSyllabus("PPS syllabus", courses);
+  assert.equal(pps?.entities.syllabusCourseCode, "ESC103");
+  assert.match(pps.html, /Programming for Problem Solving/i);
+  const followup = answerFirstYearSyllabus("unit 2", courses, "ESC103");
+  assert.match(followup.html, /Unit 2:/);
+  assert.equal(followup.entities.syllabusCourseCode, "ESC103");
+  assert.equal(answerFirstYearSyllabus("unit 9", courses, "ESC103"), null);
+  const mathTwo = answerFirstYearSyllabus("Mathematics 2 syllabus", courses);
+  assert.match(mathTwo?.html || "", /Mathematics\s*-\s*II/i);
+  assert.match(mathTwo?.html || "", /Unit 5: Linear Algebra/i);
+});
 
 const schedule = [
   { id: "cea-mon-math", group: "CEA", day: "Monday", start: 510, end: 570, subject: "MATH I", teacher: "DR GAGANDEEP KAUR LOTEY", room: "F108", type: "L", cohorts: "" },
