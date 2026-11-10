@@ -172,6 +172,11 @@ test("broken SMS-style input still routes", () => {
 
 test("subject codes and nicknames are matched to real subjects only", () => {
   assert.match(htmlOf("PPS teacher"), /PROGRAMMING FOR PROBLEM SOLVING/);
+  const edgCtx = buildAnswerContext({
+    schedule: [...schedule, { id: "cea-thu-edg", group: "CEA", day: "Thursday", start: 510, end: 570, subject: "ENGINEERING DRAWING", teacher: "DR DRAWING", room: "F101", type: "L", cohorts: "" }],
+    roomSchedule, group: "CEA", profile: { section: "CEA" }, now: ctx.now, metadata: ctx.metadata, datesheet
+  });
+  assert.match(htmlOf("EDG teacher", edgCtx), /DR DRAWING/);
   assert.match(htmlOf("CEB BEE class"), /BASIC ELECTRICAL AND ELECTRONICS ENGINEERING/);
   assert.equal(answerLocally("MCPD kab hai", ctx), null, "an unpublished subject is not invented");
   assert.equal(intentOf("XYZ nonsense subject"), null);

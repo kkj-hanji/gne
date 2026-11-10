@@ -56,7 +56,7 @@ const SUBJECT_ALIASES = Object.freeze({
   m1: ["math"], math1: ["math"], maths: ["math"], mathematics: ["math"], calculus: ["math"],
   phy: ["physics"], phys: ["physics"], physic: ["physics"],
   chem: ["chemistry"], chemisty: ["chemistry"],
-  eg: ["drawing"], ed: ["drawing"], drawing: ["drawing"], graphics: ["drawing"],
+  eg: ["drawing"], ed: ["drawing"], edg: ["drawing"], drawing: ["drawing"], graphics: ["drawing"],
   mp: ["manufacturing"], workshop: ["manufacturing"], wshop: ["manufacturing"],
   eco: ["economics"], econ: ["economics"],
   mcpd: ["mentoring"], mentoring: ["mentoring"],
