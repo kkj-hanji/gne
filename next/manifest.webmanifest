@@ -70,6 +70,13 @@
       "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
     },
     {
+      "name": "Teacher timetable",
+      "short_name": "Teachers",
+      "description": "Open any teacher's published weekly classes",
+      "url": "./teachers",
+      "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
       "name": "Notices",
       "short_name": "Notices",
       "description": "Official notices and exam updates",

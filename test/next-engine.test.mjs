@@ -174,6 +174,17 @@ test("a verified release is sanitised and refuses unreadable cells", async () =>
   assert.throws(() => readVerifiedFetTimetable(broken, "groups", { DOMParser }), /could not be read completely/i);
 });
 
+test("the bundled fallback release is complete and parseable", async () => {
+  const groups = await readFile(new URL("../next/data/timetable-groups.html", import.meta.url), "utf8");
+  const rooms = await readFile(new URL("../next/data/timetable-rooms.html", import.meta.url), "utf8");
+  const schedule = readVerifiedFetTimetable(groups, "groups", { DOMParser });
+  const roomSchedule = readVerifiedFetTimetable(rooms, "rooms", { DOMParser });
+  assert.ok(schedule.length > 500, `groups bundle has ${schedule.length} rows`);
+  assert.ok(roomSchedule.length > 500, `rooms bundle has ${roomSchedule.length} rows`);
+  assert.ok(new Set(schedule.map((entry) => entry.group)).size > 40, "every section is present");
+  assert.ok(schedule.every((entry) => entry.teacher && entry.room && DAY_NAMES.includes(entry.day)));
+});
+
 test("sanitizeSchedule drops malformed rows and keeps missing details explicit", () => {
   assert.deepEqual(sanitizeSchedule(null), []);
   const clean = sanitizeSchedule([
@@ -326,6 +337,25 @@ test("profile and datesheet answers come from device data only", () => {
   assert.match(profile.html, /DR MENTOR/);
   assert.match(profile.html, /device only/i);
 
+  const fullProfile = context({
+    profile: {
+      name: "Test Student", section: "CEA", subsection: "", branch: "Civil Engineering",
+      mentor: "DR MENTOR", mentorPhone: "9876543210", academicGroup: "CEAM1", mentorVenue: "LH-101"
+    }
+  });
+  const phone = answerLocally("what is my mentor phone number", fullProfile);
+  assert.equal(phone.intent, "PROFILE_MENTOR_PHONE");
+  assert.match(phone.html, /9876543210/);
+  const venue = answerLocally("my mentor venue", fullProfile);
+  assert.equal(venue.intent, "PROFILE_MENTOR_VENUE");
+  assert.match(venue.html, /LH-101/);
+  const group = answerLocally("what is my mentoring group", fullProfile);
+  assert.equal(group.intent, "PROFILE_ACADEMIC_GROUP");
+  assert.match(group.html, /CEAM1/);
+  const summary = answerLocally("who am i", fullProfile);
+  assert.match(summary.html, /Mentor phone: 9876543210/);
+  assert.match(summary.html, /Mentoring group: CEAM1/);
+
   const exam = answerLocally("When is my ESE exam?", context());
   assert.equal(exam.intent, "DATESHEET");
   assert.match(exam.html, /2026-11-20/);
@@ -338,6 +368,28 @@ test("profile and datesheet answers come from device data only", () => {
   const missing = answerLocally("exam on 30 December", context());
   assert.equal(missing.intent, "DATESHEET_NONE");
   assert.match(missing.html, /will not guess/);
+});
+
+test("admin-published date sheets answer without replacing the official ESE sheet", () => {
+  const publishedDatesheets = [{
+    title: "MSE-II Chemistry date sheet",
+    scope: "MSE",
+    department: "Applied Sciences",
+    date: "2026-11-20",
+    url: "https://gndec.ac.in/notice.pdf",
+    body: "23 Nov Chemistry\n24 Nov Physics"
+  }];
+  const mse = answerLocally("MSE chemistry date sheet", context({ publishedDatesheets }));
+  assert.equal(mse.intent, "PUBLISHED_DATESHEET");
+  assert.match(mse.html, /MSE-II Chemistry/);
+  assert.match(mse.html, /notice\.pdf/);
+  assert.match(mse.html, /23 Nov Chemistry/);
+
+  const generic = answerLocally("show the date sheet", context({ publishedDatesheets }));
+  assert.equal(generic.intent, "PUBLISHED_DATESHEET");
+
+  const ese = answerLocally("When is my ESE exam?", context({ publishedDatesheets }));
+  assert.equal(ese.intent, "DATESHEET");
 });
 
 test("refusals are explicit, bounded and never fabricated", () => {

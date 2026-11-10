@@ -50,3 +50,28 @@ export function profileAppliesToSelection(profile, group, subgroup) {
   if (section !== clean(group).toUpperCase()) return false;
   return sub === clean(subgroup).toUpperCase();
 }
+
+/** Only the rows that belong to the profile's academic (mentoring) group. */
+export function academicOverlayFromSchedule(schedule, profile) {
+  const academicGroup = clean(profile?.academicGroup);
+  if (!academicGroup) return [];
+  return (Array.isArray(schedule) ? schedule : []).filter((entry) => entry && entry.group === academicGroup);
+}
+
+function entryKey(entry) {
+  return `${entry.day}|${entry.start}|${entry.end}|${entry.subject}`;
+}
+
+/**
+ * Append official academic-group rows to one day's base classes, then fill the
+ * mentoring class details. Only the appended rows receive the override, so a
+ * teacher or room that the section timetable already prints is never replaced.
+ */
+export function classesWithOverlay(base, overlay, day, profile) {
+  const entries = Array.isArray(base) ? base : [];
+  const existing = new Set(entries.map(entryKey));
+  const extra = (Array.isArray(overlay) ? overlay : [])
+    .filter((entry) => entry && entry.day === day && !existing.has(entryKey(entry)))
+    .map((entry) => applyMentoringOverride(entry, profile));
+  return [...entries, ...extra].sort((a, b) => a.start - b.start);
+}

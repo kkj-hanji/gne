@@ -43,8 +43,19 @@ jobs:
       - name: Verify the live release is complete
         run: node scripts/verify-next-live.mjs
 
+      - name: Refresh official data bundles
+        run: |
+          node scripts/build-campus.mjs
+          node scripts/build-datesheet.mjs
+          node scripts/build-directory-indexes.mjs
+          node scripts/build-syllabus-index.mjs
+          node scripts/build-papers.mjs --write
+
       - name: Rebuild static SEO pages
         run: npm run build:seo
+
+      - name: Bundle the verified timetable for first-load and outage fallback
+        run: npm run build:next-bundle
 
       - name: Test the regenerated directory
         run: |
@@ -54,15 +65,15 @@ jobs:
       - name: Commit changed pages
         id: commit
         run: |
-          if [ -z "$(git status --porcelain -- next/college next/sitemap.xml next/robots.txt next/icons/og-cover.svg)" ]; then
+          if [ -z "$(git status --porcelain -- next/college next/data next/sitemap.xml next/robots.txt next/icons/og-cover.svg public/data src/data)" ]; then
             echo "No timetable change."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "gndec-compass-bot"
           git config user.email "gndec-compass-bot@users.noreply.github.com"
-          git add next/college next/sitemap.xml next/robots.txt next/icons/og-cover.svg
-          git commit -m "chore(next): refresh timetable directory from verified release"
+          git add next/college next/data next/sitemap.xml next/robots.txt next/icons/og-cover.svg public/data src/data
+          git commit -m "chore(next): refresh official data and timetable directory"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
 

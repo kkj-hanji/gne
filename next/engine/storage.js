@@ -58,7 +58,8 @@ export async function saveSnapshot(snapshot) {
     entries: snapshot.schedule.length,
     roomEntries: Array.isArray(snapshot.roomSchedule) ? snapshot.roomSchedule.length : 0,
     schedule: snapshot.schedule,
-    roomSchedule: Array.isArray(snapshot.roomSchedule) ? snapshot.roomSchedule : []
+    roomSchedule: Array.isArray(snapshot.roomSchedule) ? snapshot.roomSchedule : [],
+    subgroupSchedule: Array.isArray(snapshot.subgroupSchedule) ? snapshot.subgroupSchedule : []
   };
   const db = await openDatabase();
   if (!db) {

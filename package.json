@@ -14,6 +14,7 @@
     "build": "wrangler deploy --dry-run --outdir dist",
     "build:next": "wrangler deploy --dry-run -c wrangler.next.jsonc",
     "build:next-icons": "node scripts/build-next-icons.mjs",
+    "build:next-bundle": "node scripts/bundle-next-timetable.mjs",
     "build:seo": "node scripts/build-next-seo.mjs",
     "verify:next": "node scripts/verify-next-live.mjs",
     "probe:next": "node scripts/probe-next-ask.mjs",

@@ -30,7 +30,7 @@ import {
 import { digestCopy, dueReminder, isQuietTime, notificationCopy } from "./engine/reminders.js";
 import { buildIcs, downloadIcs } from "./engine/ics.js";
 import { ROUTES as SEO_ROUTES, headTags, routeFromPath } from "./seo-meta.js";
-import { applyMentoringOverrides, MENTORING_SUBJECT, profileAppliesToSelection } from "./engine/mentoring.js";
+import { academicOverlayFromSchedule, applyMentoringOverride, classesWithOverlay, MENTORING_SUBJECT, profileAppliesToSelection } from "./engine/mentoring.js";
 import {
   NOTICE_CATEGORIES, TRANSCRIBED_NOTICES, filterNotices, isRecent, mergeNotices, noticeStats, slugify
 } from "./engine/notices.js";
@@ -62,6 +62,9 @@ const state = {
   route: "today",
   schedule: [],
   roomSchedule: [],
+  subgroupSchedule: [],
+  academicOverlay: [],
+  academicOverlayGroup: "",
   groups: [],
   group: "",
   subgroup: "",
@@ -99,6 +102,7 @@ const state = {
   directoryStatus: "idle",
   faculty: [],
   students: [],
+  rosterGeneratedAt: "",
   syllabus: null,
   compareA: "",
   compareB: "",
@@ -108,6 +112,7 @@ const state = {
   busy: false,
   brainState: "idle",
   dataStatus: "loading",
+  dataFallback: false,
   lastSync: "",
   online: typeof navigator === "undefined" ? true : navigator.onLine !== false,
   day: "",
@@ -116,6 +121,8 @@ const state = {
   roomDay: "",
   roomTime: "",
   roomZone: "",
+  teacherQuery: "",
+  teacherSelected: "",
   debug: { attempts: [], last: null },
   installPrompt: null,
   notified: new Set(),
@@ -200,10 +207,54 @@ function subgroupsFor(group) {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
+/** Groups that only exist in the official subgroup (academic/mentoring) file. */
+function academicGroups() {
+  return [...new Set(state.subgroupSchedule.map((entry) => entry.group).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function academicOverlayForProfile(schedule, profile = state.profile) {
+  return academicOverlayFromSchedule(schedule, profile);
+}
+
+/**
+ * Mirrors the legacy Compass timetable: the official section file is the base
+ * timetable, and the official subgroup file contributes the student's academic
+ * (mentoring) group rows. Those extra rows receive mentor overrides; printed
+ * base rows never do.
+ */
+function refreshAcademicOverlay() {
+  const academicGroup = String(state.profile?.academicGroup || "").replace(/\s+/g, " ").trim();
+  state.academicOverlay = academicOverlayForProfile(state.subgroupSchedule, state.profile);
+  state.academicOverlayGroup = academicGroup;
+}
+
+function overlayApplies() {
+  const academicGroup = String(state.profile?.academicGroup || "").replace(/\s+/g, " ").trim();
+  return Boolean(academicGroup)
+    && state.academicOverlayGroup === academicGroup
+    && profileAppliesToSelection(state.profile, state.group, state.subgroup);
+}
+
+/**
+ * The verified schedule an answer should read: the base section timetable plus
+ * the student's official academic-group rows, de-duplicated and mentor-filled.
+ */
+function effectiveSchedule() {
+  if (!overlayApplies()) return state.schedule;
+  const existing = new Set(state.schedule
+    .filter((entry) => entry.group === state.group)
+    .map((entry) => `${entry.day}|${entry.start}|${entry.end}|${entry.subject}`));
+  const extra = state.academicOverlay
+    .filter((entry) => !existing.has(`${entry.day}|${entry.start}|${entry.end}|${entry.subject}`))
+    .map((entry) => ({ ...applyMentoringOverride(entry, state.profile), group: state.group, cohorts: "" }));
+  return [...state.schedule, ...extra];
+}
+
 function classesForDay(day) {
-  const entries = classesFor(state.schedule, state.group, day, state.subgroup);
-  if (!profileAppliesToSelection(state.profile, state.group, state.subgroup)) return entries;
-  return applyMentoringOverrides(entries, state.profile);
+  const base = classesFor(state.schedule, state.group, day, state.subgroup);
+  if (!overlayApplies()) return base;
+  return classesWithOverlay(base, state.academicOverlay, day, state.profile);
 }
 
 function preferredGroup(groups) {
@@ -326,13 +377,15 @@ function persistSelection() {
   storageSet(SELECTION_KEY, JSON.stringify({ group: state.group, subgroup: state.subgroup }));
 }
 
-function applySchedule(schedule, roomSchedule, metadata, { fromCache = false } = {}) {
+function applySchedule(schedule, roomSchedule, metadata, subgroupSchedule = [], { fromCache = false } = {}) {
   state.schedule = Array.isArray(schedule) ? schedule : [];
   state.roomSchedule = Array.isArray(roomSchedule) ? roomSchedule : [];
+  state.subgroupSchedule = Array.isArray(subgroupSchedule) ? subgroupSchedule : [];
   state.groups = [...new Set(state.schedule.map((entry) => entry.group))].sort((a, b) => a.localeCompare(b));
   state.metadata = metadata || state.metadata;
   state.dataStatus = fromCache ? "cached" : "ready";
   resolveSelection();
+  refreshAcademicOverlay();
 }
 
 async function loadSnapshots() {
@@ -354,23 +407,36 @@ async function loadCachedData() {
     version: latest.version,
     checkedAt: latest.checkedAt,
     source: "device snapshot"
-  }, { fromCache: true });
+  }, latest.subgroupSchedule || [], { fromCache: true });
   state.lastSync = latest.createdAt;
   return true;
+}
+
+async function fetchTimetableSource(source, bundledPath) {
+  try {
+    return { text: await fetchText(`/api/legacy/api/timetable?source=${source}`), bundled: false };
+  } catch (error) {
+    if (!bundledPath) throw error;
+    return { text: await fetchText(bundledPath), bundled: true };
+  }
 }
 
 async function loadLiveData({ manual = false } = {}) {
   if (manual) toast("Checking the official GNDEC sources…");
   state.dataStatus = state.dataStatus === "ready" ? "ready" : "loading";
   try {
-    const [groupsHtml, roomsHtml] = await Promise.all([
-      fetchText("/api/legacy/api/timetable?source=groups"),
-      fetchText("/api/legacy/api/timetable?source=rooms")
+    const [groups, rooms, subgroup] = await Promise.all([
+      fetchTimetableSource("groups", "/data/timetable-groups.html"),
+      fetchTimetableSource("rooms", "/data/timetable-rooms.html"),
+      fetchTimetableSource("subgroups", "/data/timetable-subgroups.html").catch(() => ({ text: "", bundled: false }))
     ]);
-    const schedule = readVerifiedFetTimetable(groupsHtml, "groups");
-    const roomSchedule = readVerifiedFetTimetable(roomsHtml, "rooms");
-    const metadata = await loadSourceMetadata();
-    applySchedule(schedule, roomSchedule, metadata);
+    const schedule = readVerifiedFetTimetable(groups.text, "groups");
+    const roomSchedule = readVerifiedFetTimetable(rooms.text, "rooms");
+    const subgroupSchedule = subgroup.text ? readVerifiedFetTimetable(subgroup.text, "subgroups") : [];
+    const bundled = groups.bundled || rooms.bundled || subgroup.bundled;
+    const metadata = { ...(await loadSourceMetadata()), source: bundled ? "bundled verified release" : "official source" };
+    state.dataFallback = bundled;
+    applySchedule(schedule, roomSchedule, metadata, subgroupSchedule);
     state.lastSync = new Date().toISOString();
     await saveSnapshot({
       id: `snap-${Date.now()}`,
@@ -379,12 +445,14 @@ async function loadLiveData({ manual = false } = {}) {
       checkedAt: metadata?.checkedAt || "",
       groups: state.groups.length,
       schedule,
-      roomSchedule
+      roomSchedule,
+      subgroupSchedule
     });
     await pruneSnapshots(v("data.snapshots"));
     state.snapshots = await listSnapshots();
     state.dataStatus = "ready";
-    if (manual) toast("Official timetable verified and refreshed.", "success");
+    if (bundled) toast(`The official GNDEC source is unreachable. Showing the bundled verified ${metadata?.version || "published"} release.`);
+    if (manual && !bundled) toast("Official timetable verified and refreshed.", "success");
     render();
     return true;
   } catch (error) {
@@ -497,8 +565,20 @@ async function loadPapers() {
 
 /** Every notice source, merged once per render. */
 function allNotices() {
+  const admin = [
+    ...state.content.notices,
+    ...publishedDatesheets().map((sheet) => ({
+      title: sheet.title || "Date sheet",
+      date: sheet.date || "",
+      category: "Examination",
+      author: sheet.department || "Admin",
+      url: sheet.url || "",
+      body: sheet.body || "",
+      admin: true
+    }))
+  ];
   return mergeNotices({
-    admin: state.content.notices,
+    admin,
     transcribed: transcribedNotices(),
     campus: state.campus.notices,
     curated: state.notices
@@ -521,6 +601,15 @@ function holidayOverrides() {
   return [...state.content.holidays, ...state.content.datesheets.filter((item) => String(item.scope || "").toLowerCase() === "holiday")];
 }
 
+/** Admin-published date sheets, newest first. Holiday overrides stay in the calendar. */
+function publishedDatesheets() {
+  return state.content.datesheets
+    .filter((item) => String(item.scope || "").toLowerCase() !== "holiday")
+    .filter((item) => item.published !== false)
+    .slice()
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(a.title || "").localeCompare(String(b.title || "")));
+}
+
 function activeAnnouncements() {
   const today = now().dateISO;
   return state.content.announcements.filter((item) => !item.expiresAt || item.expiresAt >= today);
@@ -541,7 +630,7 @@ async function ensureLiveContent() {
 
 function ensureDirectoryData() {
   const tab = state.directoryTab;
-  const loaded = tab === "faculty" ? state.faculty.length > 0 : tab === "students" ? state.students.length > 0 : Boolean(state.syllabus);
+  const loaded = tab === "faculty" ? state.faculty.length > 0 : (tab === "students" || tab === "mentoring") ? state.students.length > 0 : Boolean(state.syllabus);
   if (loaded) {
     if (state.directoryStatus !== "ready") {
       state.directoryStatus = "ready";
@@ -551,7 +640,7 @@ function ensureDirectoryData() {
   }
   if (state.directoryStatus !== "idle") return;
   if (tab === "faculty") loadFaculty();
-  else if (tab === "students") loadStudents();
+  else if (tab === "students" || tab === "mentoring") loadStudents();
   else loadSyllabusIndex();
 }
 
@@ -583,12 +672,71 @@ async function loadStudents() {
   try {
     const data = await fetchJson("/api/legacy/data/student-roster-index.json", {}, 25000);
     state.students = Array.isArray(data?.records) ? data.records : [];
+    state.rosterGeneratedAt = String(data?.generatedAt || data?.schemaVersion || "");
     state.directoryStatus = "ready";
+    syncProfileFromRoster({ silent: state.route !== "directory" });
   } catch {
     state.students = [];
     state.directoryStatus = "error";
   }
-  if (state.route === "directory" && state.directoryTab === "students") render();
+  if (state.route === "directory" && (state.directoryTab === "students" || state.directoryTab === "mentoring")) render();
+}
+
+function rosterIdentity() {
+  const crn = String(state.profile?.crn || "").replace(/\D/g, "");
+  const registration = String(state.profile?.registrationNo || "").replace(/\D/g, "");
+  return { crn, registration };
+}
+
+/** Exact CRN or registration match only. Names are never used for automatic matching. */
+function rosterRecordForProfile() {
+  const { crn, registration } = rosterIdentity();
+  if (!crn && !registration) return null;
+  const matches = state.students.filter((record) => {
+    const recordCrn = String(record?.crn || "").replace(/\D/g, "");
+    const recordReg = String(record?.registrationNo || "").replace(/\D/g, "");
+    return (crn && recordCrn === crn) || (registration && recordReg === registration);
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * Mirrors the legacy profile refresh: the published roster is the authority for
+ * section, sub-group, mentor and mentoring group once CRN/registration matches.
+ * A name-only profile is never guessed; a manual profile is left untouched.
+ */
+function syncProfileFromRoster({ silent = true } = {}) {
+  if (!state.students.length) return false;
+  const record = rosterRecordForProfile();
+  if (!record) return false;
+  const version = state.rosterGeneratedAt || "published";
+  const next = {
+    ...state.profile,
+    name: record.name || state.profile.name,
+    crn: record.crn || state.profile.crn,
+    registrationNo: record.registrationNo || state.profile.registrationNo,
+    branch: record.branch || state.profile.branch,
+    section: record.section || state.profile.section,
+    subsection: record.subsection || state.profile.subsection,
+    mentor: record.mentor || state.profile.mentor,
+    mentorPhone: record.mentorPhone || state.profile.mentorPhone,
+    academicGroup: record.academicGroup || state.profile.academicGroup,
+    mentorVenue: record.mentorVenue || record.venue || state.profile.mentorVenue,
+    rosterVersion: version
+  };
+  const changed = Object.keys(next).some((key) => String(next[key] ?? "") !== String(state.profile?.[key] ?? ""));
+  const saved = saveProfile(localStorage, next);
+  if (!saved) return false;
+  state.profile = saved;
+  if (saved.section && state.groups.includes(saved.section)) {
+    state.group = saved.section;
+    state.subgroup = subgroupsFor(saved.section).includes(saved.subsection) ? saved.subsection : "";
+    persistSelection();
+  }
+  refreshAcademicOverlay();
+  if (changed && !silent) toast(`Profile verified against the current official roster: ${saved.name || saved.crn}.`, "success");
+  if (changed) render();
+  return changed;
 }
 
 async function loadSyllabusIndex() {
@@ -627,7 +775,7 @@ function nextClassInfo() {
   for (let offset = 1; offset <= 7; offset += 1) {
     const candidate = addDays(clock, offset);
     if (!STUDY_DAYS.includes(candidate.day)) continue;
-    const future = classesFor(state.schedule, state.group, candidate.day, state.subgroup);
+    const future = classesForDay(candidate.day);
     if (future.length) return { kind: "later", entry: future[0], clock, day: candidate };
   }
   return { kind: "none", clock };
@@ -639,6 +787,7 @@ const ROUTES = {
   today: { title: "Today", eyebrow: "Verified college data" },
   timetable: { title: "Timetable", eyebrow: "Official weekly pattern" },
   rooms: { title: "Rooms", eyebrow: "Published room timetable" },
+  teachers: { title: "Teachers", eyebrow: "Faculty-wise timetable" },
   ask: { title: "Ask Compass", eyebrow: "Deterministic, never guesses" },
   notices: { title: "Notices", eyebrow: "Official college updates" },
   papers: { title: "Papers", eyebrow: "Official subject question banks" },
@@ -754,6 +903,7 @@ function render() {
   switch (state.route) {
     case "timetable": html = renderTimetable(); break;
     case "rooms": html = renderRooms(); break;
+    case "teachers": html = renderTeachers(); break;
     case "ask": html = renderAsk(); break;
     case "notices": html = renderNotices(); break;
     case "papers": html = renderPapers(); break;
@@ -790,6 +940,7 @@ function ensureRouteData() {
 }
 
 function dataChip() {
+  if (state.dataStatus === "ready" && state.dataFallback) return `<span class="sync-dot is-stale" aria-hidden="true"></span> Bundled verified ${escapeHtml(state.metadata?.version || "release")}`;
   if (state.dataStatus === "ready") return `<span class="sync-dot" aria-hidden="true"></span> Verified ${escapeHtml(shortDate(state.metadata?.checkedAt || state.lastSync))}`;
   if (state.dataStatus === "cached") return `<span class="sync-dot is-stale" aria-hidden="true"></span> Cached release ${escapeHtml(state.metadata?.version || "")}`;
   if (state.dataStatus === "error") return `<span class="sync-dot is-offline" aria-hidden="true"></span> No verified data`;
@@ -1089,7 +1240,7 @@ function renderTimetable() {
         <span class="badge badge-accent">${escapeHtml(selectionLabel())}</span>
       </div>
       <div class="day-tabs" style="margin-top:12px" role="tablist" aria-label="Day">
-        ${days.map((day) => `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${classesFor(state.schedule, state.group, day, state.subgroup).length} class${classesFor(state.schedule, state.group, day, state.subgroup).length === 1 ? "" : "es"}</small></button>`).join("")}
+        ${days.map((day) => `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${classesForDay(day).length} class${classesForDay(day).length === 1 ? "" : "es"}</small></button>`).join("")}
       </div>
       <div style="margin-top:14px">${view === "week" ? renderWeekGrid(clock) : view === "agenda" ? renderAgenda() : renderDayView(state.day, clock)}</div>
     </div>`}
@@ -1097,7 +1248,7 @@ function renderTimetable() {
 }
 
 function renderDayView(day, clock) {
-  const classes = classesFor(state.schedule, state.group, day, state.subgroup);
+  const classes = classesForDay(day);
   if (!classes.length) return emptyState("☕", `No class on ${day}`, "The official release has no class for this section on this day.", `<button class="btn btn-sm" data-route="rooms">Find a free room</button>`);
   let blocks = classes.map((entry) => classCard(entry, v("timetable.clock"), { highlight: v("timetable.highlightNow") && day === clock.day && entry.start <= clock.minutes && clock.minutes < entry.end })).join("");
   if (v("timetable.showEmpty")) {
@@ -1113,7 +1264,7 @@ function renderDayView(day, clock) {
 
 function renderAgenda() {
   return STUDY_DAYS.map((day) => {
-    const classes = classesFor(state.schedule, state.group, day, state.subgroup);
+    const classes = classesForDay(day);
     if (!classes.length) return "";
     return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${classes.length}</span></p>${classes.map((entry) => classCard(entry, v("timetable.clock"))).join("")}</div>`;
   }).join("") || emptyState("▦", "No classes published", "The official release has no class for this section.");
@@ -1125,7 +1276,7 @@ function renderWeekGrid(clock) {
   const rows = starts.map((start) => {
     const end = start + 60;
     return `<tr><th scope="row">${escapeHtml(humanTime(start, v("timetable.clock")))}</th>${days.map((day) => {
-      const entries = classesFor(state.schedule, state.group, day, state.subgroup).filter((entry) => entry.start < end && entry.end > start);
+      const entries = classesForDay(day).filter((entry) => entry.start < end && entry.end > start);
       return `<td>${entries.map((entry) => `<div class="week-slot"><strong>${escapeHtml(entry.subject)}</strong><span>${escapeHtml(entry.room)}</span></div>`).join("")}</td>`;
     }).join("")}</tr>`;
   }).join("");
@@ -1195,6 +1346,56 @@ function renderHeatmap() {
     return `<div class="timeline-item"><div class="timeline-time">${escapeHtml(humanTime(hour * 60, v("timetable.clock")))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${result.rooms.length} free</div><div class="timeline-meta">${ratio}% of published rooms</div></div></div>`;
   }).join("");
   return `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Hour-by-room heatmap</h2><p class="card-sub">Free room counts per hour. Computed locally.</p></div></div><div class="timeline">${rows}</div></section>`;
+}
+
+/* ── Teachers ──────────────────────────────────────────────────────────── */
+
+function teacherNames() {
+  return [...new Set(state.schedule
+    .map((entry) => String(entry?.teacher || "").trim())
+    .filter((name) => name && !/not listed/i.test(name)))]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function teacherEntries(name) {
+  return state.schedule
+    .filter((entry) => String(entry?.teacher || "").trim() === name)
+    .sort((a, b) => STUDY_DAYS.indexOf(a.day) - STUDY_DAYS.indexOf(b.day) || a.start - b.start);
+}
+
+function renderTeachers() {
+  const clock = now();
+  if (state.teacherSelected && !state.schedule.some((entry) => entry.teacher === state.teacherSelected)) state.teacherSelected = "";
+  const query = state.teacherQuery.trim().toLowerCase();
+  const all = teacherNames();
+  const matches = query ? all.filter((name) => name.toLowerCase().includes(query)) : all;
+  const selected = state.teacherSelected;
+  const entries = selected ? teacherEntries(selected) : [];
+  const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
+  const dayRows = selected ? days.map((day) => {
+    const dayEntries = entries.filter((entry) => entry.day === day);
+    if (!dayEntries.length) return "";
+    return `<section class="card" style="margin-top:12px"><div class="card-head"><div><h2 class="card-title">${escapeHtml(day)}</h2><p class="card-sub">${dayEntries.length} published class${dayEntries.length === 1 ? "" : "es"}</p></div></div>${dayEntries.map((entry) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(humanTime(entry.start, v("timetable.clock")))} – ${escapeHtml(humanTime(entry.end, v("timetable.clock")))}</div><div class="answer-class-body"><strong>${escapeHtml(entry.subject)}</strong><div class="answer-class-meta">${escapeHtml(entry.group)} · ${escapeHtml(entry.room || "Room not listed")}</div></div></div>`).join("")}</section>`;
+  }).join("") : "";
+  return `<div class="page page-teachers">
+    <div class="page-head">
+      <div class="page-head-text">
+        <h2 class="page-title">Teacher timetable</h2>
+        <p class="page-sub">Every teacher printed in the official FET release, with their published classes across all sections. No teacher, subject or room is invented.</p>
+      </div>
+      <div class="page-actions"><span class="badge">${escapeHtml(state.schedule.length ? `${all.length} published teachers` : "Timetable loading")}</span></div>
+    </div>
+    <div class="card">
+      <div class="field"><label for="teacher-search">Search a teacher</label><input id="teacher-search" type="search" value="${escapeHtml(state.teacherQuery)}" placeholder="Type a teacher name, e.g. Sharma…" data-teacher-search autocomplete="off" /></div>
+      <p class="card-sub" style="margin-top:8px">${query ? `${matches.length} of ${all.length} teachers match “${escapeHtml(state.teacherQuery)}”.` : "Choose a teacher to open their full weekly timetable."}</p>
+    </div>
+    ${selected ? `<div class="card" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h2 class="card-title">${escapeHtml(selected)}</h2><p class="card-sub">${entries.length} published class${entries.length === 1 ? "" : "es"} across ${new Set(entries.map((entry) => entry.group)).size} section${new Set(entries.map((entry) => entry.group)).size === 1 ? "" : "s"}</p></div><button class="btn btn-sm btn-ghost" data-action="clear-teacher">Clear</button></div>${dayRows || emptyState("▦", "No classes published", "The official release has no class for this teacher.")}` : ""}
+    ${!selected && !state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see teacher timetables.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : ""}
+    ${!selected && state.schedule.length ? (matches.length ? `<div class="directory-grid" style="margin-top:14px">${matches.slice(0, 120).map((name) => {
+      const count = teacherEntries(name).length;
+      return `<button class="card directory-card" data-teacher="${escapeHtml(name)}" style="text-align:left"><div class="directory-card-head"><span class="directory-initials" aria-hidden="true">${escapeHtml(name.replace(/^(?:DR|ER|MS|MR|MRS|PROF)\.?\s+/i, "").split(/\s+/).map((part) => part[0]).slice(0, 2).join(""))}</span><div><h3 class="directory-name">${escapeHtml(name)}</h3><p class="directory-meta">${count} published class${count === 1 ? "" : "es"}</p></div></div></button>`;
+    }).join("")}</div>${matches.length > 120 ? `<p class="card-sub" style="margin-top:10px">Showing the first 120 teachers. Narrow the search to see more.</p>` : ""}` : emptyState("🔎", "No matching teacher", `No published teacher name contains “${escapeHtml(state.teacherQuery)}”.`)) : ""}
+  </div>`;
 }
 
 /* ── Notices ───────────────────────────────────────────────────────────── */
@@ -1352,6 +1553,9 @@ function renderCalendar() {
       <div class="page-actions"><a class="btn btn-sm" href="/notices">Notices</a></div>
     </div>
     ${upcoming.length ? `<section class="card"><div class="card-head"><div><h2 class="card-title">Coming up</h2><p class="card-sub">Next published off days from today.</p></div></div><div class="holiday-row">${upcoming.map((item) => `<div class="holiday-pill"><strong>${escapeHtml(dateOnly(item.date))}</strong><span>${escapeHtml(dayOfWeek(item.date))}</span><small>${escapeHtml(item.name)}</small></div>`).join("")}</div></section>` : ""}
+    ${publishedDatesheets().length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Published date sheets</h2><p class="card-sub">Transcribed by the college admin from an official notice. The original link is always kept.</p></div><a class="btn btn-sm" href="/notices">All notices</a></div>
+      <ul class="doc-list">${publishedDatesheets().map((item) => `<li><div>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "Date sheet")}</a>` : `<strong>${escapeHtml(item.title || "Date sheet")}</strong>`}<span class="badge">${escapeHtml(item.scope || "Examination")}</span>${item.department ? `<span class="badge">${escapeHtml(item.department)}</span>` : ""}<div class="card-sub" style="margin-top:6px">${escapeHtml(item.date ? shortDate(item.date) : "Undated")}${item.body ? ` · ${escapeHtml(String(item.body).slice(0, 400)).replace(/\n/g, " ")}` : ""}</div></div></li>`).join("")}</ul>
+    </section>` : ""}
     <section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Academic periods</h2><p class="card-sub">From the official academic calendar; these are periods, not subject exam sittings.</p></div><a class="btn btn-sm" href="${escapeHtml(CALENDAR_SOURCE.url)}" target="_blank" rel="noopener noreferrer">Official PDF ↗</a></div>
       <div class="period-grid">${ACADEMIC_PERIODS.map((period) => `<div class="period-card"><h3>${escapeHtml(period.scope)}</h3><dl><dt>Semester starts</dt><dd>${escapeHtml(dateOnly(period.start))}</dd><dt>Preparatory leave</dt><dd>${escapeHtml(dateOnly(period.prepStart))} → ${escapeHtml(dateOnly(period.prepEnd))}</dd><dt>Examinations</dt><dd>From ${escapeHtml(dateOnly(period.examsStart))}</dd></dl></div>`).join("")}</div>
     </section>
@@ -1570,7 +1774,7 @@ function renderAdminForm() {
     <form id="admin-form" class="admin-form" novalidate>
       <div class="admin-form-grid">${schema.fields.map((field) => adminFieldHtml(field, item)).join("")}</div>
       <div class="admin-upload-row">
-        <label class="btn btn-sm admin-file-label">Upload image or PDF<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" data-admin-file /></label>
+        <label class="btn btn-sm admin-file-label">Upload image, PDF or text<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.txt,.md,.csv" data-admin-file /></label>
         <span class="card-sub" id="admin-upload-status">The uploaded file is linked into the URL field. Maximum 1.5 MB.</span>
       </div>
       <div class="chip-row" style="margin-top:14px">
@@ -1688,7 +1892,7 @@ function renderAdmin() {
     <section class="card" style="margin-top:14px">
       <div class="card-head"><div><h2 class="card-title">Upload a file</h2><p class="card-sub">PNG, JPEG, WebP, GIF or PDF up to 1.5 MB. Files are stored in the content store and served from this Worker.</p></div></div>
       <div class="admin-upload-row">
-        <label class="btn btn-sm admin-file-label">Choose file<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" data-admin-file data-standalone="true" /></label>
+        <label class="btn btn-sm admin-file-label">Choose file<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.txt,.md,.csv" data-admin-file data-standalone="true" /></label>
         <span class="card-sub" id="admin-upload-status">Nothing uploaded in this session.</span>
       </div>
     </section>
@@ -1805,7 +2009,40 @@ function directoryMatches() {
     const records = state.students.filter((record) => [record.name, record.crn, record.registrationNo, record.section, record.subsection, record.mentor, record.serialNo, record.currentSerialNo].some((value) => String(value || "").toLowerCase().includes(query)));
     return { records, total: state.students.length, query };
   }
+  if (state.directoryTab === "mentoring") {
+    const groups = mentoringGroups();
+    const records = groups.filter((group) => !query || [group.academicGroup, group.section, group.subsection, group.branch, group.mentor, group.venue, group.mentorPhone].some((value) => String(value || "").toLowerCase().includes(query)));
+    return { records, total: groups.length, query };
+  }
   return { records: [], total: 0, query };
+}
+
+/** One row per verified mentoring group, from the published student roster. */
+function mentoringGroups() {
+  const map = new Map();
+  for (const record of state.students) {
+    if (!record) continue;
+    const academicGroup = String(record.academicGroup || "").trim();
+    const mentor = String(record.mentor || "").trim();
+    if (!academicGroup && !mentor) continue;
+    const venue = String(record.mentorVenue || record.venue || "").trim();
+    const key = [academicGroup, record.section || "", mentor, venue, record.mentorPhone || ""].join("|");
+    const entry = map.get(key) || {
+      academicGroup,
+      section: record.section || "",
+      subsection: record.subsection || "",
+      branch: record.branch || "",
+      mentor,
+      mentorPhone: record.mentorPhone || "",
+      venue,
+      students: 0
+    };
+    entry.students += 1;
+    map.set(key, entry);
+  }
+  return [...map.values()].sort((a, b) => (a.academicGroup || "").localeCompare(b.academicGroup || "", undefined, { numeric: true })
+    || (a.section || "").localeCompare(b.section || "")
+    || (a.mentor || "").localeCompare(b.mentor || ""));
 }
 
 function facultyCard(record) {
@@ -1825,11 +2062,13 @@ function facultyCard(record) {
 }
 
 function studentRow(record) {
+  const key = record.crn || record.registrationNo || record.name || "";
   return `<tr>
     <td><strong>${escapeHtml(record.name || "")}</strong><br /><small>${escapeHtml(record.crn || record.registrationNo || "")}</small></td>
     <td>${escapeHtml(record.section || "")}${record.subsection ? ` · ${escapeHtml(record.subsection)}` : ""}</td>
     <td>${escapeHtml(record.branch || "")}</td>
     <td>${escapeHtml(record.mentor || "—")}${record.mentorVenue || record.venue ? `<br /><small>${escapeHtml(record.mentorVenue || record.venue)}</small>` : ""}</td>
+    <td><button class="btn btn-sm" data-action="use-student" data-student="${escapeHtml(key)}">Use</button></td>
   </tr>`;
 }
 
@@ -1853,13 +2092,13 @@ function renderDirectory() {
   const loading = state.directoryStatus === "loading";
   const failed = state.directoryStatus === "error";
   const { records, total, query } = directoryMatches();
-  const placeholder = tab === "faculty" ? "Search name, department, designation or email…" : tab === "students" ? "Type at least 2 letters of a name, CRN or registration number…" : "Search the first-year syllabus, e.g. Mathematics, ESC101, credits…";
-  const tabs = [["faculty", "Faculty", state.faculty.length], ["students", "Students", state.students.length], ["syllabus", "Syllabus", state.syllabus?.pages?.length || 0]];
+  const placeholder = tab === "faculty" ? "Search name, department, designation or email…" : tab === "students" ? "Type at least 2 letters of a name, CRN or registration number…" : tab === "mentoring" ? "Search a mentoring group, section or mentor…" : "Search the first-year syllabus, e.g. Mathematics, ESC101, credits…";
+  const tabs = [["faculty", "Faculty", state.faculty.length], ["students", "Students", state.students.length], ["mentoring", "Mentoring", state.students.length ? mentoringGroups().length : 0], ["syllabus", "Syllabus", state.syllabus?.pages?.length || 0]];
   return `<div class="page page-directory">
     <div class="page-head">
       <div class="page-head-text">
         <h2 class="page-title">College directory</h2>
-        <p class="page-sub">Faculty, student sections and the published first-year syllabus. Searches run on this device only.</p>
+        <p class="page-sub">Faculty, student sections, mentoring groups and the published first-year syllabus. Searches run on this device only.</p>
       </div>
       <div class="page-actions"><span class="badge">${escapeHtml(total ? `${total} published records` : "On-device search")}</span></div>
     </div>
@@ -1870,14 +2109,25 @@ function renderDirectory() {
       <div class="field"><label for="directory-search" class="visually-hidden">Search ${escapeHtml(tab)}</label>
         <input id="directory-search" type="search" value="${escapeHtml(state.directoryQuery)}" placeholder="${escapeHtml(placeholder)}" data-directory-search autocomplete="off" />
       </div>
-      <p class="card-sub" style="margin-top:8px">${tab === "faculty" ? "Names and public contact details come from the official GNDEC faculty directory." : tab === "students" ? "Student records stay in this browser. Compass never uploads a name, CRN or registration number." : "Text is extracted from the official first-year syllabus PDF. Always confirm the authoritative PDF before relying on a page."}</p>
+      <p class="card-sub" style="margin-top:8px">${tab === "faculty" ? "Names and public contact details come from the official GNDEC faculty directory." : tab === "students" ? "Student records stay in this browser. Compass never uploads a name, CRN or registration number." : tab === "mentoring" ? "Every mentoring group and mentor published in the student roster, grouped with its section and venue." : "Text is extracted from the official first-year syllabus PDF. Always confirm the authoritative PDF before relying on a page."}</p>
     </div>
     ${loading ? `<section class="card" style="margin-top:14px"><p class="card-sub">Loading the verified ${escapeHtml(tab)} data…</p></section>` : ""}
     ${failed ? emptyState("⚠", "Directory unavailable", "The official record could not be loaded. Nothing was guessed or stored.", `<button class="btn btn-primary" data-action="retry-directory">Try again</button>`) : ""}
     ${!loading && !failed && tab === "faculty" ? `<p class="card-sub" style="margin:14px 0 8px">${records.length} of ${total} faculty${query ? ` matching “${escapeHtml(state.directoryQuery)}”` : ""}.</p><div class="directory-grid">${records.slice(0, 60).map(facultyCard).join("")}</div>${records.length > 60 ? `<p class="card-sub" style="margin-top:10px">Showing the first 60. Narrow the search to see more.</p>` : ""}` : ""}
-    ${!loading && !failed && tab === "students" ? (query.length < 2 ? emptyState("🔎", "Search a student", "Enter at least 2 letters of a name, CRN or registration number. Results are computed on this device and never sent anywhere.") : records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} match${records.length === 1 ? "" : "es"}</h2><p class="card-sub">Showing at most 50 records from the published roster. Mentor details are published by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Student</th><th>Section</th><th>Branch</th><th>Mentor</th></tr></thead><tbody>${records.slice(0, 50).map(studentRow).join("")}</tbody></table></div></section>` : emptyState("🗂", "No matching student", `Nothing in the published roster matches “${state.directoryQuery}”. Check the CRN or spelling.`)) : ""}
+    ${!loading && !failed && tab === "students" ? (query.length < 2 ? emptyState("🔎", "Search a student", "Enter at least 2 letters of a name, CRN or registration number. Results are computed on this device and never sent anywhere.") : records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} match${records.length === 1 ? "" : "es"}</h2><p class="card-sub">Showing at most 50 records from the published roster. Mentor details are published by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Student</th><th>Section</th><th>Branch</th><th>Mentor</th><th>Profile</th></tr></thead><tbody>${records.slice(0, 50).map(studentRow).join("")}</tbody></table></div></section>` : emptyState("🗂", "No matching student", `Nothing in the published roster matches “${state.directoryQuery}”. Check the CRN or spelling.`)) : ""}
+    ${!loading && !failed && tab === "mentoring" ? (records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} mentoring group${records.length === 1 ? "" : "s"}</h2><p class="card-sub">Grouped from ${state.students.length} published roster records. Venue and phone are printed by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Mentoring group</th><th>Section</th><th>Mentor</th><th>Contact</th><th>Students</th></tr></thead><tbody>${records.map(mentoringRow).join("")}</tbody></table></div></section>` : emptyState("🧑‍🏫", "No matching mentoring group", `Nothing in the published roster matches “${state.directoryQuery}”.`)) : ""}
     ${!loading && !failed && tab === "syllabus" ? (state.syllabus ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">First-year syllabus</h2><p class="card-sub">${state.syllabus.pages.length} extracted pages · <a href="${escapeHtml(state.syllabus.source)}" target="_blank" rel="noopener noreferrer">official PDF ↗</a></p></div></div>${query.length < 3 ? `<p class="card-sub">Type at least 3 characters to search inside the published syllabus text.</p>` : syllabusResults().length ? syllabusResults().map((page) => `<article class="syllabus-hit"><h3>Page ${page.number}</h3><p>${escapeHtml(page.excerpt)}</p></article>`).join("") : `<p class="card-sub">No page contains “${escapeHtml(state.directoryQuery)}”. Try a subject name or code such as ESC101.</p>`}</section>` : "") : ""}
   </div>`;
+}
+
+function mentoringRow(record) {
+  return `<tr>
+    <td><strong>${escapeHtml(record.academicGroup || "—")}</strong></td>
+    <td>${escapeHtml(record.section || "")}${record.subsection ? ` · ${escapeHtml(record.subsection)}` : ""}<br /><small>${escapeHtml(record.branch || "")}</small></td>
+    <td>${escapeHtml(record.mentor || "—")}</td>
+    <td>${record.mentorPhone ? `<a href="tel:${escapeHtml(record.mentorPhone)}">${escapeHtml(record.mentorPhone)}</a>` : "—"}${record.venue ? `<br /><small>${escapeHtml(record.venue)}</small>` : ""}</td>
+    <td>${record.students}</td>
+  </tr>`;
 }
 
 /* ── Compare two sections ──────────────────────────────────────────────── */
@@ -2173,7 +2423,8 @@ function updateChatHead() {
 
 function currentAnswerContext() {
   const context = buildAnswerContext({
-    schedule: state.schedule,
+    schedule: effectiveSchedule(),
+    allSchedule: state.schedule,
     roomSchedule: state.roomSchedule,
     group: state.group,
     subgroup: state.subgroup,
@@ -2181,6 +2432,7 @@ function currentAnswerContext() {
     now: now(),
     metadata: state.metadata,
     datesheet: state.datesheet,
+    publishedDatesheets: publishedDatesheets(),
     notices: allNotices(),
     papers: allPapers(),
     syllabus: allSyllabus(),
@@ -2376,7 +2628,7 @@ function renderVersionCard() {
     <div class="card-head"><div><h2 class="card-title">Version & rollback</h2><p class="card-sub">Every generation stays reachable. The new app, the previous 2.0 generation and the frozen legacy build are separate on purpose.</p></div></div>
     <div class="version-grid">
       <dl class="version-cell"><dt>This app</dt><dd>v${escapeHtml(version?.app?.version || APP_VERSION)} · ${escapeHtml(version?.app?.channel || "stable")}</dd></dl>
-      <dl class="version-cell"><dt>Build</dt><dd>${escapeHtml(version?.app?.build || "2026-11-09")}</dd></dl>
+      <dl class="version-cell"><dt>Build</dt><dd>${escapeHtml(version?.app?.build || "2026-11-10")}</dd></dl>
       <dl class="version-cell"><dt>Data release</dt><dd>${escapeHtml(state.metadata?.version || "not loaded")}</dd></dl>
       <dl class="version-cell"><dt>Verified</dt><dd>${escapeHtml(shortDate(state.metadata?.checkedAt || state.lastSync))}</dd></dl>
       <dl class="version-cell"><dt>Content store</dt><dd>${version?.content?.store ? "connected" : "not configured"}</dd></dl>
@@ -2424,8 +2676,13 @@ function renderProfileCard() {
       <div class="field"><label for="profile-subsection">Sub-group</label><select id="profile-subsection" data-profile="subsection"><option value="">Whole section</option>${subgroupsFor(profile.section || state.group).map((subgroup) => `<option value="${escapeHtml(subgroup)}" ${subgroup === profile.subsection ? "selected" : ""}>${escapeHtml(subgroup)}</option>`).join("")}</select></div>
       <div class="field"><label for="profile-branch">Branch</label><input id="profile-branch" data-profile="branch" value="${escapeHtml(profile.branch || "")}" /></div>
       <div class="field"><label for="profile-mentor">Mentor</label><input id="profile-mentor" data-profile="mentor" value="${escapeHtml(profile.mentor || "")}" /></div>
+      <div class="field"><label for="profile-mentor-phone">Mentor phone</label><input id="profile-mentor-phone" data-profile="mentorPhone" value="${escapeHtml(profile.mentorPhone || "")}" inputmode="tel" /></div>
+      <div class="field"><label for="profile-mentor-venue">Mentoring venue</label><input id="profile-mentor-venue" data-profile="mentorVenue" value="${escapeHtml(profile.mentorVenue || "")}" /></div>
+      <div class="field"><label for="profile-academic-group">Mentoring group</label><input id="profile-academic-group" data-profile="academicGroup" list="academic-group-options" value="${escapeHtml(profile.academicGroup || "")}" placeholder="e.g. ECB1-M1" /><datalist id="academic-group-options">${academicGroups().map((group) => `<option value="${escapeHtml(group)}"></option>`).join("")}</datalist></div>
       <div class="field"><label for="profile-attendance">Attendance target (%)</label><input id="profile-attendance" data-profile="attendanceTarget" type="number" min="0" max="100" value="${Number(profile.attendanceTarget) || 76}" /></div>
     </div>
+    <p class="card-sub" style="margin-top:10px">Mentor name and venue fill the official mentoring class only when the timetable leaves them blank. The mentoring group pulls your verified subgroup (academic) rows from the official subgroup timetable.</p>
+    ${profile.rosterVersion ? `<p class="card-sub" style="margin-top:6px"><span class="badge badge-accent">Roster verified</span> Matched to the published roster${state.rosterGeneratedAt ? ` generated ${escapeHtml(shortDate(state.rosterGeneratedAt))}` : ""}. Section, sub-group and mentor follow the official record.</p>` : `<p class="card-sub" style="margin-top:6px">Add your CRN or registration number to match the published roster automatically.</p>`}
     <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="save-profile">Save profile</button><button class="btn btn-sm" data-action="use-profile-section">Use profile section</button></div>
   </div>`;
 }
@@ -2467,9 +2724,24 @@ function commandItems() {
     { label: "Export timetable as .ics", kind: "action", action: exportIcs },
     { label: "Clear app cache", kind: "action", action: clearCache },
     { label: "Ask: What is my next class?", kind: "ask", action: () => askFromAnywhere("What is my next class?") },
+    { label: "Find a teacher timetable", kind: "page", action: () => navigate("teachers") },
     ...CATEGORIES.map((category) => ({ label: `Settings · ${category.title}`, kind: "setting", action: () => navigate(`settings/${category.id}`) }))
   ];
   return items;
+}
+
+function goToDirectory(tab, query) {
+  state.directoryTab = tab;
+  state.directoryQuery = query;
+  navigate("directory");
+}
+
+function selectTimetable(group, subgroup = "") {
+  if (!state.groups.includes(group)) return;
+  state.group = group;
+  state.subgroup = subgroupsFor(group).includes(subgroup) ? subgroup : "";
+  persistSelection();
+  navigate("timetable");
 }
 
 function renderCommandResults(query = "") {
@@ -2477,27 +2749,78 @@ function renderCommandResults(query = "") {
   if (!root) return;
   const text = query.trim().toLowerCase();
   const items = commandItems().filter((item) => !text || item.label.toLowerCase().includes(text));
-  // Universal find: the same palette searches verified timetable entities.
+  // Universal find: one palette over timetable entities, sections, notices,
+  // papers, syllabus and the faculty/student directory. Every result is
+  // verified data already loaded from an official source.
   const entityItems = [];
   if (text.length >= 2) {
     const seen = new Set();
-    const push = (label, question) => {
-      const key = question.toLowerCase();
-      if (seen.has(key) || entityItems.length >= 6) return;
+    const push = (label, kind, action) => {
+      const key = `${kind}:${label}`.toLowerCase();
+      if (seen.has(key) || entityItems.length >= 10) return;
       seen.add(key);
-      entityItems.push({ label, kind: "find", action: () => askFromAnywhere(question) });
+      entityItems.push({ label, kind, action });
     };
+    const ask = (label, question) => push(label, "find", () => askFromAnywhere(question));
     for (const entry of state.schedule) {
       if (!entry) continue;
-      if (entry.subject && entry.subject.toLowerCase().includes(text)) push(`Ask: where is ${entry.subject}?`, `where is ${entry.subject}`);
-      if (entry.teacher && entry.teacher.toLowerCase().includes(text)) push(`Ask: ${entry.teacher} timetable`, `${entry.teacher} timetable`);
-      if (entry.group && entry.group.toLowerCase().includes(text)) push(`Ask: ${entry.group} timetable`, `${entry.group} timetable`);
+      if (entry.subject && entry.subject.toLowerCase().includes(text)) ask(`Ask: where is ${entry.subject}?`, `where is ${entry.subject}`);
+      if (entry.teacher && entry.teacher.toLowerCase().includes(text)) ask(`Ask: ${entry.teacher} timetable`, `${entry.teacher} timetable`);
+      if (entry.group && entry.group.toLowerCase().includes(text)) push(`${entry.group} timetable`, "section", () => selectTimetable(entry.group));
+      if (entry.cohorts && entry.cohorts.toLowerCase().includes(text)) {
+        const cohort = String(entry.cohorts).split(/\s*,\s*/).find((value) => value.toLowerCase().includes(text));
+        if (cohort && cohort !== entry.group) push(`${cohort} timetable`, "subsection", () => selectTimetable(entry.group, cohort));
+      }
     }
     for (const entry of state.roomSchedule) {
-      if (entry?.room && entry.room.toLowerCase().includes(text)) push(`Ask: is ${entry.room} free now?`, `is ${entry.room} free now`);
+      if (entry?.room && entry.room.toLowerCase().includes(text)) ask(`Ask: is ${entry.room} free now?`, `is ${entry.room} free now`);
+    }
+    for (const name of teacherNames()) {
+      if (name.toLowerCase().includes(text)) {
+        push(`Teacher: ${name}`, "teacher", () => { state.teacherSelected = name; state.teacherQuery = ""; navigate("teachers"); });
+      }
+    }
+    for (const notice of allNotices()) {
+      if (notice.title && notice.title.toLowerCase().includes(text)) {
+        push(`Notice: ${notice.title}`, "notice", () => { state.noticeQuery = notice.title; navigate("notices"); });
+      }
+    }
+    for (const paper of allPapers()) {
+      const haystack = `${paper.subject} ${paper.code} ${paper.department} ${paper.title}`;
+      if (haystack.toLowerCase().includes(text)) {
+        push(`Paper: ${paper.title}`, "paper", () => { state.paperQuery = paper.subject || paper.title; navigate("papers"); });
+      }
+    }
+    for (const doc of allSyllabus()) {
+      const haystack = `${doc.label} ${doc.department} ${doc.semester}`;
+      if (haystack.toLowerCase().includes(text)) {
+        push(`Syllabus: ${doc.label}`, "syllabus", () => { state.syllabusQuery = doc.label; navigate("syllabus"); });
+      }
+    }
+    for (const sheet of publishedDatesheets()) {
+      const haystack = `${sheet.title || ""} ${sheet.scope || ""} ${sheet.department || ""} ${sheet.body || ""}`;
+      if (haystack.toLowerCase().includes(text)) {
+        push(`Date sheet: ${sheet.title || "published sheet"}`, "datesheet", () => navigate("calendar"));
+      }
+    }
+    for (const faculty of state.faculty) {
+      if (faculty?.name && `${faculty.name} ${faculty.department || ""}`.toLowerCase().includes(text)) {
+        push(`Faculty: ${faculty.name}`, "faculty", () => goToDirectory("faculty", faculty.name));
+      }
+    }
+    for (const student of state.students) {
+      const haystack = `${student?.name || ""} ${student?.crn || ""} ${student?.registrationNo || ""}`;
+      if (student?.name && haystack.toLowerCase().includes(text)) {
+        push(`Student: ${student.name}`, "student", () => goToDirectory("students", student.name));
+      }
+    }
+    for (const group of mentoringGroups()) {
+      if (`${group.academicGroup} ${group.section} ${group.mentor}`.toLowerCase().includes(text)) {
+        push(`Mentoring: ${group.academicGroup || group.section} · ${group.mentor}`, "mentoring", () => goToDirectory("mentoring", group.academicGroup || group.section));
+      }
     }
   }
-  const visible = [...items, ...entityItems].slice(0, 12);
+  const visible = [...items, ...entityItems].slice(0, 14);
   root.dataset.active = "0";
   root.innerHTML = visible.length ? visible.map((item, index) => `<button class="command-item ${index === 0 ? "is-active" : ""}" data-command-index="${index}"><span>${escapeHtml(item.label)}</span><span class="cmd-kind">${escapeHtml(item.kind)}</span></button>`).join("") : `<div class="empty" style="padding:24px"><p class="empty-text">No command matches that.</p></div>`;
   root._items = visible;
@@ -2541,7 +2864,7 @@ function toggleTheme() {
 
 function exportIcs() {
   try {
-    const ics = buildIcs({ schedule: state.schedule, group: state.group, subgroup: state.subgroup, version: state.metadata?.version, startDate: now().dateISO });
+    const ics = buildIcs({ schedule: effectiveSchedule(), group: state.group, subgroup: state.subgroup, version: state.metadata?.version, startDate: now().dateISO });
     downloadIcs(`gndec-${state.group}${state.subgroup ? `-${state.subgroup}` : ""}.ics`, ics);
     toast("Calendar exported.", "success");
   } catch (error) {
@@ -2795,11 +3118,45 @@ async function handleAction(action, element) {
     case "save-profile":
       saveProfileFromForm();
       break;
+    case "clear-teacher":
+      state.teacherSelected = "";
+      state.teacherQuery = "";
+      render();
+      break;
+    case "use-student": {
+      const key = element.dataset.student;
+      const record = state.students.find((row) => [row.crn, row.registrationNo, row.name].filter(Boolean).map(String).includes(key));
+      if (!record) { toast("That roster record is no longer available.", "error"); break; }
+      state.profile = saveProfile(localStorage, {
+        ...state.profile,
+        name: record.name || "",
+        crn: record.crn || "",
+        registrationNo: record.registrationNo || "",
+        branch: record.branch || "",
+        section: record.section || state.profile.section,
+        subsection: record.subsection || "",
+        mentor: record.mentor || "",
+        mentorPhone: record.mentorPhone || "",
+        academicGroup: record.academicGroup || "",
+        mentorVenue: record.mentorVenue || record.venue || "",
+        rosterVersion: state.rosterGeneratedAt || "published"
+      }) || state.profile;
+      if (state.profile.section && state.groups.includes(state.profile.section)) {
+        state.group = state.profile.section;
+        state.subgroup = subgroupsFor(state.group).includes(state.profile.subsection) ? state.profile.subsection : "";
+        persistSelection();
+      }
+      refreshAcademicOverlay();
+      render();
+      toast(`Profile set from the published roster: ${record.name || key}.`, "success");
+      break;
+    }
     case "use-profile-section":
       if (state.profile.section && state.groups.includes(state.profile.section)) {
         state.group = state.profile.section;
         state.subgroup = subgroupsFor(state.group).includes(state.profile.subsection) ? state.profile.subsection : "";
         persistSelection();
+        refreshAcademicOverlay();
         render();
         toast("Timetable selection updated.");
       } else toast("Set a section in your profile first.", "error");
@@ -2825,7 +3182,7 @@ async function handleAction(action, element) {
     case "download-offline": {
       if (!state.schedule.length) { toast("Load the timetable first.", "error"); break; }
       await requestPersistentStorage();
-      await saveSnapshot({ id: `snap-${Date.now()}`, createdAt: new Date().toISOString(), version: state.metadata?.version || "unknown", checkedAt: state.metadata?.checkedAt || "", schedule: state.schedule, roomSchedule: state.roomSchedule });
+      await saveSnapshot({ id: `snap-${Date.now()}`, createdAt: new Date().toISOString(), version: state.metadata?.version || "unknown", checkedAt: state.metadata?.checkedAt || "", schedule: state.schedule, roomSchedule: state.roomSchedule, subgroupSchedule: state.subgroupSchedule });
       toast("Offline data saved on this device.", "success");
       break;
     }
@@ -2869,13 +3226,15 @@ function saveProfileFromForm() {
     profile[input.dataset.profile] = input.value;
   });
   state.profile = saveProfile(localStorage, profile) || profile;
-  if (profile.section && state.groups.includes(profile.section)) {
-    state.group = profile.section;
-    state.subgroup = subgroupsFor(profile.section).includes(profile.subsection) ? profile.subsection : "";
+  const verified = state.students.length ? syncProfileFromRoster({ silent: true }) : false;
+  if (state.profile.section && state.groups.includes(state.profile.section)) {
+    state.group = state.profile.section;
+    state.subgroup = subgroupsFor(state.profile.section).includes(state.profile.subsection) ? state.profile.subsection : "";
     persistSelection();
   }
+  refreshAcademicOverlay();
   render();
-  toast("Profile saved on this device.", "success");
+  toast(verified ? "Profile saved and verified against the current official roster." : "Profile saved on this device. Add your CRN to match the official roster automatically.", "success");
 }
 
 function exportData() {
@@ -2919,7 +3278,7 @@ function importData() {
 async function restoreSnapshot(id) {
   const snapshot = await getSnapshot(id);
   if (!snapshot?.schedule?.length) { toast("Snapshot is missing.", "error"); return; }
-  applySchedule(snapshot.schedule, snapshot.roomSchedule, { version: snapshot.version, checkedAt: snapshot.checkedAt, source: "device snapshot" }, { fromCache: true });
+  applySchedule(snapshot.schedule, snapshot.roomSchedule, { version: snapshot.version, checkedAt: snapshot.checkedAt, source: "device snapshot" }, snapshot.subgroupSchedule || [], { fromCache: true });
   state.lastSync = snapshot.createdAt;
   render();
   toast(`Restored release ${snapshot.version || ""}.`, "success");
@@ -3087,6 +3446,13 @@ function bindEvents() {
       askFromAnywhere(askChip.dataset.askQuestion);
       return;
     }
+    const teacherButton = event.target.closest("[data-teacher]");
+    if (teacherButton) {
+      state.teacherSelected = teacherButton.dataset.teacher;
+      state.teacherQuery = "";
+      render();
+      return;
+    }
     const actionTarget = event.target.closest("[data-action]");
     if (actionTarget) {
       handleAction(actionTarget.dataset.action, actionTarget);
@@ -3192,6 +3558,19 @@ function bindEvents() {
       state.searchTimer = setTimeout(() => {
         render();
         const input = $("[data-notice-search]");
+        if (input) { input.focus(); input.setSelectionRange(caret, caret); }
+      }, 200);
+      return;
+    }
+    const teacherSearch = event.target.closest("[data-teacher-search]");
+    if (teacherSearch) {
+      state.teacherQuery = teacherSearch.value;
+      state.teacherSelected = "";
+      const caret = teacherSearch.selectionStart;
+      clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(() => {
+        render();
+        const input = $("[data-teacher-search]");
         if (input) { input.focus(); input.setSelectionRange(caret, caret); }
       }, 200);
       return;
@@ -3314,6 +3693,9 @@ async function init() {
   loadNotices().then(() => { if (state.route === "today" || state.route === "notices") render(); });
 
   await loadLiveData();
+  if (rosterIdentity().crn || rosterIdentity().registration) {
+    loadStudents().catch(() => {});
+  }
   await loadSnapshots();
   updateLegacyCards();
   startTimers();

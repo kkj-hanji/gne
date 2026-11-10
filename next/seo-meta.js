@@ -81,6 +81,14 @@ export const ROUTES = Object.freeze({
       "Find free classrooms, lecture halls and labs at GNDEC Ludhiana right now, or at any hour or day. Calculated from the official room timetable, with free-until times.",
     keywords: ["gndec free rooms", "gndec empty classroom", "gndec lab availability", "gndec room timetable", "khali room gndec", "free room now gndec"]
   },
+  teachers: {
+    slug: "teachers",
+    title: "GNDEC Teachers Timetable - Find Any Faculty Member's Classes",
+    heading: "GNDEC Teacher Timetable",
+    description:
+      "Search every teacher printed in the official GNDEC timetable and open their published weekly classes, subjects, sections and rooms. No teacher or class is guessed.",
+    keywords: ["gndec teacher timetable", "gndec faculty timetable", "gndec professor schedule", "gndec teacher classes", "gndec faculty schedule"]
+  },
   ask: {
     slug: "ask",
     title: "Ask Compass — GNDEC Timetable Assistant in English, Hinglish, Punjabi",
@@ -154,7 +162,7 @@ export const ROUTES = Object.freeze({
   }
 });
 
-export const ROUTE_ORDER = Object.freeze(["today", "timetable", "rooms", "ask", "notices", "papers", "syllabus", "calendar", "directory", "compare", "settings"]);
+export const ROUTE_ORDER = Object.freeze(["today", "timetable", "rooms", "teachers", "ask", "notices", "papers", "syllabus", "calendar", "directory", "compare", "settings"]);
 
 export function normalizeOrigin(origin = "") {
   const raw = String(origin || "").trim();

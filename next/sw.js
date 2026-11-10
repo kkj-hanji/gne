@@ -9,7 +9,7 @@
  *   navigation cached shell, never a guessed offline error page
  */
 
-const VERSION = "compass-next-v2.4.0";
+const VERSION = "compass-next-v2.6.0";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 
@@ -38,6 +38,8 @@ const SHELL_ASSETS = [
   "./engine/papers.js",
   "./engine/syllabus.js",
   "./data/papers-index.json",
+  "./data/timetable-groups.html",
+  "./data/timetable-rooms.html",
   "./icons/icon.svg",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -76,7 +78,7 @@ function isLegacyApi(url) {
 }
 
 function isStatic(url) {
-  return /\.(?:css|js|svg|png|webmanifest|woff2?|json)$/i.test(url.pathname);
+  return /\.(?:css|js|html|svg|png|webmanifest|woff2?|json)$/i.test(url.pathname);
 }
 
 async function networkFirst(request, cacheName) {

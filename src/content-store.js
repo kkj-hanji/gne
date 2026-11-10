@@ -409,13 +409,16 @@ export async function restorePrevious(env, name, { actor = "owner" } = {}) {
 
 /* ── Files ──────────────────────────────────────────────────────────────── */
 
-const ALLOWED_FILE_TYPES = Object.freeze(["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"]);
+const ALLOWED_FILE_TYPES = Object.freeze([
+  "image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf",
+  "text/plain", "text/markdown", "text/csv"
+]);
 
 export async function putFile(env, { bytes, type, name } = {}) {
   requireKv(env);
   const contentType = String(type || "").toLowerCase().split(";")[0].trim();
   if (!ALLOWED_FILE_TYPES.includes(contentType)) {
-    throw new ContentError("Only PNG, JPEG, WebP, GIF or PDF uploads are accepted.", 415);
+    throw new ContentError("Only PNG, JPEG, WebP, GIF, PDF, plain text, Markdown or CSV uploads are accepted.", 415);
   }
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
   if (!data.byteLength) throw new ContentError("The uploaded file is empty.");

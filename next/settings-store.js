@@ -28,7 +28,9 @@ export const EMPTY_PROFILE = Object.freeze({
   subsection: "",
   mentor: "",
   mentorPhone: "",
+  academicGroup: "",
   mentorVenue: "",
+  rosterVersion: "",
   batch: "2026",
   attendanceTarget: 76
 });
@@ -243,8 +245,10 @@ export function loadProfile(storage) {
       section: String(legacy.section || ""),
       subsection: String(legacy.subsection || legacy.subgroup || ""),
       mentor: String(legacy.mentor || ""),
-      mentorPhone: String(legacy.mentorPhone || ""),
+      mentorPhone: String(legacy.mentorPhone || legacy.mentorMobile || ""),
+      academicGroup: String(legacy.academicGroup || legacy.mentoringGroup || ""),
       mentorVenue: String(legacy.mentorVenue || legacy.venue || ""),
+      rosterVersion: String(legacy.rosterVersion || ""),
       batch: String(legacy.batch || "2026"),
       attendanceTarget: Number(legacy.attendanceTarget) || 76,
       migratedFromLegacy: true

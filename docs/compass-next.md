@@ -19,10 +19,10 @@ build is always reachable from the new app's Settings page and from the sidebar
 
 | Area | Change |
 | --- | --- |
-| Pages | `Today`, `Timetable`, `Rooms`, `Ask`, `Notices`, `Directory`, `Compare`, `Settings` |
+| Pages | `Today`, `Timetable`, `Rooms`, `Teachers`, `Ask`, `Notices`, `Papers`, `Syllabus`, `Calendar`, `Directory`, `Compare`, `Settings`, `Admin` |
 | Settings | 104 typed flags in 12 categories, 6 one-click presets, searchable, URL-overridable |
 | Ask Compass | Deterministic multi-engine chain with Hinglish / Punjabi-in-Latin / Hindi-in-Latin / English understanding and safe fallback |
-| SEO | Per-route metadata and JSON-LD injected by the Worker, 270 pre-rendered static college pages, sitemap, robots, OG cover |
+| SEO | Per-route metadata and JSON-LD injected by the Worker, 283 pre-rendered static college pages, sitemap, robots, OG cover |
 | PWA | Installable, offline shell + cached verified data, update banner |
 | Data | Reuses the verified legacy release through an allow-listed read-only proxy |
 | Automation | CI, daily data refresh, daily live verifier, GitHub issue on failure |
@@ -116,6 +116,8 @@ independent, deterministic fallback. On top of it, the new chain adds:
   timetable parsing and room availability.
 - `next/engine/ics.js`, `reminders.js` — calendar export and local reminders.
 - `next/engine/storage.js` — device profile, snapshots and persistence.
+- Admin-published date sheets are matched ahead of the official ESE sheet only
+  when the question names them; the official sheet remains the default.
 
 Rules enforced by the pipeline and its tests:
 

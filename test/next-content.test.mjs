@@ -38,8 +38,10 @@ import {
 } from "../next/engine/syllabus.js";
 import {
   MENTORING_SUBJECT,
+  academicOverlayFromSchedule,
   applyMentoringOverride,
   applyMentoringOverrides,
+  classesWithOverlay,
   profileAppliesToSelection
 } from "../next/engine/mentoring.js";
 import {
@@ -323,6 +325,40 @@ test("mentoring fills only missing teacher and room, never printed facts", () =>
   ], profile);
   assert.equal(entries[0].teacher, "DR MENTOR");
   assert.equal(entries[1].teacher, "Teacher not listed");
+});
+
+test("academic overlay keeps only the verified mentoring group and appends its rows", () => {
+  const profile = {
+    mentor: "DR MENTOR",
+    mentorVenue: "LH-101",
+    academicGroup: "CEA-M1",
+    section: "CEA",
+    subsection: "CEA1"
+  };
+  const subgroupSchedule = [
+    { group: "CEA-M1", day: "MON", start: 540, end: 600, subject: MENTORING_SUBJECT, teacher: "Teacher not listed", room: "Room not listed" },
+    { group: "CEA-M1", day: "TUE", start: 540, end: 600, subject: "PHYSICS", teacher: "Teacher not listed", room: "Room not listed" },
+    { group: "CEB-M1", day: "MON", start: 600, end: 660, subject: "CHEMISTRY", teacher: "X", room: "Y" }
+  ];
+  const overlay = academicOverlayFromSchedule(subgroupSchedule, profile);
+  assert.equal(overlay.length, 2);
+  assert.ok(overlay.every((entry) => entry.group === "CEA-M1"));
+  assert.deepEqual(academicOverlayFromSchedule(subgroupSchedule, { ...profile, academicGroup: "" }), []);
+
+  const base = [
+    { day: "MON", start: 540, end: 600, subject: MENTORING_SUBJECT, teacher: "Teacher not listed", room: "Room not listed" }
+  ];
+  const monday = classesWithOverlay(base, overlay, "MON", profile);
+  // The base row is never replaced; the identical overlay row is de-duplicated.
+  assert.equal(monday.length, 1);
+  assert.equal(monday[0].teacher, "Teacher not listed");
+  assert.equal(monday[0].room, "Room not listed");
+
+  const tuesday = classesWithOverlay([], overlay, "TUE", profile);
+  assert.equal(tuesday.length, 1);
+  // Non-mentoring overlay rows keep their printed (missing) details.
+  assert.equal(tuesday[0].teacher, "Teacher not listed");
+  assert.equal(tuesday[0].room, "Room not listed");
 });
 
 /* ── Content store ──────────────────────────────────────────────────────── */

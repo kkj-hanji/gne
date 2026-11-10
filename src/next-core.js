@@ -28,7 +28,7 @@ import {
 
 export const APP_NAME = "GNDEC Compass";
 export const APP_VERSION = "2.1.0";
-export const BUILD_DATE = "2026-11-09";
+export const BUILD_DATE = "2026-11-10";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
 const PROXY_PREFIX = "/api/legacy/";

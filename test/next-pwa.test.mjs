@@ -136,8 +136,9 @@ test("the new app talks only to its own origin and the legacy proxy", async () =
   for (const url of urls) {
     assert.match(url, /^\/(?:api|legacy)/, `unexpected fetch target ${url}`);
   }
-  assert.match(app, /\/api\/legacy\/api\/timetable\?source=groups/);
-  assert.match(app, /\/api\/legacy\/api\/timetable\?source=rooms/);
+  assert.match(app, /\/api\/legacy\/api\/timetable\?source=\$\{source\}/);
+  assert.match(app, /\/data\/timetable-groups\.html/);
+  assert.match(app, /\/data\/timetable-rooms\.html/);
   for (const line of app.split("\n").filter((text) => text.includes("localStorage."))) {
     assert.match(line, /try\s*\{/, `unguarded storage access: ${line.trim()}`);
   }
@@ -149,7 +150,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.equal(next.main, "src/next-worker.js");
   assert.equal(next.assets.directory, "next");
   assert.equal(next.assets.binding, "ASSETS");
-  assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
+  assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
   assert.equal(next.vars.APP_VERSION, "2.1.0");

@@ -495,7 +495,7 @@ function teacherResult(question, ctx) {
   const tokens = contentTokens(question);
   if (!tokens.length) return null;
   const scoped = subjectEntries(ctx);
-  const allEntries = Array.isArray(ctx.schedule) ? ctx.schedule : [];
+  const allEntries = Array.isArray(ctx.allSchedule) ? ctx.allSchedule : Array.isArray(ctx.schedule) ? ctx.schedule : [];
   const names = [...new Set(allEntries.map((entry) => entry.teacher).filter((name) => name && !/not listed/i.test(name)))];
   const scored = names
     .map((name) => {
@@ -677,8 +677,9 @@ function freeRoomsResult(question, ctx) {
 }
 
 function profileResult(question, ctx) {
-  if (!wants(question, ["my", "mine", "mera", "meri", "mere"]) && !/\bwho am i\b/.test(canonicalize(question))) return null;
-  if (!wants(question, VOCAB.profile) && !wants(question, ["name", "who am i"])) return null;
+  const text = canonicalize(question);
+  if (!wants(question, ["my", "mine", "mera", "meri", "mere"]) && !/\bwho am i\b/.test(text)) return null;
+  if (!wants(question, VOCAB.profile) && !wants(question, ["name", "who am i"]) && !/\b(?:mentoring|academic)\s+group\b/.test(text)) return null;
   const profile = ctx.profile || {};
   if (!profile.section) {
     return {
@@ -686,11 +687,40 @@ function profileResult(question, ctx) {
       intent: "PROFILE_EMPTY", confidence: 0.9, plan: ["read the device profile", "offer setup", "never assume a student"]
     };
   }
+  const venue = profile.mentorVenue || profile.venue;
+  // A targeted sub-question answers with exactly the requested saved field.
+  if (/\b(?:mentor\s+)?phone|mobile|contact\b/.test(text)) {
+    return {
+      html: profile.mentorPhone
+        ? `<p><strong>Mentor phone:</strong> ${escapeHtml(profile.mentorPhone)}${profile.mentor ? ` · ${escapeHtml(profile.mentor)}` : ""}</p><p class="answer-meta">Saved on this device only.</p>`
+        : `<p>No mentor phone is saved on this device. Add it in <strong>Settings → Profile</strong>; Compass will never guess a number.</p>`,
+      intent: "PROFILE_MENTOR_PHONE", confidence: 0.95, plan: ["read the saved device profile", "never query a server"], entities: {}
+    };
+  }
+  if (/\b(?:venue|room|place)\b/.test(text)) {
+    return {
+      html: venue
+        ? `<p><strong>Mentor venue:</strong> ${escapeHtml(venue)}${profile.mentor ? ` · ${escapeHtml(profile.mentor)}` : ""}</p><p class="answer-meta">Saved on this device only. The official timetable always wins when it prints a room.</p>`
+        : `<p>No mentoring venue is saved on this device. Add it in <strong>Settings → Profile</strong>; Compass will never guess a room.</p>`,
+      intent: "PROFILE_MENTOR_VENUE", confidence: 0.95, plan: ["read the saved device profile", "never overwrite printed timetable details"], entities: {}
+    };
+  }
+  if (/\b(?:mentoring|academic)\s+group\b/.test(text)) {
+    return {
+      html: profile.academicGroup
+        ? `<p><strong>Mentoring group:</strong> ${escapeHtml(profile.academicGroup)}</p><p class="answer-meta">Saved on this device. It selects your official subgroup rows when the college publishes them.</p>`
+        : `<p>No mentoring group is saved on this device. Add it in <strong>Settings → Profile</strong>; Compass will never guess a group.</p>`,
+      intent: "PROFILE_ACADEMIC_GROUP", confidence: 0.95, plan: ["read the saved device profile", "never infer a group"], entities: {}
+    };
+  }
   const parts = [
     profile.name ? `<strong>${escapeHtml(profile.name)}</strong>` : "",
     profile.section ? `Section ${escapeHtml(profile.section)}${profile.subsection ? ` · ${escapeHtml(profile.subsection)}` : ""}` : "",
     profile.branch ? escapeHtml(profile.branch) : "",
-    profile.mentor ? `Mentor: ${escapeHtml(profile.mentor)}` : ""
+    profile.mentor ? `Mentor: ${escapeHtml(profile.mentor)}` : "",
+    profile.mentorPhone ? `Mentor phone: ${escapeHtml(profile.mentorPhone)}` : "",
+    profile.academicGroup ? `Mentoring group: ${escapeHtml(profile.academicGroup)}` : "",
+    venue ? `Mentor venue: ${escapeHtml(venue)}` : ""
   ].filter(Boolean);
   return {
     html: `<p>${parts.join(" · ")}</p><p class="answer-meta">Saved on this device only. You can change it in Settings → Profile.</p>`,
@@ -779,6 +809,68 @@ function datesheetResult(question, ctx) {
 function datesheetSource(data) {
   const url = data?.source?.url;
   return `<p class="answer-source">${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Official tentative ESE datesheet</a>` : "Official tentative ESE datesheet"}${data?.checkedAt ? ` · checked ${escapeHtml(String(data.checkedAt).slice(0, 10))}` : ""}.</p>`;
+}
+
+/* Admin-published date sheets. They are transcribed from a notice, so they are
+ * surfaced only when the question actually names one, and the original notice
+ * link stays attached. The official ESE sheet remains the default source. */
+
+const SHEET_WORDS = Object.freeze([
+  "datesheet", "date sheet", "date-sheet", "datasheet", "data sheet",
+  "exam schedule", "exam dates", "examination schedule", "examination dates",
+  "paper schedule", "paper dates", "test schedule", "mse schedule",
+  "kada paper", "paper kado", "pariksha", "imtihan", "datesheet kado"
+]);
+
+const RAW_QUESTION_WORDS = Object.freeze(new Set([
+  "the", "and", "for", "with", "what", "when", "where", "which", "who", "how", "why",
+  "is", "are", "was", "were", "do", "does", "did", "can", "could", "will", "would",
+  "my", "our", "your", "his", "her", "their", "this", "that", "these", "those",
+  "show", "tell", "give", "list", "find", "please", "kindly", "about", "any", "all",
+  "me", "there", "here", "of", "in", "on", "at", "to", "from", "by", "a", "an",
+  "gndec", "college", "compass"
+]));
+
+function publishedDatesheetResult(question, ctx) {
+  const text = canonicalize(question);
+  const list = Array.isArray(ctx.publishedDatesheets) ? ctx.publishedDatesheets : [];
+  if (!list.length) return null;
+  const mentionsSheet = wants(text, SHEET_WORDS);
+  const mentionsExam = wants(text, VOCAB.exam);
+  if (!mentionsSheet && !mentionsExam) return null;
+
+  const query = contentQuery(text);
+  const tokens = canonicalize(question)
+    .split(" ")
+    .filter((token) => token.length >= 3 && !RAW_QUESTION_WORDS.has(token));
+  const genericSheetQuery = tokens.length > 0 && tokens.every((token) => ["date", "sheet", "datesheet", "datasheet"].includes(token));
+  const scored = list
+    .map((item) => {
+      const hay = canonicalize([item.title, item.scope, item.department, item.body].filter(Boolean).join(" "));
+      const words = hay.split(/\s+/).filter((word) => word.length >= 3);
+      let score = 0;
+      for (const token of tokens) {
+        if (hay.includes(token)) score += 2;
+        else if (token.length >= 4 && words.some((word) => tokenSimilar(token, word) >= 0.84)) score += 1;
+      }
+      return { item, score };
+    })
+    .filter((row) => tokens.length && row.score > 0)
+    .sort((a, b) => b.score - a.score || String(b.item.date || "").localeCompare(String(a.item.date || "")));
+  if (!scored.length) {
+    if (!genericSheetQuery) return null;
+    if (!mentionsSheet) return null;
+  }
+
+  const matched = (scored.length ? scored.slice(0, 4).map((row) => row.item) : list.slice(0, 4));
+  return {
+    html: `<p><strong>Published date sheet${matched.length === 1 ? "" : "s"}</strong>${query ? ` · matching “${escapeHtml(query)}”` : ""}</p>
+      <div class="answer-table">${matched.map((item) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(item.date || "Published")}</div><div class="answer-class-body"><strong>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "Date sheet")}</a>` : escapeHtml(item.title || "Date sheet")}</strong><div class="answer-class-meta">${escapeHtml(item.scope || "Examination")}${item.department ? ` · ${escapeHtml(item.department)}` : ""}${item.body ? ` · transcribed from the official notice` : ""}</div>${item.body ? `<div class="answer-class-meta">${escapeHtml(String(item.body).slice(0, 400)).replace(/\n/g, "<br />")}</div>` : ""}</div></div>`).join("")}</div>
+      <p class="answer-meta">These rows are transcribed from an official notice by the college admin. Open the linked notice before travelling; Compass never fills a missing date.</p>`,
+    intent: "PUBLISHED_DATESHEET", confidence: 0.9,
+    plan: ["read admin-published date sheets", "match the requested words", "keep the official notice link", "never invent a date"],
+    entities: { query }
+  };
 }
 
 /* ── Content results: notices, papers, syllabus, calendar, mentoring ───── */
@@ -922,8 +1014,13 @@ function mentoringResult(question, ctx) {
     };
   }
   const venue = profile.mentorVenue || profile.venue;
+  const contact = [
+    profile.mentorPhone ? `Phone: ${escapeHtml(profile.mentorPhone)}` : "",
+    profile.academicGroup ? `Mentoring group: ${escapeHtml(profile.academicGroup)}` : "",
+    venue ? `Venue: ${escapeHtml(venue)}` : ""
+  ].filter(Boolean);
   return {
-    html: `<p><strong>Your saved mentor:</strong> ${escapeHtml(profile.mentor)}${venue ? ` · ${escapeHtml(venue)}` : ""}</p>
+    html: `<p><strong>Your saved mentor:</strong> ${escapeHtml(profile.mentor)}${contact.length ? ` · ${contact.join(" · ")}` : ""}</p>
       <p class="answer-meta">Saved on this device and applied only to your selected section and sub-group. The official timetable always wins when it prints a teacher or room.</p>`,
     intent: "MENTOR", confidence: 0.95,
     plan: ["read the saved device profile", "match the selected section", "never overwrite printed timetable details"]
@@ -1144,6 +1241,9 @@ function answerOnce(question, ctx, memory) {
   const holidayEarly = holidayResult(text, ctx);
   if (holidayEarly) return holidayEarly;
 
+  const publishedSheet = publishedDatesheetResult(text, ctx);
+  if (publishedSheet) return publishedSheet;
+
   const datesheetEarly = datesheetResult(text, ctx);
   if (datesheetEarly) return datesheetEarly;
 
@@ -1258,6 +1358,7 @@ function withSuggestion(answer) {
 /** Build the context object used by the local engine and the Brain adapter. */
 export function buildAnswerContext({
   schedule = [],
+  allSchedule = null,
   roomSchedule = [],
   group = "",
   subgroup = "",
@@ -1265,6 +1366,7 @@ export function buildAnswerContext({
   now = getIndiaNow(),
   metadata = null,
   datesheet = null,
+  publishedDatesheets = [],
   notices = [],
   papers = [],
   syllabus = [],
@@ -1279,7 +1381,8 @@ export function buildAnswerContext({
   includeLectureHalls = true
 } = {}) {
   return {
-    schedule, roomSchedule, group, subgroup, profile, now, metadata, datesheet,
+    schedule, allSchedule: Array.isArray(allSchedule) ? allSchedule : schedule, roomSchedule, group, subgroup, profile, now, metadata, datesheet,
+    publishedDatesheets: Array.isArray(publishedDatesheets) ? publishedDatesheets : [],
     notices, papers, syllabus, holidays, departments,
     clock, showTeacher, showRoom, showCode, roomDuration, includeLabs, includeLectureHalls
   };

@@ -32,9 +32,9 @@ const ORIGIN = normalizeOrigin(process.env.PUBLIC_ORIGIN || SITE.defaultOrigin);
 const LEGACY = process.env.LEGACY_ORIGIN || "https://gndec-compass.koush3069.workers.dev";
 
 const SOURCES = {
-  groups: { local: [".cache-next/groups.html"], url: `${LEGACY}/api/timetable?source=groups` },
-  rooms: { local: [".cache-next/rooms.html"], url: `${LEGACY}/api/timetable?source=rooms` },
-  datesheet: { local: [".cache-next/datesheet.json"], url: `${LEGACY}/data/end-sem-datesheet.json` }
+  groups: { local: ["next/data/timetable-groups.html", ".cache-next/groups.html"], url: `${LEGACY}/api/timetable?source=groups` },
+  rooms: { local: ["next/data/timetable-rooms.html", ".cache-next/rooms.html"], url: `${LEGACY}/api/timetable?source=rooms` },
+  datesheet: { local: [".cache-next/datesheet.json", "public/data/end-sem-datesheet.json"], url: `${LEGACY}/data/end-sem-datesheet.json` }
 };
 
 /**

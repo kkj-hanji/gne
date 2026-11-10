@@ -246,10 +246,18 @@ test("profiles are local, bounded and never invented", () => {
     crn: "12345",
     section: "CEA",
     subsection: "CEA2",
+    mentor: "DR MENTOR",
+    mentorPhone: "9876543210",
+    academicGroup: "CEA-M1",
+    mentorVenue: "LH-101",
     attendanceTarget: 250,
     extra: "ignored"
   });
   assert.equal(saved.name, "Test Student");
+  assert.equal(saved.mentor, "DR MENTOR");
+  assert.equal(saved.mentorPhone, "9876543210");
+  assert.equal(saved.academicGroup, "CEA-M1");
+  assert.equal(saved.mentorVenue, "LH-101");
   assert.equal(saved.attendanceTarget, 100);
   assert.equal("extra" in saved, false, "unknown profile keys must not be persisted");
 
@@ -257,16 +265,23 @@ test("profiles are local, bounded and never invented", () => {
   assert.equal(loaded.section, "CEA");
   assert.equal(loaded.subsection, "CEA2");
   assert.equal(loaded.name, "Test Student");
+  assert.equal(loaded.academicGroup, "CEA-M1");
 });
 
 test("legacy profile migrates without a roster or server lookup", () => {
   const storage = memoryStorage({
-    "gndec-compass-student-v1": JSON.stringify({ name: "Legacy", section: "MEB", subgroup: "MEB1", crn: "9" })
+    "gndec-compass-student-v1": JSON.stringify({
+      name: "Legacy", section: "MEB", subgroup: "MEB1", crn: "9",
+      mentor: "M", mentorMobile: "999", mentoringGroup: "MEB-M2", venue: "LH-2"
+    })
   });
   const profile = loadProfile(storage);
   assert.equal(profile.name, "Legacy");
   assert.equal(profile.section, "MEB");
   assert.equal(profile.subsection, "MEB1");
+  assert.equal(profile.mentorPhone, "999");
+  assert.equal(profile.academicGroup, "MEB-M2");
+  assert.equal(profile.mentorVenue, "LH-2");
   assert.equal(profile.migratedFromLegacy, true);
 });
 
