@@ -5,6 +5,12 @@ import { canonicalize, tokenSimilar } from "./language.js";
 export const DAY_NAMES = Object.freeze(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
 export const STUDY_DAYS = Object.freeze(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
 export const IST = "Asia/Kolkata";
+export const COLLEGE_LOOKAHEAD_MINUTES = 17 * 60;
+
+/** The legacy dashboard stays on today's plan until the 5 PM look-ahead. */
+export function shouldLookAheadAtFive(minutes, hasClassesToday) {
+  return !hasClassesToday || Number(minutes) >= COLLEGE_LOOKAHEAD_MINUTES;
+}
 
 export function isValidDate(value) {
   return value instanceof Date && !Number.isNaN(value.getTime());
@@ -102,6 +108,23 @@ export function formatDuration(minutes) {
   const mins = Math.round(minutes % 60);
   if (!hours) return `${mins} min`;
   return mins ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+/** Return only unoccupied intervals between listed classes. */
+export function freeGapsBetweenClasses(entries, minimumMinutes = 15) {
+  const classes = (Array.isArray(entries) ? entries : [])
+    .filter((entry) => Number.isFinite(entry?.start) && Number.isFinite(entry?.end) && entry.end > entry.start)
+    .slice()
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const gaps = [];
+  let occupiedUntil = null;
+  for (const entry of classes) {
+    if (occupiedUntil !== null && entry.start > occupiedUntil && entry.start - occupiedUntil >= minimumMinutes) {
+      gaps.push({ start: occupiedUntil, end: entry.start });
+    }
+    occupiedUntil = occupiedUntil === null ? entry.end : Math.max(occupiedUntil, entry.end);
+  }
+  return gaps;
 }
 
 const MERIDIEM = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)\b/i;

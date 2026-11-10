@@ -4,9 +4,9 @@ import { readFile } from "node:fs/promises";
 import { DOMParser } from "linkedom";
 
 import {
-  DAY_NAMES, STUDY_DAYS, addDays, formatDuration, getIndiaNow, humanTime,
+  COLLEGE_LOOKAHEAD_MINUTES, DAY_NAMES, STUDY_DAYS, addDays, formatDuration, freeGapsBetweenClasses, getIndiaNow, humanTime,
   isHappeningNow, minutesFromTime, nextStudyDay, parseTimeExpression,
-  relativeStartLabel, resolveQuestionDay, weekdayIndex
+  relativeStartLabel, resolveQuestionDay, shouldLookAheadAtFive, weekdayIndex
 } from "../next/engine/datetime.js";
 import {
   parseFetTimetable, readVerifiedFetTimetable, sanitizeSchedule, mergeSchedules
@@ -436,6 +436,24 @@ test("calendar export is valid, bounded and only uses published entries", () => 
 
   assert.throws(() => buildIcs({ schedule, group: "" }), /Choose a section/);
   assert.throws(() => buildIcs({ schedule, group: "NOPE" }), /No published class/);
+});
+
+test("free timetable gaps are derived from class boundaries and merge overlaps safely", () => {
+  assert.deepEqual(freeGapsBetweenClasses([
+    { start: 600, end: 650 },
+    { start: 510, end: 570 },
+    { start: 640, end: 660 },
+    { start: 700, end: 750 }
+  ]), [{ start: 570, end: 600 }, { start: 660, end: 700 }]);
+  assert.deepEqual(freeGapsBetweenClasses([{ start: 510, end: 560 }, { start: 570, end: 600 }]), []);
+  assert.deepEqual(freeGapsBetweenClasses([{ start: 600, end: 600 }, { start: "600", end: 650 }]), []);
+});
+
+test("the legacy dashboard look-ahead starts at 5 PM, not at the last class bell", () => {
+  assert.equal(COLLEGE_LOOKAHEAD_MINUTES, 1020);
+  assert.equal(shouldLookAheadAtFive(1019, true), false);
+  assert.equal(shouldLookAheadAtFive(1020, true), true);
+  assert.equal(shouldLookAheadAtFive(800, false), true);
 });
 
 test("reminders respect lead time and quiet hours", () => {

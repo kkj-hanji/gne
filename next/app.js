@@ -16,8 +16,8 @@ import {
   saveProfile, saveUserValues
 } from "./settings-store.js";
 import {
-  DAY_NAMES, STUDY_DAYS, addDays, formatDuration, getIndiaNow, humanTime,
-  nextStudyDay, relativeStartLabel, resolveQuestionDay
+  DAY_NAMES, STUDY_DAYS, addDays, formatDuration, freeGapsBetweenClasses, getIndiaNow, humanTime,
+  nextStudyDay, relativeStartLabel, resolveQuestionDay, shouldLookAheadAtFive
 } from "./engine/datetime.js";
 import { mergeSchedules, readVerifiedFetTimetable } from "./engine/fet-parser.js";
 import { computeFreeRooms, formatFreeWindow, groupRooms, roomZone, zoneFromQuestion } from "./engine/free-rooms.js";
@@ -412,12 +412,18 @@ async function loadCachedData() {
   return true;
 }
 
-async function fetchTimetableSource(source, bundledPath) {
+function isTimetableDocument(text) {
+  return /<table[\s>]/i.test(text) && /<td[\s>]/i.test(text);
+}
+
+async function fetchTimetableSource(source, bundledPath, timeout = 12000) {
   try {
-    return { text: await fetchText(`/api/legacy/api/timetable?source=${source}`), bundled: false };
+    return { text: await fetchText(`/api/legacy/api/timetable?source=${source}`, timeout), bundled: false };
   } catch (error) {
     if (!bundledPath) throw error;
-    return { text: await fetchText(bundledPath), bundled: true };
+    const text = await fetchText(bundledPath, timeout);
+    if (!isTimetableDocument(text)) throw new Error(`The bundled ${source} timetable is not available.`);
+    return { text, bundled: true };
   }
 }
 
@@ -428,12 +434,21 @@ async function loadLiveData({ manual = false } = {}) {
     const [groups, rooms, subgroup] = await Promise.all([
       fetchTimetableSource("groups", "/data/timetable-groups.html"),
       fetchTimetableSource("rooms", "/data/timetable-rooms.html"),
-      fetchTimetableSource("subgroups", "/data/timetable-subgroups.html").catch(() => ({ text: "", bundled: false }))
+      fetchTimetableSource("subgroups", "/data/timetable-subgroups.html", 10000).catch(() => ({ text: "", bundled: false }))
     ]);
     const schedule = readVerifiedFetTimetable(groups.text, "groups");
     const roomSchedule = readVerifiedFetTimetable(rooms.text, "rooms");
-    const subgroupSchedule = subgroup.text ? readVerifiedFetTimetable(subgroup.text, "subgroups") : [];
-    const bundled = groups.bundled || rooms.bundled || subgroup.bundled;
+    // The academic-group overlay is optional. A missing or unreadable subgroup
+    // document must never stop the verified section and room timetables loading.
+    let subgroupSchedule = [];
+    if (subgroup.text && isTimetableDocument(subgroup.text)) {
+      try {
+        subgroupSchedule = readVerifiedFetTimetable(subgroup.text, "subgroups");
+      } catch {
+        subgroupSchedule = [];
+      }
+    }
+    const bundled = groups.bundled || rooms.bundled;
     const metadata = { ...(await loadSourceMetadata()), source: bundled ? "bundled verified release" : "official source" };
     state.dataFallback = bundled;
     applySchedule(schedule, roomSchedule, metadata, subgroupSchedule);
@@ -772,6 +787,9 @@ function nextClassInfo() {
   const next = classes.find((entry) => entry.start > clock.minutes) || null;
   if (current) return { kind: "current", entry: current, clock };
   if (next) return { kind: "next", entry: next, clock };
+  // Match the legacy app's five PM look-ahead: keep today's plan selected
+  // until 17:00 when today has a timetable, then move the dashboard forward.
+  if (classes.length && !shouldLookAheadAtFive(clock.minutes, true)) return { kind: "none", clock };
   for (let offset = 1; offset <= 7; offset += 1) {
     const candidate = addDays(clock, offset);
     if (!STUDY_DAYS.includes(candidate.day)) continue;
@@ -1010,11 +1028,15 @@ function renderToday() {
     includeLectureHalls: v("rooms.includeLectureHalls")
   });
   const today = classesForDay(clock.day);
+  const lookAhead = info.kind === "later" && shouldLookAheadAtFive(clock.minutes, today.length > 0);
+  const timelineDay = lookAhead ? info.day.day : clock.day;
+  const timelineClasses = lookAhead ? classesForDay(timelineDay) : today;
   const greeting = clock.hour < 12 ? "Good morning" : clock.hour < 17 ? "Good afternoon" : "Good evening";
   const name = state.profile.name ? `, ${state.profile.name.split(/\s+/)[0]}` : "";
   const hero = renderHero(info, clock, greeting + name);
   const freeRooms = v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
-  const timeline = v("today.hero") === "timeline" ? "" : renderTodayTimeline(today, clock);
+  const timelineClock = lookAhead ? { ...clock, day: timelineDay, minutes: 0 } : clock;
+  const timeline = v("today.hero") === "timeline" ? "" : renderTodayTimeline(timelineClasses, timelineClock, { lookAhead });
   const notices = v("today.noticesCard") ? renderNoticesCard() : "";
   const examCard = v("today.examCountdown") && exam ? renderExamCard(exam) : "";
   const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
@@ -1090,6 +1112,10 @@ function renderHero(info, clock, greeting) {
     eyebrow = "No more classes today";
     title = `${info.entry.subject} on ${info.day.day}`;
     meta = `${humanTime(info.entry.start, v("timetable.clock"))} · ${info.entry.room} · ${info.entry.teacher}`;
+  } else if (info.kind === "none") {
+    eyebrow = "No more classes today";
+    title = "Your schedule stays on today";
+    meta = "Compass looks ahead to your next study day at 5:00 PM.";
   } else {
     eyebrow = "No classes published";
     title = "A clear day";
@@ -1111,6 +1137,7 @@ function todaySummary(info) {
   if (info.kind === "current") return `You are in ${info.entry.subject} until ${humanTime(info.entry.end)}.`;
   if (info.kind === "next") return `${info.entry.subject} at ${humanTime(info.entry.start)} in ${info.entry.room}.`;
   if (info.kind === "later") return `Next published class is on ${info.day.day}.`;
+  if (info.kind === "none") return "No more class is listed today. Compass looks ahead at 5:00 PM.";
   return "No class is published for your section today.";
 }
 
@@ -1120,7 +1147,7 @@ function heroActions() {
     <button class="btn btn-ghost" data-route="rooms">Free rooms</button>`;
 }
 
-function renderTodayTimeline(classes, clock) {
+function renderTodayTimeline(classes, clock, { lookAhead = false } = {}) {
   const rows = [];
   const slots = classes.map((entry) => ({ ...entry, free: false }));
   if (v("timetable.showEmpty")) {
@@ -1148,7 +1175,7 @@ function renderTodayTimeline(classes, clock) {
     </div>`);
   }
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Today · ${escapeHtml(clock.day)}</h2><p class="card-sub">${classes.length} published class${classes.length === 1 ? "" : "es"} · ${escapeHtml(selectionLabel())}</p></div><div class="card-actions"><button class="btn btn-sm" data-route="timetable">Full view</button></div></div>
+    <div class="card-head"><div><h2 class="card-title">${lookAhead ? "Next study day" : "Today"} · ${escapeHtml(clock.day)}</h2><p class="card-sub">${classes.length} published class${classes.length === 1 ? "" : "es"} · ${escapeHtml(selectionLabel())}${lookAhead ? " · automatic look-ahead after 5:00 PM" : ""}</p></div><div class="card-actions"><button class="btn btn-sm" data-route="timetable">Full view</button></div></div>
     <div class="timeline">${rows.join("")}</div>
   </section>`;
 }
@@ -1248,9 +1275,16 @@ function renderTimetable() {
 }
 
 function renderDayView(day, clock) {
-  const classes = classesForDay(day);
+  const classes = classesForDay(day).slice().sort((a, b) => a.start - b.start || a.end - b.end);
   if (!classes.length) return emptyState("☕", `No class on ${day}`, "The official release has no class for this section on this day.", `<button class="btn btn-sm" data-route="rooms">Find a free room</button>`);
-  let blocks = classes.map((entry) => classCard(entry, v("timetable.clock"), { highlight: v("timetable.highlightNow") && day === clock.day && entry.start <= clock.minutes && clock.minutes < entry.end })).join("");
+  const gaps = new Map(freeGapsBetweenClasses(classes).map((gap) => [gap.start, gap]));
+  let blocks = classes.map((entry) => {
+    const next = classes.find((candidate) => candidate.start > entry.start && candidate.start >= entry.end);
+    const gap = next ? gaps.get(entry.end) : null;
+    const card = classCard(entry, v("timetable.clock"), { highlight: v("timetable.highlightNow") && day === clock.day && entry.start <= clock.minutes && clock.minutes < entry.end });
+    const breakCard = gap ? `<div class="schedule-gap" role="note"><span class="schedule-gap-mark" aria-hidden="true">·</span><span><strong>Break / free time</strong><small>${escapeHtml(humanTime(gap.start, v("timetable.clock")))} – ${escapeHtml(humanTime(gap.end, v("timetable.clock")))} · no class is listed</small></span></div>` : "";
+    return `${card}${breakCard}`;
+  }).join("");
   if (v("timetable.showEmpty")) {
     const bells = [
       { start: 510, end: 570 }, { start: 570, end: 630 }, { start: 630, end: 690 }, { start: 690, end: 750 },
@@ -1276,8 +1310,11 @@ function renderWeekGrid(clock) {
   const rows = starts.map((start) => {
     const end = start + 60;
     return `<tr><th scope="row">${escapeHtml(humanTime(start, v("timetable.clock")))}</th>${days.map((day) => {
-      const entries = classesForDay(day).filter((entry) => entry.start < end && entry.end > start);
-      return `<td>${entries.map((entry) => `<div class="week-slot"><strong>${escapeHtml(entry.subject)}</strong><span>${escapeHtml(entry.room)}</span></div>`).join("")}</td>`;
+      const dayClasses = classesForDay(day);
+      const entries = dayClasses.filter((entry) => entry.start < end && entry.end > start);
+      const betweenClasses = !entries.length && dayClasses.some((entry) => entry.end <= start) && dayClasses.some((entry) => entry.start >= end);
+      const gap = betweenClasses ? `<div class="week-gap">Break / no class listed</div>` : "";
+      return `<td>${entries.map((entry) => `<div class="week-slot"><strong>${escapeHtml(entry.subject)}</strong><span>${escapeHtml(entry.room)}</span></div>`).join("")}${gap}</td>`;
     }).join("")}</tr>`;
   }).join("");
   return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => `<th scope="col">${escapeHtml(day)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;

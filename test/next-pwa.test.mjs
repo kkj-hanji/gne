@@ -139,6 +139,9 @@ test("the new app talks only to its own origin and the legacy proxy", async () =
   assert.match(app, /\/api\/legacy\/api\/timetable\?source=\$\{source\}/);
   assert.match(app, /\/data\/timetable-groups\.html/);
   assert.match(app, /\/data\/timetable-rooms\.html/);
+  assert.match(app, /function isTimetableDocument/);
+  assert.match(app, /let subgroupSchedule = \[\]/);
+  assert.match(app, /subgroupSchedule = readVerifiedFetTimetable\(subgroup\.text, "subgroups"\)/);
   for (const line of app.split("\n").filter((text) => text.includes("localStorage."))) {
     assert.match(line, /try\s*\{/, `unguarded storage access: ${line.trim()}`);
   }
@@ -153,7 +156,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.1.0");
+  assert.equal(next.vars.APP_VERSION, "2.1.1");
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");
@@ -178,4 +181,21 @@ test("the new app ships no map, no analytics SDK and no remote inference", async
   }
   const brain = await read("../next/engine/brain-bridge.js");
   assert.doesNotMatch(brain, /\bembedding|tensorflow|onnxruntime|transformers/i);
+});
+
+test("mobile navigation keeps the drawer crisp above its dimming scrim", async () => {
+  const styles = await read("../next/styles.css");
+  const scrim = styles.match(/\.scrim\s*\{[^}]*z-index:\s*(\d+)/);
+  const mobileSidebar = styles.match(/@media\s*\(max-width:\s*980px\)[\s\S]*?\.sidebar\s*\{[^}]*z-index:\s*(\d+)/);
+  assert.ok(scrim && mobileSidebar, "scrim and mobile drawer stacking rules exist");
+  assert.ok(Number(mobileSidebar[1]) > Number(scrim[1]), "drawer paints above the scrim");
+});
+
+test("timetable labels only data-derived gaps and keeps the five PM look-ahead", async () => {
+  const app = await read("../next/app.js");
+  assert.match(app, /freeGapsBetweenClasses\(classes\)/);
+  assert.match(app, /Break \/ free time/);
+  assert.match(app, /Break \/ no class listed/);
+  assert.match(app, /shouldLookAheadAtFive\(clock\.minutes, true\)/);
+  assert.match(app, /automatic look-ahead after 5:00 PM/);
 });
