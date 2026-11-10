@@ -69,11 +69,13 @@ test("settings open on a simple overview and keep technical controls under More 
   assert.match(app, /<strong>More settings<\/strong>/);
   assert.match(app, /Find your student profile/);
   assert.match(app, /renderProfileCard\(\)\}\s*<section class="card quick-settings"/);
-  assert.match(app, /Admin session active/);
-  assert.match(app, /Sign in on the Admin page with an owner or editor token/);
-  assert.doesNotMatch(app, /unlockAdminMode|data-action="export-ics"|Export \.ics/);
-  assert.match(app, /legacy Admin AI enrollment command/);
-  assert.match(app, /no admin access granted/);
+  assert.match(app, /Admin mode active/);
+  assert.match(app, /verified owner unlocks Admin AI mode with/);
+  assert.match(app, /unlockAdminMode/);
+  assert.match(app, /api\/admin\/ai\/unlock/);
+  assert.match(app, /api\/admin\/ai\/status/);
+  assert.match(app, /adminProfile: state\.profile, selection:/);
+  assert.doesNotMatch(app, /data-action="export-ics"|Export \.ics/);
   assert.match(app, /data-profile-lookup-query/);
   assert.match(app, /data-profile="serialNo"|profile-serial/);
   assert.doesNotMatch(app, /Attendance target \(%\)/);

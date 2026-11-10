@@ -3,7 +3,7 @@
  *
  * The new app is served from /next via static assets. It shares the verified
  * official data and Brain engines with the frozen legacy Worker through a
- * strict, read-only proxy. The proxy is an allow-list: it cannot be pointed at
+ * strict allow-list proxy. The proxy cannot be pointed at
  * another host, it cannot fetch a path that is not public, and it never
  * forwards cookies.
  */
@@ -27,7 +27,7 @@ import {
 } from "./content-store.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.1.4";
+export const APP_VERSION = "2.1.5";
 export const BUILD_DATE = "2026-11-10";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
@@ -37,7 +37,7 @@ const MAX_PROXY_PATH = 320;
 /** Only these legacy paths may be proxied. Everything else is refused. */
 const ALLOWED_PATHS = Object.freeze([
   /^api\/timetable$/, /^api\/sources$/, /^api\/section-list$/, /^api\/faculty$/, /^api\/faculty\/profile$/,
-  /^api\/faculty\/photo$/, /^api\/syllabus$/, /^api\/chat$/, /^data\/[a-z0-9._-]+\.json$/,
+  /^api\/faculty\/photo$/, /^api\/syllabus$/, /^api\/chat$/, /^api\/admin\/ai\/unlock$/, /^data\/[a-z0-9._-]+\.json$/,
   /^brain-kernel\.js$/, /^brain-v1-2\.js$/, /^brain-v2-2\.js$/, /^brain-v2\.js$/,
   /^academic-calendar\.js$/, /^academic-notices\.js$/, /^end-sem-datesheet\.js$/, /^campus\.js$/, /^mse2-theory\.js$/,
   /^notices\/[a-z0-9._-]+\.html$/
@@ -169,8 +169,8 @@ async function proxyRequest(request, env, ctx, deps = {}) {
   if (!["GET", "HEAD", "POST"].includes(method)) {
     return jsonResponse({ error: "Method not allowed." }, { status: 405, headers: { Allow: "GET, HEAD, POST" } });
   }
-  if (method === "POST" && decoded !== "api/chat") {
-    return jsonResponse({ error: "Only the open-ended AI relay accepts POST." }, { status: 405 });
+  if (method === "POST" && decoded !== "api/chat" && decoded !== "api/admin/ai/unlock") {
+    return jsonResponse({ error: "This legacy route does not accept POST through Compass Next." }, { status: 405 });
   }
 
   const origin = legacyOrigin(env);
@@ -178,6 +178,24 @@ async function proxyRequest(request, env, ctx, deps = {}) {
   const isChat = decoded === "api/chat";
   const cache = method === "GET" && !isChat && (deps.cache === undefined ? globalThis.caches?.default : deps.cache);
   const cacheKey = cache ? new Request(`${origin}/${decoded}${url.search}`, { method: "GET" }) : null;
+  let requestBody = method === "POST" ? request.body : undefined;
+  if (isChat && method === "POST") {
+    const declared = Number(request.headers.get("Content-Length") || 0);
+    if (declared > MAX_JSON_BODY) return jsonResponse({ error: "The chat request is too large." }, { status: 413 });
+    const rawBody = await request.clone().text();
+    if (rawBody.length > MAX_JSON_BODY) return jsonResponse({ error: "The chat request is too large." }, { status: 413 });
+    try {
+      const payload = JSON.parse(rawBody);
+      // Rebuild parsed JSON bodies as strings so the Worker relay does not pass
+      // a consumed Request stream to fetch when it only needs to inspect it.
+      requestBody = rawBody;
+      if (payload?.adminProfile && !await hasActiveAdminAiSession(request, env, payload.adminProfile, payload.selection || {})) {
+        delete payload.adminProfile;
+        delete payload.selection;
+        requestBody = JSON.stringify(payload);
+      }
+    } catch { /* the legacy relay returns its normal invalid-JSON error */ }
+  }
 
   const requestHeaders = new Headers();
   const accept = request.headers.get("Accept");
@@ -194,7 +212,7 @@ async function proxyRequest(request, env, ctx, deps = {}) {
     response = await fetchLegacy(env, deps, upstream.toString(), {
       method,
       headers: requestHeaders,
-      body: method === "POST" ? request.body : undefined,
+      body: requestBody,
       redirect: "manual",
       signal: withTimeout(isChat ? 120000 : 20000),
       cf: { cacheEverything: false }
@@ -288,6 +306,85 @@ export function versionPayload(env = {}) {
 
 const MAX_JSON_BODY = 120_000;
 const MAX_UPLOAD_BODY = 1_700_000;
+const ADMIN_AI_SESSION_PREFIX = "gndec-next:admin-ai:";
+
+function normalizeAdminName(value = "") {
+  return String(value).normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, " ").trim().toLowerCase();
+}
+
+function configuredOwnerProfile(profile = {}, selection = {}) {
+  const branch = normalizeAdminName(profile.branch);
+  const correctBranch = branch === "ec" || branch === "electronics and communication engineering" || branch === "electronics and communication engineering ec";
+  const crn = String(profile.crn || "").replace(/[^a-z0-9]+/gi, "").toUpperCase();
+  return normalizeAdminName(profile.name) === "kaushik jain" && crn === "2617070" && correctBranch
+    && String(profile.section || "").toUpperCase() === "ECB"
+    && String(profile.subsection || profile.subgroup || "").toUpperCase() === "ECB1"
+    && String(selection.group || "").toUpperCase() === "ECB"
+    && String(selection.subgroup || "").toUpperCase() === "ECB1";
+}
+
+async function adminAiIdentity(request) {
+  const deviceId = request.headers.get("X-Compass-Device") || "";
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  if (!/^[a-z0-9][a-z0-9_-]{15,127}$/i.test(deviceId) || !ip || ip.length > 80) return null;
+  const digest = async (value) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return { deviceId, deviceHash: await digest(deviceId), ipHash: await digest(ip) };
+}
+
+async function adminProfileHash(profile, selection) {
+  const fields = [profile.name, profile.crn, profile.registrationNo, profile.branch, profile.section, profile.subsection, selection.group, selection.subgroup]
+    .map((value) => String(value || "").trim().toLowerCase()).join("|");
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fields)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function hasActiveAdminAiSession(request, env, profile, selection) {
+  if (!env.CONTENT || !configuredOwnerProfile(profile, selection)) return false;
+  const identity = await adminAiIdentity(request);
+  if (!identity) return false;
+  const saved = await env.CONTENT.get(`${ADMIN_AI_SESSION_PREFIX}${identity.deviceHash}`, "json");
+  return Boolean(saved && saved.ipHash === identity.ipHash
+    && saved.profileHash === await adminProfileHash(profile, selection)
+    && Date.parse(saved.expiresAt || "") > Date.now());
+}
+
+async function adminAiRequest(request, env, ctx, deps = {}) {
+  if (request.method !== "POST") return jsonResponse({ error: "Use POST for Admin AI enrollment." }, { status: 405, headers: { Allow: "POST" } });
+  const origin = request.headers.get("Origin");
+  if (origin && origin !== new URL(request.url).origin) return jsonResponse({ error: "Cross-origin Admin AI requests are refused." }, { status: 403 });
+  if (!env.CONTENT) return jsonResponse({ error: "Admin AI session storage is unavailable." }, { status: 503 });
+  const identity = await adminAiIdentity(request);
+  if (!identity) return jsonResponse({ error: "A valid Compass device and Cloudflare client network are required." }, { status: 400 });
+  let body;
+  try { body = await readJsonBody(request); }
+  catch (error) { return contentErrorResponse(error); }
+  const profile = body?.profile || {};
+  const selection = body?.selection || {};
+  if (!configuredOwnerProfile(profile, selection)) return jsonResponse({ error: "Admin AI mode requires the verified owner profile with ECB1 selected." }, { status: 403 });
+
+  const key = `${ADMIN_AI_SESSION_PREFIX}${identity.deviceHash}`;
+  const profileHash = await adminProfileHash(profile, selection);
+  if (new URL(request.url).pathname === "/api/admin/ai/status") {
+    const saved = await env.CONTENT.get(key, "json");
+    const active = Boolean(saved && saved.ipHash === identity.ipHash && saved.profileHash === profileHash && Date.parse(saved.expiresAt || "") > Date.now());
+    if (!active) return jsonResponse({ ok: false, active: false }, { status: 200 });
+    return jsonResponse({ ok: true, active: true, expiresAt: saved.expiresAt });
+  }
+
+  const unlockRequest = new Request(new URL("/api/legacy/api/admin/ai/unlock", request.url), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Compass-Device": identity.deviceId },
+    body: JSON.stringify({ profile })
+  });
+  const unlockResponse = await proxyRequest(unlockRequest, env, ctx, deps);
+  let unlocked;
+  try { unlocked = await unlockResponse.json(); } catch { unlocked = null; }
+  if (!unlockResponse.ok || !unlocked?.expiresAt) {
+    return jsonResponse({ error: unlocked?.error || "The legacy AI service refused enrollment." }, { status: unlockResponse.status || 502 });
+  }
+  const ttl = Math.max(60, Math.ceil((Date.parse(unlocked.expiresAt) - Date.now()) / 1000));
+  await env.CONTENT.put(key, JSON.stringify({ ipHash: identity.ipHash, profileHash, expiresAt: unlocked.expiresAt }), { expirationTtl: ttl });
+  return jsonResponse({ ok: true, expiresAt: unlocked.expiresAt });
+}
 
 async function readJsonBody(request) {
   const contentType = String(request.headers.get("Content-Type") || "");
@@ -442,6 +539,11 @@ export async function handleRequest(request, env = {}, ctx = {}, deps = {}) {
     return securityHeaders(jsonResponse(versionPayload(env), {
       headers: { "Cache-Control": "public, max-age=120" }
     }));
+  }
+
+  if (url.pathname === "/api/admin/ai/unlock" || url.pathname === "/api/admin/ai/status") {
+    try { return securityHeaders(await adminAiRequest(request, env, ctx, deps)); }
+    catch { return securityHeaders(jsonResponse({ error: "Admin AI enrollment could not be completed." }, { status: 502 })); }
   }
 
   if (url.pathname === "/api/content" || url.pathname.startsWith("/api/content/") || url.pathname.startsWith("/api/admin/")) {

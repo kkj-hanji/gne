@@ -47,6 +47,7 @@ const SELECTION_KEY = "gndec-compass-next-selection-v1";
 const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 const DEVICE_KEY = "gndec-compass-next-device-v1";
+const ADMIN_MODE_KEY = "gndec-compass-next-admin-mode-v1";
 const GROUP_USAGE_KEY = "gndec-compass-next-group-usage-v1";
 const REMINDER_KEY = "gndec-compass-next-reminders-v1";
 const DIGEST_KEY = "gndec-compass-next-digest-v1";
@@ -96,6 +97,7 @@ const state = {
   adminStatus: "idle",
   adminData: null,
   adminError: "",
+  adminAiSession: null,
   adminTab: "notices",
   adminEditing: null,
   adminBusy: false,
@@ -2515,12 +2517,12 @@ async function sendQuestion(rawQuestion) {
 
   try {
     if (question.toUpperCase() === "KKJ") {
-      const answer = "In the classic Compass, KKJ is the legacy Admin AI enrollment command. Compass Next does not use it to unlock settings or publishing. Open Admin and sign in with your owner or editor token to access privileged tools.";
+      const answer = await unlockAdminMode();
       state.chat[thinkingIndex] = {
         role: "assistant",
         html: textToHtml(answer),
         createdAt: new Date().toISOString(),
-        meta: { intent: "ADMIN_HELP", confidence: 1, plan: ["explain legacy command", "no admin access granted"], engine: "local" }
+        meta: { intent: "ADMIN_MODE", confidence: 1, plan: ["verify owner profile, device and network", "keep publishing behind Admin token"], engine: "local" }
       };
       return;
     }
@@ -2664,7 +2666,7 @@ async function askExternalAi(question, thinkingIndex) {
     const response = await fetch("/api/legacy/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Compass-Device": device },
-      body: JSON.stringify({ question, context: aiContextPayload(), stream: true, heavy: false })
+      body: JSON.stringify({ question, context: aiContextPayload(), ...(hasAdminMode() ? { adminProfile: state.profile, selection: { group: state.group, subgroup: state.subgroup } } : {}), stream: true, heavy: false })
     });
     if (!response.ok) return null;
     const count = Number(storageGet("gndec-compass-next-ai-count") || 0);
@@ -2738,7 +2740,96 @@ function compassDeviceId() {
 }
 
 function hasAdminMode() {
-  return state.adminStatus === "ready" && Boolean(state.adminData);
+  try {
+    const saved = JSON.parse(storageGet(ADMIN_MODE_KEY) || "null");
+    const profileMatches = Boolean(saved && isKaushikAdminProfile()
+      && saved.profileFingerprint === adminModeFingerprint()
+      && Date.parse(saved.expiresAt || "") > Date.now());
+    const active = Boolean(profileMatches && state.adminAiSession?.active
+      && state.adminAiSession.expiresAt === saved.expiresAt
+      && state.adminAiSession.profileFingerprint === saved.profileFingerprint);
+    if (saved && (!isKaushikAdminProfile() || saved.profileFingerprint !== adminModeFingerprint() || Date.parse(saved.expiresAt || "") <= Date.now())) {
+      storageRemove(ADMIN_MODE_KEY);
+      state.adminAiSession = null;
+    }
+    return active || (state.adminStatus === "ready" && Boolean(state.adminData));
+  } catch {
+    storageRemove(ADMIN_MODE_KEY);
+    return state.adminStatus === "ready" && Boolean(state.adminData);
+  }
+}
+
+function isKaushikAdminProfile() {
+  const profile = state.profile || {};
+  const normalize = (value) => String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const crn = String(profile.crn || "").replace(/[^a-z0-9]+/gi, "").toUpperCase();
+  const branch = normalize(profile.branch);
+  return normalize(profile.name) === "kaushik jain" && crn === "2617070"
+    && (branch === "ec" || branch === "electronics and communication engineering" || branch === "electronics and communication engineering ec")
+    && String(profile.section || "").toUpperCase() === "ECB"
+    && String(profile.subsection || "").toUpperCase() === "ECB1"
+    && String(state.group || "").toUpperCase() === "ECB"
+    && String(state.subgroup || "").toUpperCase() === "ECB1";
+}
+
+function adminModeFingerprint() {
+  const profile = state.profile || {};
+  const identity = [profile.name, profile.crn, profile.registrationNo, profile.branch, profile.section, profile.subsection, state.group, state.subgroup]
+    .map((value) => String(value || "").trim().toLowerCase()).join("|");
+  let hash = 2166136261;
+  for (let index = 0; index < identity.length; index += 1) hash = Math.imul(hash ^ identity.charCodeAt(index), 16777619);
+  return `profile-v1-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+async function unlockAdminMode() {
+  if (!isKaushikAdminProfile()) {
+    return "Admin AI mode is available only for the verified owner profile with its matching timetable section and subgroup selected.";
+  }
+  try {
+    const profileFingerprint = adminModeFingerprint();
+    const response = await fetch("/api/admin/ai/unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Compass-Device": compassDeviceId() },
+      body: JSON.stringify({ profile: state.profile, selection: { group: state.group, subgroup: state.subgroup } }),
+      cache: "no-store"
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error || "Admin enrollment was rejected.");
+    const expiresAt = String(payload?.expiresAt || "");
+    if (!expiresAt || Date.parse(expiresAt) <= Date.now()) throw new Error("The server did not return a valid admin session.");
+    storageSet(ADMIN_MODE_KEY, JSON.stringify({ expiresAt, profileFingerprint }));
+    state.adminAiSession = { active: true, expiresAt, profileFingerprint };
+    if (state.route === "settings") render();
+    return `Admin AI mode is active on this device until ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(new Date(expiresAt))}. It unlocks advanced settings and the owner AI allowance for this verified profile, device, and current network. Publishing and content changes still require the separate Admin token.`;
+  } catch (error) {
+    return `Admin AI enrollment failed: ${error?.message || "Check the saved profile and try again."}`;
+  }
+}
+
+async function restoreAdminAiSession() {
+  let saved;
+  try { saved = JSON.parse(storageGet(ADMIN_MODE_KEY) || "null"); } catch { saved = null; }
+  if (!saved || !isKaushikAdminProfile() || saved.profileFingerprint !== adminModeFingerprint() || Date.parse(saved.expiresAt || "") <= Date.now()) {
+    if (saved) storageRemove(ADMIN_MODE_KEY);
+    state.adminAiSession = null;
+    return false;
+  }
+  try {
+    const response = await fetch("/api/admin/ai/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Compass-Device": compassDeviceId() },
+      body: JSON.stringify({ profile: state.profile, selection: { group: state.group, subgroup: state.subgroup } }),
+      cache: "no-store"
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload?.active || payload.expiresAt !== saved.expiresAt) throw new Error("Admin session is no longer active.");
+    state.adminAiSession = { active: true, expiresAt: saved.expiresAt, profileFingerprint: saved.profileFingerprint };
+    return true;
+  } catch {
+    storageRemove(ADMIN_MODE_KEY);
+    state.adminAiSession = null;
+    return false;
+  }
 }
 
 function groupBranchCode(group) {
@@ -2832,7 +2923,7 @@ function renderSettings() {
       <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">Theme, colours, timetable and language.</p></div></div>${everydayFlags.map(renderFlagRow).join("")}</section>
       <details class="card settings-advanced"><summary><span><strong>More settings</strong><small>Optional controls and additional app tools</small></span><span aria-hidden="true">＋</span></summary>
         <div class="preset-row">${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}</div>
-        ${!adminMode ? `<p class="settings-admin-hint">Privacy, Data & offline, and Advanced & Labs appear after you sign in to the Admin page with an owner or editor token.</p>` : `<p class="settings-admin-hint is-active">Admin session active · privileged settings are visible on this device.</p>`}
+        ${!adminMode ? `<p class="settings-admin-hint">Privacy, Data & offline, and Advanced & Labs appear after the verified owner unlocks Admin AI mode with <code>KKJ</code> in Ask Compass. Publishing still requires a separate token.</p>` : `<p class="settings-admin-hint is-active">Admin mode active · privileged settings are visible on this device.</p>`}
         <nav class="settings-category-grid" aria-label="Additional settings">${allowedCategories.map((category) => `<button class="settings-nav-item" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)} <span aria-hidden="true">›</span></button>`).join("")}</nav>
         <details class="settings-special"><summary>Special option · App versions & backups</summary>${renderVersionCard()}</details>
       </details>
@@ -2850,7 +2941,7 @@ function renderSettings() {
           ${flags.length ? flags.map((flag) => renderFlagRow(flag)).join("") : `<p class="card-sub">No control matches “${escapeHtml(query)}”.</p>`}
           ${active.id === "labs" && v("labs.flagInspector") ? renderFlagInspector() : ""}
           ${active.id === "labs" ? renderDangerZone() : ""}
-        </section>` : accessDenied ? `<div class="card">${emptyState("🔒", "Admin sign-in required", `Sign in on the Admin page with an owner or editor token to open ${escapeHtml(CATEGORIES.find((category) => category.id === state.settingsCategory)?.title || "this section")}.`)}</div>` : `<div class="card">${emptyState("⚙", "No matching setting", `Nothing matches “${escapeHtml(state.settingsQuery)}”.`)}</div>`}
+        </section>` : accessDenied ? `<div class="card">${emptyState("🔒", "Admin mode required", `Send KKJ in Ask Compass from the verified owner profile to open ${escapeHtml(CATEGORIES.find((category) => category.id === state.settingsCategory)?.title || "this section")}.`)}</div>` : `<div class="card">${emptyState("⚙", "No matching setting", `Nothing matches “${escapeHtml(state.settingsQuery)}”.`)}</div>`}
       </div>
     </div>`}
   </div>`;
@@ -4007,8 +4098,9 @@ async function init() {
 
   await loadLiveData();
   if (rosterIdentity().crn || rosterIdentity().registration || rosterIdentity().serial || state.profile.name) {
-    loadStudents().catch(() => {});
+    await loadStudents({ quiet: true }).catch(() => {});
   }
+  await restoreAdminAiSession();
   await loadSnapshots();
   updateLegacyCards();
   startTimers();

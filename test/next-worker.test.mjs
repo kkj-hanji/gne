@@ -171,7 +171,7 @@ test("encoded traversal and malformed encodings are rejected before fetch", asyn
   assert.equal(fetched, false);
 });
 
-test("only GET, HEAD and the chat POST are accepted", async () => {
+test("only GET, HEAD, chat POST, and the exact legacy AI enrollment POST are accepted", async () => {
   const deps = { cache: null, fetch: async () => response("ok") };
   const put = await handleRequest(request("/api/legacy/api/timetable", { method: "PUT", body: "x" }), env(), ctx(), deps);
   assert.equal(put.status, 405);
@@ -179,6 +179,22 @@ test("only GET, HEAD and the chat POST are accepted", async () => {
 
   const postTimetable = await handleRequest(request("/api/legacy/api/timetable", { method: "POST", body: "x" }), env(), ctx(), deps);
   assert.equal(postTimetable.status, 405);
+
+  const unlock = await handleRequest(request("/api/legacy/api/admin/ai/unlock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Compass-Device": "nx-abcdefghijklmnop" },
+    body: JSON.stringify({ profile: { name: "Owner" } })
+  }), env(), ctx(), {
+    cache: null,
+    fetch: async (url, init) => {
+      assert.equal(url, "https://legacy.compass.test/api/admin/ai/unlock");
+      assert.equal(init.method, "POST");
+      assert.equal(init.headers.get("X-Compass-Device"), "nx-abcdefghijklmnop");
+      return response('{"ok":true,"expiresAt":"2026-12-10T00:00:00.000Z"}', { headers: { "Content-Type": "application/json" } });
+    }
+  });
+  assert.equal(unlock.status, 200);
+  assert.equal((await unlock.json()).ok, true);
 
   const head = await handleRequest(request("/api/legacy/api/sources", { method: "HEAD" }), env(), ctx(), deps);
   assert.equal(head.status, 200);
