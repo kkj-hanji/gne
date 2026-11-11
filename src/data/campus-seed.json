@@ -5,7 +5,7 @@
     "facultyDirectory": "https://gndec.ac.in/faculty/",
     "provenance": "Department names, Heads of Department, contact details, notices, and syllabus documents are read from public GNDEC pages. A missing value stays missing; Compass does not infer an appointment or a document."
   },
-  "checkedAt": "2026-11-10T06:34:03.751Z",
+  "checkedAt": "2026-11-11T00:52:44.753Z",
   "departments": [
     {
       "id": "ce",
@@ -22,8 +22,8 @@
         "sourceUrl": "https://ce.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.483Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:32.045Z",
       "syllabusErrors": []
     },
     {
@@ -42,8 +42,8 @@
         "sourceUrl": "https://cse.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.481Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:32.779Z",
       "syllabusErrors": []
     },
     {
@@ -62,8 +62,8 @@
         "sourceUrl": "https://ece.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.479Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:32.509Z",
       "syllabusErrors": []
     },
     {
@@ -81,8 +81,8 @@
         "sourceUrl": "https://ee.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.476Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:33.032Z",
       "syllabusErrors": []
     },
     {
@@ -100,8 +100,8 @@
         "sourceUrl": "https://it.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.474Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:33.305Z",
       "syllabusErrors": []
     },
     {
@@ -120,8 +120,8 @@
         "sourceUrl": "https://me.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.473Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:33.434Z",
       "syllabusErrors": []
     },
     {
@@ -140,8 +140,8 @@
         "sourceUrl": "https://mba.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.470Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:33.112Z",
       "syllabusErrors": []
     },
     {
@@ -160,8 +160,8 @@
         "sourceUrl": "https://mca.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.468Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:33.669Z",
       "syllabusErrors": []
     },
     {
@@ -180,8 +180,8 @@
         "sourceUrl": "https://appsc.gndec.ac.in/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.465Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:33.787Z",
       "syllabusErrors": []
     },
     {
@@ -201,8 +201,8 @@
         "sourceUrl": "https://architecture.gndec.ac.in/website1/",
         "verified": true
       },
-      "error": "fetch failed",
-      "checkedAt": "2026-11-10T06:33:42.460Z",
+      "error": "",
+      "checkedAt": "2026-11-11T00:52:37.245Z",
       "syllabusErrors": []
     }
   ],
@@ -1323,7 +1323,7 @@
     "notices": 20,
     "syllabusDocuments": 103
   },
-  "noticeboardError": "fetch failed",
+  "noticeboardError": "",
   "unavailableDepartments": [],
-  "seededAt": "2026-11-10T06:34:03.751Z"
+  "seededAt": "2026-11-11T00:52:44.753Z"
 }
