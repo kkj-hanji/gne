@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { dayOfWeek } from "../next/engine/calendar.js";
-import { PTU_HOLIDAYS_2027 } from "../next/data/ptu-holidays-2027.js";
+import { PTU_HOLIDAYS_2027, PTU_RESTRICTED_HOLIDAYS_2026, PTU_RESTRICTED_HOLIDAYS_2027 } from "../next/data/ptu-holidays-2027.js";
 import { fetchPtuHolidaySources, parsePtuHolidayIndex, ptuHolidaySeed } from "../src/ptu-holidays.js";
 import { handleRequest } from "../src/next-core.js";
 
@@ -24,6 +24,10 @@ test("published 2027 gazetted dates are valid and weekday labels agree with date
   }
   assert.equal(dayOfWeek("2027-01-15"), "Friday");
   assert.equal(dayOfWeek("2027-12-28"), "Tuesday");
+  assert.equal(PTU_RESTRICTED_HOLIDAYS_2026.length, 28);
+  assert.equal(PTU_RESTRICTED_HOLIDAYS_2027.length, 29);
+  assert.ok(PTU_RESTRICTED_HOLIDAYS_2027.some((item) => item.date === "2027-10-30" && item.name === "Goverdhan Pooja"));
+  assert.ok(PTU_RESTRICTED_HOLIDAYS_2027.every((item) => dayOfWeek(item.date)));
 });
 
 test("PTU refresh follows the official page and flags changed PDFs instead of trusting stale rows", async () => {
@@ -54,5 +58,7 @@ test("calendar view explains PTU scope and separates it from GNDEC working-day c
   assert.match(app, /function renderPtuHolidayReferences/);
   assert.match(app, /GNDEC notices and its academic calendar decide GNDEC working days/);
   assert.match(app, /2027 gazetted holidays/);
+  assert.match(app, /2027 restricted holidays/);
+  assert.match(app, /2026 restricted holidays/);
   assert.match(app, /PTU’s 2027 PDF has changed/);
 });

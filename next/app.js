@@ -42,7 +42,7 @@ import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
 } from "./engine/calendar.js";
-import { PTU_HOLIDAYS_2027 } from "./data/ptu-holidays-2027.js";
+import { PTU_HOLIDAYS_2027, PTU_RESTRICTED_HOLIDAYS_2026, PTU_RESTRICTED_HOLIDAYS_2027 } from "./data/ptu-holidays-2027.js";
 import { PTU_HOLIDAY_SOURCE_SEED } from "./data/ptu-holiday-sources.js";
 
 const CHAT_KEY = "gndec-compass-next-chat-v1";
@@ -1898,13 +1898,19 @@ function renderPtuHolidayReferences() {
   const years = state.ptuHolidaySources?.years || {};
   const year2026 = years["2026"];
   const year2027 = years["2027"];
-  const changed = Boolean(year2027?.changed);
+  const changed2026 = Boolean(year2026?.changed);
+  const changed2027 = Boolean(year2027?.changed);
   const checked = state.ptuHolidaySources?.checkedAt ? `Last checked ${escapeHtml(shortDate(state.ptuHolidaySources.checkedAt))}.` : "Checking PTU’s current document links…";
   return `<section class="card ptu-holidays-card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">PTU holiday calendars</h2><p class="card-sub">Gazetted and restricted holiday references for IKGPTU campuses and affiliated colleges. ${checked}</p></div><a class="btn btn-sm" href="https://ptu.ac.in/holidays/" target="_blank" rel="noopener noreferrer">PTU holidays page ↗</a></div>
     <p class="card-sub ptu-holidays-note">These are PTU / Punjab Government references. GNDEC notices and its academic calendar decide GNDEC working days and local changes.</p>
     <div class="ptu-holiday-sources">${year2026?.url ? `<a class="chip" href="${escapeHtml(year2026.url)}" target="_blank" rel="noopener noreferrer">Open official 2026 calendar (PDF) ↗</a>` : ""}${year2027?.url ? `<a class="chip" href="${escapeHtml(year2027.url)}" target="_blank" rel="noopener noreferrer">Open official 2027 calendar (PDF) ↗</a>` : ""}</div>
-    ${changed ? `<div class="ptu-holiday-alert" role="status"><strong>PTU’s 2027 PDF has changed.</strong> The English date list is hidden until the revised document can be checked. Use the current official PDF link above.</div>` : `<h3 class="ptu-holiday-year">2027 gazetted holidays · English</h3><p class="card-sub">English names transcribed from PTU’s 2027 PDF. The official document also lists restricted holidays.</p><ul class="holiday-list ptu-holiday-list">${PTU_HOLIDAYS_2027.map(({ date, name }) => `<li class="holiday-item"><time datetime="${escapeHtml(date)}">${escapeHtml(dateOnly(date))}</time><span class="holiday-day">${escapeHtml(dayOfWeek(date))}</span><span class="holiday-name">${escapeHtml(name)}</span></li>`).join("")}</ul>`}
+    ${changed2027 ? `<div class="ptu-holiday-alert" role="status"><strong>PTU’s 2027 PDF has changed.</strong> The English date lists for 2027 are hidden until the revised document can be checked. Use the current official PDF link above.</div>` : `${renderPtuHolidayList("2027 gazetted holidays · English", PTU_HOLIDAYS_2027, true)}${renderPtuHolidayList("2027 restricted holidays · English", PTU_RESTRICTED_HOLIDAYS_2027)}`}
+    ${changed2026 ? `<div class="ptu-holiday-alert" role="status"><strong>PTU’s 2026 PDF has changed.</strong> The restricted-date transcription is hidden until the revised document can be checked.</div>` : renderPtuHolidayList("2026 restricted holidays · English", PTU_RESTRICTED_HOLIDAYS_2026)}
   </section>`;
+}
+
+function renderPtuHolidayList(title, entries, open = false) {
+  return `<details class="ptu-holiday-details"${open ? " open" : ""}><summary>${escapeHtml(title)} <span>${entries.length} dates</span></summary><ul class="holiday-list ptu-holiday-list">${entries.map(({ date, name }) => `<li class="holiday-item"><time datetime="${escapeHtml(date)}">${escapeHtml(dateOnly(date))}</time><span class="holiday-day">${escapeHtml(dayOfWeek(date))}</span><span class="holiday-name">${escapeHtml(name)}</span></li>`).join("")}</ul></details>`;
 }
 
 /* ── Directory: faculty, students, syllabus ────────────────────────────── */

@@ -1214,7 +1214,9 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
 .holiday-item.is-restricted, .holiday-item.is-half-day { color: var(--text-soft); }
 .ptu-holidays-note { margin: -2px 0 12px; }
 .ptu-holiday-sources { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
-.ptu-holiday-year { margin: 18px 0 4px; font-size: .92rem; }
+.ptu-holiday-details { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
+.ptu-holiday-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; color: var(--text); font-size: .88rem; font-weight: 750; list-style-position: inside; }
+.ptu-holiday-details > summary span { color: var(--muted); font-size: .72rem; font-weight: 600; white-space: nowrap; }
 .ptu-holiday-list { max-height: 580px; overflow: auto; padding-right: 6px; }
 .ptu-holiday-list .holiday-item { min-height: 38px; }
 .ptu-holiday-alert { display: grid; gap: 4px; padding: 12px 14px; margin-top: 14px; border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--border)); border-radius: 12px; background: color-mix(in srgb, var(--warning) 9%, var(--surface-2)); color: var(--text); font-size: .84rem; line-height: 1.5; }

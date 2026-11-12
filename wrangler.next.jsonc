@@ -7,7 +7,7 @@
     "crons": ["17 */4 * * *"]
   },
   "vars": {
-    "APP_VERSION": "2.2.3",
+    "APP_VERSION": "2.2.4",
     "APP_CHANNEL": "stable",
     "BUILD_TIME": "2026-11-12",
     "PUBLIC_ORIGIN": "https://gndec-compass-next.koush3069.workers.dev",
