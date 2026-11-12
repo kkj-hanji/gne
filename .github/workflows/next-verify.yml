@@ -43,7 +43,10 @@ jobs:
             local url="$1" expect="$2"
             local body
             body="$(curl -fsS --retry 3 --max-time 30 "$url")"
-            echo "$body" | grep -q "$expect" || { echo "FAIL $url missing: $expect"; exit 1; }
+            # Use a shell substring check instead of `echo | grep -q`: with
+            # pipefail, grep can exit early on large HTML and make echo fail
+            # with SIGPIPE even when the expected text is present.
+            [[ "$body" == *"$expect"* ]] || { echo "FAIL $url missing: $expect"; exit 1; }
             echo "OK $url"
           }
           check "$base/" "GNDEC Compass"
