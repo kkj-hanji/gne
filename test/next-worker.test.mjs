@@ -45,6 +45,19 @@ test("health reports the app and the legacy origin without secrets", async () =>
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), null);
 });
 
+test("official notice feed serves the verified bootstrap and refreshes through the Next Worker", async () => {
+  const queued = [];
+  const res = await handleRequest(request("/api/official-notices"), env(), { waitUntil: (promise) => queued.push(promise) }, {
+    officialNotices: { refresh: async () => ({ notices: [] }) }
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("X-Content-Type-Options"), "nosniff");
+  const value = await res.json();
+  assert.equal(value.source, "https://erp.gndec.ac.in/notice");
+  assert.equal(value.notices[0].title, "Struck_off_Notice 45_12.11.26");
+  assert.equal(queued.length, 1);
+});
+
 test("version describes the engine and privacy posture", async () => {
   const payload = versionPayload(env());
   assert.equal(payload.app.name, APP_NAME);

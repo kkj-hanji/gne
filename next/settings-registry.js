@@ -22,11 +22,11 @@ export const LEGACY_PROFILE_KEY = "gndec-compass-student-v1";
 export const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 export const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 
-export const APP_VERSION = "2.2.0";
+export const APP_VERSION = "2.2.3";
 export const APP_CHANNEL = "stable";
 
 export const THEMES = ["system", "light", "dark", "oled"];
-export const ACCENTS = ["emerald", "azure", "amber", "rose", "violet", "teal", "indigo", "coral", "lime"];
+export const ACCENTS = ["auto", "emerald", "azure", "amber", "rose", "violet", "teal", "indigo", "coral", "lime", "cyan", "plum", "orange"];
 export const DENSITIES = ["comfortable", "compact"];
 export const EXPERIENCES = ["new", "classic", "safe"];
 export const NAV_BOTTOM_ROUTES = Object.freeze(["today", "ask", "timetable", "rooms", "teachers", "notices", "papers", "syllabus", "calendar", "directory", "compare"]);
@@ -107,8 +107,9 @@ export const FLAGS = Object.freeze([
       { value: "oled", label: "OLED black" }
     ], keywords: "dark light theme colour"
   }),
-  flag("appearance.accent", "Accent colour", "Used for highlights, focus rings and the active navigation item.", {
-    category: "appearance", type: "select", default: "emerald", values: [
+  flag("appearance.accent", "Accent colour", "Choose Teal or let Compass adapt the accent to your theme and colour palette.", {
+    category: "appearance", type: "select", default: "teal", values: [
+      { value: "auto", label: "Auto — match theme" },
       { value: "emerald", label: "Emerald" },
       { value: "azure", label: "Azure" },
       { value: "amber", label: "Amber" },
@@ -117,11 +118,14 @@ export const FLAGS = Object.freeze([
       { value: "teal", label: "Teal" },
       { value: "indigo", label: "Indigo" },
       { value: "coral", label: "Coral" },
-      { value: "lime", label: "Lime" }
+      { value: "lime", label: "Lime" },
+      { value: "cyan", label: "Cyan" },
+      { value: "plum", label: "Plum" },
+      { value: "orange", label: "Orange" }
     ], keywords: "colour accent green blue"
   }),
   flag("appearance.palette", "Colour palette", "Choose the overall surface colours for both light and dark themes.", {
-    category: "appearance", type: "select", default: "forest", values: [
+    category: "appearance", type: "select", default: "ocean", values: [
       { value: "forest", label: "Forest green" },
       { value: "ocean", label: "Ocean blue" },
       { value: "sand", label: "Warm sand" },
@@ -131,7 +135,7 @@ export const FLAGS = Object.freeze([
     ], keywords: "colour combination background surfaces palette"
   }),
   flag("appearance.background", "Background style", "Use a quiet solid background or a subtle colour wash.", {
-    category: "appearance", type: "select", default: "solid", values: [
+    category: "appearance", type: "select", default: "mist", values: [
       { value: "solid", label: "Quiet solid" },
       { value: "wash", label: "Soft colour wash" },
       { value: "aurora", label: "Aurora glow" },
@@ -144,8 +148,8 @@ export const FLAGS = Object.freeze([
       { value: "compact", label: "Compact" }
     ], keywords: "spacing compact"
   }),
-  flag("appearance.fontScale", "Text size", "Scales the whole interface. 100% is the design default.", {
-    category: "appearance", type: "range", default: 100, min: 90, max: 130, step: 5, unit: "%", keywords: "font size text bigger"
+  flag("appearance.fontScale", "Text size", "Scales the whole interface. 98% is the Compass default.", {
+    category: "appearance", type: "range", default: 98, min: 80, max: 130, step: 1, unit: "%", keywords: "font size text bigger"
   }),
   flag("appearance.reduceMotion", "Reduce motion", "Stops transitions, parallax and animated reveals.", {
     category: "appearance", default: false, keywords: "animation motion accessibility"
@@ -225,9 +229,6 @@ export const FLAGS = Object.freeze([
   }),
   flag("today.freshnessBadge", "Data freshness", "Show when the timetable was last verified.", {
     category: "today", default: true, keywords: "freshness verified"
-  }),
-  flag("today.quickAsk", "Quick ask", "Show three suggested questions on Today.", {
-    category: "today", default: true, keywords: "ask suggestions"
   }),
   flag("today.attendanceCard", "Attendance card", "Track attendance against your target. Requires attendance entries.", {
     category: "today", default: false, badge: "Beta", keywords: "attendance"
@@ -538,13 +539,6 @@ export const FLAG_MAP = Object.freeze(Object.fromEntries(FLAGS.map((item) => [it
 
 export const PRESETS = Object.freeze([
   {
-    id: "balanced",
-    title: "Balanced",
-    description: "The recommended defaults: fast, offline-ready and readable.",
-    badge: "Recommended",
-    values: {}
-  },
-  {
     id: "battery",
     title: "Battery saver",
     description: "Fewer animations, no background prefetch and quieter notifications.",
@@ -596,19 +590,6 @@ export const PRESETS = Object.freeze([
       "notifications.examAlerts": true,
       "ask.length": "short",
       "data.autoUpdate": true
-    }
-  },
-  {
-    id: "developer",
-    title: "Developer",
-    description: "Labs, debug panels and the beta channel. Not recommended for daily use.",
-    values: {
-      "labs.experiments": true,
-      "labs.debugPanel": true,
-      "labs.flagInspector": true,
-      "labs.cacheInspector": true,
-      "data.channel": "beta",
-      "experience.showBuildChannel": true
     }
   }
 ].map(Object.freeze));

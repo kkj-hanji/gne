@@ -20,13 +20,13 @@
     theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
   root.dataset.theme = theme === "light" ? "light" : theme === "oled" ? "oled" : "dark";
-  root.dataset.accent = String(pick("appearance.accent", "emerald"));
-  root.dataset.palette = String(pick("appearance.palette", "forest"));
-  root.dataset.background = String(pick("appearance.background", "solid"));
+  root.dataset.accent = String(pick("appearance.accent", "teal"));
+  root.dataset.palette = String(pick("appearance.palette", "ocean"));
+  root.dataset.background = String(pick("appearance.background", "mist"));
   root.dataset.density = String(pick("appearance.density", "comfortable"));
   root.dataset.experience = String(pick("experience.mode", "new"));
 
-  var scale = Number(pick("appearance.fontScale", 100));
+  var scale = Number(pick("appearance.fontScale", 98));
   if (pick("a11y.largeText", false)) scale = Math.max(scale, 125);
   if (Number.isFinite(scale)) root.style.setProperty("--font-scale", (Math.min(130, Math.max(90, scale)) / 100).toFixed(2));
 

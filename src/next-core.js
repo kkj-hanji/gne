@@ -25,10 +25,12 @@ import {
   restorePrevious,
   upsertItem
 } from "./content-store.js";
+import { officialNoticesResponse } from "./official-notices.js";
+import { ptuHolidaySourcesResponse } from "./ptu-holidays.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.1.6";
-export const BUILD_DATE = "2026-11-10";
+export const APP_VERSION = "2.2.3";
+export const BUILD_DATE = "2026-11-12";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
 const PROXY_PREFIX = "/api/legacy/";
@@ -525,6 +527,14 @@ async function adminRequest(request, env, deps = {}) {
 
 export async function handleRequest(request, env = {}, ctx = {}, deps = {}) {
   const url = new URL(request.url);
+
+  if (url.pathname === "/api/official-notices") {
+    return securityHeaders(await officialNoticesResponse(request, env, ctx, deps.officialNotices || {}));
+  }
+
+  if (url.pathname === "/api/ptu-holidays") {
+    return securityHeaders(await ptuHolidaySourcesResponse(request, env, ctx, deps.ptuHolidays || {}));
+  }
 
   if (url.pathname === "/api/health") {
     return securityHeaders(jsonResponse({

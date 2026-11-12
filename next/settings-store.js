@@ -277,6 +277,17 @@ export function applyPreset(current, presetId) {
   return sanitizeValues({ ...defaultValues(), ...current, ...preset.values });
 }
 
+/** Apply a preset or undo the active preset to its saved starting values. */
+export function togglePreset(current, presetId, activePreset = "", undoValues = null) {
+  const values = sanitizeValues(current);
+  if (!PRESET_MAP[presetId]) return { values, activePreset, undoValues, applied: false };
+  if (activePreset === presetId && undoValues) {
+    return { values: sanitizeValues(undoValues), activePreset: "", undoValues: null, applied: false };
+  }
+  const baseline = activePreset && undoValues ? sanitizeValues(undoValues) : values;
+  return { values: applyPreset(values, presetId), activePreset: presetId, undoValues: baseline, applied: true };
+}
+
 /** Reset all settings, or only one category. Actions/info flags are skipped. */
 export function resetValues(current = {}, category = "") {
   if (!category) return defaultValues();

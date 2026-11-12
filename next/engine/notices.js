@@ -73,6 +73,10 @@ export function normalizeNotice(raw, origin = "official") {
   if (!title) return null;
   const url = canonicalUrl(raw?.url || raw?.link) || cleanText(raw?.url || raw?.link);
   const date = dateOnly(raw?.date || raw?.publishedAt || raw?.createdAt);
+  const istParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const istToday = `${istParts.find((part) => part.type === "year")?.value}-${istParts.find((part) => part.type === "month")?.value}-${istParts.find((part) => part.type === "day")?.value}`;
+  const ageDays = date ? Math.round((Date.parse(`${istToday}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86400000) : Number.POSITIVE_INFINITY;
+  const autoPinned = origin === "campus" && ageDays >= 0 && ageDays <= 1;
   const id = cleanText(raw?.id) || `${slugify(title)}-${date || "undated"}`;
   return {
     id,
@@ -84,7 +88,8 @@ export function normalizeNotice(raw, origin = "official") {
     source: cleanText(raw?.source || url) || "",
     body: cleanText(raw?.body).slice(0, 4000),
     attachments: Array.isArray(raw?.attachments) ? raw.attachments.filter(Boolean).slice(0, 8) : [],
-    pinned: Boolean(raw?.pinned),
+    pinned: Boolean(raw?.pinned || autoPinned),
+    privacyNote: cleanText(raw?.privacyNote).slice(0, 500),
     transcribed: Boolean(raw?.transcribed),
     admin: origin === "admin",
     origin

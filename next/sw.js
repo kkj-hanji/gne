@@ -9,7 +9,7 @@
  *   navigation cached shell, never a guessed offline error page
  */
 
-const VERSION = "compass-next-v2.7.0";
+const VERSION = "compass-next-v2.9.1";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 
@@ -39,6 +39,8 @@ const SHELL_ASSETS = [
   "./engine/notices.js",
   "./engine/papers.js",
   "./engine/syllabus.js",
+  "./data/ptu-holidays-2027.js",
+  "./data/ptu-holiday-sources.js",
   "./data/papers-index.json",
   "./data/timetable-groups.html",
   "./data/timetable-rooms.html",

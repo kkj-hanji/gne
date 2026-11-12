@@ -3,6 +3,13 @@
 const CHEMISTRY_SECTIONS = Object.freeze(["CSA", "CSB", "CSC", "CSD", "CSE", "CSF", "ITA", "ITB", "ITC"]);
 const PHYSICS_SECTIONS = Object.freeze(["MEA", "MEB", "CEA", "CEB", "EEA", "EEB", "ECA", "ECB", "RAI"]);
 
+export function examGroupForSection(value) {
+  const section = canonicalSection(value);
+  if (CHEMISTRY_SECTIONS.includes(section)) return "Chemistry group";
+  if (PHYSICS_SECTIONS.includes(section)) return "Physics group";
+  return "";
+}
+
 const theory = (id, group, date, subject, start, end, sections) => Object.freeze({
   id, category: "MSE-II theory", title: subject, date, start, end, sections, group,
   sourceLabel: "Applied Sciences · transcribed",

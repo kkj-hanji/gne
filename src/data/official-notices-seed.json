@@ -1,0 +1,26 @@
+{
+  "source": "https://erp.gndec.ac.in/notice",
+  "checkedAt": "2026-11-12T00:00:00.000Z",
+  "notices": [
+    {
+      "id": "struck-off-notice-45-121126",
+      "title": "Struck_off_Notice 45_12.11.26",
+      "url": "https://erp.gndec.ac.in/noticeboard/struck-off-notice-45-121126",
+      "date": "2026-11-12",
+      "publishedAt": "2026-11-12",
+      "author": "administrator",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/notice",
+      "body": "GNDEC has posted a struck-off notice. The attached official document may contain student names, college and university roll numbers, parent names, and individual reasons. Compass does not copy those personal details; open the source if you need to check your own record.",
+      "attachments": [
+        {
+          "label": "Struck_off_Notice 45_12.11.26.pdf",
+          "url": "https://erp.gndec.ac.in/files/Struck_off_Notice%2045_12.11.26.pdf"
+        }
+      ],
+      "privacyNote": "Student-identifying information may be present in the official attachment. Compass does not use your saved profile to search or disclose it.",
+      "sensitive": true,
+      "origin": "campus"
+    }
+  ]
+}

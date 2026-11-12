@@ -141,6 +141,11 @@ test("the map is never bundled and starts disabled", async () => {
 test("defaults contain every interactive flag and no action flags", () => {
   const values = defaultValues();
   assert.equal(values["appearance.theme"], "dark");
+  assert.equal(values["appearance.accent"], "teal");
+  assert.equal(values["appearance.palette"], "ocean");
+  assert.equal(values["appearance.background"], "mist");
+  assert.equal(values["appearance.density"], "comfortable");
+  assert.equal(values["appearance.fontScale"], 98);
   for (const flag of FLAGS) {
     if (flag.type === "action" || flag.type === "info") {
       assert.equal(flag.id in values, false, `${flag.id} must not be stored`);
@@ -167,9 +172,9 @@ test("coercion rejects malformed values and clamps ranges", () => {
   const scale = getFlag("appearance.fontScale");
   assert.equal(coerceValue(scale, 125), 125);
   assert.equal(coerceValue(scale, 500), 130);
-  assert.equal(coerceValue(scale, 0), 90);
-  assert.equal(coerceValue(scale, 103), 105);
-  assert.equal(coerceValue(scale, "not-a-number"), 100);
+  assert.equal(coerceValue(scale, 0), 80);
+  assert.equal(coerceValue(scale, 103), 103);
+  assert.equal(coerceValue(scale, "not-a-number"), 98);
 
   assert.deepEqual(sanitizeValues({ "appearance.theme": "dark", unknown: true }), {
     ...defaultValues(),
@@ -186,7 +191,7 @@ test("URL overrides are parsed defensively", () => {
   assert.deepEqual(parseUrlOverrides("?ff=privacy.deleteAll=1"), {});
   assert.deepEqual(parseUrlOverrides("?ff=unknown.flag=1"), {});
   assert.deepEqual(parseUrlOverrides("?other=1"), {});
-  assert.deepEqual(parseUrlOverrides("?ff=appearance.accent=azure=extra"), { "appearance.accent": "emerald" });
+  assert.deepEqual(parseUrlOverrides("?ff=appearance.accent=azure=extra"), { "appearance.accent": "teal" });
 });
 
 test("precedence is URL > admin > device > default", () => {
@@ -350,12 +355,8 @@ test("presets apply on top of current values and remain reversible", () => {
   assert.equal(accessibility["appearance.fontScale"], 125);
   assert.equal(accessibility["appearance.highContrast"], true);
 
-  const developer = applyPreset(base, "developer");
-  assert.equal(developer["labs.experiments"], true);
-  assert.equal(developer["data.channel"], "beta");
-
   assert.deepEqual(applyPreset(base, "does-not-exist"), sanitizeValues(base));
-  assert.equal(PRESETS.length, 6);
+  assert.equal(PRESETS.length, 4);
   for (const preset of PRESETS) {
     assert.ok(PRESET_MAP[preset.id], `${preset.id} must be indexed`);
     for (const key of Object.keys(preset.values)) assert.ok(FLAG_MAP[key], `${preset.id} references unknown ${key}`);

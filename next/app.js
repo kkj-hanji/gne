@@ -11,7 +11,7 @@ import {
   getFlag, isMapFlagEnabled
 } from "./settings-registry.js";
 import {
-  applyPreset, coerceValue, defaultValues, exportBundle, importBundle,
+  applyPreset, coerceValue, defaultValues, exportBundle, importBundle, sanitizeValues, togglePreset,
   isFlagAvailable, loadProfile, loadUserValues, resetValues, resolveValues,
   saveProfile, saveUserValues
 } from "./settings-store.js";
@@ -37,11 +37,13 @@ import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine
 import { answerFirstYearSyllabus, buildSyllabusIndex, groupSyllabus, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
-import { examEventsForSelection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
+import { examEventsForSelection, examGroupForSection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
 } from "./engine/calendar.js";
+import { PTU_HOLIDAYS_2027 } from "./data/ptu-holidays-2027.js";
+import { PTU_HOLIDAY_SOURCE_SEED } from "./data/ptu-holiday-sources.js";
 
 const CHAT_KEY = "gndec-compass-next-chat-v1";
 const SELECTION_KEY = "gndec-compass-next-selection-v1";
@@ -52,6 +54,7 @@ const ADMIN_MODE_KEY = "gndec-compass-next-admin-mode-v1";
 const GROUP_USAGE_KEY = "gndec-compass-next-group-usage-v1";
 const REMINDER_KEY = "gndec-compass-next-reminders-v1";
 const DIGEST_KEY = "gndec-compass-next-digest-v1";
+const PRESET_UNDO_KEY = "gndec-compass-next-preset-undo-v1";
 const THEME_ORDER = ["system", "light", "dark", "oled"];
 
 const BRANCHES = Object.freeze([
@@ -81,6 +84,10 @@ const state = {
   datesheet: null,
   notices: [],
   noticesStatus: "idle",
+  officialNotices: [],
+  officialNoticesStatus: "idle",
+  ptuHolidaySources: PTU_HOLIDAY_SOURCE_SEED,
+  ptuHolidayStatus: "idle",
   content: { notices: [], announcements: [], holidays: [], papers: [], syllabus: [], datesheets: [], links: [], configured: false, meta: null },
   contentStatus: "idle",
   campus: { notices: [], syllabus: [], departments: [], checkedAt: "" },
@@ -107,6 +114,7 @@ const state = {
   directoryStatus: "idle",
   faculty: [],
   facultyStatus: "idle",
+  facultyProfileSelected: "",
   students: [],
   rosterGeneratedAt: "",
   profileLookupQuery: "",
@@ -130,6 +138,9 @@ const state = {
   day: "",
   settingsCategory: "overview",
   settingsQuery: "",
+  settingsMoreOpen: false,
+  activePreset: "",
+  presetUndo: null,
   roomDay: "",
   roomDayAuto: true,
   roomTime: "",
@@ -300,6 +311,13 @@ function loadAllSettings() {
   const resolved = resolveValues({ user, admin: state.adminValues, search: location.search });
   state.values = resolved.values;
   state.sources = resolved.sources;
+  try {
+    const savedPreset = JSON.parse(storageGet(PRESET_UNDO_KEY) || "null");
+    if (savedPreset && PRESETS.some((preset) => preset.id === savedPreset.id) && savedPreset.values && typeof savedPreset.values === "object") {
+      state.activePreset = savedPreset.id;
+      state.presetUndo = sanitizeValues(savedPreset.values);
+    }
+  } catch { clearPresetUndo(); }
   state.profile = loadProfile(localStorage);
   // Auto is the default for every student. Only the verified owner can opt
   // into the local-only diagnostic path from the advanced settings.
@@ -346,9 +364,23 @@ function applyAppearance() {
 function setFlag(id, raw) {
   const flag = getFlag(id);
   if (!flag) return;
+  clearPresetUndo();
   state.values[id] = coerceValue(flag, raw);
   persistSettings();
   applyAppearance();
+}
+
+function clearPresetUndo() {
+  state.activePreset = "";
+  state.presetUndo = null;
+  storageRemove(PRESET_UNDO_KEY);
+}
+
+function renderPresetRow() {
+  return `<div class="preset-row">${PRESETS.map((preset) => {
+    const active = state.activePreset === preset.id;
+    return `<button class="preset${active ? " is-active" : ""}" data-action="preset" data-preset="${preset.id}" aria-pressed="${active}"><strong>${escapeHtml(preset.title)}</strong><small>${active ? "Applied · click again to undo" : escapeHtml(preset.description)}</small></button>`;
+  }).join("")}</div>`;
 }
 
 /* ── Data loading ──────────────────────────────────────────────────────── */
@@ -563,6 +595,30 @@ async function loadNotices() {
   }
 }
 
+async function loadOfficialNotices() {
+  state.officialNoticesStatus = "loading";
+  try {
+    const data = await fetchJson("/api/official-notices", {}, 25000);
+    state.officialNotices = Array.isArray(data?.notices) ? data.notices : [];
+    state.officialNoticesStatus = "ready";
+  } catch {
+    state.officialNotices = [];
+    state.officialNoticesStatus = "error";
+  }
+  if (["today", "notices"].includes(state.route)) render();
+}
+
+async function loadPtuHolidaySources() {
+  state.ptuHolidayStatus = "loading";
+  try {
+    state.ptuHolidaySources = await fetchJson("/api/ptu-holidays", {}, 25000);
+    state.ptuHolidayStatus = "ready";
+  } catch {
+    state.ptuHolidayStatus = "error";
+  }
+  if (state.route === "calendar") render();
+}
+
 /* ── Live content: admin overlay + campus directory + papers ───────────── */
 
 async function loadContent() {
@@ -635,7 +691,7 @@ function allNotices() {
   return mergeNotices({
     admin,
     transcribed: transcribedNotices(),
-    campus: state.campus.notices,
+    campus: [...state.officialNotices, ...state.campus.notices],
     curated: state.notices
   });
 }
@@ -672,9 +728,11 @@ function activeAnnouncements() {
 
 async function ensureLiveContent() {
   const jobs = [];
+  if (state.route === "calendar" && state.ptuHolidayStatus === "idle") jobs.push(loadPtuHolidaySources());
   if (state.contentStatus === "idle") jobs.push(loadContent());
   if (state.campusStatus === "idle") jobs.push(loadCampus());
   if (state.noticesStatus === "idle") jobs.push(loadNotices());
+  if (state.officialNoticesStatus === "idle") jobs.push(loadOfficialNotices());
   if (state.papersStatus === "idle") jobs.push(loadPapers());
   if (!jobs.length) return;
   await Promise.allSettled(jobs);
@@ -1110,6 +1168,9 @@ function render() {
   }
   view.innerHTML = html;
   ensureRouteData();
+  if (state.route === "calendar" && location.hash === "#exam-datesheet") {
+    requestAnimationFrame(() => $("#exam-datesheet")?.scrollIntoView({ block: "start", behavior: "smooth" }));
+  }
   state.renderedAt = Date.now();
   if (state.route === "ask") {
     renderChatMessages();
@@ -1220,6 +1281,7 @@ function renderToday() {
   const examCard = v("today.examCountdown") && exam ? renderExamCard(exam) : "";
   const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
   const holiday = v("today.holidayBanner") ? holidayOn(clock.dateISO, holidayOverrides()) : null;
+  const examHref = exam ? "/calendar#exam-datesheet" : "/calendar";
 
   return `<div class="page page-today">
     ${hero}
@@ -1228,17 +1290,16 @@ function renderToday() {
     <div class="stat-grid">
       <div class="stat"><div class="stat-label">Classes today</div><div class="stat-value">${today.length}</div><div class="stat-sub">${escapeHtml(clock.day)}</div></div>
       <div class="stat"><div class="stat-label">Free rooms now</div><div class="stat-value">${free.error ? "—" : free.rooms.length}</div><div class="stat-sub">${free.error ? "Room data loading" : `for the next hour`}</div></div>
-      <div class="stat"><div class="stat-label">Next exam</div><div class="stat-value">${exam ? escapeHtml(shortExamDate(exam.date)) : "—"}</div><div class="stat-sub">${exam ? escapeHtml(exam.subject) : "No published date"}</div></div>
+      <a class="stat stat-link" href="${examHref}" aria-label="${exam ? `Open full datesheet for ${escapeHtml(exam.title)} on ${escapeHtml(shortExamDate(exam.date))}` : "Open exam calendar"}"><div class="stat-label">Next exam</div><div class="stat-value">${exam ? escapeHtml(shortExamDate(exam.date)) : "—"}</div><div class="stat-sub">${exam ? escapeHtml(exam.title) : "No published date"}</div>${exam ? `<span class="stat-link-hint">Full datesheet <span aria-hidden="true">↗</span></span>` : ""}</a>
     </div>
     <div class="dashboard-grid">
       <div class="stack">
         ${timeline}
-        ${examCard}
-        ${notices}
+        ${freeRooms}
       </div>
       <div class="stack">
-        ${freeRooms}
-        ${v("today.quickAsk") ? renderQuickAsk() : ""}
+        ${examCard}
+        ${notices}
       </div>
     </div>
   </div>`;
@@ -1329,7 +1390,7 @@ function heroActions() {
 function renderTodayTimeline(classes, clock, { lookAhead = false } = {}) {
   const rows = [];
   const slots = classes.map((entry) => ({ ...entry, free: false }));
-  if (v("timetable.showEmpty")) {
+  if (classes.length) {
     const bells = [
       { start: 510, end: 570 }, { start: 570, end: 630 }, { start: 630, end: 690 }, { start: 690, end: 750 },
       { start: 750, end: 810 }, { start: 810, end: 870 }, { start: 870, end: 930 }, { start: 930, end: 980 }
@@ -1339,17 +1400,17 @@ function renderTodayTimeline(classes, clock, { lookAhead = false } = {}) {
     }
   }
   slots.sort((a, b) => a.start - b.start);
-  const visible = slots.filter((entry) => entry.end > clock.minutes).slice(0, 8);
-  const list = visible.length ? visible : slots.slice(0, 8);
+  const visible = slots.filter((entry) => entry.end > clock.minutes).slice(0, 16);
+  const list = visible.length ? visible : slots.slice(0, 16);
   if (!list.length) return `<section class="card"><div class="card-head"><div><h2 class="card-title">Today</h2><p class="card-sub">No class published for ${escapeHtml(clock.day)}.</p></div></div>${emptyState("☕", "Nothing scheduled", "The official weekly timetable has no class for your section today.", `<button class="btn btn-sm" data-route="timetable">Open timetable</button>`)}</section>`;
   for (const entry of list) {
     const isNow = entry.start <= clock.minutes && clock.minutes < entry.end;
     rows.push(`<div class="timeline-item${isNow ? " is-now" : ""}${entry.free ? " is-free" : ""}">
-      <div class="timeline-time">${escapeHtml(humanTime(entry.start, v("timetable.clock")))}</div>
+      <div class="timeline-time">${escapeHtml(humanTime(entry.start, v("timetable.clock")))}${entry.free ? `<span class="timeline-time-end">${escapeHtml(humanTime(entry.end, v("timetable.clock")))}</span>` : ""}</div>
       <span class="timeline-dot" aria-hidden="true"></span>
       <div class="timeline-body">
-        <div class="timeline-subject">${escapeHtml(entry.subject)}</div>
-        <div class="timeline-meta">${entry.free ? "Free slot" : `${escapeHtml(entry.room)} · ${escapeHtml(entry.teacher)}`}</div>
+        <div class="timeline-subject">${entry.free ? "Free period" : escapeHtml(entry.subject)}</div>
+        <div class="timeline-meta">${entry.free ? "No class listed in this bell slot" : `${escapeHtml(entry.room)} · ${escapeHtml(entry.teacher)}`}</div>
       </div>
     </div>`);
   }
@@ -1371,19 +1432,26 @@ function renderFreeRoomsCard(result, clock) {
 }
 
 function renderExamCard(exam) {
-  const action = exam.sourceUrl
-    ? `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open date sheet</a>`
-    : `<button class="btn btn-sm" data-ask-question="Show my next exam date sheet">Ask Compass</button>`;
+  const groupLabel = examGroupForSection(state.group);
+  const profileLabel = [state.profile.name, state.group, groupLabel].filter(Boolean).join(" · ");
+  const official = exam.sourceUrl ? `<a class="chip" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">Official source ↗</a>` : "";
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Next published exam</h2><p class="card-sub">${escapeHtml(exam.category)} · ${escapeHtml(exam.sourceLabel || "published date sheet")}</p></div><div class="card-actions">${action}</div></div>
-    <div class="timeline-item"><div class="timeline-time">${escapeHtml(shortExamDate(exam.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.title)}</div><div class="timeline-meta">${escapeHtml(exam.tab || exam.sourceNote || "")}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</div></div></div>
+    <div class="card-head"><div><h2 class="card-title">Next exam</h2><p class="card-sub">${escapeHtml(profileLabel || "Based on the selected timetable")} · ${escapeHtml(exam.category)}</p></div></div>
+    <a class="exam-next-link" href="/calendar#exam-datesheet" aria-label="Open the full date sheet for ${escapeHtml(exam.title)}">
+      <span class="exam-next-date">${escapeHtml(shortExamDate(exam.date))}</span>
+      <span class="exam-next-title">${escapeHtml(exam.title)}</span>
+      <span class="exam-next-meta">${escapeHtml(exam.tab || exam.sourceNote || exam.sourceLabel || "Published date sheet")}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</span>
+      <span class="exam-next-open">View full datesheet <span aria-hidden="true">→</span></span>
+    </a>
+    ${official ? `<div class="chip-row exam-source-row">${official}</div>` : ""}
   </section>`;
 }
 
 function renderExamDayCard(exams, dateISO) {
   const sources = [...new Map(exams.filter((exam) => exam.sourceUrl).map((exam) => [exam.sourceUrl, exam])).values()];
+  const audience = [state.profile.name, state.group, examGroupForSection(state.group)].filter(Boolean).join(" · ");
   return `<section class="card exam-day-card">
-    <div class="card-head"><div><h2 class="card-title">Today's exam date sheet</h2><p class="card-sub">${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(selectionLabel())} · use this published schedule for today</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(exam.category.includes("workshop") ? "Workshop sheet" : exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
+    <div class="card-head"><div><h2 class="card-title">Today's exam date sheet</h2><p class="card-sub">${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(audience || selectionLabel())} · selected-group exams only</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(exam.category.includes("workshop") ? "Workshop sheet" : exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
     <div class="timeline">${exams.map((exam) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(examTimeLabel(exam, humanTime))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.title)}</div><div class="timeline-meta">${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionNote ? ` · ${escapeHtml(exam.sessionNote)}` : ""}</div></div></div>`).join("")}</div>
   </section>`;
 }
@@ -1398,16 +1466,8 @@ function renderNoticesCard() {
   const notices = allNotices().slice(0, 4);
   if (!notices.length) return "";
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Latest notices</h2><p class="card-sub">Official, transcribed and admin updates · newest first</p></div><div class="card-actions"><button class="btn btn-sm" data-route="notices">All notices</button></div></div>
-    <div class="timeline">${notices.map((notice) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(dayMonth(notice.date))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${notice.url ? `<a href="${escapeHtml(notice.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a>` : escapeHtml(notice.title)}</div><div class="timeline-meta">${escapeHtml(notice.category)}${notice.admin ? " · admin" : notice.transcribed ? " · transcribed" : " · official"}</div></div></div>`).join("")}</div>
-  </section>`;
-}
-
-function renderQuickAsk() {
-  const chips = suggestedQuestions().slice(0, 6);
-  return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Ask Compass</h2><p class="card-sub">Verified answers from your active section and timetable.</p></div></div>
-    <div class="chip-row">${chips.map((chip) => `<button class="chip" data-ask-question="${escapeHtml(chip)}">${escapeHtml(chip)}</button>`).join("")}</div>
+    <div class="card-head"><div><h2 class="card-title">Latest notices</h2><p class="card-sub">Official updates · fresh notices stay pinned for two days</p></div><div class="card-actions"><button class="btn btn-sm" data-route="notices">All notices</button></div></div>
+    <div class="today-notice-list">${notices.map((notice) => `<article class="today-notice${notice.pinned ? " is-pinned" : ""}"><div class="today-notice-top"><span class="badge">${escapeHtml(notice.category)}</span>${notice.pinned ? `<span class="badge badge-accent">New · pinned</span>` : ""}<time datetime="${escapeHtml(notice.date)}">${escapeHtml(dayMonth(notice.date))}</time></div><h3 class="today-notice-title">${notice.url ? `<a href="${escapeHtml(notice.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a>` : escapeHtml(notice.title)}</h3>${notice.body ? `<p class="today-notice-summary">${escapeHtml(notice.body)}</p>` : ""}${notice.privacyNote ? `<p class="notice-privacy-note">${escapeHtml(notice.privacyNote)}</p>` : ""}${notice.attachments?.length ? `<div class="chip-row">${notice.attachments.slice(0, 3).map((file) => `<a class="chip" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(file.label)} ↗</a>`).join("")}</div>` : ""}</article>`).join("")}</div>
   </section>`;
 }
 
@@ -1683,6 +1743,7 @@ function noticeCard(notice, { dense = false } = {}) {
     <h3 class="notice-title">${title}</h3>
     <p class="notice-meta">${notice.date ? `<time datetime="${escapeHtml(notice.date)}">${escapeHtml(dateOnly(notice.date))}</time>` : "Undated"}${notice.author ? ` · ${escapeHtml(notice.author)}` : ""}</p>
     ${body}
+    ${notice.privacyNote ? `<p class="notice-privacy-note">${escapeHtml(notice.privacyNote)}</p>` : ""}
     ${notice.attachments?.length ? `<div class="chip-row">${notice.attachments.map((file) => `<a class="chip" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(file.label)}</a>`).join("")}</div>` : ""}
   </article>`;
 }
@@ -1810,12 +1871,16 @@ function renderCalendar() {
     else months[key].push(row);
   }
   const monthKeys = Object.keys(months).sort();
+  const examRows = importantExamEvents();
+  const examGroup = examGroupForSection(state.group);
+  const examOwner = [state.profile.name, state.group, examGroup].filter(Boolean).join(" · ");
   return `<div class="page page-calendar">
     <div class="page-head">
-      <div class="page-head-text"><h2 class="page-title">Academic calendar</h2><p class="page-sub">Published academic periods, the official 2026 holiday list and any date the college changes through a notice.</p></div>
+      <div class="page-head-text"><h2 class="page-title">Academic calendar</h2><p class="page-sub">Published academic periods, GNDEC holiday and working-day changes, and PTU gazetted and restricted holiday references.</p></div>
       <div class="page-actions"><a class="btn btn-sm" href="/notices">Notices</a></div>
     </div>
     ${upcoming.length ? `<section class="card"><div class="card-head"><div><h2 class="card-title">Coming up</h2><p class="card-sub">Next published off days from today.</p></div></div><div class="holiday-row">${upcoming.map((item) => `<div class="holiday-pill"><strong>${escapeHtml(dateOnly(item.date))}</strong><span>${escapeHtml(dayOfWeek(item.date))}</span><small>${escapeHtml(item.name)}</small></div>`).join("")}</div></section>` : ""}
+    <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · only matching published exams are listed${examGroup ? ` · ${escapeHtml(examGroup)} entries are selected automatically` : ""}</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? `<div class="exam-datesheet-list">${examRows.map((exam) => `<article class="exam-datesheet-row"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</p></div><a class="chip" href="${escapeHtml(exam.sourceUrl || "/notices")}" ${exam.sourceUrl?.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source ↗</a></article>`).join("")}</div>` : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}</section>
     ${publishedDatesheets().length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Published date sheets</h2><p class="card-sub">Transcribed by the college admin from an official notice. The original link is always kept.</p></div><a class="btn btn-sm" href="/notices">All notices</a></div>
       <ul class="doc-list">${publishedDatesheets().map((item) => `<li><div>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "Date sheet")}</a>` : `<strong>${escapeHtml(item.title || "Date sheet")}</strong>`}<span class="badge">${escapeHtml(item.scope || "Examination")}</span>${item.department ? `<span class="badge">${escapeHtml(item.department)}</span>` : ""}<div class="card-sub" style="margin-top:6px">${escapeHtml(item.date ? shortDate(item.date) : "Undated")}${item.body ? ` · ${escapeHtml(String(item.body).slice(0, 400)).replace(/\n/g, " ")}` : ""}</div></div></li>`).join("")}</ul>
     </section>` : ""}
@@ -1825,7 +1890,21 @@ function renderCalendar() {
     <section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Holidays 2026</h2><p class="card-sub">${HOLIDAYS_2026.length} published entries. Restricted and half-day holidays are labelled.</p></div><a class="btn btn-sm" href="${escapeHtml(HOLIDAY_SOURCE.url)}" target="_blank" rel="noopener noreferrer">Official list ↗</a></div>
       ${monthKeys.map((key) => `<div class="month-block"><h3>${escapeHtml(calendarMonthLabel(key))}</h3><ul class="holiday-list">${months[key].sort((a, b) => a.date.localeCompare(b.date)).map((item) => `<li class="holiday-item is-${escapeHtml(item.type)}"><time datetime="${escapeHtml(item.date)}">${escapeHtml(dateOnly(item.date))}</time><span class="holiday-day">${escapeHtml(dayOfWeek(item.date))}</span><span class="holiday-name">${escapeHtml(item.name)}</span>${item.type !== "holiday" ? `<span class="badge">${escapeHtml(item.type)}</span>` : ""}${item.overridden ? `<span class="badge badge-warn">Admin override</span>` : ""}</li>`).join("")}</ul></div>`).join("")}
     </section>
+    ${renderPtuHolidayReferences()}
   </div>`;
+}
+
+function renderPtuHolidayReferences() {
+  const years = state.ptuHolidaySources?.years || {};
+  const year2026 = years["2026"];
+  const year2027 = years["2027"];
+  const changed = Boolean(year2027?.changed);
+  const checked = state.ptuHolidaySources?.checkedAt ? `Last checked ${escapeHtml(shortDate(state.ptuHolidaySources.checkedAt))}.` : "Checking PTU’s current document links…";
+  return `<section class="card ptu-holidays-card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">PTU holiday calendars</h2><p class="card-sub">Gazetted and restricted holiday references for IKGPTU campuses and affiliated colleges. ${checked}</p></div><a class="btn btn-sm" href="https://ptu.ac.in/holidays/" target="_blank" rel="noopener noreferrer">PTU holidays page ↗</a></div>
+    <p class="card-sub ptu-holidays-note">These are PTU / Punjab Government references. GNDEC notices and its academic calendar decide GNDEC working days and local changes.</p>
+    <div class="ptu-holiday-sources">${year2026?.url ? `<a class="chip" href="${escapeHtml(year2026.url)}" target="_blank" rel="noopener noreferrer">Open official 2026 calendar (PDF) ↗</a>` : ""}${year2027?.url ? `<a class="chip" href="${escapeHtml(year2027.url)}" target="_blank" rel="noopener noreferrer">Open official 2027 calendar (PDF) ↗</a>` : ""}</div>
+    ${changed ? `<div class="ptu-holiday-alert" role="status"><strong>PTU’s 2027 PDF has changed.</strong> The English date list is hidden until the revised document can be checked. Use the current official PDF link above.</div>` : `<h3 class="ptu-holiday-year">2027 gazetted holidays · English</h3><p class="card-sub">English names transcribed from PTU’s 2027 PDF. The official document also lists restricted holidays.</p><ul class="holiday-list ptu-holiday-list">${PTU_HOLIDAYS_2027.map(({ date, name }) => `<li class="holiday-item"><time datetime="${escapeHtml(date)}">${escapeHtml(dateOnly(date))}</time><span class="holiday-day">${escapeHtml(dayOfWeek(date))}</span><span class="holiday-name">${escapeHtml(name)}</span></li>`).join("")}</ul>`}
+  </section>`;
 }
 
 /* ── Directory: faculty, students, syllabus ────────────────────────────── */
@@ -2310,18 +2389,47 @@ function mentoringGroups() {
 
 function facultyCard(record) {
   const meta = [record.designation, record.department].filter(Boolean).join(" · ");
+  const key = facultyProfileKey(record);
   return `<article class="card directory-card">
     <div class="directory-card-head">
-      ${facultyAvatar(record)}
-      <div><h3 class="directory-name">${escapeHtml(record.name)}</h3><p class="directory-meta">${escapeHtml(meta || "GNDEC faculty")}</p></div>
+      <button type="button" class="faculty-profile-trigger" data-faculty-profile="${escapeHtml(key)}" aria-label="View ${escapeHtml(record.name)} faculty profile">${facultyAvatar(record)}</button>
+      <div><button type="button" class="faculty-profile-name" data-faculty-profile="${escapeHtml(key)}">${escapeHtml(record.name)}</button><p class="directory-meta">${escapeHtml(meta || "GNDEC faculty")}</p></div>
     </div>
     ${record.qualifications ? `<p class="directory-detail">${escapeHtml(String(record.qualifications).replace(/\s+/g, " ").slice(0, 180))}${String(record.qualifications).length > 180 ? "…" : ""}</p>` : ""}
     <div class="chip-row">
       ${record.email ? `<a class="chip" href="mailto:${escapeHtml(record.email)}">${escapeHtml(record.email)}</a>` : ""}
       ${record.experience ? `<span class="chip">${escapeHtml(record.experience)} experience</span>` : ""}
-      ${record.profileUrl ? `<a class="chip" href="${escapeHtml(record.profileUrl)}" target="_blank" rel="noopener noreferrer">Official profile ↗</a>` : ""}
+      <button type="button" class="chip faculty-details-button" data-faculty-profile="${escapeHtml(key)}">View details</button>
     </div>
   </article>`;
+}
+
+function facultyProfileKey(record) {
+  return String(record?.profileId || record?.name || "").trim();
+}
+
+function facultyProfileDialog(record) {
+  if (!record) return "";
+  const details = [
+    ["Qualifications", record.qualifications],
+    ["Experience", record.experience],
+    ["Journal publications", record.journalPublications],
+    ["Conference publications", record.conferencePublications],
+    ["Professional memberships", record.memberships],
+    ["Research interests", record.researchInterests]
+  ].filter(([, value]) => String(value || "").trim() && !/^(?:n\/?a|nil|none|not available)$/i.test(String(value).trim()));
+  return `<div class="faculty-profile-backdrop" data-faculty-backdrop>
+    <section class="faculty-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="faculty-profile-title" tabindex="-1">
+      <div class="faculty-profile-head">
+        ${facultyAvatar(record)}
+        <div class="faculty-profile-heading"><p class="eyebrow">${escapeHtml(record.department || "GNDEC faculty")}</p><h2 id="faculty-profile-title">${escapeHtml(record.name || "Faculty profile")}</h2><p class="card-sub">${escapeHtml(record.designation || "")}</p></div>
+        <button type="button" class="icon-button faculty-profile-close" data-action="close-faculty-profile" aria-label="Close faculty profile">×</button>
+      </div>
+      ${record.email ? `<a class="chip faculty-profile-email" href="mailto:${escapeHtml(record.email)}">${escapeHtml(record.email)}</a>` : ""}
+      <div class="faculty-profile-sections">${details.map(([label, value]) => `<section class="faculty-profile-section"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(String(value).replace(/\s+/g, " "))}</p></section>`).join("") || `<p class="card-sub">No additional public profile details are listed in the published directory.</p>`}</div>
+      <div class="faculty-profile-footer"><span class="card-sub">Details from the published GNDEC faculty directory.</span>${record.profileUrl ? `<a class="btn btn-sm" href="${escapeHtml(record.profileUrl)}" target="_blank" rel="noopener noreferrer">Source profile ↗</a>` : ""}</div>
+    </section>
+  </div>`;
 }
 
 function studentRow(record) {
@@ -2357,6 +2465,7 @@ function renderDirectory() {
   const { records, total, query } = directoryMatches();
   const placeholder = tab === "faculty" ? "Search name, department, designation or email…" : tab === "students" ? "Type at least 2 letters of a name, CRN or registration number…" : tab === "mentoring" ? "Search a mentoring group, section or mentor…" : "Search the first-year syllabus, e.g. Mathematics, ESC101, credits…";
   const tabs = [["faculty", "Faculty", state.faculty.length], ["students", "Students", state.students.length], ["mentoring", "Mentoring", state.students.length ? mentoringGroups().length : 0], ["syllabus", "Syllabus", state.syllabus?.pages?.length || 0]];
+  const facultyRecord = tab === "faculty" ? state.faculty.find((record) => facultyProfileKey(record) === state.facultyProfileSelected) : null;
   return `<div class="page page-directory">
     <div class="page-head">
       <div class="page-head-text">
@@ -2376,7 +2485,7 @@ function renderDirectory() {
     </div>
     ${loading ? `<section class="card" style="margin-top:14px"><p class="card-sub">Loading the verified ${escapeHtml(tab)} data…</p></section>` : ""}
     ${failed ? emptyState("⚠", "Directory unavailable", "The official record could not be loaded. Nothing was guessed or stored.", `<button class="btn btn-primary" data-action="retry-directory">Try again</button>`) : ""}
-    ${!loading && !failed && tab === "faculty" ? `<p class="card-sub" style="margin:14px 0 8px">${records.length} of ${total} faculty${query ? ` matching “${escapeHtml(state.directoryQuery)}”` : ""}.</p><div class="directory-grid">${records.slice(0, 60).map(facultyCard).join("")}</div>${records.length > 60 ? `<p class="card-sub" style="margin-top:10px">Showing the first 60. Narrow the search to see more.</p>` : ""}` : ""}
+    ${!loading && !failed && tab === "faculty" ? `<p class="card-sub" style="margin:14px 0 8px">${records.length} of ${total} faculty${query ? ` matching “${escapeHtml(state.directoryQuery)}”` : ""}. Select a photo or name to view the full public profile.</p><div class="directory-grid">${records.slice(0, 60).map(facultyCard).join("")}</div>${records.length > 60 ? `<p class="card-sub" style="margin-top:10px">Showing the first 60. Narrow the search to see more.</p>` : ""}${facultyProfileDialog(facultyRecord)}` : ""}
     ${!loading && !failed && tab === "students" ? (query.length < 2 ? emptyState("🔎", "Search a student", "Enter at least 2 letters of a name, CRN or registration number. Results are computed on this device and never sent anywhere.") : records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} match${records.length === 1 ? "" : "es"}</h2><p class="card-sub">Showing at most 50 records from the published roster. Mentor details are published by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Student</th><th>Section</th><th>Branch</th><th>Mentor</th><th>Profile</th></tr></thead><tbody>${records.slice(0, 50).map(studentRow).join("")}</tbody></table></div></section>` : emptyState("🗂", "No matching student", `Nothing in the published roster matches “${state.directoryQuery}”. Check the CRN or spelling.`)) : ""}
     ${!loading && !failed && tab === "mentoring" ? (records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} mentoring group${records.length === 1 ? "" : "s"}</h2><p class="card-sub">Grouped from ${state.students.length} published roster records. Venue and phone are printed by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Mentoring group</th><th>Section</th><th>Mentor</th><th>Contact</th><th>Students</th></tr></thead><tbody>${records.map(mentoringRow).join("")}</tbody></table></div></section>` : emptyState("🧑‍🏫", "No matching mentoring group", `Nothing in the published roster matches “${state.directoryQuery}”.`)) : ""}
     ${!loading && !failed && tab === "syllabus" ? (state.syllabus ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">First-year syllabus</h2><p class="card-sub">${state.syllabus.pages.length} extracted pages · <a href="${escapeHtml(state.syllabus.source)}" target="_blank" rel="noopener noreferrer">official PDF ↗</a></p></div></div>${query.length < 3 ? `<p class="card-sub">Type at least 3 characters to search inside the published syllabus text.</p>` : syllabusResults().length ? syllabusResults().map((page) => `<article class="syllabus-hit"><h3>Page ${page.number}</h3><p>${escapeHtml(page.excerpt)}</p></article>`).join("") : `<p class="card-sub">No page contains “${escapeHtml(state.directoryQuery)}”. Try a subject name or code such as ESC101.</p>`}</section>` : "") : ""}
@@ -3043,9 +3152,9 @@ function renderSettings() {
     </div>
     ${overview ? `<div class="settings-overview">
       ${renderProfileCard()}
-      <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">Theme, colours, timetable and language.</p></div></div>${everydayFlags.map(renderFlagRow).join("")}</section>
-      <details class="card settings-advanced"><summary><span><strong>More settings</strong><small>Optional controls and additional app tools</small></span><span aria-hidden="true">＋</span></summary>
-        <div class="preset-row">${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}</div>
+      <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">Theme, colours, timetable and language.</p></div><button class="btn btn-sm" data-action="reset-section" data-category="appearance">Reset appearance</button></div>${everydayFlags.map(renderFlagRow).join("")}</section>
+      <details class="card settings-advanced" ${state.settingsMoreOpen ? "open" : ""}><summary><span><strong>More settings</strong><small>Optional controls and additional app tools</small></span><span aria-hidden="true">＋</span></summary>
+        ${renderPresetRow()}
         ${!adminMode ? `<p class="settings-admin-hint">Privacy, Data & offline, and Advanced & Labs appear after the verified owner unlocks Admin AI mode with <code>KKJ</code> in Ask Compass. Publishing still requires a separate token.</p>` : `<p class="settings-admin-hint is-active">Admin mode active · privileged settings are visible on this device.</p>`}
         <nav class="settings-category-grid" aria-label="Additional settings">${allowedCategories.map((category) => `<button class="settings-nav-item" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)} <span aria-hidden="true">›</span></button>`).join("")}</nav>
         <details class="settings-special"><summary>Special option · App versions & backups</summary>${renderVersionCard()}</details>
@@ -3056,7 +3165,7 @@ function renderSettings() {
         ${visibleCategories.map((category) => `<button class="settings-nav-item ${category.id === active?.id ? "is-active" : ""}" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)}</button>`).join("")}
       </nav>
       <div class="settings-content">
-        <div class="preset-row">${PRESETS.map((preset) => `<button class="preset" data-action="preset" data-preset="${preset.id}"><strong>${escapeHtml(preset.title)}</strong><small>${escapeHtml(preset.description)}</small></button>`).join("")}</div>
+        ${renderPresetRow()}
         ${query ? `<p class="card-sub">${flags.length} matching control${flags.length === 1 ? "" : "s"}</p>` : ""}
         ${active ? `<section class="setting-section card" id="settings-${active.id}">
           <div class="setting-section-head"><div><h2>${escapeHtml(active.title)}</h2><p>${escapeHtml(active.description)}</p></div><button class="btn btn-sm" data-action="reset-section" data-category="${active.id}">Reset section</button></div>
@@ -3384,6 +3493,10 @@ function askFromAnywhere(question) {
 
 async function handleAction(action, element) {
   switch (action) {
+    case "close-faculty-profile":
+      state.facultyProfileSelected = "";
+      render();
+      break;
     case "bottom-nav-move": {
       const order = String(v("nav.bottomOrder") || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
       const index = order.indexOf(element.dataset.route);
@@ -3546,11 +3659,19 @@ async function handleAction(action, element) {
       break;
     case "preset": {
       const preset = element.dataset.preset;
-      state.values = applyPreset(state.values, preset);
+      const previousPreset = PRESETS.find((item) => item.id === preset);
+      if (!previousPreset) break;
+      state.settingsMoreOpen = Boolean($(".settings-advanced")?.open);
+      const result = togglePreset(state.values, preset, state.activePreset, state.presetUndo);
+      state.values = result.values;
+      state.activePreset = result.activePreset;
+      state.presetUndo = result.undoValues;
+      if (state.activePreset) storageSet(PRESET_UNDO_KEY, JSON.stringify({ id: state.activePreset, values: state.presetUndo }));
+      else storageRemove(PRESET_UNDO_KEY);
       persistSettings();
       applyAppearance();
       render();
-      toast(`Preset applied: ${preset.replace(/-/g, " ")}`, "success");
+      toast(result.applied ? `Preset applied: ${preset.replace(/-/g, " ")}. Click it again to undo.` : "Preset undone. Your previous settings are restored.", "success");
       break;
     }
     case "settings-category":
@@ -3561,6 +3682,7 @@ async function handleAction(action, element) {
       break;
     case "reset-section":
       state.values = resetValues(state.values, element.dataset.category);
+      clearPresetUndo();
       persistSettings();
       applyAppearance();
       render();
@@ -3568,6 +3690,7 @@ async function handleAction(action, element) {
       break;
     case "reset-all":
       state.values = defaultValues();
+      clearPresetUndo();
       persistSettings();
       applyAppearance();
       render();
@@ -3708,6 +3831,7 @@ async function handleAction(action, element) {
     }
     case "delete-all":
       if (window.confirm("Delete settings, profile, chat history and snapshots from this device? The legacy build stays untouched.")) {
+        clearPresetUndo();
         storageRemove(SETTINGS_KEY);
         storageRemove(CHAT_KEY);
         storageRemove(SELECTION_KEY);
@@ -3792,6 +3916,7 @@ function importData() {
       const bundle = importBundle(payload);
       if (!bundle) throw new Error("This file is not a Compass export.");
       state.values = bundle.values;
+      clearPresetUndo();
       persistSettings();
       if (bundle.profile) { state.profile = saveProfile(localStorage, bundle.profile) || bundle.profile; }
       applyAppearance();
@@ -3952,6 +4077,9 @@ function toggleSidebar(open = undefined) {
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 
 function bindEvents() {
+  document.addEventListener("toggle", (event) => {
+    if (event.target.matches?.(".settings-advanced")) state.settingsMoreOpen = event.target.open;
+  }, true);
   $("#view")?.addEventListener("error", (event) => {
     const image = event.target;
     if (!(image instanceof HTMLImageElement) || !image.matches("img[data-faculty-initials], img[data-faculty-photo-fallback]")) return;
@@ -3970,6 +4098,18 @@ function bindEvents() {
       navigate(routeTarget.dataset.route);
       return;
     }
+    const facultyProfileButton = event.target.closest("[data-faculty-profile]");
+    if (facultyProfileButton) {
+      state.facultyProfileSelected = facultyProfileButton.dataset.facultyProfile;
+      render();
+      $(".faculty-profile-dialog")?.focus();
+      return;
+    }
+    if (event.target.matches("[data-faculty-backdrop]")) {
+      state.facultyProfileSelected = "";
+      render();
+      return;
+    }
     const directoryTab = event.target.closest("[data-directory-tab]");
     if (directoryTab) {
       const nextTab = directoryTab.dataset.directoryTab;
@@ -3977,6 +4117,7 @@ function bindEvents() {
         state.directoryTab = nextTab;
         state.directoryQuery = "";
         state.directoryStatus = "idle";
+        state.facultyProfileSelected = "";
         render();
       }
       return;
@@ -4007,6 +4148,29 @@ function bindEvents() {
     if (event.target.closest("#update-dismiss")) { $("#update-banner").hidden = true; return; }
     if (event.target.closest("#update-reload")) return;
     if (event.target.closest("#open-legacy-side")) { openLegacy(); return; }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!state.facultyProfileSelected) return;
+    if (event.key === "Escape") {
+      state.facultyProfileSelected = "";
+      render();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const dialog = $(".faculty-profile-dialog");
+    const focusable = dialog ? $$('a[href], button:not([disabled]), [tabindex="0"]', dialog) : [];
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !state.facultyProfileSelected) return;
+    state.facultyProfileSelected = "";
+    render();
   });
 
   document.addEventListener("change", (event) => {
