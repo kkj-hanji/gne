@@ -37,7 +37,7 @@ import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine
 import { answerFirstYearSyllabus, buildSyllabusIndex, groupSyllabus, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
-import { examEventsForSelection, examGroupForSection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
+import { academicYearForSection, allPublishedExamEvents, examEventsForSelection, examGroupForSection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
@@ -980,11 +980,44 @@ function examsForDate(dateISO) {
 }
 
 function importantExamEvents() {
-  return examEventsForSelection({ datesheet: state.datesheet, group: state.group }).filter((exam) => {
+  return examEventsForSelection({ datesheet: state.datesheet, group: state.group, branch: state.profile.branch }).filter((exam) => {
     const label = `${exam.category || ""} ${exam.title || ""}`.toLowerCase();
     if (/workshop|practical|lab/.test(label)) return false;
     return /\bmse\b|end[- ]?sem(?:ester)?|\bfinal\b|\btentative\b|\bese\b/.test(label);
   });
+}
+
+function examRowMarkup(exam) {
+  return `<article class="exam-datesheet-row"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</p></div><a class="chip" href="${escapeHtml(exam.sourceUrl || "/notices")}" ${exam.sourceUrl?.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source ↗</a></article>`;
+}
+
+function otherExamSections(primaryRows, selectedYear, selectedGroup) {
+  const primaryIds = new Set(primaryRows.map((row) => row.id));
+  const isImportant = (exam) => {
+    const label = `${exam.category || ""} ${exam.title || ""}`.toLowerCase();
+    return !/workshop|practical|lab/.test(label) && /\bmse\b|end[- ]?sem(?:ester)?|\bfinal\b|\btentative\b|\bese\b/.test(label);
+  };
+  const remaining = allPublishedExamEvents(state.datesheet).filter((exam) => isImportant(exam) && !primaryIds.has(exam.id));
+  const sections = [];
+  if (selectedYear === 1 && selectedGroup) {
+    const opposite = selectedGroup === "Physics group" ? "Chemistry group" : "Physics group";
+    const oppositeRows = remaining.filter((exam) => exam.year === 1 && exam.cohort === opposite);
+    if (oppositeRows.length) {
+      sections.push(`<details class="exam-other-group"><summary>First year · ${escapeHtml(opposite)} <span>${oppositeRows.length} exams</span></summary><div class="exam-datesheet-list">${oppositeRows.map(examRowMarkup).join("")}</div></details>`);
+    }
+  }
+  const other = remaining.filter((exam) => !(selectedYear === 1 && selectedGroup && exam.year === 1 && exam.cohort && exam.cohort !== selectedGroup));
+  const yearGroups = new Map();
+  for (const exam of other) {
+    const key = exam.year ? `${exam.year}` : "other";
+    if (!yearGroups.has(key)) yearGroups.set(key, []);
+    yearGroups.get(key).push(exam);
+  }
+  for (const [year, rows] of [...yearGroups].sort(([a], [b]) => a === "other" ? 1 : b === "other" ? -1 : Number(a) - Number(b))) {
+    const label = year === "other" ? "Other published programmes" : `${year === "1" ? "First" : year === "2" ? "Second" : year === "3" ? "Third" : "Fourth"} year · other programmes`;
+    sections.push(`<details class="exam-other-group"><summary>${label} <span>${rows.length} exams</span></summary><div class="exam-datesheet-list">${rows.map(examRowMarkup).join("")}</div></details>`);
+  }
+  return sections.join("");
 }
 
 function nextClassInfo() {
@@ -1873,14 +1906,16 @@ function renderCalendar() {
   const monthKeys = Object.keys(months).sort();
   const examRows = importantExamEvents();
   const examGroup = examGroupForSection(state.group);
+  const examYear = academicYearForSection(state.group);
   const examOwner = [state.profile.name, state.group, examGroup].filter(Boolean).join(" · ");
+  const otherExamMarkup = otherExamSections(examRows, examYear, examGroup);
   return `<div class="page page-calendar">
     <div class="page-head">
       <div class="page-head-text"><h2 class="page-title">Academic calendar</h2><p class="page-sub">Published academic periods, GNDEC holiday and working-day changes, and PTU gazetted and restricted holiday references.</p></div>
       <div class="page-actions"><a class="btn btn-sm" href="/notices">Notices</a></div>
     </div>
     ${upcoming.length ? `<section class="card"><div class="card-head"><div><h2 class="card-title">Coming up</h2><p class="card-sub">Next published off days from today.</p></div></div><div class="holiday-row">${upcoming.map((item) => `<div class="holiday-pill"><strong>${escapeHtml(dateOnly(item.date))}</strong><span>${escapeHtml(dayOfWeek(item.date))}</span><small>${escapeHtml(item.name)}</small></div>`).join("")}</div></section>` : ""}
-    <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · only matching published exams are listed${examGroup ? ` · ${escapeHtml(examGroup)} entries are selected automatically` : ""}</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? `<div class="exam-datesheet-list">${examRows.map((exam) => `<article class="exam-datesheet-row"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</p></div><a class="chip" href="${escapeHtml(exam.sourceUrl || "/notices")}" ${exam.sourceUrl?.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source ↗</a></article>`).join("")}</div>` : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}</section>
+    <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · ${examYear ? `Your ${examYear === 1 ? "first" : examYear === 2 ? "second" : examYear === 3 ? "third" : "fourth"} year${examGroup ? ` · ${escapeHtml(examGroup)}` : ""}` : "Your matching published exams"} shown first; other published exams are collapsed below.</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? `<div class="exam-datesheet-list">${examRows.map(examRowMarkup).join("")}</div>` : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}${otherExamMarkup}</section>
     ${publishedDatesheets().length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Published date sheets</h2><p class="card-sub">Transcribed by the college admin from an official notice. The original link is always kept.</p></div><a class="btn btn-sm" href="/notices">All notices</a></div>
       <ul class="doc-list">${publishedDatesheets().map((item) => `<li><div>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "Date sheet")}</a>` : `<strong>${escapeHtml(item.title || "Date sheet")}</strong>`}<span class="badge">${escapeHtml(item.scope || "Examination")}</span>${item.department ? `<span class="badge">${escapeHtml(item.department)}</span>` : ""}<div class="card-sub" style="margin-top:6px">${escapeHtml(item.date ? shortDate(item.date) : "Undated")}${item.body ? ` · ${escapeHtml(String(item.body).slice(0, 400)).replace(/\n/g, " ")}` : ""}</div></div></li>`).join("")}</ul>
     </section>` : ""}

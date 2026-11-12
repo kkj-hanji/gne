@@ -4,6 +4,7 @@ const CHEMISTRY_SECTIONS = Object.freeze(["CSA", "CSB", "CSC", "CSD", "CSE", "CS
 const PHYSICS_SECTIONS = Object.freeze(["MEA", "MEB", "CEA", "CEB", "EEA", "EEB", "ECA", "ECB", "RAI"]);
 
 export function examGroupForSection(value) {
+  if (academicYearForSection(value) !== 1) return "";
   const section = canonicalSection(value);
   if (CHEMISTRY_SECTIONS.includes(section)) return "Chemistry group";
   if (PHYSICS_SECTIONS.includes(section)) return "Physics group";
@@ -48,18 +49,54 @@ export const TRANSCRIBED_EXAMS = Object.freeze([
 ]);
 
 function canonicalSection(value) {
-  let code = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^D[23]/, "");
+  let code = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^D[1-4]/, "");
   code = code.replace(/^ECE/, "EC").replace(/^CSE/, "CS");
   return code;
 }
 
-function eseEntries(datesheet, section) {
-  const chemistry = CHEMISTRY_SECTIONS.includes(section);
-  const physics = PHYSICS_SECTIONS.includes(section);
+export function academicYearForSection(value) {
+  const match = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").match(/^D([1-4])/);
+  if (match) return Number(match[1]);
+  const section = canonicalSection(value);
+  return CHEMISTRY_SECTIONS.includes(section) || PHYSICS_SECTIONS.includes(section) ? 1 : null;
+}
+
+function branchForSelection(value, branch = "") {
+  let code = String(branch || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!code) {
+    const section = canonicalSection(value);
+    code = section.match(/^(?:CS|IT|ME|CE|EE|EC|RAI|BBA|MBA|BCA|MCA|BVOC|BCOM)/)?.[0] || "";
+  }
+  if (code === "EC") return "ECE";
+  if (code === "CS") return "CSE";
+  if (code === "BCOM") return "B.COM";
+  if (code === "BVOC") return "B.VOC";
+  return code;
+}
+
+function semesterYear(entry, tabLabel = "") {
+  const semester = Number(entry.semesterNumber);
+  if (Number.isFinite(semester) && semester > 0) return Math.ceil(semester / 2);
+  return String(tabLabel).trim().toLowerCase() === "applied sciences" ? 1 : null;
+}
+
+function normalizedGroup(value) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("chemistry")) return "Chemistry group";
+  if (text.includes("physics")) return "Physics group";
+  return "";
+}
+
+function tabMatchesBranch(tab, branch) {
+  const label = String(tab || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const wanted = String(branch || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!wanted) return false;
+  return label === wanted || (wanted === "ECE" && label === "ECE") || (wanted === "CSE" && label === "CSE")
+    || (wanted === "BCOM" && label === "BCOM") || (wanted === "BVOC" && label === "BVOC");
+}
+
+function eseEntries(datesheet) {
   return (datesheet?.tabs || []).flatMap((tab) => (tab.entries || []).map((entry) => {
-    const qualifier = String(entry.qualifier || entry.header || "").toLowerCase();
-    if (qualifier.includes("chemistry group") && physics) return null;
-    if (qualifier.includes("physics group") && chemistry) return null;
     const sourceUrl = datesheet?.source?.url
       ? `${datesheet.source.url}${tab.gid ? `#gid=${encodeURIComponent(tab.gid)}` : ""}`
       : "";
@@ -73,20 +110,32 @@ function eseEntries(datesheet, section) {
       tab: tab.label || "",
       sessionRaw: entry.sessionRaw || "",
       sessionNote: entry.sessionNote || "",
+      year: semesterYear(entry, tab.label),
+      cohort: normalizedGroup(entry.qualifier || entry.header),
       sourceLabel: "Official tentative ESE sheet",
       sourceUrl
     };
   }).filter(Boolean));
 }
 
-export function examEventsForSelection({ datesheet, group } = {}) {
-  const section = canonicalSection(group);
-  const transcribed = section
-    ? TRANSCRIBED_EXAMS.filter((event) => event.sections.includes(section))
-    : [];
-  return [...transcribed, ...eseEntries(datesheet, section)]
+export function allPublishedExamEvents(datesheet) {
+  return [...TRANSCRIBED_EXAMS.map((event) => ({ ...event, year: 1, cohort: normalizedGroup(event.group) })), ...eseEntries(datesheet)]
     .filter((event) => /^\d{4}-\d{2}-\d{2}$/.test(event.date))
     .sort(compareExams);
+}
+
+export function examEventsForSelection({ datesheet, group, branch = "" } = {}) {
+  const section = canonicalSection(group);
+  const year = academicYearForSection(group);
+  const selectedGroup = examGroupForSection(group);
+  const selectedBranch = branchForSelection(group, branch);
+  if (!section || !year) return [];
+  return allPublishedExamEvents(datesheet).filter((event) => {
+    if (event.year !== year) return false;
+    if (event.sections) return year === 1 && event.sections.includes(section);
+    if (year === 1 && selectedGroup) return event.tab === "Applied Sciences" && (!event.cohort || event.cohort === selectedGroup);
+    return tabMatchesBranch(event.tab, selectedBranch);
+  });
 }
 
 function compareExams(a, b) {

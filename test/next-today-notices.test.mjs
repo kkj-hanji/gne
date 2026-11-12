@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { examGroupForSection, examEventsForSelection } from "../next/engine/exams.js";
+import { academicYearForSection, examGroupForSection, examEventsForSelection } from "../next/engine/exams.js";
 import datesheet from "../src/data/datesheet-seed.json" with { type: "json" };
 
 const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
@@ -28,6 +28,14 @@ test("full datesheet is grouped for the active profile section and names its exa
   assert.ok(physics.every((event) => !/chemistry group/i.test(`${event.tab} ${event.title}`)));
   assert.match(app, /Exam datesheet for your selection/);
   assert.match(app, /selected-group exams only/);
+  assert.equal(academicYearForSection("ECB"), 1);
+  assert.equal(academicYearForSection("D2ECB1"), 2);
+  assert.equal(academicYearForSection("D3CEB"), 3);
+  assert.equal(examGroupForSection("D2ECB1"), "", "upper-year sections should not inherit first-year Chemistry/Physics labels");
+  assert.ok(physics.filter((event) => event.tab).every((event) => event.tab === "Applied Sciences"), "a first-year Physics selection must not include other programme tabs");
+  assert.ok(examEventsForSelection({ datesheet, group: "D2ECB1" }).every((event) => event.tab === "ECE" && event.year === 2), "a second-year ECE selection must only include its own ESE tab and year");
+  assert.match(app, /<details class="exam-other-group">/);
+  assert.match(app, /Other year · other programmes|year · other programmes/);
 });
 
 test("Today notice and exam cards keep readable, responsive colors from the selected theme", () => {
