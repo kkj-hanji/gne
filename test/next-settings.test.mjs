@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
-  ACCENTS, CATEGORIES, DENSITIES, EXPERIENCES, FLAGS, FLAG_MAP, PRESETS,
+  ACCENTS, CATEGORIES, DENSITIES, EXPERIENCES, FLAGS, FLAG_MAP, NAV_BOTTOM_ROUTES, PRESETS,
   PRESET_MAP, SETTINGS_SCHEMA_VERSION, THEMES, flagsForCategory, getFlag,
   isMapFlagEnabled
 } from "../next/settings-registry.js";
@@ -35,7 +35,7 @@ test("settings registry has unique ids and complete metadata", () => {
     assert.match(flag.id, /^[a-z0-9]+\.[a-zA-Z0-9]+$/, `${flag.id} must be namespaced`);
     assert.ok(flag.title && flag.description, `${flag.id} needs title and description`);
     assert.ok(CATEGORIES.some((category) => category.id === flag.category), `${flag.id} has an unknown category`);
-    assert.ok(["boolean", "select", "range", "action", "info"].includes(flag.type), `${flag.id} has a supported type`);
+    assert.ok(["boolean", "select", "range", "order", "action", "info"].includes(flag.type), `${flag.id} has a supported type`);
     if (flag.type === "boolean") assert.equal(typeof flag.default, "boolean", `${flag.id} default must be boolean`);
     if (flag.type === "select") {
       assert.ok(Array.isArray(flag.values) && flag.values.length >= 2, `${flag.id} needs select values`);
@@ -51,6 +51,18 @@ test("settings registry has unique ids and complete metadata", () => {
       }
     }
   }
+});
+
+test("mobile navigation defaults to Today, Ask, Timetable, Rooms and validates order/count", () => {
+  const values = defaultValues();
+  assert.equal(values["nav.bottomItems"], "4");
+  assert.deepEqual(values["nav.bottomOrder"].split(",").slice(0, 4), ["today", "ask", "timetable", "rooms"]);
+  assert.equal(FLAG_MAP["nav.bottomItems"].values.length, 5);
+  assert.equal(coerceValue(FLAG_MAP["nav.bottomItems"], "2"), "2");
+  assert.equal(coerceValue(FLAG_MAP["nav.bottomItems"], "9"), "4");
+  const reordered = coerceValue(FLAG_MAP["nav.bottomOrder"], "rooms,ask,rooms,settings,compare").split(",");
+  assert.equal(reordered.slice(0, 3).join(","), "rooms,ask,compare");
+  assert.deepEqual(new Set(reordered), new Set(NAV_BOTTOM_ROUTES));
 });
 
 test("every category is declared, ordered and populated", () => {

@@ -14,6 +14,7 @@ import {
   LEGACY_BRAIN_KEY,
   FLAGS,
   FLAG_MAP,
+  NAV_BOTTOM_ROUTES,
   PRESET_MAP
 } from "./settings-registry.js";
 
@@ -62,6 +63,12 @@ export function coerceValue(flag, raw) {
   if (flag.type === "select") {
     const text = String(raw);
     return flag.values.some((option) => option.value === text) ? text : flag.default;
+  }
+  if (flag.type === "order") {
+    const values = Array.isArray(raw) ? raw : String(raw || "").split(",");
+    const order = [...new Set(values.map((value) => String(value).trim()).filter((value) => NAV_BOTTOM_ROUTES.includes(value)))];
+    for (const route of NAV_BOTTOM_ROUTES) if (!order.includes(route)) order.push(route);
+    return order.join(",") || flag.default;
   }
   if (flag.type === "range") {
     const number = Number(raw);

@@ -7,7 +7,7 @@
  */
 
 import {
-  APP_VERSION, CATEGORIES, FLAGS, PRESETS, SETTINGS_KEY,
+  APP_VERSION, CATEGORIES, FLAGS, NAV_BOTTOM_ROUTES, PRESETS, SETTINGS_KEY,
   getFlag, isMapFlagEnabled
 } from "./settings-registry.js";
 import {
@@ -35,6 +35,7 @@ import {
 } from "./engine/notices.js";
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
 import { answerFirstYearSyllabus, buildSyllabusIndex, groupSyllabus, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
+import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
 import { examEventsForSelection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
 import {
@@ -141,6 +142,7 @@ const state = {
   legacyUrl: "https://gndec-compass.koush3069.workers.dev",
   refreshTimer: 0,
   reminderTimer: 0,
+  clockTimer: 0,
   renderedAt: 0,
   snapshots: [],
   reloading: false,
@@ -1050,11 +1052,37 @@ function updateChrome() {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
+  renderMobileNavigation();
   const initials = (state.profile.name || "G").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "G";
   $("#avatar-initials").textContent = initials;
   $("#build-line").textContent = `v${state.version?.app?.version || APP_VERSION} · ${state.version?.app?.channel || "stable"}`;
   $("#build-line").hidden = !v("experience.showBuildChannel") && state.route !== "settings";
+  updateLiveClock();
   syncSeoHead();
+}
+
+const MOBILE_NAV_ICONS = Object.freeze({ today: "◉", ask: "✧", timetable: "▦", rooms: "▤", teachers: "♙", notices: "▤", papers: "▧", syllabus: "▤", calendar: "▦", directory: "♧", compare: "⇄" });
+
+function renderMobileNavigation() {
+  const nav = $("#bottom-nav");
+  if (!nav) return;
+  const configured = String(v("nav.bottomOrder") || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
+  const routes = [...new Set([...configured, ...NAV_BOTTOM_ROUTES])];
+  const count = Math.max(1, Math.min(5, Number(v("nav.bottomItems")) || 4));
+  nav.innerHTML = routes.slice(0, count).map((route) => {
+    const label = ROUTES[route]?.title || route;
+    return `<button type="button" class="bottom-item ${state.route === route ? "is-active" : ""}" data-route="${route}" aria-label="${escapeHtml(label)}" ${state.route === route ? 'aria-current="page"' : ""}><span aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><span>${escapeHtml(label === "Ask Compass" ? "Ask" : label)}</span></button>`;
+  }).join("");
+}
+
+function updateLiveClock() {
+  const clock = now();
+  const date = $("#topbar-clock-date");
+  const time = $("#topbar-clock-time");
+  const element = $("#topbar-clock");
+  if (date) date.textContent = `${clock.day} · ${clock.dateISO}`;
+  if (time) time.textContent = clock.time;
+  if (element) element.dateTime = clock.iso;
 }
 
 function render() {
@@ -2614,7 +2642,7 @@ async function sendQuestion(rawQuestion) {
         const brain = runBrain(question, ctx);
         state.debug.attempts = brain.attempts;
         if (brain.result) {
-          answer = { html: brain.result.answer, intent: brain.result.intent, confidence: brain.result.confidence, plan: brain.result.plan || [], source: "" };
+          answer = { html: brain.result.answer, intent: brain.result.intent, confidence: brain.result.confidence, plan: brain.result.plan || [], entities: brain.result.entities || {}, source: "" };
           engine = brain.result.engine;
         }
       }
@@ -2651,6 +2679,7 @@ async function sendQuestion(rawQuestion) {
         confidence: answer.confidence,
         plan: answer.plan,
         entities: answer.entities || {},
+        copyContext: { group: state.group, subgroup: state.subgroup, dateISO: now().dateISO },
         engine,
         source: answer.source || "",
         cached: Boolean(answer.cached)
@@ -3058,9 +3087,11 @@ function renderFlagRow(flag) {
     control = `<select data-setting="${flag.id}" ${available ? "" : "disabled"} aria-label="${escapeHtml(flag.title)}">${flag.values.map((option) => `<option value="${escapeHtml(option.value)}" ${String(value) === String(option.value) ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select>`;
   } else if (flag.type === "range") {
     control = `<div class="range-wrap"><input type="range" data-setting="${flag.id}" data-range="${flag.id}" min="${flag.min}" max="${flag.max}" step="${flag.step}" value="${value}" ${available ? "" : "disabled"} aria-label="${escapeHtml(flag.title)}" /><output id="out-${flag.id}">${value} ${escapeHtml(flag.unit || "")}</output></div>`;
+  } else if (flag.type === "order") {
+    control = renderBottomOrderControl(value);
   }
   const managed = source === "admin" ? `<div class="setting-note">Managed by the college admin. Your device value is kept but overridden.</div>` : "";
-  return `<div class="setting-row${available ? "" : " is-disabled"}" id="setting-${flag.id}">
+  return `<div class="setting-row${available ? "" : " is-disabled"}${flag.type === "order" ? " is-order-setting" : ""}" id="setting-${flag.id}">
     <div class="setting-text">
       <div class="setting-label">${escapeHtml(flag.title)}${flag.badge ? ` <span class="badge${flag.status === "experimental" ? " badge-warn" : ""}">${escapeHtml(flag.badge)}</span>` : ""}${flag.requiresRestart ? ` <span class="badge">Restart</span>` : ""}</div>
       <div class="setting-desc">${escapeHtml(flag.description)}</div>
@@ -3069,6 +3100,11 @@ function renderFlagRow(flag) {
     </div>
     <div class="setting-control">${control}</div>
   </div>`;
+}
+
+function renderBottomOrderControl(value) {
+  const order = String(value || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
+  return `<div class="bottom-order-list" aria-label="Reorder mobile destinations">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="bottom-nav-move" data-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="bottom-nav-move" data-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">The first selected number of destinations appears on the phone bar. Settings stays in the side menu.</p>`;
 }
 
 function renderVersionCard() {
@@ -3348,6 +3384,17 @@ function askFromAnywhere(question) {
 
 async function handleAction(action, element) {
   switch (action) {
+    case "bottom-nav-move": {
+      const order = String(v("nav.bottomOrder") || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
+      const index = order.indexOf(element.dataset.route);
+      const direction = element.dataset.direction === "up" ? -1 : 1;
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= order.length) break;
+      [order[index], order[target]] = [order[target], order[index]];
+      setFlag("nav.bottomOrder", order.join(","));
+      render();
+      break;
+    }
     case "retry-notices":
       state.noticesStatus = "idle";
       state.contentStatus = "idle";
@@ -3539,7 +3586,10 @@ async function handleAction(action, element) {
     case "copy-message": {
       const message = state.chat[Number(element.dataset.index)];
       if (message) {
-        const text = message.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        const text = formatDayScheduleCopy(message, {
+          ...(message.meta?.copyContext || { group: state.group, subgroup: state.subgroup, dateISO: now().dateISO }),
+          schedule: effectiveSchedule()
+        }) || message.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
         navigator.clipboard?.writeText(text).then(() => toast("Copied.")).catch(() => toast("Copy failed.", "error"));
       }
       break;
@@ -3976,6 +4026,7 @@ function bindEvents() {
       const flag = getFlag(setting.dataset.setting);
       setFlag(flag.id, flag.type === "boolean" ? setting.checked : setting.value);
       if (flag.id === "labs.experiments" || flag.id === "experience.mode") render();
+      else if (flag.id === "nav.bottomItems" || flag.id === "nav.bottomOrder") { renderMobileNavigation(); if (state.route === "settings") render(); }
       else if (flag.category === "timetable" || flag.category === "rooms" || flag.category === "today") render();
       return;
     }
@@ -4179,6 +4230,8 @@ function bindEvents() {
 
 function startTimers() {
   clearInterval(state.reminderTimer);
+  clearInterval(state.clockTimer);
+  state.clockTimer = setInterval(updateLiveClock, 15000);
   state.reminderTimer = setInterval(() => {
     checkReminders();
     checkDigest();

@@ -22,13 +22,14 @@ export const LEGACY_PROFILE_KEY = "gndec-compass-student-v1";
 export const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 export const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 
-export const APP_VERSION = "2.1.9";
+export const APP_VERSION = "2.2.0";
 export const APP_CHANNEL = "stable";
 
 export const THEMES = ["system", "light", "dark", "oled"];
 export const ACCENTS = ["emerald", "azure", "amber", "rose", "violet", "teal", "indigo", "coral", "lime"];
 export const DENSITIES = ["comfortable", "compact"];
 export const EXPERIENCES = ["new", "classic", "safe"];
+export const NAV_BOTTOM_ROUTES = Object.freeze(["today", "ask", "timetable", "rooms", "teachers", "notices", "papers", "syllabus", "calendar", "directory", "compare"]);
 
 export const CATEGORIES = Object.freeze([
   { id: "experience", title: "Experience & rollback", icon: "history", order: 10, description: "Switch between the new app, the classic layout and the frozen legacy build." },
@@ -175,10 +176,16 @@ export const FLAGS = Object.freeze([
     ], keywords: "home start landing"
   }),
   flag("nav.bottomItems", "Bottom navigation", "How many destinations appear on the mobile bar.", {
-    category: "navigation", type: "select", default: "5", values: [
+    category: "navigation", type: "select", default: "4", values: [
+      { value: "1", label: "1 item" },
+      { value: "2", label: "2 items" },
+      { value: "3", label: "3 items" },
       { value: "4", label: "4 items" },
       { value: "5", label: "5 items" }
     ], keywords: "mobile nav bottom"
+  }),
+  flag("nav.bottomOrder", "Mobile bar order", "Choose the order used by your mobile navigation shortcuts.", {
+    category: "navigation", type: "order", default: "today,ask,timetable,rooms,teachers,notices,papers,syllabus,calendar,directory,compare", keywords: "mobile nav bottom reorder rearrange"
   }),
   flag("nav.commandPalette", "Command palette", "Press Ctrl/Cmd+K to jump anywhere or run an action.", {
     category: "navigation", default: true, keywords: "keyboard search command"
