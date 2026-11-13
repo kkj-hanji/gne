@@ -5,7 +5,7 @@
     "facultyDirectory": "https://gndec.ac.in/faculty/",
     "provenance": "Department names, Heads of Department, contact details, notices, and syllabus documents are read from public GNDEC pages. A missing value stays missing; Compass does not infer an appointment or a document."
   },
-  "checkedAt": "2026-11-11T00:52:44.753Z",
+  "checkedAt": "2026-11-13T01:27:11.979Z",
   "departments": [
     {
       "id": "ce",
@@ -23,7 +23,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:32.045Z",
+      "checkedAt": "2026-11-13T01:26:59.278Z",
       "syllabusErrors": []
     },
     {
@@ -43,7 +43,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:32.779Z",
+      "checkedAt": "2026-11-13T01:27:00.209Z",
       "syllabusErrors": []
     },
     {
@@ -63,7 +63,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:32.509Z",
+      "checkedAt": "2026-11-13T01:26:59.997Z",
       "syllabusErrors": []
     },
     {
@@ -82,7 +82,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:33.032Z",
+      "checkedAt": "2026-11-13T01:27:00.493Z",
       "syllabusErrors": []
     },
     {
@@ -101,7 +101,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:33.305Z",
+      "checkedAt": "2026-11-13T01:27:00.473Z",
       "syllabusErrors": []
     },
     {
@@ -121,7 +121,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:33.434Z",
+      "checkedAt": "2026-11-13T01:27:01.066Z",
       "syllabusErrors": []
     },
     {
@@ -141,7 +141,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:33.112Z",
+      "checkedAt": "2026-11-13T01:27:01.171Z",
       "syllabusErrors": []
     },
     {
@@ -161,7 +161,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:33.669Z",
+      "checkedAt": "2026-11-13T01:27:01.451Z",
       "syllabusErrors": []
     },
     {
@@ -181,7 +181,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:33.787Z",
+      "checkedAt": "2026-11-13T01:27:00.779Z",
       "syllabusErrors": []
     },
     {
@@ -202,11 +202,29 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-11T00:52:37.245Z",
+      "checkedAt": "2026-11-13T01:27:02.805Z",
       "syllabusErrors": []
     }
   ],
   "notices": [
+    {
+      "id": "struck-off-notice-45-12-11-26",
+      "title": "Struck_off_Notice 45_12.11.26",
+      "url": "https://erp.gndec.ac.in/noticeboard/struck-off-notice-45-121126",
+      "author": "administrator",
+      "publishedAt": "2026-11-12",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
+    {
+      "id": "struck-off-notice-44-25-07-26",
+      "title": "Struck_off_Notice_44_25.07.26",
+      "url": "https://erp.gndec.ac.in/noticeboard/struck-off-notice-44-250726",
+      "author": "administrator",
+      "publishedAt": "2026-11-12",
+      "category": "Notice",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
     {
       "id": "tentative-date-sheet-for-regular-end-semester-examinations-november-2026",
       "title": "Tentative Date Sheet for Regular End Semester Examinations – November 2026",
@@ -361,29 +379,11 @@
       "source": "https://erp.gndec.ac.in/noticeboard"
     },
     {
-      "id": "six-months-progress-presentation-of-ms-ritu-phd-regd-no-1903009-urn-1935251",
-      "title": "Six Months Progress Presentation of Ms. Ritu, PhD. Regd. No.1903009, URN 1935251",
-      "url": "https://erp.gndec.ac.in/noticeboard/six-months-progress-presentation-of-ms-ritu-phd-regd-no1903009-urn-1935251",
-      "author": "administrator",
-      "publishedAt": "2026-07-28",
-      "category": "General",
-      "source": "https://erp.gndec.ac.in/noticeboard"
-    },
-    {
       "id": "struck-off-notice-43-25-07-26-pdf",
       "title": "Struck_off_Notice_43_25.07.26.pdf",
       "url": "https://erp.gndec.ac.in/noticeboard/struck-off-notice-43-250726pdf",
       "author": "administrator",
       "publishedAt": "2026-07-28",
-      "category": "Notice",
-      "source": "https://erp.gndec.ac.in/noticeboard"
-    },
-    {
-      "id": "notice-regarding-classes-of-odd-semester",
-      "title": "Notice regarding classes of Odd Semester",
-      "url": "https://erp.gndec.ac.in/noticeboard/notice-regarding-classes-of-odd-semester",
-      "author": "administrator",
-      "publishedAt": "2026-07-23",
       "category": "Notice",
       "source": "https://erp.gndec.ac.in/noticeboard"
     }
@@ -1325,5 +1325,5 @@
   },
   "noticeboardError": "",
   "unavailableDepartments": [],
-  "seededAt": "2026-11-11T00:52:44.753Z"
+  "seededAt": "2026-11-13T01:27:11.979Z"
 }
