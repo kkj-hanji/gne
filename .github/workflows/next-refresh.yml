@@ -49,6 +49,7 @@ jobs:
           node scripts/build-datesheet.mjs
           node scripts/build-directory-indexes.mjs
           node scripts/build-syllabus-index.mjs
+          node scripts/build-appsc-scheme.mjs
           node scripts/build-papers.mjs --write
 
       - name: Rebuild static SEO pages

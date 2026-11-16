@@ -20,7 +20,7 @@ import {
   currentAndNext, escapeHtml, freeBellSlots, keywordsOf, normalizeQuestion
 } from "../next/engine/answer.js";
 import { buildIcs, firstMonday } from "../next/engine/ics.js";
-import { answerFirstYearSyllabus, parseFirstYearSyllabus } from "../next/engine/syllabus.js";
+import { answerFirstYearScheme, answerFirstYearSyllabus, inferFirstYearContext, parseFirstYearSyllabus, resolveFirstYearSchemeCourse } from "../next/engine/syllabus.js";
 import {
   digestCopy, dueReminder, isQuietTime, notificationCopy, reminderWindow
 } from "../next/engine/reminders.js";
@@ -45,6 +45,75 @@ test("official first-year syllabus supports course and remembered unit follow-up
   const mathTwo = answerFirstYearSyllabus("Mathematics 2 syllabus", courses);
   assert.match(mathTwo?.html || "", /Mathematics\s*-\s*II/i);
   assert.match(mathTwo?.html || "", /Unit 5: Linear Algebra/i);
+});
+
+test("first-year scheme answers credits, CA/ESE marks and the semester-specific maths course", async () => {
+  const scheme = JSON.parse(await readFile(new URL("../next/data/appsc-first-year-scheme-2025.json", import.meta.url), "utf8"));
+  assert.equal(scheme.courses.length, 12);
+  assert.deepEqual(Object.keys(scheme.semesters).sort(), ["1", "2"]);
+  assert.equal(scheme.semesters["1"].Chemistry.credits, 20);
+  assert.equal(scheme.semesters["2"].Physics.credits, 21);
+  assert.equal(scheme.source, "https://appsc.gndec.ac.in/sites/default/files/2026-03/ss%20and%20Syllabus%20sem1%2C2%20Dec%202025%20unsigned.pdf");
+  assert.match(scheme.assessmentNote, /does not publish an MSE-1\/MSE-2 split/i);
+  const drawing = scheme.courses.find((course) => course.code === "ESC102");
+  assert.equal(drawing.theoryPractical, "Theory + Practical");
+  assert.match(drawing.assessmentNote, /Unit-1 to Unit-4/i);
+  assert.match(drawing.assessmentNote, /Unit-5 and Unit-6.*10% weightage/i);
+
+  const maths = answerFirstYearScheme("maths 2 credits and marks", scheme, { semester: "2" });
+  assert.equal(maths?.entities.syllabusCourseCode, "BSC104");
+  assert.match(maths.html, /Mathematics-II/);
+  assert.match(maths.html, /40 marks/);
+  assert.match(maths.html, /60 marks/);
+  assert.match(maths.html, /100 marks/);
+  assert.match(maths.html, /95%/);
+
+  const edg = answerFirstYearScheme("EDG marks distribution", scheme, { semester: "1" });
+  assert.equal(edg?.entities.syllabusCourseCode, "ESC102");
+  assert.match(edg.html, /40 marks/);
+  assert.match(edg.html, /60 marks/);
+
+  const workshop = answerFirstYearScheme("workshop internal marks", scheme, { semester: "1" });
+  assert.equal(workshop?.entities.syllabusCourseCode, "LESC104");
+  assert.match(workshop.html, /Continuous Assessment/);
+  assert.match(workshop.html, /NIL/);
+
+  const typo = answerFirstYearScheme("phyiscs credits", scheme);
+  assert.equal(typo?.entities.syllabusCourseCode, "BSC101");
+
+  const mse = answerFirstYearScheme("MSE-1 and MSE-2 marks of PPS", scheme, { semester: "1" });
+  assert.match(mse.html, /does <strong>not<\/strong> publish/);
+  assert.match(mse.html, /MSE-1 \/ MSE-2/);
+  assert.equal(answerFirstYearScheme("PPS unit 2 syllabus", scheme), null);
+  assert.equal(answerFirstYearScheme("quantum mechanics credits", scheme), null);
+
+  const semesterMath = answerFirstYearSyllabus("maths syllabus", parseFirstYearSyllabus(
+    JSON.parse(await readFile(new URL("../public/data/first-year-syllabus-index.json", import.meta.url), "utf8")).pages
+  ), "", { semester: "2" });
+  assert.match(semesterMath?.html || "", /Mathematics\s*-\s*II/i);
+  assert.doesNotMatch(semesterMath?.html || "", /Mathematics\s*-\s*I\b/);
+
+  const inferred = inferFirstYearContext({
+    section: "ECB",
+    schedule: [{ subject: "MATH II" }, { subject: "PHYSICS L" }],
+    now: "2026-11-16"
+  });
+  assert.equal(inferred.group, "Physics");
+  assert.equal(inferred.semester, "2");
+  assert.equal(inferred.semesterSource, "timetable");
+
+  const firstSemester = inferFirstYearContext({ section: "CSA", schedule: [{ subject: "MATH I" }], now: "2026-11-16" });
+  assert.equal(firstSemester.group, "Chemistry");
+  assert.equal(firstSemester.semester, "1");
+
+  const ambiguous = answerFirstYearScheme("maths marks", scheme);
+  assert.match(ambiguous.html, /BSC102/);
+  assert.match(ambiguous.html, /BSC104/);
+
+  const listing = answerFirstYearScheme("semester 2 subjects", scheme, { semester: "2", group: "Physics" });
+  assert.match(listing.html, /Chemistry group|Physics group/);
+  assert.match(listing.html, /21 credits/);
+  assert.match(listing.html, /does not publish an MSE-1\/MSE-2 split|does not publish how it is split/i);
 });
 
 const schedule = [

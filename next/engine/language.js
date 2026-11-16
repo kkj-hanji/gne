@@ -205,6 +205,7 @@ const SPELLING = {
   secton: "section", sction: "section", subjet: "subject", sbjct: "subject",
   teachr: "teacher", teacer: "teacher", techer: "teacher",
   physcs: "physics", phyics: "physics", physc: "physics",
+  phyiscs: "physics", physcis: "physics", physisc: "physics",
   chemstry: "chemistry", chemisty: "chemistry",
   exma: "exam", eaxm: "exam", exm: "exam",
   clas: "class", clss: "class", classs: "class",

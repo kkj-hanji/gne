@@ -161,7 +161,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.2.4");
+  assert.equal(next.vars.APP_VERSION, "2.2.6");
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");
@@ -175,6 +175,19 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.equal(current.name, "gndec-compass");
   assert.equal(current.assets.directory, "public");
   assert.notEqual(current.name, next.name);
+});
+
+test("the first-year scheme semester choice is persistent and shared with Ask Compass", async () => {
+  const app = await read("../next/app.js");
+  const css = await read("../next/styles.css");
+  assert.match(app, /SCHEME_SEMESTER_KEY\s*=\s*"gndec-compass-next-scheme-semester-v1"/);
+  assert.match(app, /data-action="scheme-semester"/);
+  assert.match(app, /storageSet\(SCHEME_SEMESTER_KEY, semester\)/);
+  assert.match(app, /const selectedSemester = \["1", "2"\]\.includes\(state\.schemeSemesterChoice\)/);
+  assert.match(app, /answerFirstYearSyllabus\([^\n]+\{ semester: selectedSemester \}\)/);
+  assert.match(app, /answerFirstYearScheme\(question, state\.firstYearScheme, \{\s*semester: selectedSemester/s);
+  assert.match(css, /\.scheme-semester-picker/);
+  assert.match(css, /\.scheme-card \.table-wrap \{ overflow-x: auto; \}/);
 });
 
 test("the new app ships no map, no analytics SDK and no remote inference", async () => {

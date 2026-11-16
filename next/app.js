@@ -34,7 +34,7 @@ import {
   NOTICE_CATEGORIES, TRANSCRIBED_NOTICES, filterNotices, isRecent, mergeNotices, noticeStats, slugify
 } from "./engine/notices.js";
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
-import { answerFirstYearSyllabus, buildSyllabusIndex, groupSyllabus, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
+import { answerFirstYearScheme, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
 import { academicYearForSection, allPublishedExamEvents, examEventsForSelection, examGroupForSection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
@@ -52,6 +52,7 @@ const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 const DEVICE_KEY = "gndec-compass-next-device-v1";
 const ADMIN_MODE_KEY = "gndec-compass-next-admin-mode-v1";
 const GROUP_USAGE_KEY = "gndec-compass-next-group-usage-v1";
+const SCHEME_SEMESTER_KEY = "gndec-compass-next-scheme-semester-v1";
 const REMINDER_KEY = "gndec-compass-next-reminders-v1";
 const DIGEST_KEY = "gndec-compass-next-digest-v1";
 const PRESET_UNDO_KEY = "gndec-compass-next-preset-undo-v1";
@@ -101,6 +102,7 @@ const state = {
   paperDepartment: "",
   syllabusQuery: "",
   syllabusDepartment: "",
+  schemeSemesterChoice: storageGet(SCHEME_SEMESTER_KEY) || "auto",
   adminToken: "",
   adminStatus: "idle",
   adminData: null,
@@ -124,6 +126,8 @@ const state = {
   syllabus: null,
   firstYearSyllabusCourses: [],
   firstYearSyllabusPromise: null,
+  firstYearScheme: null,
+  firstYearSchemePromise: null,
   compareA: "",
   compareB: "",
   compareDay: "",
@@ -1846,6 +1850,87 @@ function renderPapers() {
 
 /* ── Syllabus ───────────────────────────────────────────────────────────── */
 
+function schemeMarksOf(course) {
+  return {
+    ca: course.caMarks ?? course.internalMarks ?? null,
+    ese: course.eseMarks ?? course.externalMarks ?? null,
+    total: course.totalMarks ?? null
+  };
+}
+
+function firstYearSchemeGroupTable(semester, groupName, scheme, inferred) {
+  const bucket = scheme?.semesters?.[String(semester)]?.[groupName];
+  if (!bucket?.courses?.length) return "";
+  const rows = bucket.courses
+    .map((code) => (scheme.courses || []).find((course) => course.code === code))
+    .filter(Boolean);
+  const active = String(semester) === inferred.semester && groupName === inferred.group;
+  const detailsFor = (course) => {
+    const ltp = [course.lectureHours, course.tutorialHours, course.practicalHours].every((value) => value != null)
+      ? `${course.lectureHours}/${course.tutorialHours}/${course.practicalHours} L/T/P` : "Not stated";
+    const facts = [
+      ["Course type", course.courseType || "Not stated"], ["Teaching hours", ltp],
+      ["Theory / practical", course.theoryPractical || "Not stated"],
+      ["ESE duration", course.eseDurationHours ? `${course.eseDurationHours} hours` : (course.eseDurationNote || "Not stated")],
+      ["Numerical/design/programming share", course.minNumericalPercent == null ? (course.minNumericalNote || "Not stated") : `${course.minNumericalPercent}% of ESE`],
+      ["Prerequisites", course.prerequisites || "Not stated"], ["Material allowed", course.additionalMaterial || "Not stated"]
+    ];
+    return `<details class="scheme-course-detail"><summary>Course rules</summary><dl>${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>${course.assessmentNote ? `<p>${escapeHtml(course.assessmentNote)}</p>` : ""}</details>`;
+  };
+  return `<div class="scheme-group${active ? " is-active" : ""}">
+    <div class="scheme-group-head"><h4>${escapeHtml(groupName)} group</h4><span class="badge">${escapeHtml(String(bucket.credits))} credits</span>${active ? `<span class="badge badge-ok">Your group</span>` : ""}</div>
+    <div class="table-wrap"><table class="scheme-table">
+      <thead><tr><th>Code</th><th>Course</th><th>L/T/P</th><th>Cr</th><th>Internal · CA</th><th>External · ESE</th><th>Total</th></tr></thead>
+      <tbody>${rows.map((course) => {
+        const marks = schemeMarksOf(course);
+        const ltp = [course.lectureHours, course.tutorialHours, course.practicalHours].every((value) => value != null)
+          ? `${course.lectureHours}/${course.tutorialHours}/${course.practicalHours}` : "—";
+        return `<tr><td>${escapeHtml(course.code)}</td><td>${escapeHtml(course.title)}</td><td>${escapeHtml(ltp)}</td><td>${course.credits ?? "—"}</td><td>${marks.ca == null ? "NIL" : marks.ca}</td><td>${marks.ese == null ? "NIL" : marks.ese}</td><td>${marks.total == null ? "—" : marks.total}${detailsFor(course)}</td></tr>`;
+      }).join("")}</tbody>
+      <tfoot><tr><th colspan="3">Semester total</th><th>${bucket.credits}</th><th>${bucket.internalMarks}</th><th>${bucket.externalMarks}</th><th>${bucket.totalMarks}</th></tr></tfoot>
+    </table></div>
+  </div>`;
+}
+function renderFirstYearSchemeCard() {
+  const scheme = state.firstYearScheme;
+  if (!scheme) {
+    if (!state.firstYearSchemePromise) {
+      loadFirstYearSchemeKnowledge().then((data) => {
+        if (data && state.route === "syllabus") render();
+      }).catch(() => {});
+    }
+    return `<section class="card scheme-card"><div class="card-head"><div><h2 class="card-title">First-year study scheme · 2024</h2><p class="card-sub">Loading the verified Applied Sciences scheme…</p></div></div></section>`;
+  }
+  const inferred = inferFirstYearContext({ section: state.profile.section || state.group, schedule: state.schedule, now: now() });
+  const choice = state.schemeSemesterChoice;
+  const semester = ["1", "2"].includes(choice) ? choice : (choice === "all" ? "" : inferred.semester);
+  const group = inferred.group;
+  const semesters = ["1", "2"];
+  const renderSemester = (sem, groups = ["Chemistry", "Physics"]) => `<div class="scheme-semester">
+      <h3>Semester ${sem}${String(sem) === semester ? ` <span class="badge badge-ok">${choice === "auto" ? inferred.semesterSource === "academic-calendar" ? "Estimated from calendar" : "Detected from timetable" : "Selected"}</span>` : ""}</h3>
+      <div class="scheme-groups">${groups.map((groupName) => firstYearSchemeGroupTable(sem, groupName, scheme, { ...inferred, semester: semester || "" })).filter(Boolean).join("")}</div>
+    </div>`;
+  const preferredGroups = group && scheme?.semesters?.[semester]?.[group] ? [group] : ["Chemistry", "Physics"];
+  const primary = semester ? renderSemester(semester, preferredGroups) : semesters.map((sem) => renderSemester(sem)).join("");
+  const alternateGroup = semester && preferredGroups.length === 1
+    ? firstYearSchemeGroupTable(semester, preferredGroups[0] === "Chemistry" ? "Physics" : "Chemistry", scheme, { ...inferred, semester }) : "";
+  const otherSemester = semester ? semesters.filter((sem) => sem !== semester).map((sem) => renderSemester(sem)).join("") : "";
+  const extra = [alternateGroup, otherSemester].filter(Boolean).join("");
+  const contextBits = [state.profile.section || state.group, group ? `${group} group` : "", semester ? `Semester ${semester}` : ""].filter(Boolean);
+  const choiceButtons = [["auto", "My detected semester"], ["1", "Semester 1"], ["2", "Semester 2"], ["all", "Full scheme"]];
+  return `<section class="card scheme-card">
+    <div class="card-head">
+      <div><h2 class="card-title">B.Tech first-year study scheme · Scheme 2024</h2><p class="card-sub">Official Applied Sciences scheme for semesters 1 and 2, issued December 2025. Per-course CA/internal, ESE/external, total marks, credits and L/T/P are shown below.</p></div>
+      <div class="page-actions"><span class="badge">${(scheme.courses || []).length} courses</span><a class="btn btn-sm" href="${escapeHtml(FIRST_YEAR_SCHEME_SOURCE)}" target="_blank" rel="noopener noreferrer">Official PDF ↗</a></div>
+    </div>
+    ${contextBits.length ? `<p class="scheme-context"><strong>Your selection:</strong> ${escapeHtml(contextBits.join(" · "))}${choice === "auto" && inferred.semesterSource === "academic-calendar" ? " · semester estimated from the academic calendar; choose your semester below to override" : ""}${choice === "auto" && inferred.semesterSource === "timetable" ? " · semester detected from your selected timetable" : ""}</p>` : `<p class="scheme-context">Set your section in Settings or Timetable to highlight your group and semester.</p>`}
+    <div class="scheme-semester-picker" role="group" aria-label="Choose which first-year semester to show">${choiceButtons.map(([value, label]) => `<button class="chip chip-button ${choice === value ? "is-active" : ""}" data-action="scheme-semester" data-semester="${value}" aria-pressed="${choice === value}">${label}</button>`).join("")}</div>
+    ${primary}
+    ${extra ? `<details class="scheme-other-details"><summary>Show the other first-year semester and group</summary>${alternateGroup ? `<h3>Semester ${semester} · other group</h3><div class="scheme-groups">${alternateGroup}</div>` : ""}${otherSemester}</details>` : ""}
+    <p class="answer-meta"><strong>Assessment limits in this PDF:</strong> it publishes the CA/internal total and ESE/external total. It does not define an MSE-1/MSE-2 split, assignment marks, or a universal internal sub-component breakdown, so Compass will not invent those. Course-specific exam rules appear under “Course rules”.</p>
+    <p class="answer-meta">Ask Compass can answer by course code, full title or shortform such as <strong>EDG</strong>, <strong>PPS</strong>, <strong>workshop</strong>, <strong>BEEE</strong>, <strong>math</strong> or <strong>math 2</strong>. It uses the detected or selected semester for ambiguous course names.</p>
+  </section>`;
+}
 function renderSyllabus() {
   const docs = allSyllabus();
   const groups = groupSyllabus(docs);
@@ -1859,6 +1944,7 @@ function renderSyllabus() {
       <div class="page-head-text"><h2 class="page-title">Syllabus</h2><p class="page-sub">Every syllabus document published by a GNDEC department. Compass links the official PDF and never re-types its contents.</p></div>
       <div class="page-actions"><span class="badge">${docs.length} documents</span><span class="badge">${groups.length} departments</span></div>
     </div>
+    ${renderFirstYearSchemeCard()}
     <div class="filter-bar">
       <input type="search" value="${escapeHtml(state.syllabusQuery)}" placeholder="Search department, batch, semester…" data-syllabus-search aria-label="Search syllabus" />
       <div class="chip-row" role="group" aria-label="Filter by department">
@@ -2767,16 +2853,40 @@ async function sendQuestion(rawQuestion) {
       return;
     }
     if (!state.schedule.length) await waitForVerifiedSchedule();
-    if (/\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline)\b/i.test(question)) await loadFirstYearSyllabusKnowledge();
+    const wantsFirstYearFacts = /\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline|scheme|credits?|marks?|marking|assessment|internal|external|continuous assessment|\bca\b|\bese\b|\bmse\b|mst|weightage|distribution|prerequisites?|workshop|physics|chemistry|maths?|mathematics|pps|python|edg|bee|beee|english|economics|mentoring)\b/i.test(question);
+    if (wantsFirstYearFacts) await Promise.all([loadFirstYearSyllabusKnowledge(), loadFirstYearSchemeKnowledge()]);
     const ctx = currentAnswerContext();
     let answer = null;
     let engine = "local";
 
     const previousSyllabusCode = [...state.chat.slice(0, thinkingIndex)].reverse()
       .find((message) => message.role === "assistant" && message.meta?.entities?.syllabusCourseCode)?.meta.entities.syllabusCourseCode || "";
-    const syllabusAnswer = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, previousSyllabusCode);
-    if (syllabusAnswer) {
+    const firstYear = inferFirstYearContext({
+      section: state.profile.section || state.group,
+      schedule: state.schedule,
+      now: now()
+    });
+    const selectedSemester = ["1", "2"].includes(state.schemeSemesterChoice)
+      ? state.schemeSemesterChoice
+      : state.schemeSemesterChoice === "all" ? "" : firstYear.semester;
+    const schemeAnswer = answerFirstYearScheme(question, state.firstYearScheme, {
+      semester: selectedSemester,
+      group: firstYear.group,
+      section: state.profile.section || state.group,
+      now: now(),
+      previousCourse: previousSyllabusCode
+    });
+    const syllabusAnswer = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, previousSyllabusCode, { semester: selectedSemester });
+    const asksForSchemeFacts = /\b(?:credits?|marks?|assessment|internal|external|weightage|distribution|ca|ese|mse|mst|ltp)\b/i.test(question);
+    if (syllabusAnswer && !asksForSchemeFacts) {
       answer = syllabusAnswer;
+      engine = "local";
+    } else if (schemeAnswer && syllabusAnswer
+      && schemeAnswer.entities?.syllabusCourseCode === syllabusAnswer.entities?.syllabusCourseCode) {
+      answer = { ...schemeAnswer, html: `${schemeAnswer.html}${syllabusAnswer.html}` };
+      engine = "local";
+    } else if (schemeAnswer || syllabusAnswer) {
+      answer = schemeAnswer || syllabusAnswer;
       engine = "local";
     }
 
@@ -2904,6 +3014,20 @@ async function loadFirstYearSyllabusKnowledge() {
     return state.firstYearSyllabusCourses;
   })();
   return state.firstYearSyllabusPromise;
+}
+
+async function loadFirstYearSchemeKnowledge() {
+  if (state.firstYearScheme) return state.firstYearScheme;
+  if (!state.firstYearSchemePromise) state.firstYearSchemePromise = (async () => {
+    try {
+      const data = await fetchJson("/data/appsc-first-year-scheme-2025.json", {}, 12000);
+      state.firstYearScheme = data?.courses?.length ? data : null;
+    } catch {
+      state.firstYearScheme = null;
+    }
+    return state.firstYearScheme;
+  })();
+  return state.firstYearSchemePromise;
 }
 
 function canUseExternalAi() {
@@ -3575,6 +3699,14 @@ async function handleAction(action, element) {
       state.syllabusDepartment = element.dataset.department || "";
       render();
       break;
+    case "scheme-semester": {
+      const semester = element.dataset.semester || "auto";
+      if (!["auto", "1", "2", "all"].includes(semester)) break;
+      state.schemeSemesterChoice = semester;
+      storageSet(SCHEME_SEMESTER_KEY, semester);
+      render();
+      break;
+    }
     case "open-admin":
       navigate("admin");
       break;
