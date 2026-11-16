@@ -29,7 +29,7 @@ import { officialNoticesResponse } from "./official-notices.js";
 import { ptuHolidaySourcesResponse } from "./ptu-holidays.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.2.6";
+export const APP_VERSION = "2.2.7";
 export const BUILD_DATE = "2026-11-12";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 

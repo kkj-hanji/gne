@@ -1906,8 +1906,11 @@ function renderFirstYearSchemeCard() {
   const semester = ["1", "2"].includes(choice) ? choice : (choice === "all" ? "" : inferred.semester);
   const group = inferred.group;
   const semesters = ["1", "2"];
+  const semesterEvidence = inferred.semesterSource === "academic-calendar"
+    ? "Published academic calendar"
+    : inferred.semesterSource === "academic-calendar-estimate" ? "Calendar estimate" : "Selected";
   const renderSemester = (sem, groups = ["Chemistry", "Physics"]) => `<div class="scheme-semester">
-      <h3>Semester ${sem}${String(sem) === semester ? ` <span class="badge badge-ok">${choice === "auto" ? inferred.semesterSource === "academic-calendar" ? "Estimated from calendar" : "Detected from timetable" : "Selected"}</span>` : ""}</h3>
+      <h3>Semester ${sem}${String(sem) === semester ? ` <span class="badge badge-ok">${choice === "auto" ? semesterEvidence : "Selected"}</span>` : ""}</h3>
       <div class="scheme-groups">${groups.map((groupName) => firstYearSchemeGroupTable(sem, groupName, scheme, { ...inferred, semester: semester || "" })).filter(Boolean).join("")}</div>
     </div>`;
   const preferredGroups = group && scheme?.semesters?.[semester]?.[group] ? [group] : ["Chemistry", "Physics"];
@@ -1923,7 +1926,7 @@ function renderFirstYearSchemeCard() {
       <div><h2 class="card-title">B.Tech first-year study scheme · Scheme 2024</h2><p class="card-sub">Official Applied Sciences scheme for semesters 1 and 2, issued December 2025. Per-course CA/internal, ESE/external, total marks, credits and L/T/P are shown below.</p></div>
       <div class="page-actions"><span class="badge">${(scheme.courses || []).length} courses</span><a class="btn btn-sm" href="${escapeHtml(FIRST_YEAR_SCHEME_SOURCE)}" target="_blank" rel="noopener noreferrer">Official PDF ↗</a></div>
     </div>
-    ${contextBits.length ? `<p class="scheme-context"><strong>Your selection:</strong> ${escapeHtml(contextBits.join(" · "))}${choice === "auto" && inferred.semesterSource === "academic-calendar" ? " · semester estimated from the academic calendar; choose your semester below to override" : ""}${choice === "auto" && inferred.semesterSource === "timetable" ? " · semester detected from your selected timetable" : ""}</p>` : `<p class="scheme-context">Set your section in Settings or Timetable to highlight your group and semester.</p>`}
+    ${contextBits.length ? `<p class="scheme-context"><strong>Your selection:</strong> ${escapeHtml(contextBits.join(" · "))}${choice === "auto" && inferred.semesterSource === "academic-calendar" ? " · current term follows the published first-year academic calendar" : ""}${choice === "auto" && inferred.semesterSource === "academic-calendar-estimate" ? " · semester is a calendar estimate because no published first-year period covers this date" : ""}</p>` : `<p class="scheme-context">Set your section in Settings or Timetable to highlight your group and semester.</p>`}
     <div class="scheme-semester-picker" role="group" aria-label="Choose which first-year semester to show">${choiceButtons.map(([value, label]) => `<button class="chip chip-button ${choice === value ? "is-active" : ""}" data-action="scheme-semester" data-semester="${value}" aria-pressed="${choice === value}">${label}</button>`).join("")}</div>
     ${primary}
     ${extra ? `<details class="scheme-other-details"><summary>Show the other first-year semester and group</summary>${alternateGroup ? `<h3>Semester ${semester} · other group</h3><div class="scheme-groups">${alternateGroup}</div>` : ""}${otherSemester}</details>` : ""}

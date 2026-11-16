@@ -5,6 +5,7 @@
  */
 
 import { examGroupForSection } from "./exams.js";
+import { ACADEMIC_PERIODS } from "./calendar.js";
 import { canonicalize, tokenSimilar } from "./language.js";
 
 export function cleanText(value) {
@@ -96,8 +97,27 @@ export function searchSyllabus(list = [], query = "", { department = "", limit =
 }
 
 /** Parse course blocks from the official indexed first-year PDF text. */
+function cleanFirstYearPdfText(value) {
+  return String(value == null ? "" : value)
+    // Remove repeating PDF page furniture, including OCR's joined page count.
+    .replace(/\b\d+\s+of\s+30\s+Scheme\s+Code\s*[-–—]?\s*2024\b/gi, " ")
+    .replace(/\bScheme\s+Code\s*[-–—]?\s*2024\b/gi, " ")
+    .replace(/Guru\s+Nanak\s+Dev\s+Engineering\s+College,?\s+Ludhiana\s+An\s+Autonomous\s+College\s+under\s+UGC\s+Act\s+1956\s+(?:st\s+)?B\.?\s*Tech\.?\s+1\s+Year\s*\(Common\s+for\s+all\s+Branches\)/gi, " ")
+    .replace(/\bPart\s*[-–—]\s*[AB]\b/gi, " ")
+    // Repair known line-wrap OCR splits from this source PDF.
+    .replace(/\bPol\s+ar\b/gi, "Polar")
+    .replace(/\bcontinuo\s+us\b/gi, "continuous")
+    .replace(/\bconst\s+ants\b/gi, "constants")
+    .replace(/\bcooli\s+ng\b/gi, "cooling")
+    .replace(/\bcorrel\s+ation\b/gi, "correlation")
+    .replace(/\bsolutio\s+n\b/gi, "solution")
+    .replace(/\bhy\s+perbolic\b/gi, "hyperbolic")
+    .replace(/\bprac\s+tice\b/gi, "practice")
+    .replace(/\s+/g, " ").trim();
+}
+
 export function parseFirstYearSyllabus(pages = []) {
-  const text = (Array.isArray(pages) ? pages : []).map((page) => String(page?.text || "")).join("\n");
+  const text = cleanFirstYearPdfText((Array.isArray(pages) ? pages : []).map((page) => String(page?.text || "")).join("\n"));
   const starts = [...text.matchAll(/\bCourse\s+Code\s*:\s*([A-Z][A-Z\s]{1,8}\d[\d\s]*)\b/gi)];
   const courses = [];
   for (let index = 0; index < starts.length; index += 1) {
@@ -125,7 +145,9 @@ export function parseFirstYearSyllabus(pages = []) {
 /** Answer a syllabus query only from the extracted official first-year PDF text. */
 export function answerFirstYearSyllabus(question = "", courses = [], previousCourse = "", { semester = "" } = {}) {
   if (!Array.isArray(courses) || !courses.length) return null;
-  const normalized = cleanText(question).toLowerCase();
+  const normalized = cleanText(question).toLowerCase()
+    .replace(/\bsyl+ab(?:u|o)s\b/g, "syllabus")
+    .replace(/\bsyllab(?:u|o)s\b/g, "syllabus");
   const aliases = [
     ["programming for problem solving", ["pps", "programming", "problem solving"]],
     ["engineering drawing and graphics", ["edg", "drawing", "graphics"]],
@@ -273,8 +295,10 @@ export function resolveFirstYearSchemeCourse(question = "", scheme = null, { sem
 /**
  * Infer the student's first-year semester and group without inventing data.
  * The section name is a published first-year section, and the timetable
- * subject names print "MATH I" or "MATH II". The calendar month is only a
- * labelled last resort for first-year students.
+ * section identifies the first-year cohort and the published academic period
+ * identifies its current semester. Section-wide timetables can contain mixed,
+ * stale, or next-semester subjects, so their subject names are never allowed
+ * to override an applicable official first-year calendar period.
  */
 export function inferFirstYearContext({ section = "", schedule = [], now = null } = {}) {
   const subjects = (Array.isArray(schedule) ? schedule : [])
@@ -296,25 +320,28 @@ export function inferFirstYearContext({ section = "", schedule = [], now = null 
     }
   }
 
+  let dateISO = "";
+  if (typeof now === "string") dateISO = now.slice(0, 10);
+  else if (now instanceof Date && Number.isFinite(now.getTime())) dateISO = now.toISOString().slice(0, 10);
+  else if (now?.dateISO) dateISO = String(now.dateISO).slice(0, 10);
+
   let semester = "";
   let semesterSource = "";
-  if (/\b(?:math(?:ematics)?\s*(?:ii|2)|m\s*-?\s*2|python|mentoring|mpd)\b/.test(text)) {
-    semester = "2";
-    semesterSource = "timetable";
-  } else if (/\b(?:math(?:ematics)?\s*(?:i|1)\b|m\s*-?\s*1|pps|programming for problem solving)\b/.test(text)) {
+  // The first-year academic calendar is the authoritative current-term signal.
+  // This prevents a shared timetable that includes MATH II/Python/mentoring
+  // from silently changing a first-year user's current semester.
+  const academicPeriod = ACADEMIC_PERIODS.find((period) => period.kind === "first"
+    && dateISO >= period.start && dateISO < period.examsStart);
+  if (sectionGroup && academicPeriod) {
     semester = "1";
-    semesterSource = "timetable";
-  }
-
-  if (!semester) {
-    let month = null;
-    if (typeof now === "string" && now.length >= 7) month = Number(now.slice(5, 7)) - 1;
-    else if (now instanceof Date) month = now.getMonth();
-    else if (now?.dateISO) month = Number(now.dateISO.slice(5, 7)) - 1;
+    semesterSource = "academic-calendar";
+  } else if (sectionGroup && dateISO) {
+    // Seasonal estimate only when no published first-year period covers today.
+    // Keep this labelled as estimated; do not infer from timetable subjects.
+    const month = Number(dateISO.slice(5, 7)) - 1;
     if (Number.isFinite(month) && month >= 0 && month <= 11) {
-      // First-year admission starts in the odd semester (July–December).
       semester = month >= 6 ? "1" : "2";
-      semesterSource = "academic-calendar";
+      semesterSource = "academic-calendar-estimate";
     }
   }
 
@@ -416,10 +443,10 @@ export function answerFirstYearScheme(question = "", scheme = null, { semester =
           <div><dt>Group</dt><dd>${escapeHtml(resolvedGroup || "Not printed for this section")}</dd></div>
           <div><dt>Semester</dt><dd>${resolvedSemester ? `Semester ${escapeHtml(resolvedSemester)}` : "Not known"}</dd></div>
         </dl>
-        <p class="answer-meta">Compass reads the group from your selected first-year section and the semester from your verified timetable subjects (for example “MATH II” means semester 2). ${inferred.semesterSource === "academic-calendar" ? "Because your timetable did not print a semester-specific subject, the academic calendar month is used and marked as an estimate." : ""} Nothing is stored on the server.</p>
+        <p class="answer-meta">Compass reads your group from the selected first-year section. During a published first-year academic period, it uses that calendar period for the current semester; timetable subject names cannot override it. Outside a published period, the semester is only a seasonal estimate. Nothing is stored on the server.</p>
         <p class="answer-source">Group names come from the official first-year study scheme. <a href="${FIRST_YEAR_SCHEME_SOURCE}" target="_blank" rel="noopener noreferrer">Open the PDF</a>.</p>`,
       intent: "FIRST_YEAR_IDENTITY", confidence: 0.9,
-      plan: ["read the selected first-year section", "read semester-specific subjects from the verified timetable", "never store the inference"],
+      plan: ["read the selected first-year section", "use the published first-year academic period when available", "never promote the semester from mixed timetable subjects"],
       entities: { firstYearSemester: resolvedSemester, firstYearGroup: resolvedGroup }
     };
   }

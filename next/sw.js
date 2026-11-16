@@ -9,7 +9,7 @@
  *   navigation cached shell, never a guessed offline error page
  */
 
-const VERSION = "compass-next-v2.9.4";
+const VERSION = "compass-next-v2.9.5";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 

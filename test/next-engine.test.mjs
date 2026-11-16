@@ -45,6 +45,21 @@ test("official first-year syllabus supports course and remembered unit follow-up
   const mathTwo = answerFirstYearSyllabus("Mathematics 2 syllabus", courses);
   assert.match(mathTwo?.html || "", /Mathematics\s*-\s*II/i);
   assert.match(mathTwo?.html || "", /Unit 5: Linear Algebra/i);
+
+  const mathOne = answerFirstYearSyllabus("math 1 sylabus", courses, "", { semester: "1" });
+  assert.equal(mathOne?.entities.syllabusCourseCode, "BSC102");
+  assert.match(mathOne?.html || "", /Mathematics\s*-\s*I\s*·\s*BSC102/i);
+  assert.doesNotMatch(mathOne?.html || "", /Scheme Code|of 30|Guru Nanak Dev Engineering College|Part\s*-\s*B/);
+  assert.match(mathOne?.html || "", /arbitrary constants/i);
+  assert.match(mathOne?.html || "", /Newton’s law of cooling/i);
+  const mathOneUnitThree = answerFirstYearSyllabus("unit 3", courses, mathOne.entities.syllabusCourseCode, { semester: "1" });
+  assert.equal(mathOneUnitThree?.entities.syllabusCourseCode, "BSC102");
+  assert.match(mathOneUnitThree?.html || "", /Unit 3: Ordinary Differential Equations/i);
+  assert.doesNotMatch(mathOneUnitThree?.html || "", /Scheme Code|of 30|Guru Nanak Dev Engineering College|Part\s*-\s*B/);
+
+  const mathTwoUnitThree = answerFirstYearSyllabus("unit 3", courses, mathTwo.entities.syllabusCourseCode, { semester: "2" });
+  assert.equal(mathTwoUnitThree?.entities.syllabusCourseCode, "BSC104");
+  assert.match(mathTwoUnitThree?.html || "", /Unit 3: Probability/i);
 });
 
 test("first-year scheme answers credits, CA/ESE marks and the semester-specific maths course", async () => {
@@ -96,15 +111,39 @@ test("first-year scheme answers credits, CA/ESE marks and the semester-specific 
   const inferred = inferFirstYearContext({
     section: "ECB",
     schedule: [{ subject: "MATH II" }, { subject: "PHYSICS L" }],
-    now: "2026-11-16"
+    now: "2026-11-17"
   });
   assert.equal(inferred.group, "Physics");
-  assert.equal(inferred.semester, "2");
-  assert.equal(inferred.semesterSource, "timetable");
+  assert.equal(inferred.semester, "1");
+  assert.equal(inferred.semesterSource, "academic-calendar");
 
-  const firstSemester = inferFirstYearContext({ section: "CSA", schedule: [{ subject: "MATH I" }], now: "2026-11-16" });
+  const firstSemester = inferFirstYearContext({ section: "CSA", schedule: [{ subject: "MATH I" }], now: "2026-11-17" });
   assert.equal(firstSemester.group, "Chemistry");
   assert.equal(firstSemester.semester, "1");
+
+  const roster = JSON.parse(await readFile(new URL("../public/data/student-roster-index.json", import.meta.url), "utf8"));
+  for (const [crn, section, group] of [
+    ["2617070", "ECB", "Physics"],
+    ["2615231", "CSD", "Chemistry"],
+    ["2617092", "ECB", "Physics"],
+    ["2617076", "ECB", "Physics"]
+  ]) {
+    const student = roster.records.find((record) => record.crn === crn);
+    assert.ok(student, `roster includes ${crn}`);
+    assert.equal(student.section, section);
+    const context = inferFirstYearContext({
+      section: student.section,
+      schedule: [{ subject: "MATH II" }, { subject: "PYTHON" }, { subject: "MENTORING" }],
+      now: "2026-11-17"
+    });
+    assert.equal(context.group, group, `${crn} group`);
+    assert.equal(context.semester, "1", `${crn} semester`);
+    assert.equal(context.semesterSource, "academic-calendar", `${crn} semester source`);
+  }
+  const kaushikContext = answerFirstYearScheme("which semester am i", scheme, {
+    section: "ECB", group: "Physics", now: "2026-11-17"
+  });
+  assert.match(kaushikContext?.html || "", /<dt>Semester<\/dt><dd>Semester 1<\/dd>/);
 
   const ambiguous = answerFirstYearScheme("maths marks", scheme);
   assert.match(ambiguous.html, /BSC102/);
