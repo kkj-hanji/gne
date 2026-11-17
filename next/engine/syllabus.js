@@ -148,6 +148,7 @@ export function answerFirstYearSyllabus(question = "", courses = [], previousCou
   const normalized = cleanText(question).toLowerCase()
     .replace(/\bsyl+ab(?:u|o)s\b/g, "syllabus")
     .replace(/\bsyllab(?:u|o)s\b/g, "syllabus");
+  const asksSyllabus = /syllabus|unit|units|chapter|chapters|topic|topics|contents|course outline/i.test(normalized);
   const aliases = [
     ["programming for problem solving", ["pps", "programming", "problem solving"]],
     ["engineering drawing and graphics", ["edg", "drawing", "graphics"]],
@@ -160,9 +161,11 @@ export function answerFirstYearSyllabus(question = "", courses = [], previousCou
   const explicitCode = courses.find((course) => new RegExp(`\\b${course.code}\\b`, "i").test(normalized));
   const mathLevel = normalized.match(/\b(?:math(?:ematics)?|maths)\s*[- ]?\s*(i{1,3}|1|2)\b/)?.[1];
   const mathRoman = mathLevel === "1" ? "i" : mathLevel === "2" ? "ii" : mathLevel;
-  // A semester-2 student who types only "maths syllabus" gets Mathematics-II,
-  // never the semester-1 course that happens to come first in the PDF.
-  const wantedMath = mathRoman || (semester === "2" ? "ii" : semester === "1" ? "i" : "");
+  const asksMath = /\b(?:math(?:ematics)?|maths)\b/.test(normalized);
+  // Apply the semester default only to an ambiguous math request. Otherwise
+  // unit-only follow-ups such as "unit 6" must reuse the previous course,
+  // rather than being silently captured by Mathematics for the active term.
+  const wantedMath = mathRoman || (asksMath && asksSyllabus ? (semester === "2" ? "ii" : semester === "1" ? "i" : "") : "");
   const explicit = explicitCode || courses.find((course) => {
     const title = course.title.toLowerCase();
     if (wantedMath && title.includes("mathematics")) return new RegExp(`(?:^|\\s)${wantedMath}$`).test(title.trim());
@@ -170,7 +173,6 @@ export function answerFirstYearSyllabus(question = "", courses = [], previousCou
   });
   const course = explicit || courses.find((item) => item.code === previousCourse);
   if (!course) return null;
-  const asksSyllabus = /syllabus|unit|units|chapter|chapters|topic|topics|contents|course outline/i.test(normalized);
   if (!asksSyllabus) return null;
   const unitMatch = normalized.match(/\b(?:unit|u)\s*(?:-|number|no\.?\s*)?([1-9])\b/)
     || normalized.match(/\b(unit|chapter)\s+(one|two|three|four|five|six|seven|eight|nine)\b/);

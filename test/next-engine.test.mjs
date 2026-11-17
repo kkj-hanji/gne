@@ -60,6 +60,16 @@ test("official first-year syllabus supports course and remembered unit follow-up
   const mathTwoUnitThree = answerFirstYearSyllabus("unit 3", courses, mathTwo.entities.syllabusCourseCode, { semester: "2" });
   assert.equal(mathTwoUnitThree?.entities.syllabusCourseCode, "BSC104");
   assert.match(mathTwoUnitThree?.html || "", /Unit 3: Probability/i);
+
+  // A current semester default must not hijack unit-only follow-ups from a
+  // different course, and each answer must preserve the course for the next turn.
+  const physics = answerFirstYearSyllabus("physics syllabus", courses, "", { semester: "1" });
+  const physicsUnitSix = answerFirstYearSyllabus("unit 6", courses, physics.entities.syllabusCourseCode, { semester: "1" });
+  assert.equal(physicsUnitSix?.entities.syllabusCourseCode, "BSC101");
+  assert.match(physicsUnitSix?.html || "", /Unit 6: Superconductivity/i);
+  const physicsUnitTwo = answerFirstYearSyllabus("unit2", courses, physicsUnitSix.entities.syllabusCourseCode, { semester: "1" });
+  assert.equal(physicsUnitTwo?.entities.syllabusCourseCode, "BSC101");
+  assert.match(physicsUnitTwo?.html || "", /Unit 2: Laser/i);
 });
 
 test("first-year scheme answers credits, CA/ESE marks and the semester-specific maths course", async () => {
