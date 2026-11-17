@@ -3,7 +3,7 @@
   "sourceTitle": "Study Scheme & Syllabus, B.Tech. first year 2024 (semester 1 and 2, Dec 2025)",
   "sourceNote": "Scheme Code - 2024. The PDF prints the continuous-assessment (CA) total, the end-semester examination (ESE) marks, credits and L/T/P. MSE-1/MSE-2 weightage is not printed in this document and is never inferred.",
   "assessmentNote": "Published assessment: Continuous Assessment (CA) marks form the internal component and the End Semester Examination (ESE) forms the external component. The document does not publish an MSE-1/MSE-2 split, so Compass does not invent one.",
-  "generatedAt": "2026-11-16T11:01:17.278Z",
+  "generatedAt": "2026-11-17T03:07:46.874Z",
   "schemeYear": 2024,
   "courses": [
     {
@@ -26,6 +26,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "Scientific Calculator",
+      "assessmentNote": "",
       "printedSemester": "1/2",
       "semesters": [
         1,
@@ -95,6 +96,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "NIL",
+      "assessmentNote": "",
       "printedSemester": "1",
       "semesters": [
         1
@@ -164,6 +166,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "Scientific Calculator",
+      "assessmentNote": "",
       "printedSemester": "1/2",
       "semesters": [
         1,
@@ -233,6 +236,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "Non-scientific calculator",
+      "assessmentNote": "",
       "printedSemester": "2",
       "semesters": [
         2
@@ -302,6 +306,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "Scientific Calculator",
+      "assessmentNote": "",
       "printedSemester": "1/2",
       "semesters": [
         1,
@@ -441,6 +446,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "NIL",
+      "assessmentNote": "",
       "printedSemester": "1",
       "semesters": [
         1
@@ -510,6 +516,7 @@
       "minNumericalNote": "",
       "prerequisites": "ESC103",
       "additionalMaterial": "NIL",
+      "assessmentNote": "",
       "printedSemester": "2",
       "semesters": [
         2
@@ -579,6 +586,7 @@
       "minNumericalNote": "NIL",
       "prerequisites": "NIL",
       "additionalMaterial": "NIL",
+      "assessmentNote": "",
       "printedSemester": "1/2",
       "semesters": [
         1,
@@ -648,6 +656,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "Scientific Calculator",
+      "assessmentNote": "",
       "printedSemester": "1/2",
       "semesters": [
         1,
@@ -717,6 +726,7 @@
       "minNumericalNote": "",
       "prerequisites": "NIL",
       "additionalMaterial": "",
+      "assessmentNote": "",
       "printedSemester": "1/2",
       "semesters": [
         1,
@@ -786,6 +796,7 @@
       "minNumericalNote": "",
       "prerequisites": "",
       "additionalMaterial": "",
+      "assessmentNote": "",
       "printedSemester": "",
       "semesters": [
         2
