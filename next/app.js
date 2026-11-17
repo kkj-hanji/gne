@@ -7,7 +7,7 @@
  */
 
 import {
-  APP_VERSION, CATEGORIES, FLAGS, NAV_BOTTOM_ROUTES, PRESETS, SETTINGS_KEY,
+  APP_VERSION, CATEGORIES, FLAGS, NAV_BOTTOM_ROUTES, NAV_SIDE_ROUTES, PRESETS, SETTINGS_KEY,
   getFlag, isMapFlagEnabled
 } from "./settings-registry.js";
 import {
@@ -1147,6 +1147,7 @@ function updateChrome() {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
+  renderSidebarNavigation();
   renderMobileNavigation();
   const initials = (state.profile.name || "G").trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "G";
   $("#avatar-initials").textContent = initials;
@@ -1168,6 +1169,15 @@ function renderMobileNavigation() {
     const label = ROUTES[route]?.title || route;
     return `<button type="button" class="bottom-item ${state.route === route ? "is-active" : ""}" data-route="${route}" aria-label="${escapeHtml(label)}" ${state.route === route ? 'aria-current="page"' : ""}><span aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><span>${escapeHtml(label === "Ask Compass" ? "Ask" : label)}</span></button>`;
   }).join("");
+}
+
+function renderSidebarNavigation() {
+  const nav = $("#side-nav");
+  if (!nav) return;
+  const configured = String(v("nav.sideOrder") || "").split(",").filter((route) => NAV_SIDE_ROUTES.includes(route));
+  const routes = [...new Set([...configured, ...NAV_SIDE_ROUTES])];
+  const items = new Map($$(".nav-item", nav).map((item) => [item.dataset.route, item]));
+  for (const route of routes) if (items.has(route)) nav.append(items.get(route));
 }
 
 function updateLiveClock() {
@@ -3365,7 +3375,7 @@ function renderFlagRow(flag) {
   } else if (flag.type === "range") {
     control = `<div class="range-wrap"><input type="range" data-setting="${flag.id}" data-range="${flag.id}" min="${flag.min}" max="${flag.max}" step="${flag.step}" value="${value}" ${available ? "" : "disabled"} aria-label="${escapeHtml(flag.title)}" /><output id="out-${flag.id}">${value} ${escapeHtml(flag.unit || "")}</output></div>`;
   } else if (flag.type === "order") {
-    control = renderBottomOrderControl(value);
+    control = flag.id === "nav.sideOrder" ? renderSideOrderControl(value) : renderBottomOrderControl(value);
   }
   const managed = source === "admin" ? `<div class="setting-note">Managed by the college admin. Your device value is kept but overridden.</div>` : "";
   return `<div class="setting-row${available ? "" : " is-disabled"}${flag.type === "order" ? " is-order-setting" : ""}" id="setting-${flag.id}">
@@ -3382,6 +3392,11 @@ function renderFlagRow(flag) {
 function renderBottomOrderControl(value) {
   const order = String(value || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
   return `<div class="bottom-order-list" aria-label="Reorder mobile destinations">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="bottom-nav-move" data-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="bottom-nav-move" data-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">The first selected number of destinations appears on the phone bar. Settings stays in the side menu.</p>`;
+}
+
+function renderSideOrderControl(value) {
+  const order = String(value || "").split(",").filter((route) => NAV_SIDE_ROUTES.includes(route));
+  return `<div class="bottom-order-list" aria-label="Reorder side menu pages">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "⚙"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="side-nav-move" data-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="side-nav-move" data-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">This changes the page order in the desktop menu and the menu drawer on phones. Your mobile shortcut bar has its own order setting above.</p>`;
 }
 
 function renderVersionCard() {
@@ -3673,6 +3688,17 @@ async function handleAction(action, element) {
       if (index < 0 || target < 0 || target >= order.length) break;
       [order[index], order[target]] = [order[target], order[index]];
       setFlag("nav.bottomOrder", order.join(","));
+      render();
+      break;
+    }
+    case "side-nav-move": {
+      const order = String(v("nav.sideOrder") || "").split(",").filter((route) => NAV_SIDE_ROUTES.includes(route));
+      const index = order.indexOf(element.dataset.route);
+      const direction = element.dataset.direction === "up" ? -1 : 1;
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= order.length) break;
+      [order[index], order[target]] = [order[target], order[index]];
+      setFlag("nav.sideOrder", order.join(","));
       render();
       break;
     }
@@ -4367,6 +4393,7 @@ function bindEvents() {
       setFlag(flag.id, flag.type === "boolean" ? setting.checked : setting.value);
       if (flag.id === "labs.experiments" || flag.id === "experience.mode") render();
       else if (flag.id === "nav.bottomItems" || flag.id === "nav.bottomOrder") { renderMobileNavigation(); if (state.route === "settings") render(); }
+      else if (flag.id === "nav.sideOrder") render();
       else if (flag.category === "timetable" || flag.category === "rooms" || flag.category === "today") render();
       return;
     }

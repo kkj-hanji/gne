@@ -22,7 +22,7 @@ export const LEGACY_PROFILE_KEY = "gndec-compass-student-v1";
 export const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 export const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 
-export const APP_VERSION = "2.2.8";
+export const APP_VERSION = "2.2.9";
 export const APP_CHANNEL = "stable";
 
 export const THEMES = ["system", "light", "dark", "oled"];
@@ -30,6 +30,7 @@ export const ACCENTS = ["auto", "emerald", "azure", "amber", "rose", "violet", "
 export const DENSITIES = ["comfortable", "compact"];
 export const EXPERIENCES = ["new", "classic", "safe"];
 export const NAV_BOTTOM_ROUTES = Object.freeze(["today", "ask", "timetable", "rooms", "teachers", "notices", "papers", "syllabus", "calendar", "directory", "compare"]);
+export const NAV_SIDE_ROUTES = Object.freeze(["today", "timetable", "rooms", "teachers", "ask", "notices", "papers", "syllabus", "calendar", "directory", "compare", "settings"]);
 
 export const CATEGORIES = Object.freeze([
   { id: "experience", title: "Experience & rollback", icon: "history", order: 10, description: "Switch between the new app, the classic layout and the frozen legacy build." },
@@ -190,6 +191,9 @@ export const FLAGS = Object.freeze([
   }),
   flag("nav.bottomOrder", "Mobile bar order", "Choose the order used by your mobile navigation shortcuts.", {
     category: "navigation", type: "order", default: "today,ask,timetable,rooms,teachers,notices,papers,syllabus,calendar,directory,compare", keywords: "mobile nav bottom reorder rearrange"
+  }),
+  flag("nav.sideOrder", "Side menu order", "Choose the order of all Compass pages in the side menu. This order also sets the full route order used by the menu on small screens.", {
+    category: "navigation", type: "order", default: "today,timetable,rooms,teachers,ask,notices,papers,syllabus,calendar,directory,compare,settings", keywords: "navigation menu sidebar reorder rearrange page order"
   }),
   flag("nav.commandPalette", "Command palette", "Press Ctrl/Cmd+K to jump anywhere or run an action.", {
     category: "navigation", default: true, keywords: "keyboard search command"

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
-  ACCENTS, CATEGORIES, DENSITIES, EXPERIENCES, FLAGS, FLAG_MAP, NAV_BOTTOM_ROUTES, PRESETS,
+  ACCENTS, CATEGORIES, DENSITIES, EXPERIENCES, FLAGS, FLAG_MAP, NAV_BOTTOM_ROUTES, NAV_SIDE_ROUTES, PRESETS,
   PRESET_MAP, SETTINGS_SCHEMA_VERSION, THEMES, flagsForCategory, getFlag,
   isMapFlagEnabled
 } from "../next/settings-registry.js";
@@ -63,6 +63,27 @@ test("mobile navigation defaults to Today, Ask, Timetable, Rooms and validates o
   const reordered = coerceValue(FLAG_MAP["nav.bottomOrder"], "rooms,ask,rooms,settings,compare").split(",");
   assert.equal(reordered.slice(0, 3).join(","), "rooms,ask,compare");
   assert.deepEqual(new Set(reordered), new Set(NAV_BOTTOM_ROUTES));
+});
+
+test("side menu order includes all twelve routes, is persistent, and sanitizes invalid entries", () => {
+  const values = defaultValues();
+  assert.equal(values["nav.sideOrder"], NAV_SIDE_ROUTES.join(","));
+  const reordered = coerceValue(FLAG_MAP["nav.sideOrder"], "settings,ask,ask,unknown,today").split(",");
+  assert.equal(reordered.slice(0, 3).join(","), "settings,ask,today");
+  assert.deepEqual(new Set(reordered), new Set(NAV_SIDE_ROUTES));
+  const clean = sanitizeValues({ "nav.sideOrder": reordered.reverse().join(",") });
+  assert.equal(clean["nav.sideOrder"].split(",")[0], "compare");
+});
+
+test("side menu reorder control is connected to live navigation and uses accessible move actions", async () => {
+  const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
+  assert.match(app, /function renderSidebarNavigation\(\)/);
+  assert.match(app, /nav\.append\(items\.get\(route\)\)/);
+  assert.match(app, /function renderSideOrderControl\(value\)/);
+  assert.match(app, /data-action="side-nav-move"/);
+  assert.match(app, /case "side-nav-move"/);
+  assert.match(app, /setFlag\("nav\.sideOrder", order\.join\(","\)\)/);
+  assert.match(app, /else if \(flag\.id === "nav\.sideOrder"\) render\(\)/);
 });
 
 test("every category is declared, ordered and populated", () => {

@@ -15,6 +15,7 @@ import {
   FLAGS,
   FLAG_MAP,
   NAV_BOTTOM_ROUTES,
+  NAV_SIDE_ROUTES,
   PRESET_MAP
 } from "./settings-registry.js";
 
@@ -65,9 +66,10 @@ export function coerceValue(flag, raw) {
     return flag.values.some((option) => option.value === text) ? text : flag.default;
   }
   if (flag.type === "order") {
+    const routes = flag.id === "nav.sideOrder" ? NAV_SIDE_ROUTES : NAV_BOTTOM_ROUTES;
     const values = Array.isArray(raw) ? raw : String(raw || "").split(",");
-    const order = [...new Set(values.map((value) => String(value).trim()).filter((value) => NAV_BOTTOM_ROUTES.includes(value)))];
-    for (const route of NAV_BOTTOM_ROUTES) if (!order.includes(route)) order.push(route);
+    const order = [...new Set(values.map((value) => String(value).trim()).filter((value) => routes.includes(value)))];
+    for (const route of routes) if (!order.includes(route)) order.push(route);
     return order.join(",") || flag.default;
   }
   if (flag.type === "range") {
