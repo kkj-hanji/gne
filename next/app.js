@@ -3391,12 +3391,12 @@ function renderFlagRow(flag) {
 
 function renderBottomOrderControl(value) {
   const order = String(value || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
-  return `<div class="bottom-order-list" aria-label="Reorder mobile destinations">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="bottom-nav-move" data-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="bottom-nav-move" data-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">The first selected number of destinations appears on the phone bar. Settings stays in the side menu.</p>`;
+  return `<div class="bottom-order-list" aria-label="Reorder mobile destinations">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="bottom-nav-move" data-order-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="bottom-nav-move" data-order-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">The first selected number of destinations appears on the phone bar. Settings stays in the side menu.</p>`;
 }
 
 function renderSideOrderControl(value) {
   const order = String(value || "").split(",").filter((route) => NAV_SIDE_ROUTES.includes(route));
-  return `<div class="bottom-order-list" aria-label="Reorder side menu pages">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "⚙"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="side-nav-move" data-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="side-nav-move" data-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">This changes the page order in the desktop menu and the menu drawer on phones. Your mobile shortcut bar has its own order setting above.</p>`;
+  return `<div class="bottom-order-list" aria-label="Reorder side menu pages">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "⚙"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="side-nav-move" data-order-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="side-nav-move" data-order-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">This changes the page order in the desktop menu and the menu drawer on phones. Your mobile shortcut bar has its own order setting above.</p>`;
 }
 
 function renderVersionCard() {
@@ -3682,7 +3682,7 @@ async function handleAction(action, element) {
       break;
     case "bottom-nav-move": {
       const order = String(v("nav.bottomOrder") || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
-      const index = order.indexOf(element.dataset.route);
+      const index = order.indexOf(element.dataset.orderRoute);
       const direction = element.dataset.direction === "up" ? -1 : 1;
       const target = index + direction;
       if (index < 0 || target < 0 || target >= order.length) break;
@@ -3693,7 +3693,7 @@ async function handleAction(action, element) {
     }
     case "side-nav-move": {
       const order = String(v("nav.sideOrder") || "").split(",").filter((route) => NAV_SIDE_ROUTES.includes(route));
-      const index = order.indexOf(element.dataset.route);
+      const index = order.indexOf(element.dataset.orderRoute);
       const direction = element.dataset.direction === "up" ? -1 : 1;
       const target = index + direction;
       if (index < 0 || target < 0 || target >= order.length) break;

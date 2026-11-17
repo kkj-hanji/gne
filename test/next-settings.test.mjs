@@ -82,6 +82,8 @@ test("side menu reorder control is connected to live navigation and uses accessi
   assert.match(app, /function renderSideOrderControl\(value\)/);
   assert.match(app, /data-action="side-nav-move"/);
   assert.match(app, /case "side-nav-move"/);
+  assert.match(app, /data-order-route="\$\{route\}"/);
+  assert.match(app, /order\.indexOf\(element\.dataset\.orderRoute\)/);
   assert.match(app, /setFlag\("nav\.sideOrder", order\.join\(","\)\)/);
   assert.match(app, /else if \(flag\.id === "nav\.sideOrder"\) render\(\)/);
 });
