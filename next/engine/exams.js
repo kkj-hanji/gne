@@ -153,6 +153,26 @@ export function importantExamEventsForSelection({ datesheet, group, branch = "" 
   return examEventsForSelection({ datesheet, group, branch }).filter(isImportantExam);
 }
 
+/** Keep separate published MSE-II and ESE sheets readable when both apply. */
+export function groupExamDatesheetEvents(events) {
+  const groups = new Map();
+  for (const exam of events || []) {
+    const category = String(exam?.category || "");
+    const key = /mse\s*[-–]?\s*(?:ii|2)/i.test(category) ? "mse"
+      : /end[- ]?sem(?:ester)?|\bese\b/i.test(category) ? "ese"
+        : `other:${category || "Published exams"}`;
+    if (!groups.has(key)) groups.set(key, {
+      label: key === "mse" ? "MSE-II datesheet" : key === "ese" ? "ESE datesheet" : key.slice(6),
+      events: []
+    });
+    groups.get(key).events.push(exam);
+  }
+  const rank = (key) => key === "mse" ? 0 : key === "ese" ? 1 : 2;
+  return [...groups.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([, group]) => group);
+}
+
 function compareExams(a, b) {
   return a.date.localeCompare(b.date)
     || (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER)

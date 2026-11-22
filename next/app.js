@@ -16,7 +16,7 @@ import {
   saveProfile, saveUserValues
 } from "./settings-store.js";
 import {
-  DAY_NAMES, STUDY_DAYS, addDays, formatDuration, freeGapsBetweenClasses, getIndiaNow, humanTime,
+  DAY_NAMES, STUDY_DAYS, addDays, formatDuration, formatHeaderDate, freeGapsBetweenClasses, getIndiaNow, humanTime,
   nextStudyDay, relativeStartLabel, resolveQuestionDay, shouldLookAheadAtFive
 } from "./engine/datetime.js";
 import { mergeSchedules, readVerifiedFetTimetable } from "./engine/fet-parser.js";
@@ -37,7 +37,8 @@ import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine
 import { answerFirstYearScheme, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
-import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examGroupForSection, examsOnDate, examTimeLabel, importantExamEventsForSelection, nextUpcomingExam } from "./engine/exams.js";
+import { normalizeProfileHistory, rememberProfile } from "./engine/profile-history.js";
+import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examGroupForSection, examsOnDate, examTimeLabel, groupExamDatesheetEvents, importantExamEventsForSelection, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
@@ -56,6 +57,7 @@ const SCHEME_SEMESTER_KEY = "gndec-compass-next-scheme-semester-v1";
 const REMINDER_KEY = "gndec-compass-next-reminders-v1";
 const DIGEST_KEY = "gndec-compass-next-digest-v1";
 const PRESET_UNDO_KEY = "gndec-compass-next-preset-undo-v1";
+const PROFILE_HISTORY_KEY = "gndec-compass-next-profile-history-v1";
 const THEME_ORDER = ["system", "light", "dark", "oled"];
 
 const BRANCHES = Object.freeze([
@@ -825,6 +827,19 @@ function rosterRecordForProfile() {
   return matchProfileRecord(state.students, state.profile);
 }
 
+function profileLookupHistory() {
+  try {
+    return normalizeProfileHistory(JSON.parse(storageGet(PROFILE_HISTORY_KEY) || "[]"));
+  } catch {
+    return [];
+  }
+}
+
+function rememberVerifiedProfile(record) {
+  const history = rememberProfile(profileLookupHistory(), { name: record?.name, crn: record?.crn });
+  storageSet(PROFILE_HISTORY_KEY, JSON.stringify(history));
+}
+
 async function lookupProfileFromSettings() {
   const query = $("[data-profile-lookup-query]")?.value.trim() || "";
   state.profileLookupQuery = query;
@@ -862,6 +877,12 @@ function renderProfileLookupResults() {
   const root = $("[data-profile-lookup-results]");
   if (!root) return;
   root.innerHTML = `${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}`;
+}
+
+function renderRecentProfiles() {
+  const history = profileLookupHistory();
+  if (!history.length) return "";
+  return `<section class="profile-history" aria-label="Recent verified profiles"><div class="profile-history-head"><h3>Recent profiles</h3><span>Saved on this device</span></div><div class="profile-match-list">${history.map((record, index) => `<button class="profile-match profile-history-match" data-action="lookup-profile-history" data-profile-history-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>Search this profile again</span><small>${record.crn ? `CRN ${escapeHtml(record.crn)}` : "Roster matched by name"}</small></button>`).join("")}</div></section>`;
 }
 
 function queueProfileSuggestions(query) {
@@ -910,6 +931,7 @@ function applyRosterRecordToProfile(record) {
     mentorVenue: record.mentorVenue || record.venue || "",
     rosterVersion: state.rosterGeneratedAt || "published"
   }) || state.profile;
+  rememberVerifiedProfile(record);
   if (state.profile.section && state.groups.includes(state.profile.section)) {
     state.group = state.profile.section;
     state.subgroup = subgroupsFor(state.group).includes(state.profile.subsection) ? state.profile.subsection : "";
@@ -948,6 +970,7 @@ function syncProfileFromRoster({ silent = true, renderOnChange = true } = {}) {
   const saved = saveProfile(localStorage, next);
   if (!saved) return false;
   state.profile = saved;
+  rememberVerifiedProfile(record);
   if (saved.section && state.groups.includes(saved.section)) {
     state.group = saved.section;
     state.subgroup = subgroupsFor(saved.section).includes(saved.subsection) ? saved.subsection : "";
@@ -983,20 +1006,17 @@ function examsForDate(dateISO) {
   return examsOnDate(importantExamEvents(), dateISO);
 }
 
-/** The next calendar date for a weekday name, counting today as offset 0. */
-function dateForWeekday(day, clock = now()) {
-  const target = DAY_NAMES.indexOf(day);
-  const base = DAY_NAMES.indexOf(clock.day);
-  if (target < 0 || base < 0) return clock.dateISO;
-  return addDays(clock, (target - base + 7) % 7).dateISO;
-}
-
 function importantExamEvents() {
   return importantExamEventsForSelection({ datesheet: state.datesheet, group: state.group, branch: state.profile.branch });
 }
 
 function examRowMarkup(exam) {
   return `<article class="exam-datesheet-row"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</p></div><a class="chip" href="${escapeHtml(exam.sourceUrl || "/notices")}" ${exam.sourceUrl?.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source ↗</a></article>`;
+}
+
+function renderExamDatesheetSections(exams) {
+  const groups = groupExamDatesheetEvents(exams);
+  return groups.length ? `<div class="exam-datesheet-sections">${groups.map((group) => `<section class="exam-datesheet-section"><h3>${escapeHtml(group.label)}</h3><div class="exam-datesheet-list">${group.events.map(examRowMarkup).join("")}</div></section>`).join("")}</div>` : "";
 }
 
 function otherExamSections(primaryRows, selectedYear, selectedGroup) {
@@ -1011,7 +1031,7 @@ function otherExamSections(primaryRows, selectedYear, selectedGroup) {
     const opposite = selectedGroup === "Physics group" ? "Chemistry group" : "Physics group";
     const oppositeRows = remaining.filter((exam) => exam.year === 1 && exam.cohort === opposite);
     if (oppositeRows.length) {
-      sections.push(`<details class="exam-other-group"><summary>First year · ${escapeHtml(opposite)} <span>${oppositeRows.length} exams</span></summary><div class="exam-datesheet-list">${oppositeRows.map(examRowMarkup).join("")}</div></details>`);
+      sections.push(`<details class="exam-other-group"><summary>First year · ${escapeHtml(opposite)} <span>${oppositeRows.length} exams</span></summary>${renderExamDatesheetSections(oppositeRows)}</details>`);
     }
   }
   const other = remaining.filter((exam) => !(selectedYear === 1 && selectedGroup && exam.year === 1 && exam.cohort && exam.cohort !== selectedGroup));
@@ -1023,7 +1043,7 @@ function otherExamSections(primaryRows, selectedYear, selectedGroup) {
   }
   for (const [year, rows] of [...yearGroups].sort(([a], [b]) => a === "other" ? 1 : b === "other" ? -1 : Number(a) - Number(b))) {
     const label = year === "other" ? "Other published programmes" : `${year === "1" ? "First" : year === "2" ? "Second" : year === "3" ? "Third" : "Fourth"} year · other programmes`;
-    sections.push(`<details class="exam-other-group"><summary>${label} <span>${rows.length} exams</span></summary><div class="exam-datesheet-list">${rows.map(examRowMarkup).join("")}</div></details>`);
+    sections.push(`<details class="exam-other-group"><summary>${label} <span>${rows.length} exams</span></summary>${renderExamDatesheetSections(rows)}</details>`);
   }
   return sections.join("");
 }
@@ -1211,10 +1231,8 @@ function renderSidebarNavigation() {
 function updateLiveClock() {
   const clock = now();
   const date = $("#topbar-clock-date");
-  const time = $("#topbar-clock-time");
   const element = $("#topbar-clock");
-  if (date) date.textContent = `${clock.day} · ${clock.dateISO}`;
-  if (time) time.textContent = clock.time;
+  if (date) date.textContent = formatHeaderDate(clock.dateISO);
   if (element) element.dateTime = clock.iso;
 }
 
@@ -1357,17 +1375,16 @@ function renderToday() {
   const examCard = v("today.examCountdown") && exam && !examMode ? renderExamCard(exam) : "";
   const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
   const holiday = v("today.holidayBanner") ? holidayOn(clock.dateISO, holidayOverrides()) : null;
-  const examHref = exam ? "/calendar#exam-datesheet" : "/calendar";
 
   return `<div class="page page-today">
     ${hero}
     ${holiday ? `<div class="announcement ${holiday.type === "working" ? "is-warning" : "is-info"}"><strong>${escapeHtml(holiday.type === "working" ? "Working day" : holiday.type === "restricted" ? "Restricted holiday" : holiday.type === "half-day" ? "Half day" : "Holiday")} · ${escapeHtml(dateOnly(holiday.date))}</strong><p>${escapeHtml(holiday.name)}${holiday.overridden ? " · admin-confirmed override" : " · from the official GNDEC holiday list"}</p></div>` : ""}
     ${announcements.length ? `<section class="announcement-stack">${announcements.map((item) => `<div class="announcement is-${escapeHtml(item.level)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></div>`).join("")}</section>` : ""}
-    <div class="stat-grid">
-      <div class="stat"><div class="stat-label">${examMode ? "Lecture timetable" : "Classes today"}</div><div class="stat-value">${examMode ? "Hidden" : today.length}</div><div class="stat-sub">${examMode ? "Exam datesheet is active" : escapeHtml(clock.day)}</div></div>
-      ${examMode ? `<div class="stat"><div class="stat-label">Exam period</div><div class="stat-value">${info.today.length ? `${info.today.length} today` : "In progress"}</div><div class="stat-sub">${info.today.length ? "Published sitting(s) today" : info.primary ? `Next paper ${escapeHtml(shortExamDate(info.primary.date))}` : "No paper scheduled today"}</div></div>` : `<div class="stat"><div class="stat-label">Free rooms now</div><div class="stat-value">${free.error ? "—" : free.rooms.length}</div><div class="stat-sub">${free.error ? "Room data loading" : `for the next hour`}</div></div>`}
-      <a class="stat stat-link" href="${examHref}" aria-label="${exam ? `Open full datesheet for ${escapeHtml(exam.title)} on ${escapeHtml(shortExamDate(exam.date))}` : "Open exam calendar"}"><div class="stat-label">Next exam</div><div class="stat-value">${exam ? escapeHtml(shortExamDate(exam.date)) : "—"}</div><div class="stat-sub">${exam ? escapeHtml(exam.title) : "No published date"}</div>${exam ? `<span class="stat-link-hint">Full datesheet <span aria-hidden="true">↗</span></span>` : ""}</a>
-    </div>
+    ${examMode ? "" : `<div class="stat-grid">
+      <div class="stat"><div class="stat-label">Classes today</div><div class="stat-value">${today.length}</div><div class="stat-sub">${escapeHtml(clock.day)}</div></div>
+      <div class="stat"><div class="stat-label">Free rooms now</div><div class="stat-value">${free.error ? "—" : free.rooms.length}</div><div class="stat-sub">${free.error ? "Room data loading" : "for the next hour"}</div></div>
+      <a class="stat stat-link" href="${exam ? "/calendar#exam-datesheet" : "/calendar"}" aria-label="${exam ? `Open full datesheet for ${escapeHtml(exam.title)} on ${escapeHtml(shortExamDate(exam.date))}` : "Open exam calendar"}"><div class="stat-label">Next exam</div><div class="stat-value">${exam ? escapeHtml(shortExamDate(exam.date)) : "—"}</div><div class="stat-sub">${exam ? escapeHtml(exam.title) : "No published date"}</div>${exam ? `<span class="stat-link-hint">Full datesheet <span aria-hidden="true">↗</span></span>` : ""}</a>
+    </div>`}
     ${examMode ? "" : renderTodayProgress(today, clock.minutes)}
     <div class="dashboard-grid">
       <div class="stack">
@@ -1385,7 +1402,7 @@ function renderToday() {
 function renderHero(info, clock, greeting) {
   if (v("today.hero") === "minimal") {
     return `<section class="hero-card">
-      <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(clock.date)}</span></div>
+      <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(heroDateLabel(info, clock))}</span></div>
       <h2 class="hero-title">${escapeHtml(selectionLabel())}</h2>
       <p class="hero-meta">${todaySummary(info)}</p>
       <div class="hero-actions">${heroActions()}</div>
@@ -1394,7 +1411,7 @@ function renderHero(info, clock, greeting) {
   }
   if (v("today.hero") === "timeline") {
     return `<section class="hero-card">
-      <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(clock.date)}</span></div>
+      <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(heroDateLabel(info, clock))}</span></div>
       <h2 class="hero-title">${escapeHtml(selectionLabel())}</h2>
       <p class="hero-meta">${todaySummary(info)}</p>
       <div class="hero-actions">${heroActions()}</div>
@@ -1463,12 +1480,22 @@ function renderHero(info, clock, greeting) {
   }
   const heroClass = info.kind === "current" ? "hero-card has-active-class" : (info.kind === "exam" || info.kind === "exam-soon") ? "hero-card has-exam-day" : "hero-card";
   return `<section class="${heroClass}">
-    <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge badge-accent">${escapeHtml(eyebrow)}</span><span class="badge">${escapeHtml(clock.date)}</span></div>
+    <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge badge-accent">${escapeHtml(eyebrow)}</span><span class="badge">${escapeHtml(heroDateLabel(info, clock))}</span></div>
     <h2 class="hero-title">${escapeHtml(title)}</h2>
     <p class="hero-meta">${escapeHtml(meta)}</p>
     <div class="hero-actions">${actions}</div>
     <div class="hero-side">${v("today.freshnessBadge") ? dataChip() : ""}<span>·</span><span>${escapeHtml(selectionLabel())}</span></div>
   </section>`;
+}
+
+function heroDateLabel(info, clock) {
+  if ((info.kind === "exam" || info.kind === "exam-soon") && info.primary) {
+    const time = info.primary.start != null && info.primary.end != null
+      ? examTimeLabel(info.primary, humanTime)
+      : info.primary.sessionRaw || "";
+    return `${shortExamDate(info.primary.date)}${time ? ` · ${time}` : ""}`;
+  }
+  return clock.date;
 }
 
 function todaySummary(info) {
@@ -1554,16 +1581,6 @@ function renderExamCard(exam) {
   </section>`;
 }
 
-function renderExamDayCard(exams, dateISO) {
-  const sources = [...new Map(exams.filter((exam) => exam.sourceUrl).map((exam) => [exam.sourceUrl, exam])).values()];
-  const audience = [state.profile.name, state.group, examGroupForSection(state.group)].filter(Boolean).join(" · ");
-  const isToday = dateISO === now().dateISO;
-  return `<section class="card exam-day-card">
-    <div class="card-head"><div><h2 class="card-title">${isToday ? "Today's exam date sheet" : "Exam date sheet"}</h2><p class="card-sub">${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(audience || selectionLabel())} · the published paper replaces the class timetable for this day</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(exam.category.includes("workshop") ? "Workshop sheet" : exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
-    <div class="timeline">${exams.map((exam) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(examTimeLabel(exam, humanTime))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.title)}</div><div class="timeline-meta">${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionNote ? ` · ${escapeHtml(exam.sessionNote)}` : ""}</div></div></div>`).join("")}</div>
-  </section>`;
-}
-
 function renderExamPeriodCard(period) {
   const todayExams = period.today || [];
   const next = period.next;
@@ -1572,11 +1589,11 @@ function renderExamPeriodCard(period) {
     : next
       ? `No paper is scheduled today. The next published paper is ${escapeHtml(next.title)} on ${escapeHtml(shortExamDate(next.date))}.`
       : "No paper is scheduled today.";
-  const rows = (period.exams || []).map(examRowMarkup).join("");
+  const rows = renderExamDatesheetSections(period.exams || []);
   return `<section class="card exam-day-card exam-period-card">
-    <div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(selectionLabel())} · exam mode started ${escapeHtml(shortExamDate(period.startDate))} · lecture timetable stays hidden until the final published paper is over.</p></div><a class="btn btn-sm" href="/calendar#exam-datesheet">Full calendar</a></div>
+    <div class="card-head"><div><h2 class="card-title">Exam datesheet</h2><p class="card-sub">${escapeHtml(selectionLabel())} · active from ${escapeHtml(shortExamDate(period.startDate))}. MSE-II and ESE are listed in separate sections.</p></div><a class="btn btn-sm" href="/calendar#exam-datesheet">Full datesheet</a></div>
     <p class="exam-period-status" role="status">${status}</p>
-    ${rows ? `<div class="exam-datesheet-list">${rows}</div>` : `<p class="exam-period-status">No matching published papers were found in the loaded datesheet.</p>`}
+    ${rows || `<p class="exam-period-status">No matching published papers were found in the loaded datesheet.</p>`}
   </section>`;
 }
 
@@ -1626,11 +1643,9 @@ function renderTimetable() {
   const branches = timetableBranches();
   const activeBranch = groupBranchCode(state.group) || branches[0] || "";
   const sections = rankedGroups(state.groups.filter((group) => groupBranchCode(group) === activeBranch));
-  const todayExamSittings = examsForDate(dateForWeekday(state.day, clock));
   const dayContent = view === "week" ? renderWeekGrid(clock)
     : view === "agenda" ? renderAgenda()
-      : todayExamSittings.length ? renderExamDayCard(todayExamSittings, dateForWeekday(state.day, clock))
-        : renderDayView(state.day, clock);
+      : renderDayView(state.day, clock);
   return `<div class="page page-timetable">
     <div class="page-head">
       <div class="page-head-text">
@@ -1657,10 +1672,8 @@ function renderTimetable() {
       </div>
       <div class="day-tabs" style="margin-top:12px" role="tablist" aria-label="Day">
         ${days.map((day) => {
-          const dISO = dateForWeekday(day, clock);
-          const hasExam = examsForDate(dISO).length > 0;
           const classCount = classesForDay(day).length;
-          return `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""} ${hasExam ? "has-exam" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}" title="${hasExam ? "Exam day" : ""}">${escapeHtml(day.slice(0, 3))}${hasExam ? `<span class="exam-dot" aria-label="Exam">📝</span>` : `<small>${classCount} class${classCount === 1 ? "" : "es"}</small>`}</button>`;
+          return `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${classCount} class${classCount === 1 ? "" : "es"}</small></button>`;
         }).join("")}
       </div>
       <div style="margin-top:14px">${dayContent}</div>
@@ -1691,12 +1704,7 @@ function renderDayView(day, clock) {
 }
 
 function renderAgenda() {
-  const clock = now();
   return STUDY_DAYS.map((day) => {
-    const exams = examsForDate(dateForWeekday(day, clock));
-    if (exams.length) {
-      return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge badge-accent">Exam day</span></p><p class="card-sub">${exams.map((exam) => `${escapeHtml(shortExamDate(exam.date))} · ${escapeHtml(exam.title)}`).join("<br>")}</p></div>`;
-    }
     const classes = classesForDay(day);
     if (!classes.length) return "";
     return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${classes.length}</span></p>${classes.map((entry) => classCard(entry, v("timetable.clock"))).join("")}</div>`;
@@ -1705,12 +1713,10 @@ function renderAgenda() {
 
 function renderWeekGrid(clock) {
   const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
-  const examDays = new Set(days.filter((day) => examsForDate(dateForWeekday(day, clock)).length));
   const starts = [...new Set([510, 570, 630, 690, 750, 810, 870, 930, ...state.schedule.filter((entry) => entry.group === state.group).map((entry) => entry.start)])].sort((a, b) => a - b);
   const rows = starts.map((start) => {
     const end = start + 60;
     return `<tr><th scope="row">${escapeHtml(humanTime(start, v("timetable.clock")))}</th>${days.map((day) => {
-      if (examDays.has(day)) return `<td class="is-exam-day"><div class="week-gap">Exam day</div></td>`;
       const dayClasses = classesForDay(day);
       const entries = dayClasses.filter((entry) => entry.start < end && entry.end > start);
       const betweenClasses = !entries.length && dayClasses.some((entry) => entry.end <= start) && dayClasses.some((entry) => entry.start >= end);
@@ -1718,7 +1724,7 @@ function renderWeekGrid(clock) {
       return `<td>${entries.map((entry) => `<div class="week-slot"><strong>${escapeHtml(entry.subject)}</strong><span>${escapeHtml(entry.room)}</span></div>`).join("")}${gap}</td>`;
     }).join("")}</tr>`;
   }).join("");
-  return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => `<th scope="col"${examDays.has(day) ? ' class="is-exam-day"' : ""}>${escapeHtml(day)}${examDays.has(day) ? ` <span class="exam-dot" title="Exam day" aria-label="Exam day">📝</span>` : ""}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => `<th scope="col">${escapeHtml(day)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ── Rooms ─────────────────────────────────────────────────────────────── */
@@ -2108,7 +2114,7 @@ function renderCalendar() {
       <div class="page-actions"><a class="btn btn-sm" href="/notices">Notices</a></div>
     </div>
     ${upcoming.length ? `<section class="card"><div class="card-head"><div><h2 class="card-title">Coming up</h2><p class="card-sub">Next published off days from today.</p></div></div><div class="holiday-row">${upcoming.map((item) => `<div class="holiday-pill"><strong>${escapeHtml(dateOnly(item.date))}</strong><span>${escapeHtml(dayOfWeek(item.date))}</span><small>${escapeHtml(item.name)}</small></div>`).join("")}</div></section>` : ""}
-    <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · ${examYear ? `Your ${examYear === 1 ? "first" : examYear === 2 ? "second" : examYear === 3 ? "third" : "fourth"} year${examGroup ? ` · ${escapeHtml(examGroup)}` : ""}` : "Your matching published exams"}. Only exams for your selected section are shown first; other published exams are collapsed below.</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? `<div class="exam-datesheet-list">${examRows.map(examRowMarkup).join("")}</div>` : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}${otherExamMarkup}</section>
+    <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · ${examYear ? `Your ${examYear === 1 ? "first" : examYear === 2 ? "second" : examYear === 3 ? "third" : "fourth"} year${examGroup ? ` · ${escapeHtml(examGroup)}` : ""}` : "Your matching published exams"}. MSE-II and ESE appear in separate sections; other published exams are collapsed below.</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? renderExamDatesheetSections(examRows) : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}${otherExamMarkup}</section>
     ${publishedDatesheets().length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Published date sheets</h2><p class="card-sub">Transcribed by the college admin from an official notice. The original link is always kept.</p></div><a class="btn btn-sm" href="/notices">All notices</a></div>
       <ul class="doc-list">${publishedDatesheets().map((item) => `<li><div>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "Date sheet")}</a>` : `<strong>${escapeHtml(item.title || "Date sheet")}</strong>`}<span class="badge">${escapeHtml(item.scope || "Examination")}</span>${item.department ? `<span class="badge">${escapeHtml(item.department)}</span>` : ""}<div class="card-sub" style="margin-top:6px">${escapeHtml(item.date ? shortDate(item.date) : "Undated")}${item.body ? ` · ${escapeHtml(String(item.body).slice(0, 400)).replace(/\n/g, " ")}` : ""}</div></div></li>`).join("")}</ul>
     </section>` : ""}
@@ -3598,6 +3604,7 @@ function renderProfileCard() {
     <div class="card-head"><div><h2 class="card-title">Find your student profile</h2><p class="card-sub">Start typing your name, CRN, registration number, or serial number. Choose a roster suggestion to fill your section, subgroup and mentor on this device.</p></div></div>
     <div class="profile-lookup"><label class="visually-hidden" for="profile-lookup">Your name, CRN, registration, or serial number</label><input id="profile-lookup" data-profile-lookup-query value="${escapeHtml(state.profileLookupQuery || profile.name || profile.crn || "")}" placeholder="Start with your name, CRN, registration, or serial" autocomplete="off" /><button class="btn btn-primary" data-action="lookup-profile">Find my profile</button></div>
     <div data-profile-lookup-results aria-live="polite">${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}</div>
+    ${renderRecentProfiles()}
     ${profile.rosterVersion ? `<p class="profile-verified"><span class="badge badge-accent">Roster matched</span> ${escapeHtml(profile.name || "Student")} · ${escapeHtml([profile.section, profile.subsection].filter(Boolean).join(" / ") || "Section not listed")}${profile.mentor ? ` · Mentor ${escapeHtml(profile.mentor)}` : ""}${state.rosterGeneratedAt ? ` · roster ${escapeHtml(shortDate(state.rosterGeneratedAt))}` : ""}</p>` : `<p class="profile-verified">Your profile stays on this device. A name is applied only when the roster match is unambiguous.</p>`}
     <div class="profile-grid profile-main-grid">
       <div class="field"><label for="profile-name">Name</label><input id="profile-name" data-profile="name" value="${escapeHtml(profile.name || "")}" autocomplete="name" /></div>
@@ -4093,6 +4100,14 @@ async function handleAction(action, element) {
     case "lookup-profile":
       await lookupProfileFromSettings();
       break;
+    case "lookup-profile-history": {
+      const record = profileLookupHistory()[Number(element.dataset.profileHistoryIndex)];
+      const input = $("[data-profile-lookup-query]");
+      if (!record || !input) { toast("That recent profile could not be loaded. Search again.", "error"); break; }
+      input.value = record.crn || record.name;
+      await lookupProfileFromSettings();
+      break;
+    }
     case "choose-profile-match": {
       const record = state.profileLookupMatches[Number(element.dataset.profileIndex)];
       if (!record) { toast("That roster match is no longer available. Search again.", "error"); break; }
@@ -4127,6 +4142,7 @@ async function handleAction(action, element) {
         mentorVenue: record.mentorVenue || record.venue || "",
         rosterVersion: state.rosterGeneratedAt || "published"
       }) || state.profile;
+      rememberVerifiedProfile(record);
       if (state.profile.section && state.groups.includes(state.profile.section)) {
         state.group = state.profile.section;
         state.subgroup = subgroupsFor(state.group).includes(state.profile.subsection) ? state.profile.subsection : "";

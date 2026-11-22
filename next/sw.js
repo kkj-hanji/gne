@@ -2,7 +2,7 @@
  * The legacy app is served from another origin and is never controlled here.
  */
 
-const VERSION = "compass-next-v3.1.1";
+const VERSION = "compass-next-v3.1.2";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 
@@ -35,6 +35,7 @@ const SHELL_ASSETS = [
   "./engine/calendar.js",
   "./engine/exams.js",
   "./engine/profile-lookup.js",
+  "./engine/profile-history.js",
   "./engine/mentoring.js",
   "./engine/notices.js",
   "./engine/papers.js",

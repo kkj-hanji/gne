@@ -46,6 +46,22 @@ export function getIndiaNow(reference = new Date()) {
   };
 }
 
+/** A compact, timezone-stable date label for the application header. */
+export function formatHeaderDate(dateISO) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateISO || ""));
+  if (!match) return String(dateISO || "");
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC"
+  }).formatToParts(date);
+  const part = (type) => parts.find((item) => item.type === type)?.value || "";
+  return `${part("weekday")}, ${part("day")} ${part("month")}, ${part("year")}`;
+}
+
 /** Add whole days to an IST calendar day without DST surprises. */
 export function addDays(now, days) {
   const base = Date.UTC(

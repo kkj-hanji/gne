@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { answerLocally, buildAnswerContext } from "../next/engine/answer.js";
-import { examDateSheetPeriod, examEventsForSelection, examsOnDate, nextUpcomingExam } from "../next/engine/exams.js";
+import { examDateSheetPeriod, examEventsForSelection, examsOnDate, groupExamDatesheetEvents, nextUpcomingExam } from "../next/engine/exams.js";
 
 const ese = {
   source: { url: "https://docs.google.com/spreadsheets/d/test/edit" },
@@ -83,7 +83,18 @@ test("official ESE datesheet narrows chemistry and physics group rows by the sel
   assert.equal(examEventsForSelection({ datesheet: ese, group: "ITC" }).filter((event) => event.category === "End-semester exam").length, 1);
 });
 
-test("only important theory/final date-sheets replace the timetable; workshops remain notice items", async () => {
+test("combined datesheets show all MSE-II papers before a separately headed ESE sheet", () => {
+  const mixed = groupExamDatesheetEvents([
+    { category: "MSE-II theory", date: "2026-11-23", title: "First MSE-II paper" },
+    { category: "End-semester exam", date: "2026-11-24", title: "ESE paper" },
+    { category: "MSE-II theory", date: "2026-11-28", title: "Last MSE-II paper" }
+  ]);
+  assert.deepEqual(mixed.map((group) => group.label), ["MSE-II datesheet", "ESE datesheet"]);
+  assert.deepEqual(mixed[0].events.map((event) => event.title), ["First MSE-II paper", "Last MSE-II paper"]);
+  assert.deepEqual(mixed[1].events.map((event) => event.title), ["ESE paper"]);
+});
+
+test("important theory and final papers drive Today exam mode while timetable views stay normal", async () => {
   const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
   const exams = await readFile(new URL("../next/engine/exams.js", import.meta.url), "utf8");
   assert.match(app, /const period = examDateSheetPeriod\(importantExamEvents\(\), clock\)/);
@@ -91,9 +102,16 @@ test("only important theory/final date-sheets replace the timetable; workshops r
   assert.match(exams, /if \(\/workshop\|practical\|lab\/\.test\(label\)\) return false/);
   const todayView = app.slice(app.indexOf("function renderToday()"), app.indexOf("function renderHero("));
   assert.match(todayView, /examMode\s*\n?\s*\? renderExamPeriodCard\(info\.period\)/);
-  assert.match(app, /todayExamSittings\.length \? renderExamDayCard\(todayExamSittings, dateForWeekday\(state\.day, clock\)\)/);
-  assert.match(app, /Today's exam date sheet/);
-  assert.match(app, /Exam datesheet for your selection/);
+  assert.match(app, /function heroDateLabel\(info, clock\)/);
+  assert.match(app, /examTimeLabel\(info\.primary, humanTime\)/);
+  assert.match(app, /groupExamDatesheetEvents\(exams\)/);
+  assert.match(exams, /MSE-II datesheet/);
+  assert.match(exams, /ESE datesheet/);
+  assert.match(app, /Exam datesheet/);
+  assert.match(todayView, /examMode \? "" : `<div class="stat-grid">/);
+  const timetable = app.slice(app.indexOf("function renderTimetable()"), app.indexOf("function renderRooms()"));
+  assert.match(timetable, /: renderDayView\(state\.day, clock\)/);
+  assert.doesNotMatch(timetable, /examsForDate|renderExamDayCard|Exam day|has-exam/);
   const askFlow = app.slice(app.indexOf("async function sendQuestion("), app.indexOf("function updateChatHead("));
   assert.ok(askFlow.indexOf("answerLocally(question, ctx, previousMemory)") < askFlow.indexOf("runBrain(question, ctx)"), "verified local timetable answers must win over Brain lecture guesses");
   assert.match(askFlow, /memory: answer\.memory/);

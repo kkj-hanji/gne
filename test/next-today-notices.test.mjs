@@ -27,7 +27,7 @@ test("full datesheet is grouped for the active profile section and names its exa
   assert.ok(chemistry.every((event) => !/physics group/i.test(`${event.tab} ${event.title}`)));
   assert.ok(physics.every((event) => !/chemistry group/i.test(`${event.tab} ${event.title}`)));
   assert.match(app, /Exam datesheet for your selection/);
-  assert.match(app, /Only exams for your selected section are shown first/);
+  assert.match(app, /MSE-II and ESE appear in separate sections/);
   assert.equal(academicYearForSection("ECB"), 1);
   assert.equal(academicYearForSection("D2ECB1"), 2);
   assert.equal(academicYearForSection("D3CEB"), 3);
