@@ -2,7 +2,7 @@
  * The legacy app is served from another origin and is never controlled here.
  */
 
-const VERSION = "compass-next-v3.1.7";
+const VERSION = "compass-next-v3.1.8";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 

@@ -1797,10 +1797,9 @@ function renderTimetable() {
       </div>
       <div class="day-tabs" style="margin-top:12px" role="tablist" aria-label="Day">
         ${days.map((day) => {
-          const papers = examsForDate(dateForTimetableDay(day, clock));
           const classCount = classesForDay(day).length;
-          const subtitle = papers.length ? `${papers.length} exam${papers.length === 1 ? "" : "s"}` : `${classCount} class${classCount === 1 ? "" : "es"}`;
-          return `<button class="day-tab ${papers.length ? "has-exam" : ""} ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${escapeHtml(subtitle)}</small></button>`;
+          const subtitle = `${classCount} class${classCount === 1 ? "" : "es"}`;
+          return `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${escapeHtml(subtitle)}</small></button>`;
         }).join("")}
       </div>
       <div style="margin-top:14px">${dayContent}</div>
@@ -1809,9 +1808,6 @@ function renderTimetable() {
 }
 
 function renderDayView(day, clock) {
-  const dateISO = dateForTimetableDay(day, clock);
-  const papers = examsForDate(dateISO);
-  if (papers.length) return `<section class="exam-timetable-day"><div class="exam-timetable-heading"><strong>Exam day · ${escapeHtml(shortExamDate(dateISO))}</strong><span>Published papers replace lectures on this date.</span></div><div class="exam-datesheet-list">${papers.map(examRowMarkup).join("")}</div></section>`;
   const classes = classesForDay(day).slice().sort((a, b) => a.start - b.start || a.end - b.end);
   if (!classes.length) return emptyState("☕", `No class on ${day}`, "The official release has no class for this section on this day.", `<button class="btn btn-sm" data-route="rooms">Find a free room</button>`);
   const gaps = new Map(freeGapsBetweenClasses(classes).map((gap) => [gap.start, gap]));
@@ -1834,11 +1830,7 @@ function renderDayView(day, clock) {
 }
 
 function renderAgenda() {
-  const clock = now();
   return STUDY_DAYS.map((day) => {
-    const dateISO = dateForTimetableDay(day, clock);
-    const papers = examsForDate(dateISO);
-    if (papers.length) return `<div class="answer-day agenda-exam-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${escapeHtml(shortExamDate(dateISO))} · ${papers.length} exam${papers.length === 1 ? "" : "s"}</span></p><div class="exam-datesheet-list">${papers.map(examRowMarkup).join("")}</div></div>`;
     const classes = classesForDay(day);
     if (!classes.length) return "";
     return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${classes.length}</span></p>${classes.map((entry) => classCard(entry, v("timetable.clock"))).join("")}</div>`;
@@ -1850,17 +1842,10 @@ function renderWeekGrid(clock) {
   const starts = [...new Set([510, 570, 630, 690, 750, 810, 870, 930, ...state.schedule.filter((entry) => entry.group === state.group).map((entry) => entry.start)])].sort((a, b) => a - b);
   return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => {
     const dateISO = dateForTimetableDay(day, clock);
-    const papers = examsForDate(dateISO);
-    return `<th scope="col">${escapeHtml(day)}<small class="week-date">${escapeHtml(shortExamDate(dateISO))}${papers.length ? " · exam" : ""}</small></th>`;
+    return `<th scope="col">${escapeHtml(day)}<small class="week-date">${escapeHtml(shortExamDate(dateISO))}</small></th>`;
   }).join("")}</tr></thead><tbody>${starts.map((start, index) => {
     const end = start + 60;
     const cells = days.map((day) => {
-      const dateISO = dateForTimetableDay(day, clock);
-      const papers = examsForDate(dateISO);
-      if (papers.length) {
-        if (index) return "";
-        return `<td class="week-exam-cell" rowspan="${starts.length}"><div class="week-exam-list">${papers.map((exam) => `<div><strong>${escapeHtml(exam.title)}</strong><span>${escapeHtml(examTimeLabel(exam, humanTime))}</span></div>`).join("")}</div></td>`;
-      }
       const dayClasses = classesForDay(day);
       const entries = dayClasses.filter((entry) => entry.start < end && entry.end > start);
       const betweenClasses = !entries.length && dayClasses.some((entry) => entry.end <= start) && dayClasses.some((entry) => entry.start >= end);

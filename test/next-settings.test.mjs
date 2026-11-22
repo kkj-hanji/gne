@@ -65,6 +65,10 @@ test("mobile navigation defaults to Today, Ask, Timetable, Rooms and validates o
   assert.deepEqual(new Set(reordered), new Set(NAV_BOTTOM_ROUTES));
 });
 
+test("the Timetable page opens in its weekly timetable table by default", () => {
+  assert.equal(defaultValues()["timetable.view"], "week");
+});
+
 test("side menu order includes all twelve routes, is persistent, and sanitizes invalid entries", () => {
   const values = defaultValues();
   assert.equal(values["nav.sideOrder"], NAV_SIDE_ROUTES.join(","));

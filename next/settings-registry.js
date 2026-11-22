@@ -22,7 +22,7 @@ export const LEGACY_PROFILE_KEY = "gndec-compass-student-v1";
 export const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 export const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
 
-export const APP_VERSION = "2.2.17";
+export const APP_VERSION = "2.2.18";
 export const APP_CHANNEL = "stable";
 
 export const THEMES = ["system", "light", "dark", "oled"];
@@ -240,7 +240,7 @@ export const FLAGS = Object.freeze([
 
   // ── Timetable ────────────────────────────────────────────────────────────
   flag("timetable.view", "Default view", "The view Timetable opens in.", {
-    category: "timetable", type: "select", default: "day", values: [
+    category: "timetable", type: "select", default: "week", values: [
       { value: "day", label: "Day" },
       { value: "week", label: "Week grid" },
       { value: "agenda", label: "Agenda list" }

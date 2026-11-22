@@ -104,7 +104,7 @@ test("weekday timetable tabs map to the upcoming India calendar date", () => {
   assert.equal(dateForTimetableDay("Monday", { dateISO: "2026-02-30", day: "Sunday" }), "");
 });
 
-test("important theory papers drive Today exam mode and replace lecture rows on matching timetable dates", async () => {
+test("Today exam datesheets stay separate from the regular lecture timetable", async () => {
   const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
   const exams = await readFile(new URL("../next/engine/exams.js", import.meta.url), "utf8");
   assert.match(app, /const period = examDateSheetPeriod\(importantExamEvents\(\), clock\)/);
@@ -123,11 +123,9 @@ test("important theory papers drive Today exam mode and replace lecture rows on 
   assert.match(app, /dateForTimetableDay, formatDuration/);
   const timetable = app.slice(app.indexOf("function renderTimetable()"), app.indexOf("function renderRooms()"));
   assert.match(timetable, /: renderDayView\(state\.day, clock\)/);
-  assert.match(timetable, /const papers = examsForDate\(dateForTimetableDay\(day, clock\)\)/);
-  assert.match(timetable, /if \(papers\.length\) return `<section class="exam-timetable-day"/);
-  assert.match(timetable, /function renderAgenda\(\)[\s\S]*?if \(papers\.length\) return `<div class="answer-day agenda-exam-day"/);
-  assert.match(timetable, /week-exam-cell/);
-  assert.match(timetable, /Published papers replace lectures on this date\./);
+  assert.match(timetable, /const classes = classesForDay\(day\)/);
+  assert.match(timetable, /const dayClasses = classesForDay\(day\)/);
+  assert.doesNotMatch(timetable, /examsForDate|exam-timetable-day|agenda-exam-day|week-exam-cell/);
   const askFlow = app.slice(app.indexOf("async function sendQuestion("), app.indexOf("function updateChatHead("));
   assert.ok(askFlow.indexOf("answerLocally(question, ctx, previousMemory)") < askFlow.indexOf("runBrain(question, ctx)"), "verified local timetable answers must win over Brain lecture guesses");
   assert.match(askFlow, /memory: answer\.memory/);
