@@ -162,6 +162,7 @@ test("Ask and the profile/date UI route seating queries locally and keep profile
   const app = await (await import("node:fs/promises")).readFile(new URL("../next/app.js", import.meta.url), "utf8");
   const html = await (await import("node:fs/promises")).readFile(new URL("../next/index.html", import.meta.url), "utf8");
   assert.match(app, /if \(seatingQuestion\) answer = await answerSeatingQuestion\(question\)/);
+  assert.match(app, /const crn = normalizeCrn\(active\?\.crn\)/);
   assert.match(app, /body: JSON\.stringify\(\{ planId: selected\.plan\.id, crn \}\)/);
   assert.match(app, /if \(!answer && v\("ask\.engine"\) === "auto"/);
   assert.match(app, /Your active profile changed during lookup/);

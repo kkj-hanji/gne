@@ -837,7 +837,7 @@ function rosterRecordForProfile() {
 }
 
 function activeProfileCrn() {
-  return normalizeCrn(state.profile?.crn) || normalizeCrn(rosterRecordForProfile()?.crn);
+  return normalizeCrn(rosterRecordForProfile()?.crn);
 }
 
 function profileLookupHistory() {
@@ -1462,8 +1462,12 @@ function todayPlanForExam(plans, exam) {
 async function loadTodaySeating() {
   const info = nextClassInfo();
   const targets = todaySeatingTargets(info);
+  if (!targets.length) return;
+  if (!state.students.length && (state.profile?.crn || state.profile?.name || state.profile?.registrationNo)) {
+    await loadStudents({ quiet: true });
+  }
   const key = todaySeatingKey(info);
-  if (!targets.length || state.todaySeating.key === key && ["loading", "ready", "unavailable", "profile-missing"].includes(state.todaySeating.status)) return;
+  if (state.todaySeating.key === key && ["loading", "ready", "unavailable", "profile-missing"].includes(state.todaySeating.status)) return;
   const crn = activeProfileCrn();
   if (!crn) {
     state.todaySeating = { key, status: "profile-missing", entries: [] };
@@ -3265,7 +3269,7 @@ function seatingAnswer(message) {
 async function answerSeatingQuestion(question) {
   if (!state.students.length) await loadStudents({ quiet: true });
   const active = matchProfileRecord(state.students, state.profile);
-  const crn = normalizeCrn(state.profile?.crn) || normalizeCrn(active?.crn);
+  const crn = normalizeCrn(active?.crn);
   if (!crn) return seatingAnswer("Select and verify your student profile in Settings first. I need its CRN to check the published seating plan.");
 
   const target = seatingStudentForQuestion(question, state.students, state.profile);
@@ -3300,7 +3304,7 @@ async function answerSeatingQuestion(question) {
       startLabel: result.plan.start == null ? "" : humanTime(result.plan.start, v("timetable.clock")),
       endLabel: result.plan.end == null ? "" : humanTime(result.plan.end, v("timetable.clock"))
     };
-    return { html: seatAnswerHtml(answerPlan, result.seat, escapeHtml), intent: "SEATING_LOOKUP", confidence: 1, plan: ["active device-profile CRN selected locally", "one published assignment returned"], entities: {}, source: "published seating plan" };
+    return { html: seatAnswerHtml(answerPlan, result.seat, escapeHtml), intent: "SEATING_LOOKUP", confidence: 1, plan: ["active profile matched to the local roster", "one published assignment returned"], entities: {}, source: "published seating plan" };
   } catch {
     return seatingAnswer("Published sitting plans are temporarily unavailable. No room has been guessed.");
   }
