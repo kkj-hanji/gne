@@ -73,7 +73,8 @@ test("seat lookup resolves exact or unique partial roster identities and chooses
     { name: "Aarav Singh", crn: "1234567", section: "ECB", subsection: "ECB1" },
     { name: "Aarav Singh", crn: "2345678", section: "ECB", subsection: "ECB1" },
     { name: "Mira Kaur", crn: "3456789", section: "ECB", subsection: "ECB2" },
-    { name: "Mohitveer Singh", crn: "4567890", section: "ECB", subsection: "ECB2" }
+    { name: "Mohitveer Singh", crn: "4567890", section: "ECB", subsection: "ECB2" },
+    { name: "Mohit Sharma", crn: "5678901", section: "ECB", subsection: "ECB2" }
   ];
   assert.equal(normalizeCrn("123-4567"), "1234567");
   assert.equal(seatingStudentForQuestion("exam room CRN 123-4567", records).record.crn, "1234567");
@@ -82,6 +83,7 @@ test("seat lookup resolves exact or unique partial roster identities and chooses
   assert.equal(seatingStudentForQuestion("exam room CRN 9999999", records).status, "not-found");
   assert.equal(seatingStudentForQuestion("my exam room", records, { crn: "3456789" }).status, "active-profile");
   assert.equal(seatingStudentForQuestion("mohitveer sitting plan", records, { crn: "1234567" }).record.crn, "4567890");
+  assert.equal(seatingStudentForQuestion("mohit sitting plan", records).status, "ambiguous");
   assert.equal(isSeatingQuestion("Aarav Singh which room", records), true, "an exact roster name plus a room question is recognized");
   assert.equal(isSeatingQuestion("CRN 1234567 room", records), true, "a CRN plus a room question is recognized");
 

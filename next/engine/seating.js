@@ -147,7 +147,7 @@ export function seatingStudentForQuestion(question, records = [], profile = {}) 
   if (partialTokens.length) {
     const partial = records.filter((record) => {
       const nameTokens = normalizedText(record?.name).split(" ").filter(Boolean);
-      return partialTokens.some((queryToken) => nameTokens.some((nameToken) => nameToken.includes(queryToken) || queryToken.includes(nameToken)));
+      return partialTokens.some((queryToken) => nameTokens.some((nameToken) => nameToken.includes(queryToken)));
     });
     if (partial.length === 1) return { status: "matched", record: partial[0] };
     if (partial.length > 1) return { status: "ambiguous" };
