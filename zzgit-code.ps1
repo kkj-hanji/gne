@@ -59,10 +59,10 @@ else {
     Write-Host "No commits to push; $branch is up to date with $upstream." -ForegroundColor DarkGray
 }
 
-Write-Host 'Deploying to Cloudflare...' -ForegroundColor Cyan
-npm run deploy
+Write-Host 'Deploying the Next web to Cloudflare...' -ForegroundColor Cyan
+npm run deploy:next
 if ($LASTEXITCODE -ne 0) {
-    throw "Cloudflare deploy failed with exit code $LASTEXITCODE."
+    throw "Next web deploy failed with exit code $LASTEXITCODE."
 }
 
-Write-Host 'Push and Cloudflare deploy completed.' -ForegroundColor Green
+Write-Host 'Push and Next web deploy completed.' -ForegroundColor Green
