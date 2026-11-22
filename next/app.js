@@ -1023,13 +1023,29 @@ function importantExamEvents() {
   return importantExamEventsForSelection({ datesheet: state.datesheet, group: state.group, branch: state.profile.branch });
 }
 
-function examRowMarkup(exam) {
-  return `<article class="exam-datesheet-row"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</p></div><a class="chip" href="${escapeHtml(exam.sourceUrl || "/notices")}" ${exam.sourceUrl?.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source ↗</a></article>`;
+function examSeatInlineMarkup(entry) {
+  if (!entry) return "";
+  let detail = "Checking the published room and row&hellip;";
+  if (entry.status === "matched") {
+    const row = entry.seat.row != null ? escapeHtml(String(entry.seat.row)) : "Not listed";
+    detail = `Room <strong>${escapeHtml(entry.seat.room)}</strong> &middot; Row <strong>${row}</strong>`;
+  } else if (entry.status === "no-plan") detail = "No seating plan is published for this paper.";
+  else if (entry.status === "missing") detail = "No assignment for this profile appears in the published plan.";
+  else if (entry.status === "unavailable") detail = "Published seating is temporarily unavailable.";
+  else if (entry.status === "profile-missing") detail = 'Verify your student profile in <a href="/settings">Settings</a> to show your room and row.';
+  return `<p class="exam-seat-inline" role="status"><strong>Your seating</strong><span>${detail}</span></p>`;
 }
 
-function renderExamDatesheetSections(exams) {
+function examRowMarkup(exam, seatEntry = null) {
+  return `<article class="exam-datesheet-row"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(exam.category)}${exam.tab ? ` &middot; ${escapeHtml(exam.tab)}` : ""}${exam.sessionRaw ? ` &middot; ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` &middot; ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</p>${examSeatInlineMarkup(seatEntry)}</div><a class="chip" href="${escapeHtml(exam.sourceUrl || "/notices")}" ${exam.sourceUrl?.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source &rarr;</a></article>`;
+}
+
+function renderExamDatesheetSections(exams, seatEntries = []) {
   const groups = groupExamDatesheetEvents(exams);
-  return groups.length ? `<div class="exam-datesheet-sections">${groups.map((group) => `<section class="exam-datesheet-section"><h3>${escapeHtml(group.label)}</h3><div class="exam-datesheet-list">${group.events.map(examRowMarkup).join("")}</div></section>`).join("")}</div>` : "";
+  const entryFor = (exam) => seatEntries.find((entry) => entry.exam?.id && exam.id
+    ? entry.exam.id === exam.id
+    : entry.exam?.date === exam.date && normalizeSeatingText(entry.exam?.title) === normalizeSeatingText(exam.title));
+  return groups.length ? `<div class="exam-datesheet-sections">${groups.map((group) => `<section class="exam-datesheet-section"><h3>${escapeHtml(group.label)}</h3><div class="exam-datesheet-list">${group.events.map((exam) => examRowMarkup(exam, entryFor(exam))).join("")}</div></section>`).join("")}</div>` : "";
 }
 
 function otherExamSections(primaryRows, selectedYear, selectedGroup) {
@@ -1384,12 +1400,11 @@ function renderToday() {
   const freeRooms = !examMode && v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
   const timelineClock = lookAhead ? { ...clock, day: timelineDay, minutes: 0 } : clock;
   const timeline = examMode
-    ? renderExamPeriodCard(info.period)
+    ? renderExamPeriodCard(info.period, info)
     : v("today.hero") === "timeline" ? ""
       : renderTodayTimeline(timelineClasses, timelineClock, { lookAhead });
   const notices = v("today.noticesCard") ? renderNoticesCard() : "";
   const examCard = v("today.examCountdown") && exam && !examMode ? renderExamCard(exam) : "";
-  const seatingCard = renderTodaySeatingCard(info);
   const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
   const holiday = v("today.holidayBanner") ? holidayOn(clock.dateISO, holidayOverrides()) : null;
 
@@ -1409,7 +1424,6 @@ function renderToday() {
         ${freeRooms}
       </div>
       <div class="stack">
-        ${seatingCard}
         ${examCard}
         ${notices}
       </div>
@@ -1429,22 +1443,14 @@ function todaySeatingKey(info) {
   return targets.length ? `${crn}|${targets.map((exam) => `${exam.date}:${exam.id || exam.title}`).join(";")}` : "";
 }
 
-function renderTodaySeatingCard(info) {
+function todaySeatingEntries(info) {
   const targets = todaySeatingTargets(info);
-  if (!targets.length) return "";
+  if (!targets.length) return [];
   const key = todaySeatingKey(info);
   const loaded = state.todaySeating.key === key ? state.todaySeating : null;
-  const content = loaded?.status === "ready" ? loaded.entries.map((entry) => {
-      if (entry.status === "no-plan") return `<div class="today-seating-entry"><strong>${escapeHtml(entry.exam.title)}</strong><p class="card-sub">${escapeHtml(shortExamDate(entry.exam.date))}${entry.exam.start != null ? ` · ${escapeHtml(examTimeLabel(entry.exam, humanTime))}` : ""} · No published seating plan found for this paper.</p></div>`;
-      if (entry.status === "missing") return `<div class="today-seating-entry"><strong>${escapeHtml(entry.exam.title)}</strong><p class="card-sub">${escapeHtml(shortExamDate(entry.exam.date))} · The published plan has no assignment for the active profile.</p></div>`;
-      if (entry.status !== "matched") return `<div class="today-seating-entry"><strong>${escapeHtml(entry.exam.title)}</strong><p class="card-sub">The published seating service is temporarily unavailable.</p></div>`;
-      return `<div class="today-seating-entry"><strong>${escapeHtml(entry.plan.subject || entry.exam.title)}</strong><p class="card-sub">${escapeHtml(shortExamDate(entry.plan.date))}${entry.plan.start != null ? ` · ${escapeHtml(humanTime(entry.plan.start, v("timetable.clock")))}${entry.plan.end != null ? `–${escapeHtml(humanTime(entry.plan.end, v("timetable.clock")))}` : ""}` : ""}</p><dl class="today-seat-details"><div><dt>Room</dt><dd>${escapeHtml(entry.seat.room)}</dd></div><div><dt>Row</dt><dd>${entry.seat.row != null ? escapeHtml(String(entry.seat.row)) : "Not listed"}</dd></div></dl></div>`;
-    }).join("") : loaded?.status === "unavailable"
-      ? `<p class="card-sub">Published seating plans are temporarily unavailable. Try again when you are online.</p>`
-      : loaded?.status === "profile-missing"
-        ? `<p class="card-sub">Set or verify your profile in Settings to look up your room and row.</p><a class="btn btn-sm" href="/settings">Open profile settings</a>`
-        : `<p class="card-sub" role="status">Checking the published seating plan…</p>`;
-  return `<section class="card today-seating-card"><div class="card-head"><div><h2 class="card-title">Your exam room &amp; row</h2><p class="card-sub">Matched to the active device profile and published seating data.</p></div><a class="btn btn-sm" href="/calendar#exam-datesheet">Datesheet</a></div>${content}</section>`;
+  if (loaded?.status === "ready") return loaded.entries;
+  const status = loaded?.status || "loading";
+  return targets.map((exam) => ({ status, exam }));
 }
 
 function todayPlanForExam(plans, exam) {
@@ -1686,7 +1692,7 @@ function renderExamCard(exam) {
   </section>`;
 }
 
-function renderExamPeriodCard(period) {
+function renderExamPeriodCard(period, info = null) {
   const todayExams = period.today || [];
   const next = period.next;
   const status = todayExams.length
@@ -1694,9 +1700,9 @@ function renderExamPeriodCard(period) {
     : next
       ? `No paper is scheduled today. The next published paper is ${escapeHtml(next.title)} on ${escapeHtml(shortExamDate(next.date))}.`
       : "No paper is scheduled today.";
-  const rows = renderExamDatesheetSections(period.exams || []);
+  const rows = renderExamDatesheetSections(period.exams || [], info ? todaySeatingEntries(info) : []);
   return `<section class="card exam-day-card exam-period-card">
-    <div class="card-head"><div><h2 class="card-title">Exam datesheet</h2><p class="card-sub">${escapeHtml(selectionLabel())} · active from ${escapeHtml(shortExamDate(period.startDate))}. MSE-II and ESE are listed in separate sections.</p></div><a class="btn btn-sm" href="/calendar#exam-datesheet">Full datesheet</a></div>
+    <div class="card-head"><div><h2 class="card-title">Exam datesheet</h2><p class="card-sub">${escapeHtml(selectionLabel())} &middot; active from ${escapeHtml(shortExamDate(period.startDate))}. MSE-II and ESE are listed in separate sections.</p></div><a class="btn btn-sm" href="/calendar#exam-datesheet">Full datesheet</a></div>
     <p class="exam-period-status" role="status">${status}</p>
     ${rows || `<p class="exam-period-status">No matching published papers were found in the loaded datesheet.</p>`}
   </section>`;
@@ -3268,16 +3274,15 @@ function seatingAnswer(message) {
 
 async function answerSeatingQuestion(question) {
   if (!state.students.length) await loadStudents({ quiet: true });
-  const active = matchProfileRecord(state.students, state.profile);
-  const crn = normalizeCrn(active?.crn);
-  if (!crn) return seatingAnswer("Select and verify your student profile in Settings first. I need its CRN to check the published seating plan.");
-
   const target = seatingStudentForQuestion(question, state.students, state.profile);
-  if (target.status === "ambiguous") return seatingAnswer("I found more than one matching roster record. Search by the full CRN, select that profile in Settings, then ask again.");
-  if (target.status === "not-found") return seatingAnswer("That CRN is not in the roster available on this device. I did not send it to an external AI or guess a room.");
-  if (target.status === "matched" && normalizeCrn(target.record?.crn) !== crn) {
-    return seatingAnswer("This request names a different roster profile. Switch to that verified profile in Settings before asking for its room.");
-  }
+  if (target.status === "ambiguous") return seatingAnswer("More than one roster entry matches that name. Try the full name or exact CRN so I can verify the right student.");
+  if (target.status === "not-found") return seatingAnswer("That CRN is not in the verified roster loaded on this device. I did not guess a room or row.");
+
+  const explicitlyNamed = target.status === "matched";
+  const active = explicitlyNamed ? null : matchProfileRecord(state.students, state.profile);
+  const record = explicitlyNamed ? target.record : active;
+  const crn = normalizeCrn(record?.crn);
+  if (!crn) return seatingAnswer("Select and verify your student profile in Settings, or ask with a student name or CRN that matches the roster.");
 
   try {
     const listResponse = await fetch("/api/seatings", { cache: "no-store", headers: { Accept: "application/json" } });
@@ -3295,16 +3300,19 @@ async function answerSeatingQuestion(question) {
     });
     if (!response.ok) return seatingAnswer("The published seating service could not verify this assignment. Try again later.");
     const result = await response.json();
-    if (activeProfileCrn() !== crn) {
+    const stillVerified = state.students.filter((student) => normalizeCrn(student?.crn) === crn);
+    if (stillVerified.length !== 1) return seatingAnswer("The roster changed during lookup, so I could not safely confirm this assignment. Ask again after the roster refreshes.");
+    if (!explicitlyNamed && activeProfileCrn() !== crn) {
       return seatingAnswer("Your active profile changed during lookup. Ask again to check the current profile.");
     }
-    if (!result?.seat?.room || result.plan?.id !== selected.plan.id) return seatingAnswer("This published seating plan does not list a room for the active profile.");
+    if (!result?.seat?.room || result.plan?.id !== selected.plan.id) return seatingAnswer("This published seating plan does not list a room for the verified student.");
     const answerPlan = {
       ...result.plan,
       startLabel: result.plan.start == null ? "" : humanTime(result.plan.start, v("timetable.clock")),
       endLabel: result.plan.end == null ? "" : humanTime(result.plan.end, v("timetable.clock"))
     };
-    return { html: seatAnswerHtml(answerPlan, result.seat, escapeHtml), intent: "SEATING_LOOKUP", confidence: 1, plan: ["active profile matched to the local roster", "one published assignment returned"], entities: {}, source: "published seating plan" };
+    const studentLabel = explicitlyNamed ? `${record.name} (CRN ${crn})` : "";
+    return { html: seatAnswerHtml(answerPlan, result.seat, escapeHtml, studentLabel), intent: "SEATING_LOOKUP", confidence: 1, plan: [explicitlyNamed ? "explicit name or CRN matched to one verified roster record" : "active profile matched to the local roster", "one published assignment returned"], entities: {}, source: "published seating plan" };
   } catch {
     return seatingAnswer("Published sitting plans are temporarily unavailable. No room has been guessed.");
   }

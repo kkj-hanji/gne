@@ -25,7 +25,7 @@
   --shadow-2: 0 24px 60px rgba(0, 0, 0, .28);
   --shadow-topbar: 0 4px 24px rgba(0, 0, 0, .18);
   --sidebar-w: 264px;
-  --topbar-h: 74px;
+  --topbar-h: 82px;
   --ease: cubic-bezier(.22, .8, .26, 1);
   --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
   --speed: 200ms;
@@ -313,9 +313,9 @@ main { view-transition-name: compass-main-content; }
 .topbar-title { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
 .topbar-title h1 { font-size: clamp(1.15rem, 1rem + .6vw, 1.45rem); letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .eyebrow { color: var(--muted); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; }
-.topbar-clock { display: grid; align-content: center; gap: 2px; margin-left: auto; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)); border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: .68rem; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.topbar-clock-date { font-weight: 750; }
-.topbar-clock-time { color: var(--muted); font-size: .62rem; text-align: right; }
+.topbar-clock { display: grid; align-content: center; gap: 3px; margin-left: auto; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)); border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: .78rem; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.topbar-clock-date { font-size: .82rem; font-weight: 750; }
+.topbar-clock-time { color: var(--muted); font-size: .7rem; text-align: right; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 
 .icon-button {
@@ -481,6 +481,9 @@ main {
 .exam-datesheet-row time strong { font-size: .86rem; }
 .exam-datesheet-row time small, .exam-datesheet-row p { margin: 0; color: var(--muted); font-size: .75rem; }
 .exam-datesheet-row h3 { margin: 0 0 4px; font-size: .92rem; }
+.exam-datesheet-row .exam-seat-inline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 10px; margin: 9px 0 0; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 65%, var(--surface)); color: var(--text-soft); font-size: .78rem; line-height: 1.4; }
+.exam-seat-inline > strong { color: var(--accent-ink); font-size: .74rem; }
+.exam-seat-inline a { color: var(--accent-ink); font-weight: 750; text-decoration: underline; text-underline-offset: 2px; }
 .exam-period-groups { display: grid; gap: 12px; }
 .exam-period-day > h3 { margin: 12px 0 0; color: var(--accent-ink); font-size: .84rem; }
 .exam-datesheet-row.is-complete { opacity: .62; }
@@ -973,6 +976,14 @@ kbd { font-family: var(--font-mono); font-size: .66rem; border: 1px solid var(--
 }
 
 @media (max-width: 640px) {
+  :root { --topbar-h: 100px; }
+  .topbar { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; grid-template-rows: 42px 38px; align-content: center; gap: 4px 8px; padding: 7px 10px; }
+  .menu-button { grid-column: 1; grid-row: 1; }
+  .topbar-title { grid-column: 2; grid-row: 1; }
+  .topbar-actions { grid-column: 3; grid-row: 1; margin-left: 0; gap: 4px; }
+  .topbar-clock { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 38px; margin: 0; padding: 6px 12px; font-size: .84rem; }
+  .topbar-clock-date { font-size: .86rem; }
+  .topbar-clock-time { font-size: .78rem; }
   .stat-grid { grid-template-columns: minmax(0, 1fr); }
   .stat { display: flex; align-items: baseline; gap: 10px; }
   .stat-value { margin-top: 0; }
@@ -991,8 +1002,6 @@ kbd { font-family: var(--font-mono); font-size: .66rem; border: 1px solid var(--
   .timeline-item { grid-template-columns: 62px 14px minmax(0, 1fr); gap: 8px; }
   .chat-window { padding: 12px; }
   .msg { max-width: 96%; }
-  .topbar-clock { margin-left: auto; padding: 5px 6px; font-size: .6rem; }
-  .topbar-clock-time { font-size: .56rem; }
   .topbar-title .eyebrow { display: none; }
   .toast-root { left: 12px; right: 12px; bottom: 84px; align-items: stretch; }
   .toast { max-width: none; }
@@ -1001,8 +1010,7 @@ kbd { font-family: var(--font-mono); font-size: .66rem; border: 1px solid var(--
 
 @media (max-width: 380px) {
   .topbar-title .eyebrow { display: none; }
-  .topbar-clock { max-width: none; overflow: visible; font-size: .55rem; padding: 4px 5px; }
-  .topbar-clock-time { font-size: .52rem; }
+  .topbar-clock { padding-left: 10px; padding-right: 10px; }
   .page-actions { width: 100%; }
   .page-actions .btn { flex: 1; }
 }
@@ -1202,9 +1210,9 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
 
 /* Very small / very zoomed screens (320px and below). */
 @media (max-width: 360px) {
-  :root { --topbar-h: 62px; }
+  :root { --topbar-h: 100px; }
   main { padding-left: 8px; padding-right: 8px; }
-  .topbar { gap: 6px; padding-left: 4px; padding-right: 4px; }
+  .topbar { column-gap: 6px; padding-left: 8px; padding-right: 8px; }
   .topbar-title h1 { font-size: 1.05rem; }
   .brand { gap: 8px; padding-bottom: 10px; }
   .brand-text small { display: none; }
@@ -2699,9 +2707,3 @@ h2, .section-title { font-size: clamp(1rem, 4vw, 1.4rem); }
   cursor: pointer;
   padding: 4px;
 }
-
-.today-seating-entry + .today-seating-entry { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
-.today-seat-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0 0; }
-.today-seat-details > div { min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
-.today-seat-details dt { color: var(--muted); font-size: .72rem; }
-.today-seat-details dd { margin: 3px 0 0; font-weight: 800; overflow-wrap: anywhere; }

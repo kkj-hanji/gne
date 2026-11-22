@@ -97,9 +97,11 @@ export function parseSeatingPlanText(value) {
 export function isSeatingQuestion(question, records = [], activeName = "") {
   const raw = String(question || "").toLowerCase();
   const text = normalizedText(question);
+  const intentText = text.replace(/\bplab\b/g, "plan");
   const hindi = /(?:परीक्षा|पेपर|कमर[ेा]|कक्ष|सीट|कहाँ|कहां|किधर)/u.test(raw);
   if (!text && !hindi) return false;
   const hasCrn = /(?<!\d)(?:\d{3}[\s-]\d{4}|\d{6,12})(?!\d)/.test(String(question || ""));
+  const crnOnly = /^\s*(?:crn\s*)?(?:\d{3}[\s-]\d{4}|\d{6,12})\s*$/i.test(String(question || ""));
   const asksWhere = /\b(?:room|rm|where|which|kidhar|kithhe|kithay|kahaan|kahan|kamra)\b/.test(text) || /(?:कहाँ|कहां|किधर|कक्ष|कमर[ेा])/u.test(raw);
   let hasRosterName = false;
   if (asksWhere && !hasCrn && !/\b(?:free|available|vacant|khaali)\b/.test(text)) {
@@ -113,7 +115,8 @@ export function isSeatingQuestion(question, records = [], activeName = "") {
       if (name.length >= 3 && text.includes(name)) { hasRosterName = true; break; }
     }
   }
-  const seat = /\b(?:seat|seating|seat plan|sitt?ing plan|sitt?ing arrang(?:e)?ment|allotted seat|hall ticket|exam room|paper room|room allotment)\b/.test(text)
+  const seat = crnOnly
+    || /\b(?:seat|seating|seat plan|sitt?ing plan|sitt?ing arrang(?:e)?ment|sitt?ing class|sitt?ing row|sitt?ing location|allotted seat|hall ticket|exam room|paper room|room allotment)\b/.test(intentText)
     || /\b(?:room|rm|where|which|kidhar|kithhe|kithay|kahaan|kahan|kamra)\b/.test(text)
       && /\b(?:exam|paper|mse|ese|pariksha|imtihan)\b/.test(text)
     || /\b(?:mera|meri|mere)\b.*\b(?:paper|exam|room|seat|kamra)\b/.test(text)
@@ -190,6 +193,7 @@ export function selectSeatingPlan(plans = [], question, { dateISO, minutes = 0 }
   return nearest.length === 1 ? { status: "matched", plan: nearest[0] } : { status: "ambiguous", plans: nearest };
 }
 
-export function seatAnswerHtml(plan, seat, escapeHtml = (value) => String(value)) {
-  return `<p><strong>${escapeHtml(plan.subject || plan.title)}</strong> · ${escapeHtml(plan.date)}${plan.start != null && plan.end != null ? ` · ${escapeHtml(String(plan.startLabel || ""))}${plan.startLabel ? "–" : ""}${escapeHtml(String(plan.endLabel || ""))}` : ""}</p><p>Your published seating plan lists <strong>${escapeHtml(seat.room)}</strong>${seat.row ? ` · Row <strong>${escapeHtml(String(seat.row))}</strong>` : ""}${seat.section ? ` · ${escapeHtml(seat.section)}` : ""}.</p><p class="answer-source">Source: ${escapeHtml(plan.sourceName || "uploaded seating plan")}. Seat data is matched by the exact active-profile CRN.</p>`;
+export function seatAnswerHtml(plan, seat, escapeHtml = (value) => String(value), studentLabel = "") {
+  const assignmentFor = studentLabel ? `Published seating for <strong>${escapeHtml(studentLabel)}</strong>` : "Your published seating plan";
+  return `<p><strong>${escapeHtml(plan.subject || plan.title)}</strong> &middot; ${escapeHtml(plan.date)}${plan.start != null && plan.end != null ? ` &middot; ${escapeHtml(String(plan.startLabel || ""))}${plan.startLabel ? "&ndash;" : ""}${escapeHtml(String(plan.endLabel || ""))}` : ""}</p><p>${assignmentFor} lists <strong>${escapeHtml(seat.room)}</strong>${seat.row ? ` &middot; Row <strong>${escapeHtml(String(seat.row))}</strong>` : ""}${seat.section ? ` &middot; ${escapeHtml(seat.section)}` : ""}.</p><p class="answer-source">Source: ${escapeHtml(plan.sourceName || "uploaded seating plan")}. Assignment matched by exact CRN in the verified roster.</p>`;
 }

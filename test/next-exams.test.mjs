@@ -111,7 +111,8 @@ test("important theory papers drive Today exam mode and replace lecture rows on 
   assert.match(app, /function importantExamEvents\(\)/);
   assert.match(exams, /if \(\/workshop\|practical\|lab\/\.test\(label\)\) return false/);
   const todayView = app.slice(app.indexOf("function renderToday()"), app.indexOf("function renderHero("));
-  assert.match(todayView, /examMode\s*\n?\s*\? renderExamPeriodCard\(info\.period\)/);
+  assert.match(todayView, /examMode\s*\n?\s*\? renderExamPeriodCard\(info\.period, info\)/);
+  assert.match(app, /function renderExamDatesheetSections\(exams, seatEntries = \[\]\)/);
   assert.match(app, /function heroDateLabel\(info, clock\)/);
   assert.match(app, /examTimeLabel\(info\.primary, humanTime\)/);
   assert.match(app, /groupExamDatesheetEvents\(exams\)/);

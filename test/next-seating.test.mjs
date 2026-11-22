@@ -62,6 +62,9 @@ test("seating intent handles English, shorthand, misspelling, Hinglish and Hindi
     "mera paper kidhar hai",
     "MSE 2 ka sitting plan",
     "siting arrangment for maths",
+    "mohitveer singh sitting plab",
+    "mohitveer singh sitting class",
+    "2615231",
     "मेरा पेपर किस कमरे में है?"
   ]) assert.equal(isSeatingQuestion(question), true, question);
   assert.equal(isSeatingQuestion("Show my timetable for tomorrow"), false);
@@ -73,7 +76,7 @@ test("seat lookup resolves exact or unique partial roster identities and chooses
     { name: "Aarav Singh", crn: "1234567", section: "ECB", subsection: "ECB1" },
     { name: "Aarav Singh", crn: "2345678", section: "ECB", subsection: "ECB1" },
     { name: "Mira Kaur", crn: "3456789", section: "ECB", subsection: "ECB2" },
-    { name: "Mohitveer Singh", crn: "4567890", section: "ECB", subsection: "ECB2" },
+    { name: "Mohitveer Singh", crn: "2615231", section: "ECB", subsection: "ECB2" },
     { name: "Mohit Sharma", crn: "5678901", section: "ECB", subsection: "ECB2" }
   ];
   assert.equal(normalizeCrn("123-4567"), "1234567");
@@ -82,7 +85,11 @@ test("seat lookup resolves exact or unique partial roster identities and chooses
   assert.equal(seatingStudentForQuestion("Aarav Singh exam room", records).status, "ambiguous");
   assert.equal(seatingStudentForQuestion("exam room CRN 9999999", records).status, "not-found");
   assert.equal(seatingStudentForQuestion("my exam room", records, { crn: "3456789" }).status, "active-profile");
-  assert.equal(seatingStudentForQuestion("mohitveer sitting plan", records, { crn: "1234567" }).record.crn, "4567890");
+  assert.equal(seatingStudentForQuestion("mohitveer sitting plan", records, { crn: "1234567" }).record.crn, "2615231");
+  const explicitOtherStudentQuestion = "mohitveer singh sitting plab";
+  assert.equal(isSeatingQuestion(explicitOtherStudentQuestion, records), true);
+  assert.equal(seatingStudentForQuestion(explicitOtherStudentQuestion, records, { crn: "2617070", name: "Kaushik Jain" }).record.crn, "2615231", "an exact name query can select a different verified student without switching device profile");
+  assert.equal(seatingStudentForQuestion("2615231 sitting plan", records, { crn: "2617070" }).record.crn, "2615231");
   assert.equal(seatingStudentForQuestion("mohit sitting plan", records).status, "ambiguous");
   assert.equal(isSeatingQuestion("Aarav Singh which room", records), true, "an exact roster name plus a room question is recognized");
   assert.equal(isSeatingQuestion("CRN 1234567 room", records), true, "a CRN plus a room question is recognized");
@@ -97,6 +104,9 @@ test("seat lookup resolves exact or unique partial roster identities and chooses
   const html = seatAnswerHtml({ subject: "Maths", date: "2026-11-23", sourceName: "seating.pdf" }, { room: "<F-101>", row: 6 }, (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"));
   assert.match(html, /&lt;F-101&gt;/);
   assert.match(html, /Row <strong>6<\/strong>/);
+  const namedHtml = seatAnswerHtml({ subject: "Maths", date: "2026-11-23", sourceName: "seating.pdf" }, { room: "F-101", row: 2 }, (value) => String(value), "Mohitveer Singh (CRN 2615231)");
+  assert.match(namedHtml, /Published seating for <strong>Mohitveer Singh \(CRN 2615231\)<\/strong>/);
+  assert.match(namedHtml, /exact CRN in the verified roster/);
 });
 
 test("seating API publishes privately, reveals one exact assignment, and deletes it", async () => {
@@ -162,11 +172,15 @@ test("Ask and the profile/date UI route seating queries locally and keep profile
   const app = await (await import("node:fs/promises")).readFile(new URL("../next/app.js", import.meta.url), "utf8");
   const html = await (await import("node:fs/promises")).readFile(new URL("../next/index.html", import.meta.url), "utf8");
   assert.match(app, /if \(seatingQuestion\) answer = await answerSeatingQuestion\(question\)/);
-  assert.match(app, /const crn = normalizeCrn\(active\?\.crn\)/);
+  assert.match(app, /const explicitlyNamed = target\.status === "matched"/);
+  assert.match(app, /const crn = normalizeCrn\(record\?\.crn\)/);
   assert.match(app, /body: JSON\.stringify\(\{ planId: selected\.plan\.id, crn \}\)/);
+  assert.match(app, /seatAnswerHtml\(answerPlan, result\.seat, escapeHtml, studentLabel\)/);
   assert.match(app, /if \(!answer && v\("ask\.engine"\) === "auto"/);
   assert.match(app, /Your active profile changed during lookup/);
-  assert.match(app, /Your exam room &amp; row/);
+  assert.match(app, /class="exam-seat-inline"/);
+  assert.doesNotMatch(app, /This request names a different roster profile/);
+  assert.doesNotMatch(app, /today-seating-card/);
   assert.match(app, /data-admin-sign-in-form/);
   assert.match(app, /element\?\.closest\("\.send-button"\)/);
   assert.match(app, /<details class="profile-history">/);
