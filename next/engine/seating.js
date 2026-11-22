@@ -50,20 +50,33 @@ export function parseSeatingPlanText(value) {
     }
     roomNames.add(roomKey);
     const table = body.slice(tableStart, tableStart + tableEnd);
-    const roomSeats = [...table.matchAll(/\b\d{6,12}\b/g)].map((match) => match[0]);
+    const roomSeats = [];
+    let activeRow = 0;
+    for (const line of table.split(/\r?\n/)) {
+      const printedRow = /^\s*(\d{1,3})(?:\s+|$)/.exec(line);
+      if (printedRow) activeRow = Number(printedRow[1]);
+      for (const match of line.matchAll(/\b\d{6,12}\b/g)) {
+        if (!activeRow) {
+          warnings.push(`${room}: a CRN appears before a numbered seat row.`);
+          continue;
+        }
+        roomSeats.push({ crn: match[0], row: activeRow });
+      }
+    }
     const expected = Number(summary[1]);
     if (!roomSeats.length || roomSeats.length !== expected) {
       warnings.push(`${room}: printed total ${expected}, extracted ${roomSeats.length}.`);
       continue;
     }
-    for (const crn of roomSeats) {
+    for (const assignment of roomSeats) {
+      const { crn, row } = assignment;
       const previousRoom = crnRooms.get(crn);
       if (previousRoom) {
         warnings.push(`A CRN appears in more than one room (${previousRoom}; ${room}).`);
         continue;
       }
       crnRooms.set(crn, room);
-      seats.push({ crn, room });
+      seats.push({ crn, room, row });
       if (seats.length > MAX_SEATS_PER_PLAN) {
         return { ok: false, error: "This seating plan exceeds the 3,000-seat review limit.", seats: [], rooms: headings.length, warnings: [] };
       }
@@ -129,6 +142,16 @@ export function seatingStudentForQuestion(question, records = [], profile = {}) 
     const best = named.filter((record) => normalizedText(record.name).length === longest);
     return best.length === 1 ? { status: "matched", record: best[0] } : { status: "ambiguous" };
   }
+  const ignored = new Set(["where", "which", "room", "exam", "paper", "seat", "seating", "sitting", "plan", "arrangement", "my", "mera", "meri", "mere", "for", "what", "is", "the", "tomorrow", "today", "please", "mse", "ese", "tell", "me", "find", "show", "do", "have", "hai", "ka", "ki", "ke", "in", "mein"]);
+  const partialTokens = text.split(" ").filter((token) => token.length >= 4 && !ignored.has(token));
+  if (partialTokens.length) {
+    const partial = records.filter((record) => {
+      const nameTokens = normalizedText(record?.name).split(" ").filter(Boolean);
+      return partialTokens.some((queryToken) => nameTokens.some((nameToken) => nameToken.includes(queryToken) || queryToken.includes(nameToken)));
+    });
+    if (partial.length === 1) return { status: "matched", record: partial[0] };
+    if (partial.length > 1) return { status: "ambiguous" };
+  }
   return { status: "active-profile", profile };
 }
 
@@ -168,5 +191,5 @@ export function selectSeatingPlan(plans = [], question, { dateISO, minutes = 0 }
 }
 
 export function seatAnswerHtml(plan, seat, escapeHtml = (value) => String(value)) {
-  return `<p><strong>${escapeHtml(plan.subject || plan.title)}</strong> · ${escapeHtml(plan.date)}${plan.start != null && plan.end != null ? ` · ${escapeHtml(String(plan.startLabel || ""))}${plan.startLabel ? "–" : ""}${escapeHtml(String(plan.endLabel || ""))}` : ""}</p><p>Your published seating plan lists <strong>${escapeHtml(seat.room)}</strong>${seat.section ? ` · ${escapeHtml(seat.section)}` : ""}.</p><p class="answer-source">Source: ${escapeHtml(plan.sourceName || "uploaded seating plan")}. Seat data is matched by the exact published CRN.</p>`;
+  return `<p><strong>${escapeHtml(plan.subject || plan.title)}</strong> · ${escapeHtml(plan.date)}${plan.start != null && plan.end != null ? ` · ${escapeHtml(String(plan.startLabel || ""))}${plan.startLabel ? "–" : ""}${escapeHtml(String(plan.endLabel || ""))}` : ""}</p><p>Your published seating plan lists <strong>${escapeHtml(seat.room)}</strong>${seat.row ? ` · Row <strong>${escapeHtml(String(seat.row))}</strong>` : ""}${seat.section ? ` · ${escapeHtml(seat.section)}` : ""}.</p><p class="answer-source">Source: ${escapeHtml(plan.sourceName || "uploaded seating plan")}. Seat data is matched by the exact active-profile CRN.</p>`;
 }

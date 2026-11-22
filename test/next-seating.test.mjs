@@ -39,10 +39,14 @@ test("seating PDF text parser verifies each room total and rejects incomplete or
   assert.equal(parsed.ok, true);
   assert.equal(parsed.rooms, 2);
   assert.deepEqual(parsed.seats, [
-    { crn: "1234567", room: "F-101" },
-    { crn: "2345678", room: "F-101" },
-    { crn: "3456789", room: "G-204" }
+    { crn: "1234567", room: "F-101", row: 1 },
+    { crn: "2345678", room: "F-101", row: 2 },
+    { crn: "3456789", room: "G-204", row: 1 }
   ]);
+
+  const splitLines = parseSeatingPlanText("Room No. A-101\nS. No. CRN\n1 4567890\n5678901\n2 6789012\nSECTION ALLOTTED\nTOTAL STU. 3");
+  assert.equal(splitLines.ok, true);
+  assert.deepEqual(splitLines.seats.map(({ crn, row }) => [crn, row]), [["4567890", 1], ["5678901", 1], ["6789012", 2]]);
 
   const mismatch = parseSeatingPlanText(roomBlock("F-101", ["1234567"], 2));
   assert.equal(mismatch.ok, false);
@@ -64,11 +68,12 @@ test("seating intent handles English, shorthand, misspelling, Hinglish and Hindi
   assert.equal(isSeatingQuestion("When is the exam?"), false);
 });
 
-test("seat lookup resolves only exact roster identities and chooses the matching upcoming paper", () => {
+test("seat lookup resolves exact or unique partial roster identities and chooses the matching upcoming paper", () => {
   const records = [
     { name: "Aarav Singh", crn: "1234567", section: "ECB", subsection: "ECB1" },
     { name: "Aarav Singh", crn: "2345678", section: "ECB", subsection: "ECB1" },
-    { name: "Mira Kaur", crn: "3456789", section: "ECB", subsection: "ECB2" }
+    { name: "Mira Kaur", crn: "3456789", section: "ECB", subsection: "ECB2" },
+    { name: "Mohitveer Singh", crn: "4567890", section: "ECB", subsection: "ECB2" }
   ];
   assert.equal(normalizeCrn("123-4567"), "1234567");
   assert.equal(seatingStudentForQuestion("exam room CRN 123-4567", records).record.crn, "1234567");
@@ -76,6 +81,7 @@ test("seat lookup resolves only exact roster identities and chooses the matching
   assert.equal(seatingStudentForQuestion("Aarav Singh exam room", records).status, "ambiguous");
   assert.equal(seatingStudentForQuestion("exam room CRN 9999999", records).status, "not-found");
   assert.equal(seatingStudentForQuestion("my exam room", records, { crn: "3456789" }).status, "active-profile");
+  assert.equal(seatingStudentForQuestion("mohitveer sitting plan", records, { crn: "1234567" }).record.crn, "4567890");
   assert.equal(isSeatingQuestion("Aarav Singh which room", records), true, "an exact roster name plus a room question is recognized");
   assert.equal(isSeatingQuestion("CRN 1234567 room", records), true, "a CRN plus a room question is recognized");
 
@@ -86,8 +92,9 @@ test("seat lookup resolves only exact roster identities and chooses the matching
   ];
   assert.equal(selectSeatingPlan(plans, "mera maths room tmrw", { dateISO: "2026-11-22", minutes: 900 }).plan.id, "math-23");
   assert.equal(selectSeatingPlan(plans.slice(0, 1).concat(plans[2]), "my exam room tomorrow", { dateISO: "2026-11-22", minutes: 900 }).status, "ambiguous");
-  const html = seatAnswerHtml({ subject: "Maths", date: "2026-11-23", sourceName: "seating.pdf" }, { room: "<F-101>" }, (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"));
+  const html = seatAnswerHtml({ subject: "Maths", date: "2026-11-23", sourceName: "seating.pdf" }, { room: "<F-101>", row: 6 }, (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"));
   assert.match(html, /&lt;F-101&gt;/);
+  assert.match(html, /Row <strong>6<\/strong>/);
 });
 
 test("seating API publishes privately, reveals one exact assignment, and deletes it", async () => {
@@ -95,7 +102,7 @@ test("seating API publishes privately, reveals one exact assignment, and deletes
   const plan = {
     id: "seat-math-20261123", title: "Mathematics-I MSE-II", subject: "Mathematics-I", date: "2026-11-23",
     start: 555, end: 645, category: "MSE-II theory", sourceName: "maths-seating.pdf",
-    seats: [{ crn: "1234567", room: "F-101" }, { crn: "2345678", room: "G-204" }]
+    seats: [{ crn: "1234567", room: "F-101", row: 6 }, { crn: "2345678", room: "G-204", row: 1 }]
   };
 
   assert.equal((await handleRequest(req("/api/admin/seatings"), e, ctx())).status, 401);
@@ -114,7 +121,7 @@ test("seating API publishes privately, reveals one exact assignment, and deletes
   const lookup = await handleRequest(jsonReq("/api/seatings/lookup", { planId: plan.id, crn: "1234567" }, "", { "CF-Connecting-IP": "203.0.113.8" }), e, ctx());
   assert.equal(lookup.status, 200);
   const result = await lookup.json();
-  assert.deepEqual(result.seat, { room: "F-101" });
+  assert.deepEqual(result.seat, { room: "F-101", row: 6 });
   assert.doesNotMatch(JSON.stringify(result), /1234567|2345678|G-204/);
 
   const badCrn = await handleRequest(jsonReq("/api/seatings/lookup", { planId: plan.id, crn: "123" }), e, ctx());
@@ -135,7 +142,11 @@ test("seating API limits public lookups and validates plan rows", async () => {
   const invalid = await handleRequest(jsonReq("/api/admin/seatings", { action: "upsert", plan }), e, ctx());
   assert.equal(invalid.status, 400);
 
-  plan.seats = [{ crn: "1234567", room: "F-101" }];
+  plan.seats = [{ crn: "1234567", room: "F-101", row: 0 }];
+  const invalidRow = await handleRequest(jsonReq("/api/admin/seatings", { action: "upsert", plan }), e, ctx());
+  assert.equal(invalidRow.status, 400);
+
+  plan.seats = [{ crn: "1234567", room: "F-101", row: 1 }];
   const publish = await handleRequest(jsonReq("/api/admin/seatings", { action: "upsert", plan }), e, ctx());
   assert.equal(publish.status, 200);
   let final;
@@ -151,7 +162,10 @@ test("Ask and the profile/date UI route seating queries locally and keep profile
   assert.match(app, /if \(seatingQuestion\) answer = await answerSeatingQuestion\(question\)/);
   assert.match(app, /body: JSON\.stringify\(\{ planId: selected\.plan\.id, crn \}\)/);
   assert.match(app, /if \(!answer && v\("ask\.engine"\) === "auto"/);
-  assert.match(app, /profile or timetable selection changed during lookup/);
+  assert.match(app, /Your active profile changed during lookup/);
+  assert.match(app, /Your exam room &amp; row/);
+  assert.match(app, /data-admin-sign-in-form/);
+  assert.match(app, /element\?\.closest\("\.send-button"\)/);
   assert.match(app, /<details class="profile-history">/);
   assert.match(html, /topbar-clock-time/);
   assert.match(app, /time\.textContent = `\$\{clock\.time\} IST`/);

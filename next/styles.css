@@ -898,6 +898,36 @@ kbd { font-family: var(--font-mono); font-size: .66rem; border: 1px solid var(--
 [data-theme="light"].is-high-contrast { --border: rgba(0, 0, 0, .3); --border-strong: rgba(0, 0, 0, .5); --muted: #335a4d; }
 .is-square { --radius-xs: 2px; --radius-sm: 3px; --radius-md: 4px; --radius-lg: 5px; --radius-xl: 6px; }
 
+/* Keep the chat pane independently scrollable on Android and when the keyboard opens. */
+@media (max-width: 980px) {
+  body:has(.page-ask) { height: 100%; overflow: hidden; }
+  .app-shell:has(.page-ask) {
+    height: var(--visual-viewport-height, 100dvh);
+    min-height: 0;
+    overflow: hidden;
+    grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  }
+  .app-shell:has(.page-ask) main {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  }
+  .app-shell:has(.page-ask) #view { flex: 1; min-height: 0; overflow: hidden; }
+  .page-ask, .page-ask .chat-shell { height: 100%; min-height: 0; }
+  .page-ask .chat-shell { flex: 1 1 auto; }
+  .page-ask .chat-window {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .page-ask .composer { position: relative; flex: none; }
+}
+
 [data-experience="classic"] {
   --radius-xs: 4px; --radius-sm: 5px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 10px;
 }
@@ -2669,3 +2699,9 @@ h2, .section-title { font-size: clamp(1rem, 4vw, 1.4rem); }
   cursor: pointer;
   padding: 4px;
 }
+
+.today-seating-entry + .today-seating-entry { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
+.today-seat-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0 0; }
+.today-seat-details > div { min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+.today-seat-details dt { color: var(--muted); font-size: .72rem; }
+.today-seat-details dd { margin: 3px 0 0; font-weight: 800; overflow-wrap: anywhere; }
