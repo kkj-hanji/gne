@@ -37,7 +37,7 @@ import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine
 import { answerFirstYearScheme, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
-import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examEventsForSelection, examGroupForSection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
+import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examGroupForSection, examsOnDate, examTimeLabel, importantExamEventsForSelection, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
@@ -983,12 +983,16 @@ function examsForDate(dateISO) {
   return examsOnDate(importantExamEvents(), dateISO);
 }
 
+/** The next calendar date for a weekday name, counting today as offset 0. */
+function dateForWeekday(day, clock = now()) {
+  const target = DAY_NAMES.indexOf(day);
+  const base = DAY_NAMES.indexOf(clock.day);
+  if (target < 0 || base < 0) return clock.dateISO;
+  return addDays(clock, (target - base + 7) % 7).dateISO;
+}
+
 function importantExamEvents() {
-  return examEventsForSelection({ datesheet: state.datesheet, group: state.group, branch: state.profile.branch }).filter((exam) => {
-    const label = `${exam.category || ""} ${exam.title || ""}`.toLowerCase();
-    if (/workshop|practical|lab/.test(label)) return false;
-    return /\bmse\b|end[- ]?sem(?:ester)?|\bfinal\b|\btentative\b|\bese\b/.test(label);
-  });
+  return importantExamEventsForSelection({ datesheet: state.datesheet, group: state.group, branch: state.profile.branch });
 }
 
 function examRowMarkup(exam) {
@@ -1024,8 +1028,28 @@ function otherExamSections(primaryRows, selectedYear, selectedGroup) {
   return sections.join("");
 }
 
+/**
+ * Activate date-sheet mode three days before the first selected paper and
+ * keep it active through gaps until the final sitting is over.
+ */
+function examModeInfo(clock) {
+  const period = examDateSheetPeriod(importantExamEvents(), clock);
+  if (!period.active) return null;
+  return {
+    kind: "exam",
+    clock,
+    period,
+    exams: period.today,
+    today: period.today,
+    primary: period.today[0] || period.next,
+    day: clock
+  };
+}
+
 function nextClassInfo() {
   const clock = now();
+  const examMode = examModeInfo(clock);
+  if (examMode) return examMode;
   const classes = classesForDay(clock.day);
   const current = classes.find((entry) => entry.start <= clock.minutes && clock.minutes < entry.end) || null;
   const next = classes.find((entry) => entry.start > clock.minutes) || null;
@@ -1037,6 +1061,10 @@ function nextClassInfo() {
   for (let offset = 1; offset <= 7; offset += 1) {
     const candidate = addDays(clock, offset);
     if (!STUDY_DAYS.includes(candidate.day)) continue;
+    // The next study day may be a paper, not a lecture. Show that exam
+    // instead of silently skipping to a later class.
+    const exams = examsForDate(candidate.dateISO);
+    if (exams.length) return { kind: "exam-soon", exams, primary: exams[0], clock, day: candidate };
     const future = classesForDay(candidate.day);
     if (future.length) return { kind: "later", entry: future[0], clock, day: candidate };
   }
@@ -1303,8 +1331,8 @@ function renderToday() {
   const clock = now();
   const info = nextClassInfo();
   const exam = nextExam();
-  const examPeriod = examDateSheetPeriod(importantExamEvents(), clock);
-  const free = computeFreeRooms({
+  const examMode = info.kind === "exam";
+  const free = examMode ? null : computeFreeRooms({
     roomSchedule: state.roomSchedule,
     day: clock.day,
     minutes: clock.minutes,
@@ -1312,21 +1340,21 @@ function renderToday() {
     includeLabs: v("rooms.includeLabs"),
     includeLectureHalls: v("rooms.includeLectureHalls")
   });
-  const today = classesForDay(clock.day);
+  const today = examMode ? [] : classesForDay(clock.day);
   const lookAhead = info.kind === "later" && shouldLookAheadAtFive(clock.minutes, today.length > 0);
   const timelineDay = lookAhead ? info.day.day : clock.day;
   const timelineClasses = lookAhead ? classesForDay(timelineDay) : today;
   const greeting = clock.hour < 12 ? "Good morning" : clock.hour < 17 ? "Good afternoon" : "Good evening";
   const name = state.profile.name ? `, ${state.profile.name.split(/\s+/)[0]}` : "";
   const hero = renderHero(info, clock, greeting + name);
-  const freeRooms = v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
+  const freeRooms = !examMode && v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
   const timelineClock = lookAhead ? { ...clock, day: timelineDay, minutes: 0 } : clock;
-  const timeline = examPeriod.active
-    ? renderExamPeriodCard(examPeriod.exams, clock, examPeriod.startDate)
+  const timeline = examMode
+    ? renderExamPeriodCard(info.period)
     : v("today.hero") === "timeline" ? ""
       : renderTodayTimeline(timelineClasses, timelineClock, { lookAhead });
   const notices = v("today.noticesCard") ? renderNoticesCard() : "";
-  const examCard = v("today.examCountdown") && exam ? renderExamCard(exam) : "";
+  const examCard = v("today.examCountdown") && exam && !examMode ? renderExamCard(exam) : "";
   const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
   const holiday = v("today.holidayBanner") ? holidayOn(clock.dateISO, holidayOverrides()) : null;
   const examHref = exam ? "/calendar#exam-datesheet" : "/calendar";
@@ -1336,10 +1364,11 @@ function renderToday() {
     ${holiday ? `<div class="announcement ${holiday.type === "working" ? "is-warning" : "is-info"}"><strong>${escapeHtml(holiday.type === "working" ? "Working day" : holiday.type === "restricted" ? "Restricted holiday" : holiday.type === "half-day" ? "Half day" : "Holiday")} · ${escapeHtml(dateOnly(holiday.date))}</strong><p>${escapeHtml(holiday.name)}${holiday.overridden ? " · admin-confirmed override" : " · from the official GNDEC holiday list"}</p></div>` : ""}
     ${announcements.length ? `<section class="announcement-stack">${announcements.map((item) => `<div class="announcement is-${escapeHtml(item.level)}"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.body)}</p></div>`).join("")}</section>` : ""}
     <div class="stat-grid">
-      <div class="stat"><div class="stat-label">Classes today</div><div class="stat-value">${today.length}</div><div class="stat-sub">${escapeHtml(clock.day)}</div></div>
-      <div class="stat"><div class="stat-label">Free rooms now</div><div class="stat-value">${free.error ? "—" : free.rooms.length}</div><div class="stat-sub">${free.error ? "Room data loading" : `for the next hour`}</div></div>
+      <div class="stat"><div class="stat-label">${examMode ? "Lecture timetable" : "Classes today"}</div><div class="stat-value">${examMode ? "Hidden" : today.length}</div><div class="stat-sub">${examMode ? "Exam datesheet is active" : escapeHtml(clock.day)}</div></div>
+      ${examMode ? `<div class="stat"><div class="stat-label">Exam period</div><div class="stat-value">${info.today.length ? `${info.today.length} today` : "In progress"}</div><div class="stat-sub">${info.today.length ? "Published sitting(s) today" : info.primary ? `Next paper ${escapeHtml(shortExamDate(info.primary.date))}` : "No paper scheduled today"}</div></div>` : `<div class="stat"><div class="stat-label">Free rooms now</div><div class="stat-value">${free.error ? "—" : free.rooms.length}</div><div class="stat-sub">${free.error ? "Room data loading" : `for the next hour`}</div></div>`}
       <a class="stat stat-link" href="${examHref}" aria-label="${exam ? `Open full datesheet for ${escapeHtml(exam.title)} on ${escapeHtml(shortExamDate(exam.date))}` : "Open exam calendar"}"><div class="stat-label">Next exam</div><div class="stat-value">${exam ? escapeHtml(shortExamDate(exam.date)) : "—"}</div><div class="stat-sub">${exam ? escapeHtml(exam.title) : "No published date"}</div>${exam ? `<span class="stat-link-hint">Full datesheet <span aria-hidden="true">↗</span></span>` : ""}</a>
     </div>
+    ${examMode ? "" : renderTodayProgress(today, clock.minutes)}
     <div class="dashboard-grid">
       <div class="stack">
         ${timeline}
@@ -1400,6 +1429,26 @@ function renderHero(info, clock, greeting) {
     eyebrow = "No more classes today";
     title = `${info.entry.subject} on ${info.day.day}`;
     meta = `${humanTime(info.entry.start, v("timetable.clock"))} · ${info.entry.room} · ${info.entry.teacher}`;
+  } else if (info.kind === "exam-soon") {
+    const primary = info.primary;
+    eyebrow = `Exam on ${info.day.day}`;
+    title = primary.title;
+    const start = primary.start != null ? humanTime(primary.start, v("timetable.clock")) : "";
+    const end = primary.end != null ? humanTime(primary.end, v("timetable.clock")) : "";
+    meta = `${shortExamDate(primary.date)}${start ? ` · ${start}${end ? `–${end}` : ""}` : ""} · ${primary.category || "Exam"} · no lecture that day`;
+    actions = `<a class="btn btn-primary" href="/calendar#exam-datesheet">Open date sheet</a><button class="btn" data-route="timetable">Timetable</button>`;
+  } else if (info.kind === "exam") {
+    const primary = info.primary;
+    const isToday = Boolean(info.today?.length);
+    eyebrow = isToday ? "Exam day" : "Exam period";
+    title = primary ? primary.title : "Exam date sheet active";
+    const start = primary?.start != null ? humanTime(primary.start, v("timetable.clock")) : "";
+    const end = primary?.end != null ? humanTime(primary.end, v("timetable.clock")) : "";
+    const when = primary
+      ? `${shortExamDate(primary.date)}${start ? ` · ${start}${end ? `–${end}` : ""}` : ""} · ${primary.category || "Exam"}${isToday ? "" : " · next paper"}`
+      : "";
+    meta = when;
+    actions = `<a class="btn btn-primary" href="/calendar#exam-datesheet">Open date sheet</a><button class="btn" data-route="timetable">Timetable</button>`;
   } else if (info.kind === "none") {
     eyebrow = "No more classes today";
     title = "Your schedule stays on today";
@@ -1412,7 +1461,8 @@ function renderHero(info, clock, greeting) {
   if (v("today.leaveNow") && info.kind === "next" && info.entry.start - info.clock.minutes <= 25) {
     actions = `<button class="btn btn-primary" data-action="open-rooms">Find a room nearby</button>${actions}`;
   }
-  return `<section class="hero-card">
+  const heroClass = info.kind === "current" ? "hero-card has-active-class" : (info.kind === "exam" || info.kind === "exam-soon") ? "hero-card has-exam-day" : "hero-card";
+  return `<section class="${heroClass}">
     <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge badge-accent">${escapeHtml(eyebrow)}</span><span class="badge">${escapeHtml(clock.date)}</span></div>
     <h2 class="hero-title">${escapeHtml(title)}</h2>
     <p class="hero-meta">${escapeHtml(meta)}</p>
@@ -1425,6 +1475,15 @@ function todaySummary(info) {
   if (info.kind === "current") return `You are in ${info.entry.subject} until ${humanTime(info.entry.end)}.`;
   if (info.kind === "next") return `${info.entry.subject} at ${humanTime(info.entry.start)} in ${info.entry.room}.`;
   if (info.kind === "later") return `Next published class is on ${info.day.day}.`;
+  if (info.kind === "exam-soon") {
+    return `Next study day is an exam: ${info.primary.title} on ${shortExamDate(info.primary.date)}.`;
+  }
+  if (info.kind === "exam") {
+    if (!info.primary) return "The published exam date sheet is active.";
+    return info.today?.length
+      ? `Exam day: ${info.primary.title}${info.primary.start != null ? ` at ${humanTime(info.primary.start)}` : ""}. Lectures are not shown during the paper window.`
+      : `Exam period. Next paper: ${info.primary.title} on ${shortExamDate(info.primary.date)}.`;
+  }
   if (info.kind === "none") return "No more class is listed today. Compass looks ahead at 5:00 PM.";
   return "No class is published for your section today.";
 }
@@ -1498,27 +1557,26 @@ function renderExamCard(exam) {
 function renderExamDayCard(exams, dateISO) {
   const sources = [...new Map(exams.filter((exam) => exam.sourceUrl).map((exam) => [exam.sourceUrl, exam])).values()];
   const audience = [state.profile.name, state.group, examGroupForSection(state.group)].filter(Boolean).join(" · ");
+  const isToday = dateISO === now().dateISO;
   return `<section class="card exam-day-card">
-    <div class="card-head"><div><h2 class="card-title">Today's exam date sheet</h2><p class="card-sub">${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(audience || selectionLabel())} · selected-group exams only</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(exam.category.includes("workshop") ? "Workshop sheet" : exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
+    <div class="card-head"><div><h2 class="card-title">${isToday ? "Today's exam date sheet" : "Exam date sheet"}</h2><p class="card-sub">${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(audience || selectionLabel())} · the published paper replaces the class timetable for this day</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(exam.category.includes("workshop") ? "Workshop sheet" : exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
     <div class="timeline">${exams.map((exam) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(examTimeLabel(exam, humanTime))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.title)}</div><div class="timeline-meta">${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionNote ? ` · ${escapeHtml(exam.sessionNote)}` : ""}</div></div></div>`).join("")}</div>
   </section>`;
 }
 
-function renderExamPeriodCard(exams, clock, startDate) {
-  const sources = [...new Map(exams.filter((exam) => exam.sourceUrl).map((exam) => [exam.sourceUrl, exam])).values()];
-  const audience = [state.profile.name, state.group, examGroupForSection(state.group)].filter(Boolean).join(" · ");
-  const byDate = new Map();
-  for (const exam of exams) byDate.set(exam.date, [...(byDate.get(exam.date) || []), exam]);
-  const groups = [...byDate].map(([dateISO, rows]) => `<section class="exam-period-day"><h3>${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(dayOfWeek(dateISO))}</h3><div class="exam-datesheet-list">${rows.map((exam) => {
-    const complete = exam.date < clock.dateISO || (exam.date === clock.dateISO && exam.end != null && exam.end <= clock.minutes);
-    const inProgress = exam.date === clock.dateISO && exam.start != null && exam.start <= clock.minutes && (exam.end == null || clock.minutes < exam.end);
-    const status = complete ? "Completed" : inProgress ? "In progress" : "Upcoming";
-    const details = [exam.category, exam.tab, exam.sessionNote, examTimeLabel(exam, humanTime), status].filter(Boolean).join(" · ");
-    return `<article class="exam-datesheet-row${complete ? " is-complete" : ""}${inProgress ? " is-in-progress" : ""}"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(details)}</p></div>${exam.sourceUrl ? `<a class="chip" href="${escapeHtml(exam.sourceUrl)}" ${exam.sourceUrl.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source ↗</a>` : ""}</article>`;
-  }).join("")}</div></section>`).join("");
+function renderExamPeriodCard(period) {
+  const todayExams = period.today || [];
+  const next = period.next;
+  const status = todayExams.length
+    ? `There ${todayExams.length === 1 ? "is" : "are"} ${todayExams.length} published paper${todayExams.length === 1 ? "" : "s"} today.`
+    : next
+      ? `No paper is scheduled today. The next published paper is ${escapeHtml(next.title)} on ${escapeHtml(shortExamDate(next.date))}.`
+      : "No paper is scheduled today.";
+  const rows = (period.exams || []).map(examRowMarkup).join("");
   return `<section class="card exam-day-card exam-period-card">
-    <div class="card-head"><div><h2 class="card-title">Your exam date sheet</h2><p class="card-sub">${escapeHtml(audience || selectionLabel())} · Auto starts ${escapeHtml(shortExamDate(startDate))} and stays on the date sheet through the final paper.</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" ${exam.sourceUrl.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
-    <div class="exam-period-groups">${groups}</div>
+    <div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(selectionLabel())} · exam mode started ${escapeHtml(shortExamDate(period.startDate))} · lecture timetable stays hidden until the final published paper is over.</p></div><a class="btn btn-sm" href="/calendar#exam-datesheet">Full calendar</a></div>
+    <p class="exam-period-status" role="status">${status}</p>
+    ${rows ? `<div class="exam-datesheet-list">${rows}</div>` : `<p class="exam-period-status">No matching published papers were found in the loaded datesheet.</p>`}
   </section>`;
 }
 
@@ -1538,19 +1596,24 @@ function renderNoticesCard() {
 }
 
 function suggestedQuestions() {
+  const clock = now();
   const info = nextClassInfo();
-  const list = [];
-  if (info.kind === "current") list.push("Where is my current class?");
-  else list.push("What is my next class?");
-  list.push("Which rooms are free now?");
-  list.push("Show tomorrow's timetable");
-  if (nextExam()) list.push("When is my next exam?");
-  const subjects = [...new Set(classesForDay(now().day).map((entry) => entry.subject))].slice(0, 2);
-  subjects.forEach((subject) => list.push(`When is ${subject}?`));
-  list.push("Show latest notices");
-  list.push("When is the next holiday?");
-  if (subjects[0]) list.push(`Question bank for ${subjects[0]}`);
-  return [...new Set(list)];
+  const exam = nextExam();
+  const chips = [];
+  if (info.kind === "exam") {
+    chips.push("📝 Today's exam", "📅 Tomorrow's classes", "🚪 Free rooms now");
+  } else if (info.kind === "current") {
+    chips.push("⏭ What's next?", "🚪 Free rooms now");
+  } else if (info.kind === "next") {
+    chips.push("⏭ What's my next class?", "📅 Tomorrow's classes");
+  } else if (clock.hour < 10) {
+    chips.push("🌅 First class today", "🏠 Today's schedule");
+  } else {
+    chips.push("🏠 Today's schedule", "📅 Tomorrow's classes");
+  }
+  if (exam) chips.push(`📝 ${exam.title} exam date`);
+  chips.push("🎓 Attendance rule", "CGPA 8.5 to percentage", "How many classes can I miss?");
+  return [...new Set(chips)].slice(0, 6);
 }
 
 /* ── Timetable ─────────────────────────────────────────────────────────── */
@@ -1563,10 +1626,10 @@ function renderTimetable() {
   const branches = timetableBranches();
   const activeBranch = groupBranchCode(state.group) || branches[0] || "";
   const sections = rankedGroups(state.groups.filter((group) => groupBranchCode(group) === activeBranch));
-  const todayExamSittings = state.day === clock.day ? examsForDate(clock.dateISO) : [];
+  const todayExamSittings = examsForDate(dateForWeekday(state.day, clock));
   const dayContent = view === "week" ? renderWeekGrid(clock)
     : view === "agenda" ? renderAgenda()
-      : todayExamSittings.length ? renderExamDayCard(todayExamSittings, clock.dateISO)
+      : todayExamSittings.length ? renderExamDayCard(todayExamSittings, dateForWeekday(state.day, clock))
         : renderDayView(state.day, clock);
   return `<div class="page page-timetable">
     <div class="page-head">
@@ -1593,7 +1656,12 @@ function renderTimetable() {
         <span class="badge badge-accent">${escapeHtml(selectionLabel())}</span>
       </div>
       <div class="day-tabs" style="margin-top:12px" role="tablist" aria-label="Day">
-        ${days.map((day) => `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${classesForDay(day).length} class${classesForDay(day).length === 1 ? "" : "es"}</small></button>`).join("")}
+        ${days.map((day) => {
+          const dISO = dateForWeekday(day, clock);
+          const hasExam = examsForDate(dISO).length > 0;
+          const classCount = classesForDay(day).length;
+          return `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""} ${hasExam ? "has-exam" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}" title="${hasExam ? "Exam day" : ""}">${escapeHtml(day.slice(0, 3))}${hasExam ? `<span class="exam-dot" aria-label="Exam">📝</span>` : `<small>${classCount} class${classCount === 1 ? "" : "es"}</small>`}</button>`;
+        }).join("")}
       </div>
       <div style="margin-top:14px">${dayContent}</div>
     </div>`}
@@ -1623,7 +1691,12 @@ function renderDayView(day, clock) {
 }
 
 function renderAgenda() {
+  const clock = now();
   return STUDY_DAYS.map((day) => {
+    const exams = examsForDate(dateForWeekday(day, clock));
+    if (exams.length) {
+      return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge badge-accent">Exam day</span></p><p class="card-sub">${exams.map((exam) => `${escapeHtml(shortExamDate(exam.date))} · ${escapeHtml(exam.title)}`).join("<br>")}</p></div>`;
+    }
     const classes = classesForDay(day);
     if (!classes.length) return "";
     return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${classes.length}</span></p>${classes.map((entry) => classCard(entry, v("timetable.clock"))).join("")}</div>`;
@@ -1632,10 +1705,12 @@ function renderAgenda() {
 
 function renderWeekGrid(clock) {
   const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
+  const examDays = new Set(days.filter((day) => examsForDate(dateForWeekday(day, clock)).length));
   const starts = [...new Set([510, 570, 630, 690, 750, 810, 870, 930, ...state.schedule.filter((entry) => entry.group === state.group).map((entry) => entry.start)])].sort((a, b) => a - b);
   const rows = starts.map((start) => {
     const end = start + 60;
     return `<tr><th scope="row">${escapeHtml(humanTime(start, v("timetable.clock")))}</th>${days.map((day) => {
+      if (examDays.has(day)) return `<td class="is-exam-day"><div class="week-gap">Exam day</div></td>`;
       const dayClasses = classesForDay(day);
       const entries = dayClasses.filter((entry) => entry.start < end && entry.end > start);
       const betweenClasses = !entries.length && dayClasses.some((entry) => entry.end <= start) && dayClasses.some((entry) => entry.start >= end);
@@ -1643,7 +1718,7 @@ function renderWeekGrid(clock) {
       return `<td>${entries.map((entry) => `<div class="week-slot"><strong>${escapeHtml(entry.subject)}</strong><span>${escapeHtml(entry.room)}</span></div>`).join("")}${gap}</td>`;
     }).join("")}</tr>`;
   }).join("");
-  return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => `<th scope="col">${escapeHtml(day)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => `<th scope="col"${examDays.has(day) ? ' class="is-exam-day"' : ""}>${escapeHtml(day)}${examDays.has(day) ? ` <span class="exam-dot" title="Exam day" aria-label="Exam day">📝</span>` : ""}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ── Rooms ─────────────────────────────────────────────────────────────── */
@@ -2033,7 +2108,7 @@ function renderCalendar() {
       <div class="page-actions"><a class="btn btn-sm" href="/notices">Notices</a></div>
     </div>
     ${upcoming.length ? `<section class="card"><div class="card-head"><div><h2 class="card-title">Coming up</h2><p class="card-sub">Next published off days from today.</p></div></div><div class="holiday-row">${upcoming.map((item) => `<div class="holiday-pill"><strong>${escapeHtml(dateOnly(item.date))}</strong><span>${escapeHtml(dayOfWeek(item.date))}</span><small>${escapeHtml(item.name)}</small></div>`).join("")}</div></section>` : ""}
-    <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · ${examYear ? `Your ${examYear === 1 ? "first" : examYear === 2 ? "second" : examYear === 3 ? "third" : "fourth"} year${examGroup ? ` · ${escapeHtml(examGroup)}` : ""}` : "Your matching published exams"} shown first; other published exams are collapsed below.</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? `<div class="exam-datesheet-list">${examRows.map(examRowMarkup).join("")}</div>` : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}${otherExamMarkup}</section>
+    <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · ${examYear ? `Your ${examYear === 1 ? "first" : examYear === 2 ? "second" : examYear === 3 ? "third" : "fourth"} year${examGroup ? ` · ${escapeHtml(examGroup)}` : ""}` : "Your matching published exams"}. Only exams for your selected section are shown first; other published exams are collapsed below.</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? `<div class="exam-datesheet-list">${examRows.map(examRowMarkup).join("")}</div>` : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}${otherExamMarkup}</section>
     ${publishedDatesheets().length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Published date sheets</h2><p class="card-sub">Transcribed by the college admin from an official notice. The original link is always kept.</p></div><a class="btn btn-sm" href="/notices">All notices</a></div>
       <ul class="doc-list">${publishedDatesheets().map((item) => `<li><div>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "Date sheet")}</a>` : `<strong>${escapeHtml(item.title || "Date sheet")}</strong>`}<span class="badge">${escapeHtml(item.scope || "Examination")}</span>${item.department ? `<span class="badge">${escapeHtml(item.department)}</span>` : ""}<div class="card-sub" style="margin-top:6px">${escapeHtml(item.date ? shortDate(item.date) : "Undated")}${item.body ? ` · ${escapeHtml(String(item.body).slice(0, 400)).replace(/\n/g, " ")}` : ""}</div></div></li>`).join("")}</ul>
     </section>` : ""}
@@ -2760,6 +2835,17 @@ function renderAsk() {
         </div>
       </div>
       <div class="chat-window" id="chat-window" aria-live="polite" aria-label="Conversation"></div>
+      ${state.chat.length ? "" : `<div class="chat-chips-row" role="group" aria-label="Quick questions">${suggestedQuestions().map((q) => {
+        const queryMap = {
+          "🏠 Today's schedule": "what are my classes today",
+          "📚 Free rooms now": "which rooms are free now",
+          "📅 Tomorrow's classes": "show my timetable for tomorrow",
+          "🎓 Attendance rule": "what is the 75 percent attendance rule",
+          "CGPA 8.5 to percentage": "cgpa 8.5 to percentage",
+          "How many classes can I miss?": "how many classes can I miss"
+        };
+        return `<button class="chip" data-ask-question="${escapeHtml(queryMap[q] || q)}">${escapeHtml(q)}</button>`;
+      }).join("")}</div>`}
       <div class="composer">
         <div class="composer-row">
           <textarea class="composer-input" id="question-input" rows="1" placeholder="Ask about your next class, a room, a teacher, free rooms or exams…" aria-label="Question"></textarea>
@@ -2769,7 +2855,6 @@ function renderAsk() {
         <div class="composer-hint"><span>Enter to send · Shift+Enter for a new line</span><span>Use a follow-up like “unit 2” or “what about tomorrow?”</span></div>
       </div>
     </div>
-    ${state.chat.length ? "" : `<div style="margin-top:14px" class="chip-row">${suggestedQuestions().map((question) => `<button class="chip" data-ask-question="${escapeHtml(question)}">${escapeHtml(question)}</button>`).join("")}</div>`}
   </div>`;
 }
 
@@ -2782,6 +2867,15 @@ function engineBadge() {
 }
 
 function renderChatMessages() {
+  // Hide chips row when conversation has started
+  const chipsRow = document.querySelector(".chat-chips-row");
+  if (chipsRow) {
+    if (state.chat.length > 1) {
+      chipsRow.classList.add("hidden");
+    } else {
+      chipsRow.classList.remove("hidden");
+    }
+  }
   const windowEl = $("#chat-window");
   if (!windowEl) return;
   if (!state.chat.length) {
@@ -2793,9 +2887,24 @@ function renderChatMessages() {
 }
 
 function welcomeMessage() {
+  const greetingHour = new Date().getHours();
+  const tod = greetingHour < 12 ? "morning" : greetingHour < 17 ? "afternoon" : "evening";
   return {
     role: "assistant",
-    html: `<p><strong>Ask me anything about your college day.</strong></p><p>I read the official timetable, room release, your saved section and the published datesheet. I answer from that data only — I never guess a class, teacher, room or date.</p>`,
+    html: `<p><strong>Good ${tod}! 👋 I'm Compass, your GNDEC assistant.</strong></p>
+<p>Ask about your timetable, exams, rooms, faculty, syllabus or college calendar. Compass understands common English, Hinglish and some Hindi or Punjabi transliterations; short questions work best.</p>
+<p><strong>I can help you with:</strong></p>
+<ul>
+  <li>📅 Your timetable &amp; next class</li>
+  <li>🏫 Free rooms &amp; room availability</li>
+  <li>👨‍🏫 Faculty &amp; teacher info</li>
+  <li>📝 Exam dates &amp; datesheets</li>
+  <li>📊 The 75% attendance rule (not your attendance record)</li>
+  <li>📚 Syllabus &amp; subjects</li>
+  <li>🏖️ Holidays &amp; college calendar</li>
+  <li>🔢 CGPA &amp; marks calculation</li>
+</ul>
+<p style="font-size:0.82em;opacity:0.7;">I use only official timetable &amp; published data — I never guess or fabricate.</p>`,
     createdAt: new Date().toISOString(),
     meta: { intent: "WELCOME", confidence: 1, engine: "local", source: "" }
   };
@@ -2810,8 +2919,12 @@ function chatMessageHtml(message, index) {
   if (showDiagnostics && meta.cached) badges.push(`<span class="badge">cached</span>`);
   const why = showDiagnostics && v("ask.why") && Array.isArray(meta.plan) && meta.plan.length
     ? `<details class="answer-meta"><summary>Why this answer</summary><ol>${meta.plan.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></details>` : "";
+  const suggestions = message.meta?.suggestions || [];
+  const suggestionHtml = (message.role === "assistant" && suggestions.length && !["WELCOME","GREETING","BYE","CAPABILITIES"].includes(message.meta?.intent))
+    ? `<div class="answer-suggestions">${suggestions.slice(0,3).map((s) => `<button class="answer-suggestion-chip" data-ask-question="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("")}</div>`
+    : "";
   return `<article class="msg ${message.role}" data-message-index="${index}">
-    <div class="msg-bubble">${sanitizeHtml(message.html)}</div>
+    <div class="msg-bubble">${sanitizeHtml(message.html)}${suggestionHtml}</div>
     <div class="msg-meta">${badges.join("")}<time>${escapeHtml(messageTime(message.createdAt))}</time></div>
     ${why}
     <div class="msg-actions">${message.role === "assistant" ? `<button class="msg-action" data-action="copy-message" data-index="${index}">Copy</button>` : ""}<button class="msg-action" data-action="ask-again" data-index="${index}">Ask again</button></div>
@@ -2890,6 +3003,8 @@ async function sendQuestion(rawQuestion) {
     const ctx = currentAnswerContext();
     let answer = null;
     let engine = "local";
+    const previousMemory = [...state.chat.slice(0, thinkingIndex)].reverse()
+      .find((message) => message.role === "assistant" && message.meta?.memory)?.meta.memory || null;
 
     const previousSyllabusCode = [...state.chat.slice(0, thinkingIndex)].reverse()
       .find((message) => message.role === "assistant" && message.meta?.entities?.syllabusCourseCode)?.meta.entities.syllabusCourseCode || "";
@@ -2922,6 +3037,13 @@ async function sendQuestion(rawQuestion) {
       engine = "local";
     }
 
+    // Resolve supported factual questions against the selected local data
+    // before accepting a Brain result. This keeps exam days from being
+    // described as lecture days when a timetable contains a conflicting row.
+    if (!answer) {
+      answer = answerLocally(question, ctx, previousMemory);
+    }
+
     if (!answer && v("ask.engine") === "auto" && !v("privacy.localOnly")) {
       if (state.brainState !== "ready") {
         state.brainState = "loading";
@@ -2938,11 +3060,6 @@ async function sendQuestion(rawQuestion) {
           engine = brain.result.engine;
         }
       }
-    }
-
-    if (!answer) {
-      const local = answerLocally(question, ctx);
-      if (local) answer = local;
     }
 
     if (!answer && isOpenQuestion(question) && canUseExternalAi()) {
@@ -2971,6 +3088,14 @@ async function sendQuestion(rawQuestion) {
         confidence: answer.confidence,
         plan: answer.plan,
         entities: answer.entities || {},
+        memory: answer.memory || {
+          intent: answer.intent || "",
+          subject: answer.entities?.subject || "",
+          day: answer.entities?.day || "",
+          room: answer.entities?.room || "",
+          teacher: answer.entities?.teacher || ""
+        },
+        suggestions: answer.suggestions || [],
         copyContext: { group: state.group, subgroup: state.subgroup, dateISO: now().dateISO },
         engine,
         source: answer.source || "",
@@ -3093,7 +3218,7 @@ async function askExternalAi(question, thinkingIndex) {
     const response = await fetch("/api/legacy/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Compass-Device": device },
-      body: JSON.stringify({ question, context: aiContextPayload(), ...(hasAdminMode() ? { adminProfile: state.profile, selection: { group: state.group, subgroup: state.subgroup } } : {}), stream: true, heavy: false })
+      body: JSON.stringify({ question, context: aiContextPayload(), stream: true, heavy: false })
     });
     if (!response.ok) return null;
     const count = Number(storageGet("gndec-compass-next-ai-count") || 0);
@@ -3947,6 +4072,9 @@ async function handleAction(action, element) {
       const input = $("#question-input");
       const question = input?.value || "";
       if (input) input.value = "";
+      // Microinteraction: send-pop animation
+      const _sendBtn = el.closest(".send-button") || $("#send-button");
+      if (_sendBtn) { _sendBtn.classList.add("sending"); setTimeout(() => _sendBtn.classList.remove("sending"), 350); }
       sendQuestion(question);
       break;
     }
@@ -4240,7 +4368,7 @@ async function checkDigest() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((registration) => {
+  navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" }).then((registration) => {
     registration.addEventListener("updatefound", () => {
       const worker = registration.installing;
       if (!worker) return;
@@ -4289,10 +4417,22 @@ function setupInstallPrompt() {
 function toggleSidebar(open = undefined) {
   const sidebar = $("#sidebar");
   if (!sidebar) return;
+  const wasOpen = sidebar.classList.contains("is-open");
   const shouldOpen = open ?? !sidebar.classList.contains("is-open");
+  const isMobile = Boolean(window.matchMedia?.("(max-width: 980px)").matches);
   sidebar.classList.toggle("is-open", shouldOpen);
   $("#scrim").hidden = !shouldOpen;
-  $("#menu-button")?.setAttribute("aria-expanded", String(shouldOpen));
+  const menuButton = $("#menu-button");
+  menuButton?.setAttribute("aria-expanded", String(shouldOpen));
+  sidebar.toggleAttribute("inert", isMobile && !shouldOpen);
+  if (isMobile && !shouldOpen) sidebar.setAttribute("aria-hidden", "true");
+  else sidebar.removeAttribute("aria-hidden");
+
+  if (isMobile && shouldOpen && !wasOpen) {
+    requestAnimationFrame(() => sidebar.querySelector('button:not([disabled]), a[href], [tabindex="0"]')?.focus({ preventScroll: true }));
+  } else if (isMobile && !shouldOpen && wasOpen && sidebar.contains(document.activeElement)) {
+    menuButton?.focus({ preventScroll: true });
+  }
 }
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
@@ -4641,32 +4781,36 @@ async function init() {
   state.adminStatus = state.adminToken ? "idle" : "signed-out";
   state.day = "";
   bindEvents();
+  toggleSidebar(false);
+  window.matchMedia?.("(max-width: 980px)")?.addEventListener?.("change", () => toggleSidebar(false));
   setupInstallPrompt();
   registerServiceWorker();
   bindStaticActions();
+  setupOfflineBanner();
 
   const route = parseRoute();
   state.route = route;
   updateChrome();
 
-  const cached = await loadCachedData();
-  if (cached) render();
-
-  await loadVersion();
+  await loadCachedData();
   render();
 
-  loadDatesheet().then(() => { if (["ask", "today", "notices"].includes(state.route)) render(); });
-  loadNotices().then(() => { if (state.route === "today" || state.route === "notices") render(); });
+  // Paint the cached shell immediately, then refresh independent data in the
+  // background so a slow network cannot hold the first interactive view.
+  void loadVersion().then(() => { if (state.route === "settings") render(); });
+  void loadDatesheet().then(() => { if (["ask", "today", "notices"].includes(state.route)) render(); });
+  void loadNotices().then(() => { if (state.route === "today" || state.route === "notices") render(); });
+  void loadLiveData().then(async () => {
+    if (rosterIdentity().crn || rosterIdentity().registration || rosterIdentity().serial || state.profile.name) {
+      await loadStudents({ quiet: true }).catch(() => {});
+    }
+    await restoreAdminAiSession();
+    await loadSnapshots();
+    updateLegacyCards();
+    if (state.route === "settings") render();
+  });
 
-  await loadLiveData();
-  if (rosterIdentity().crn || rosterIdentity().registration || rosterIdentity().serial || state.profile.name) {
-    await loadStudents({ quiet: true }).catch(() => {});
-  }
-  await restoreAdminAiSession();
-  await loadSnapshots();
-  updateLegacyCards();
   startTimers();
-  if (state.route === "settings") render();
 }
 
 function bindStaticActions() {
@@ -4679,11 +4823,78 @@ function bindStaticActions() {
   if (banner) banner.hidden = true;
 }
 
+// ── Offline status banner ───────────────────────────────────────────────────
+function setupOfflineBanner() {
+  let banner = document.getElementById('offline-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'offline-banner';
+    banner.className = 'offline-banner';
+    banner.setAttribute('aria-live', 'assertive');
+    banner.setAttribute('role', 'status');
+    banner.hidden = true;
+    banner.textContent = "You're offline \u2014 showing cached data";
+    document.body.prepend(banner);
+  }
+  function updateBanner() {
+    const offline = !navigator.onLine;
+    banner.classList.toggle('is-visible', offline);
+    // Keep the banner out of the accessibility tree and page text while online.
+    banner.hidden = !offline;
+  }
+  window.addEventListener('online', updateBanner);
+  window.addEventListener('offline', updateBanner);
+  updateBanner();
+}
+
+// ── Today progress bar renderer ─────────────────────────────────────────────
+function renderTodayProgress(classes, nowMinutes) {
+  if (!classes || !classes.length) return '';
+  const done = classes.filter((c) => (c.end || 0) <= nowMinutes).length;
+  const total = classes.length;
+  const pct = Math.round((done / total) * 100);
+  return `<div class="today-progress" aria-label="Today's class progress">
+    <div class="today-progress-bar" style="width:${pct}%" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"></div>
+    <span class="today-progress-label">${done} of ${total} classes done today</span>
+  </div>`;
+}
+
+
+
 function updateLegacyCards() {
   $("#open-legacy-side")?.toggleAttribute("hidden", !v("experience.legacyCard") || !state.legacyUrl);
   const install = $("#install-side");
   if (install) install.hidden = !state.installPrompt;
 }
+
+
+// ── Haptic feedback for primary actions ────────────────────────────────────
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-primary,.chip,.nav-item,.bottom-item');
+  if (btn && navigator.vibrate) navigator.vibrate(10);
+}, { passive: true });
+
+// ── Additional keyboard shortcuts ──────────────────────────────────────────
+document.addEventListener('keydown', (kbEvent) => {
+  // Skip if typing in an input/textarea
+  if (kbEvent.target.closest('input, textarea, select, [contenteditable]')) return;
+
+  // Ctrl+K or Ctrl+/ → Ask page
+  if ((kbEvent.ctrlKey || kbEvent.metaKey) && (kbEvent.key === 'k' || kbEvent.key === '/')) {
+    kbEvent.preventDefault();
+    navigate('ask');
+    setTimeout(() => document.getElementById('question-input')?.focus(), 100);
+    return;
+  }
+  // Alt+T → Today page
+  if (kbEvent.altKey && kbEvent.key === 't') { kbEvent.preventDefault(); navigate('today'); return; }
+  // Alt+R → Rooms page
+  if (kbEvent.altKey && kbEvent.key === 'r') { kbEvent.preventDefault(); navigate('rooms'); return; }
+  // Alt+H → Home/Timetable
+  if (kbEvent.altKey && kbEvent.key === 'h') { kbEvent.preventDefault(); navigate('timetable'); return; }
+  // Alt+N → Notices
+  if (kbEvent.altKey && kbEvent.key === 'n') { kbEvent.preventDefault(); navigate('notices'); return; }
+});
 
 init().catch((error) => {
   console.error("[Compass] boot failed", error);

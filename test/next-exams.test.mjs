@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { answerLocally, buildAnswerContext } from "../next/engine/answer.js";
 import { examDateSheetPeriod, examEventsForSelection, examsOnDate, nextUpcomingExam } from "../next/engine/exams.js";
 
 const ese = {
@@ -51,6 +52,28 @@ test("Today date sheet starts three days early, stays active on gap days, and en
   assert.equal(examDateSheetPeriod(events, { dateISO: "2026-11-28", minutes: 750 }).active, false);
 });
 
+test("Ask treats a published Monday paper as the day's schedule even when a lecture row conflicts", () => {
+  const context = buildAnswerContext({
+    group: "CEA",
+    profile: { branch: "CE", section: "CEA" },
+    now: { dateISO: "2026-11-22", day: "Sunday", minutes: 600, date: "22 Nov" },
+    datesheet: { tabs: [] },
+    schedule: [{ group: "CEA", day: "Monday", start: 570, end: 630, subject: "MATH I", room: "A9 (AUTOMOBILE BLOCK)", teacher: "SUKHMINDER SINGH", type: "lecture" }]
+  });
+  const answer = answerLocally("What is my first class Monday?", context);
+  assert.equal(answer?.intent, "EXAM_DAY");
+  assert.match(answer.html, /Mathematics-I/);
+  assert.match(answer.html, /replaces the class timetable/);
+  assert.doesNotMatch(answer.html, /A9|SUKHMINDER SINGH/);
+
+  for (const question of ["Is MATH I on Monday?", "Any free periods Monday?"]) {
+    const followUp = answerLocally(question, context);
+    assert.equal(followUp?.intent, "EXAM_DAY", question);
+    assert.match(followUp.html, /Mathematics-I/);
+    assert.doesNotMatch(followUp.html, /A9|SUKHMINDER SINGH/);
+  }
+});
+
 test("official ESE datesheet narrows chemistry and physics group rows by the selected section", () => {
   const chemistry = examEventsForSelection({ datesheet: ese, group: "CSA" }).filter((event) => event.category === "End-semester exam");
   const physics = examEventsForSelection({ datesheet: ese, group: "MEB" }).filter((event) => event.category === "End-semester exam");
@@ -62,13 +85,18 @@ test("official ESE datesheet narrows chemistry and physics group rows by the sel
 
 test("only important theory/final date-sheets replace the timetable; workshops remain notice items", async () => {
   const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
-  assert.match(app, /const examPeriod = examDateSheetPeriod\(importantExamEvents\(\), clock\)/);
+  const exams = await readFile(new URL("../next/engine/exams.js", import.meta.url), "utf8");
+  assert.match(app, /const period = examDateSheetPeriod\(importantExamEvents\(\), clock\)/);
   assert.match(app, /function importantExamEvents\(\)/);
-  assert.match(app, /if \(\/workshop\|practical\|lab\/\.test\(label\)\) return false/);
-  assert.match(app, /renderExamPeriodCard\(examPeriod\.exams, clock, examPeriod\.startDate\)/);
-  assert.match(app, /todayExamSittings\.length \? renderExamDayCard\(todayExamSittings, clock\.dateISO\)/);
+  assert.match(exams, /if \(\/workshop\|practical\|lab\/\.test\(label\)\) return false/);
+  const todayView = app.slice(app.indexOf("function renderToday()"), app.indexOf("function renderHero("));
+  assert.match(todayView, /examMode\s*\n?\s*\? renderExamPeriodCard\(info\.period\)/);
+  assert.match(app, /todayExamSittings\.length \? renderExamDayCard\(todayExamSittings, dateForWeekday\(state\.day, clock\)\)/);
   assert.match(app, /Today's exam date sheet/);
-  assert.match(app, /Your exam date sheet/);
+  assert.match(app, /Exam datesheet for your selection/);
+  const askFlow = app.slice(app.indexOf("async function sendQuestion("), app.indexOf("function updateChatHead("));
+  assert.ok(askFlow.indexOf("answerLocally(question, ctx, previousMemory)") < askFlow.indexOf("runBrain(question, ctx)"), "verified local timetable answers must win over Brain lecture guesses");
+  assert.match(askFlow, /memory: answer\.memory/);
   const notices = await readFile(new URL("../next/engine/notices.js", import.meta.url), "utf8");
   assert.match(notices, /mse2-workshops-2026-11/);
 });

@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { runInNewContext } from "node:vm";
 import { access, readFile } from "node:fs/promises";
 import { parseHTML } from "linkedom";
 
@@ -7,6 +8,56 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const exists = async (path) => {
   try { await access(new URL(path, import.meta.url)); return true; } catch { return false; }
 };
+
+async function createServiceWorker(fetcher) {
+  const source = await read("../next/sw.js");
+  const origin = "https://app.test";
+  const listeners = new Map();
+  const records = new Map();
+  const keyOf = (request) => new URL(typeof request === "string" ? request : request.url, origin).href;
+  class MemoryCache {
+    constructor(name) { this.name = name; this.entries = new Map(); }
+    async match(request) { return this.entries.get(keyOf(request))?.clone(); }
+    async put(request, response) { this.entries.set(keyOf(request), response.clone()); }
+    async delete(request) { return this.entries.delete(keyOf(request)); }
+    async keys() { return [...this.entries.keys()].map((url) => new Request(url)); }
+    async add(request) { await this.put(request, await fetcher(new Request(keyOf(request)))); }
+  }
+  const caches = {
+    async open(name) {
+      if (!records.has(name)) records.set(name, new MemoryCache(name));
+      return records.get(name);
+    },
+    async keys() { return [...records.keys()]; },
+    async delete(name) { return records.delete(name); }
+  };
+  const self = {
+    location: { origin },
+    clients: { claim: async () => {} },
+    addEventListener(name, handler) { listeners.set(name, handler); },
+    skipWaiting() {}
+  };
+  runInNewContext(source, { self, caches, fetch: fetcher, Request, Response, Headers, URL, Date, Promise, console });
+  return {
+    caches,
+    async fetch(requestUrl, { mode = "cors", cache = "default" } = {}) {
+      const request = new Request(new URL(requestUrl, origin), { cache });
+      if (mode !== "cors") Object.defineProperty(request, "mode", { value: mode });
+      let responsePromise = null;
+      const waits = [];
+      listeners.get("fetch")({
+        request,
+        respondWith(promise) { responsePromise = Promise.resolve(promise); },
+        waitUntil(promise) { waits.push(Promise.resolve(promise)); }
+      });
+      return {
+        handled: Boolean(responsePromise),
+        response: responsePromise ? await responsePromise : null,
+        async waitForLifetime() { await Promise.all(waits); }
+      };
+    }
+  };
+}
 
 test("the app shell declares the PWA contract", async () => {
   const html = await read("../next/index.html");
@@ -88,9 +139,95 @@ test("the service worker precaches the real shell and isolates the legacy origin
   assert.ok(assets.includes("index.html"));
   assert.ok(assets.includes("app.js"));
   assert.ok(assets.includes("styles.css"));
+  assert.equal(assets.includes("data/timetable-groups.html"), false, "large timetable HTML loads on demand");
+  assert.equal(assets.includes("data/timetable-rooms.html"), false, "large room HTML loads on demand");
   for (const asset of new Set(assets)) {
     assert.equal(await exists(`../next/${asset}`), true, `service worker references missing ${asset}`);
   }
+});
+
+test("the worker caches only its allowlisted public endpoints and respects private cache headers", async () => {
+  const calls = [];
+  const worker = await createServiceWorker(async (request) => {
+    calls.push(request.url);
+    return new Response("public", { headers: { "Cache-Control": "public, max-age=300" } });
+  });
+  for (const path of ["/api/admin/ai/status", "/api/legacy/data/student-roster-index.json", "/api/legacy/api/chat"]) {
+    const result = await worker.fetch(path);
+    assert.equal(result.handled, false, `${path} bypasses Cache API`);
+  }
+  assert.equal(calls.length, 0);
+
+  for (const cacheControl of ["no-store", "private, max-age=60"]) {
+    const privateWorker = await createServiceWorker(async () => new Response("sensitive", { headers: { "Cache-Control": cacheControl } }));
+    const result = await privateWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
+    await result.waitForLifetime();
+    assert.equal(await result.response.text(), "sensitive");
+    const dataCache = await privateWorker.caches.open("compass-next-v3.1.1-data");
+    assert.equal((await dataCache.keys()).length, 0, `${cacheControl} responses are not stored`);
+  }
+});
+
+test("a fresh public-data hit returns immediately and its revalidation completes within worker lifetime", async () => {
+  let calls = 0;
+  const worker = await createServiceWorker(async () => new Response(`v${++calls}`, { headers: { "Cache-Control": "public, max-age=300" } }));
+  const first = await worker.fetch("/api/legacy/data/end-sem-datesheet.json");
+  await first.waitForLifetime();
+  assert.equal(await first.response.text(), "v1");
+
+  const second = await worker.fetch("/api/legacy/data/end-sem-datesheet.json");
+  assert.equal(await second.response.text(), "v1");
+  assert.equal(second.response.headers.get("x-compass-cache"), "hit");
+  await second.waitForLifetime();
+  assert.equal(calls, 2, "one background refresh ran after serving the cache hit");
+
+  const third = await worker.fetch("/api/legacy/data/end-sem-datesheet.json");
+  assert.equal(await third.response.text(), "v2");
+  await third.waitForLifetime();
+});
+
+test("warm static assets stay cache-first and offline navigation falls back to the shell", async () => {
+  let calls = 0;
+  const worker = await createServiceWorker(async () => {
+    calls += 1;
+    return new Response("module", { headers: { "Content-Type": "text/javascript" } });
+  });
+  const first = await worker.fetch("/app.js");
+  await first.waitForLifetime();
+  assert.equal(await first.response.text(), "module");
+  const second = await worker.fetch("/app.js");
+  await second.waitForLifetime();
+  assert.equal(await second.response.text(), "module");
+  assert.equal(calls, 1, "a warm launch does not revalidate every shell module");
+
+  const shell = await worker.caches.open("compass-next-v3.1.1-shell");
+  await shell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
+  const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
+  const offlineShell = await offlineWorker.caches.open("compass-next-v3.1.1-shell");
+  await offlineShell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
+  const navigation = await offlineWorker.fetch("/today", { mode: "navigate" });
+  assert.equal(await navigation.response.text(), "<main>offline shell</main>");
+  await navigation.waitForLifetime();
+});
+
+test("the public-data cache has a bounded entry count and retains recent offline data", async () => {
+  const worker = await createServiceWorker(async () => new Response("data", { headers: { "Cache-Control": "public, max-age=300" } }));
+  for (let index = 0; index < 84; index += 1) {
+    const result = await worker.fetch(`/api/legacy/api/timetable?source=groups&version=${index}`);
+    await result.waitForLifetime();
+  }
+  const cache = await worker.caches.open("compass-next-v3.1.1-data");
+  assert.equal((await cache.keys()).length, 80);
+
+  const recent = new Response("saved datesheet", { headers: { "Cache-Control": "public", "X-Compass-Cached-At": String(Date.now() - 2 * 24 * 60 * 60 * 1000) } });
+  await cache.put("/api/legacy/data/end-sem-datesheet.json", recent);
+  const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
+  const offlineCache = await offlineWorker.caches.open("compass-next-v3.1.1-data");
+  await offlineCache.put("/api/legacy/data/end-sem-datesheet.json", recent);
+  const offline = await offlineWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
+  assert.equal(await offline.response.text(), "saved datesheet");
+  assert.equal(offline.response.headers.get("x-compass-offline"), "1");
+  await offline.waitForLifetime();
 });
 
 test("PWA icon files are valid PNGs and the SVG is self-contained", async () => {

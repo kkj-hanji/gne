@@ -138,6 +138,21 @@ export function examEventsForSelection({ datesheet, group, branch = "" } = {}) {
   });
 }
 
+/**
+ * Workshop and practical rows are notice items, not day-replacing exams.
+ * Only theory, mid-semester and end-semester papers replace the timetable.
+ */
+export function isImportantExam(event) {
+  const label = `${event?.category || ""} ${event?.title || ""}`.toLowerCase();
+  if (/workshop|practical|lab/.test(label)) return false;
+  return /\bmse\b|end[- ]?sem(?:ester)?|\bfinal\b|\btentative\b|\bese\b/.test(label);
+}
+
+/** Theory/final sittings for one verified section selection. */
+export function importantExamEventsForSelection({ datesheet, group, branch = "" } = {}) {
+  return examEventsForSelection({ datesheet, group, branch }).filter(isImportantExam);
+}
+
 function compareExams(a, b) {
   return a.date.localeCompare(b.date)
     || (a.start ?? Number.MAX_SAFE_INTEGER) - (b.start ?? Number.MAX_SAFE_INTEGER)
@@ -163,7 +178,9 @@ export function examDateSheetPeriod(events, { dateISO, minutes = 0, leadDays = 3
     active: Boolean(startDate && dateISO >= startDate && remaining.length),
     startDate,
     exams,
-    remaining
+    remaining,
+    today: examsOnDate(exams, dateISO),
+    next: remaining[0] || null
   };
 }
 

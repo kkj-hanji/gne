@@ -6,7 +6,6 @@
   "start_url": "./today",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#06110e",
   "theme_color": "#06110e",
@@ -14,6 +13,10 @@
   "dir": "ltr",
   "categories": ["education", "productivity", "utilities"],
   "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "handle_links": "preferred",
   "icons": [
     {
       "src": "./icons/icon-192.png",
@@ -72,7 +75,7 @@
     {
       "name": "Teacher timetable",
       "short_name": "Teachers",
-      "description": "Open any teacher's published weekly classes",
+      "description": "Open a teacher's published weekly classes",
       "url": "./teachers",
       "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }]
     },

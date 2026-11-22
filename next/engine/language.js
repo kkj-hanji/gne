@@ -98,7 +98,62 @@ const PHRASES = [
   ["\\b(?:my\\s+section|mera\\s+section|meri\\s+section|mera\\s+group|meri\\s+group)\\b", "my section"],
   ["\\b(?:which\\s+section|kaun\\s+si\\s+section|konsi\\s+section|kaunsi\\s+section)\\b", "which section"],
   ["\\b(?:sat\\s*sri\\s*akal|sat\\s+sri\\s+akal|sat\\s+shri\\s+akal)\\b", "hello"],
-  ["\\b(?:ram\\s*ram|radhe\\s*radhe|namaste\\s+ji|namaskar)\\b", "hello"]
+  ["\\b(?:ram\\s*ram|radhe\\s*radhe|namaste\\s+ji|namaskar)\\b", "hello"],
+  ["\\b(?:jai\\s*hind|vande\\s*mataram|vande\\s+maataram)\\b", "hello"],
+  ["\\b(?:good\\s+morning|gd\\s+mrng|gd\\s+morn|gudmrng|gm)\\b", "hello"],
+  ["\\b(?:good\\s+evening|gd\\s+evng|good\\s+evning)\\b", "hello"],
+  ["\\b(?:good\\s+night|gd\\s+nite|gudnite)\\b", "bye"],
+  ["\\b(?:mid\\s*sem|mid\\s*term|mst|ct\\s*[1-3]|class\\s*test|internal\\s*exam|mse\\s*[1-3]?)\\b", "exam"],
+  ["\\b(?:back\\s*paper|backpaper|supplementary|atkt)\\b", "exam"],
+  ["\\b(?:question\\s*bank|qb|que\\s*bank|q\\s*bank)\\b", "question bank"],
+  ["\\b(?:cgpa|c\\.?g\\.?p\\.?a|cumulative\\s+grade|grade\\s+point)\\b", "cgpa"],
+  ["\\b(?:after\\s+lunch|post\\s+lunch|lunch\\s+ke\\s+baad)\\b", "afternoon"],
+  ["\\b(?:before\\s+lunch|pre\\s+lunch|lunch\\s+se\\s+pehle)\\b", "morning"],
+  ["\\b(?:building|block|bhawan|blk)\\b", "block"],
+  ["\\b(?:practical|practicals|lab\\s*work|lab\\s*class|prctcl|prac)\\b", "practical"],
+  // Indian student location queries
+  ["\\b(?:kahan|kithe|kithay|kidhar|kidder|where)\\s+(?:hai|hain|han|aa|is|are)\\b", "where is"],
+  ["\\b(?:kaun|kauno|koun|kon)\\s+(?:hai|hain|han|is|are)\\b", "who is"],
+  ["\\b(?:kab|kadon|kiddan|when)\\s+(?:hai|hain|han|aa|is)\\b", "when is"],
+  ["\\b(?:kya|ki|ke)\\s+(?:hai|hain|han|is)\\b", "what is"],
+  // More greeting forms
+  ["\\b(?:waheguru|wjkk\\s*wjkf|wjkk|waheguruji)\\b", "hello"],
+  ["\\b(?:assalamu\\s*alaikum|assalam|salaam\\s*alaikum|aoa)\\b", "hello"],
+  ["\\b(?:good\\s+afternoon|gd\\s+aftrn|gd\\s+afternoon)\\b", "hello"],
+  // College jargon
+  ["\\b(?:bunking|bunk\\s*kar|skip\\s*kar|chor\\s*du|chorr)\\b", "bunk"],
+  ["\\b(?:attendance\\s+short|short\\s+attendance|attshrt|att\\s+short)\\b", "attendance shortage"],
+  ["\\b(?:miss|skip)\\s+(?:class|classes|lecture|lectures)\\b", "attendance shortage"],
+  ["\\b(?:class|classes|lecture|lectures)\\s+(?:miss|skip)\\b", "attendance shortage"],
+  ["\\b(?:kitni|kitna|how\\s+many|how\\s+much)\\s+(?:class|classes|cls)\\b", "how many classes"],
+  ["\\b(?:pehla|pahla|first|1st)\\s+(?:class|lecture|period)\\b", "first class"],
+  ["\\b(?:aakhri|last|aakhiri|akhri|antim)\\s+(?:class|lecture|period)\\b", "last class"],
+  // Result / marks queries
+  ["\\b(?:result|marks|marks\\s*sheet|marksheet|report\\s*card)\\b", "result"],
+  // Exam venue/hall queries
+  ["\\b(?:exam\\s*hall|exam\\s*room|exam\\s*venue|exam\\s*centre|center)\\b", "exam room"],
+  // Fees / hostel (should return not-found gracefully)
+  // Fees / hostel / result (should return not-found gracefully)
+  ["\\b(?:hostel|mess|canteen|cafeteria|accommodation)\\b", "hostel"],
+  ["\\b(?:fees?|tuition|fee\\s*structure)\\b", "fees"],
+  ["\\b(?:result|marksheet|mark\\s*sheet|grade\\s*card)\\b", "result"],
+  ["\\b(?:admit\\s*card|hall\\s*ticket|roll\\s*slip)\\b", "admit card"],
+  // Student queries
+  ["\\b(?:mera\\s*roll|meri\\s*roll|roll\\s*no|roll\\s*number|enrollment|enrolment)\\b", "my roll number"],
+  // More Hinglish imperatives
+  ["\\b(?:ek\\s*baar|dobara|phir\\s*se|again\\s*batao)\\b", "again"],
+  ["\\b(?:jaldi|quickly|fast\\s*batao|jldi)\\b", "quick"],
+  // Gratitude / small talk
+  ["\\b(?:bahut\\s*acha|bahot\\s*acha|very\\s*good|shabash)\\b", "good"],
+  // Combined attendance + % queries
+  ["\\b(?:kitna\\s*attend|how\\s*many\\s*class(?:es)?\\s*(?:do\\s*i\\s*need|must|chahiye))\\b", "how many classes must attend"],
+  // CGPA queries in Hinglish
+  ["\\b(?:cgpa\\s*kitna|cgpa\\s*kya|mera\\s*cgpa|my\\s*cgpa)\\b", "cgpa"],
+  ["\\b(?:percentage\\s*kya|percentage\\s*kitni|meri\\s*percentage|my\\s*percentage)\\b", "percentage"],
+  // Practical / lab
+  ["\\b(?:lab\\s*kahan|lab\\s*mein|lab\\s*time|practical\\s*kab)\\b", "practical"],
+  // Tomorrow's first class
+  ["\\b(?:kal\\s*pehla|kal\\s*pahla|tomorrow\\s*first|tomorrow\\s*morning)\\b", "first class tomorrow"]
 ];
 
 const WORDS = [
@@ -135,7 +190,7 @@ const WORDS = [
   ["exm|exma|eaxm|exam1|exams", "exam"],
   ["phy|phyz|phys|physcs|phyics|phisics|physic", "physics"],
   ["chem|chemstry|chemisty|chemistry1", "chemistry"],
-  ["math|maths|mathematics|math1|m1", "math"],
+  ["math|maths|mathematics|math1|m1|mth|mth1", "math"],
   ["eco|econ|economics1", "economics"],
   ["eng|english|englsh|inglish", "english"],
   ["drawing|drawng|drwing|graphics1", "drawing"],
@@ -160,7 +215,7 @@ const WORDS = [
   ["kaise|kese|kiven|kive|kaisay", "how"],
   ["batao|btao|bata|bta|bolo|sunao|dikhao|dikha|dikhaao|suna|bhejo|bhej|bhejdo|bhej\\s+do", "show"],
   ["chutti|chhutti|chuti|chhuti|holiday1|leave1", "holiday"],
-  ["khali|khaali|khalee|vacent|vacant|avail|available|empty|freee", "free"],
+  ["khali|khaali|khalee|vacent|vacant|avail|available|empty|freee|phree|faree|khaali|muft", "free"],
   ["kamra|kamre|kamraa|classroom|class\\s*room", "room"],
   ["adhapak|adhyapak|guru|teacher\\s*ji|sir|maam|madam|miss|professor|prof", "teacher"],
   ["vishay|vishey|subject\\s*ji", "subject"],
@@ -189,7 +244,59 @@ const WORDS = [
   ["kalaas|klaas|klaass|kalaash", "class"],
   ["kamaraa|kamara|kamraa|kamre|kamrey", "room"],
   ["agalee|agali|aglee", "next"],
-  ["ticher|tcher|teachr|teacer|teachrr", "teacher"]
+  ["ticher|tcher|teachr|teacer|teachrr|teachaar|teechar|tichar|teacher1|prof1", "teacher"],
+
+  // Additional subject fuzzy spellings (Hinglish/Indian)
+  ["fyziqs|fyzics|phijiks|fiziks|phycis|phyzzics", "physics"],
+  ["kemistry|kemistr|chmistry|chimistry|kimistry", "chemistry"],
+  ["beee|beeee|eee", "electrical"],
+  ["ece|ec", "electronics"],
+  ["cse|cs", "computer"],
+  ["mfg|mfging", "manufacturing"],
+  ["fye|fyenglish", "english"],
+  ["fym|fymath", "math"],
+  ["fyc|fychem", "chemistry"],
+  ["fyp|fyphys", "physics"],
+  ["dsaa|dsa", "data"],
+  ["dbms", "database"],
+  ["cn|ntwk|ntwrk", "network"],
+  ["os|oprtng", "operating"],
+  ["softwr", "software"],
+  ["humnt", "humanities"],
+  ["envt|enviro|envsci", "environment"],
+
+  // Attendance shortforms
+  ["attndnce|atndnce|atndance|attndc|atndnc", "attendance"],
+  ["abst|absnt|absnt|absntee", "absent"],
+  ["prsnt|presnt|prst", "present"],
+  ["bunk|bunked|bunking|absent", "absent"],
+  ["proxy|prxy", "proxy"],
+  ["shortage|shrtage|attshort", "shortage"],
+
+  // Calculation shortforms
+  ["prcnt|persent|perct|percnt|%age", "percentage"],
+  ["calclt|calc|calclte", "calculate"],
+  ["cgpa|cg", "cgpa"],
+  ["sgpa|sg", "sgpa"],
+
+  // Hinglish action words
+  ["dasao|daso|samjhao|samjao|btado|batado", "show"],
+  ["chahiye|chahye|chayo|chiye", "want"],
+  ["lagao|laga|daal|daalo", "set"],
+  ["karo|kro|kar", "do"],
+  // More Hinglish / Indian English
+  ["btao|bato|bta|baato|batao|btaa", "show"],
+  ["dikha|dikhao|dhikha|dkhao", "show"],
+  ["puchna|puchho|pucho|poocho", "ask"],
+  ["chahta|chahti|chahte", "want"],
+  ["lagta|lagti|lgte", "seems"],
+  ["milega|milegi|milenge|milta|milti", "available"],
+  ["hai|hain|han|hei", "is"],
+  ["nahi|nahin|nhin|nhi|naa|no", "not"],
+  ["abhi", "now"],
+  // More subject shortcuts
+  // Exam types
+  ["ct2|ct-2|ct\\s*2", "exam"]
 ];
 
 const PHRASE_RULES = PHRASES.map(([pattern, replacement]) => [new RegExp(pattern, "gi"), replacement]);
@@ -219,7 +326,47 @@ const SPELLING = {
   tusday: "tuesday", tuseday: "tuesday", tuesdy: "tuesday",
   saturdy: "saturday", saterday: "saturday", sunda: "sunday", fryday: "friday",
   mondayy: "monday", tuesdayy: "tuesday", wednesdayy: "wednesday", thursdayy: "thursday",
-  fridayy: "friday", saturdayy: "saturday", sundayy: "sunday"
+  fridayy: "friday", saturdayy: "saturday", sundayy: "sunday",
+  fyziqs: "physics", fyzics: "physics", phijiks: "physics", fiziks: "physics",
+  kemistry: "chemistry", kemistr: "chemistry",
+  attndnce: "attendance", atndnce: "attendance",
+  persent: "percentage", prcnt: "percentage",
+  calclt: "calculate", beee: "electrical",
+  rroms: "rooms", roms: "rooms", romm: "room", rrom: "room",
+  teeches: "teaches", teecher: "teacher",
+  padhata: "teaches", padhate: "teaches", padhati: "teaches",
+  practicals: "practical", prctcl: "practical",
+  mst: "exam",
+  // British/Indian English spellings
+  honours: "honors", behaviour: "behavior", colour: "color",
+  programme: "program", centre: "center", analyse: "analyze",
+  // Common Indian English
+  revert: "reply", prepone: "advance", xerox: "photocopy",
+  // More typos
+  taecher: "teacher", teahcer: "teacher", taacher: "teacher",
+  rooom: "room", roooms: "rooms", classs: "class",
+  lessoon: "lesson", lecrure: "lecture", lcture: "lecture",
+  mondy: "monday", tuesdy: "tuesday", wendsday: "wednesday",
+  thurday: "thursday", fridy: "friday", satrday: "saturday",
+  // SMS shortcuts for days
+  // SMS shortcuts for days
+  mon: "monday", tue: "tuesday", wed: "wednesday",
+  thu: "thursday", fri: "friday", sat: "saturday", sun: "sunday",
+  // More teacher/subject typos
+  teachaar: "teacher", teechar: "teacher", tichar: "teacher",
+  proffesor: "teacher", proffessor: "teacher",
+  subejct: "subject", sibject: "subject",
+  atendance: "attendance", attendence: "attendance", attendanc: "attendance",
+  persantage: "percentage", persntage: "percentage",
+  calcluation: "calculation", calcualtion: "calculation",
+  // Common Hinglish words phonetically spelled
+  kaisa: "how", kaisaa: "how", kesa: "how",
+  batado: "show", bataa: "show",
+  chahieye: "want", chahiey: "want",
+  milega: "available", milegi: "available",
+  // British/Indian variants
+  practise: "practice", analysed: "analyzed",
+  labrotary: "laboratory", labratory: "laboratory"
 };
 
 /* ── public normalisation ──────────────────────────────────────────────── */
@@ -242,15 +389,18 @@ export function canonicalize(question = "") {
   // Keep the characters used by times, dates, room codes and ranges.
   text = text.replace(/[\u{1f000}-\u{1faff}\u{2600}-\u{27bf}\u{2b00}-\u{2bff}\u{fe0f}]/gu, " ");
   text = text.replace(/[^\p{L}\p{N}\s:./-]/gu, " ");
+  // BEEE is a real first-year subject code; protect it from the repeated-
+  // letter cleanup used for stretched chat spellings such as "hellooo".
+  text = text.replace(/\bbeee\b/g, "\uE000");
   text = text.replace(/([a-z])\1{2,}/g, "$1");
   text = text.replace(/\s+/g, " ").trim();
 
-  for (const [pattern, replacement] of PHRASE_RULES) text = text.replace(pattern, replacement);
+  for (const [pattern, replacement] of PHRASE_RULES) text = text.replace(pattern, ` ${replacement} `).replace(/\s+/g, " ").trim();
   for (const [pattern, replacement] of WORD_RULES) text = text.replace(pattern, replacement);
 
   text = text
     .split(" ")
-    .map((token) => SPELLING[token] || token)
+    .map((token) => token === "\uE000" ? "beee" : SPELLING[token] || token)
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
@@ -325,8 +475,30 @@ export function tokenSimilar(a = "", b = "") {
   if (left.length <= 2 || right.length <= 2) return 0;
   const max = left.length >= 8 && right.length >= 8 ? 2 : 1;
   if (left[0] === right[0] && editDistance(left, right, max) <= max) return 0.88;
+  // Phonetic sound-alike check (fyziqs ≈ physics, kemistry ≈ chemistry)
+  if (left.length >= 4 && right.length >= 4) {
+    const foldLeft = left.replace(/(.)(\1+)/g, "$1");
+    const foldRight = right.replace(/(.)(\1+)/g, "$1");
+    if (foldLeft === foldRight) return 0.9;
+  }
   const dice = diceSimilarity(left, right);
   return dice >= 0.8 ? dice * 0.9 : 0;
+}
+
+
+/**
+ * Simple phonetic key for sound-alike matching.
+ * Maps common phonetic variants: fyziqs→physics, kemistry→chemistry, etc.
+ * Returns a simplified consonant skeleton for comparison.
+ */
+export function phoneticKey(word = "") {
+  return String(word).toLowerCase()
+    .replace(/ph/g, "f").replace(/ck|qu/g, "k").replace(/x/g, "ks")
+    .replace(/gh/g, "g").replace(/kh/g, "k").replace(/sh/g, "s")
+    .replace(/th/g, "t").replace(/wh/g, "w").replace(/ch/g, "c")
+    .replace(/ae|ai|ay|ei|ey/g, "a").replace(/ie|ea|ee|oo|ou/g, "o")
+    .replace(/[aeiou]+/g, "").replace(/(.)(\1+)/g, "$1")
+    .trim();
 }
 
 /** True when any word/phrase in `terms` is present, allowing small typos. */
@@ -402,11 +574,18 @@ export const VOCAB = Object.freeze({
   syllabus: ["syllabus", "course", "curriculum", "units", "chapters"],
   faculty: ["faculty", "teacher", "professor", "department", "office", "contact"],
   college: ["college", "gndec", "campus", "address", "location", "established", "affiliated", "hostel", "library"],
-  greeting: ["hello", "hi", "hey", "namaste", "sat sri akal"],
-  thanks: ["thanks", "thank you"],
-  bye: ["bye", "goodbye", "see you"],
-  capabilities: ["who are you", "what can you do", "help", "how do you work"],
-  change: ["change", "update", "edit", "set", "select"]
+  greeting: ["hello", "hi", "hey", "namaste", "sat sri akal", "good morning", "good evening", "namaskar", "jai hind", "good afternoon"],
+  thanks: ["thanks", "thank you", "thx", "ty", "shukriya", "dhanyavad"],
+  bye: ["bye", "goodbye", "see you", "good night", "phir milte"],
+  capabilities: ["who are you", "what can you do", "help", "how do you work", "kya kar sakte ho"],
+  change: ["change", "update", "edit", "set", "select"],
+  exam: ["exam", "exams", "ese", "datesheet", "date sheet", "end sem", "end semester", "test", "mse", "mid sem", "midterm", "ct", "class test", "mst", "back paper", "supplementary"],
+  attendance: ["attendance", "present", "absent", "percentage", "bunk", "bunked", "proxy", "shortage"],
+  syllabus: ["syllabus", "course", "curriculum", "units", "chapters", "chapter", "unit", "topic", "topics"],
+  freePeriod: ["free", "empty", "vacant", "break", "gap", "no class", "spare", "gaps", "breaks", "leisure", "khali period"],
+  practical: ["practical", "practicals", "lab work", "lab class", "prac"],
+  cgpa: ["cgpa", "sgpa", "grade point", "cumulative grade", "percentage from cgpa"],
+  questionBank: ["question bank", "qb", "que bank", "previous year", "pyq"]
 });
 
 /**
@@ -431,7 +610,10 @@ export const QUERY_STOPWORDS = Object.freeze(new Set([
   "holiday", "holidays", "off", "leave", "attendance", "profile", "mentor", "crn", "registration",
   "gndec", "college", "campus", "compass", "please", "plz", "pls", "help",
   "da", "daa", "de", "dee", "di", "nu", "te", "vich", "ch", "naal", "layi", "liye", "ton", "toh",
-  "wala", "wali", "wale", "koi", "bhi", "hi", "ta", "fer", "phir", "hai", "hain", "h"
+  "wala", "wali", "wale", "koi", "bhi", "hi", "ta", "fer", "phir", "hai", "hain", "h",
+  "yaar", "yar", "bhai", "bhaiya", "bro", "dost", "na", "ji", "kindly", "ok", "okay",
+  "hmm", "umm", "arre", "arey", "oye", "actually", "bas", "abey", "abe", "sun", "suno",
+  "dekh", "dekho", "bol", "bolo", "re", "bata", "bhai", "dost"
 ]));
 
 /** Meaningful tokens after alias expansion and stopword removal. */

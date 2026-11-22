@@ -1,6 +1,6 @@
 /* Compass Next — pre-paint theme boot.
-   Runs synchronously before the stylesheet paint so the app never flashes the
-   wrong theme. Deliberately tiny and defensive. */
+   Runs synchronously before stylesheet paint so the app never flashes the
+   wrong theme (eliminates FOUC) and sets up progressive SW update checks. */
 (function () {
   "use strict";
   var KEY = "gndec-compass-next-settings-v2";
@@ -15,11 +15,44 @@
     return Object.prototype.hasOwnProperty.call(values, id) ? values[id] : fallback;
   }
 
-  var theme = String(pick("appearance.theme", "dark"));
+  var rawTheme = String(pick("appearance.theme", "dark"));
+  var theme = rawTheme;
   if (theme === "system") {
     theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
-  root.dataset.theme = theme === "light" ? "light" : theme === "oled" ? "oled" : "dark";
+  var resolvedTheme = theme === "light" ? "light" : theme === "oled" ? "oled" : "dark";
+  root.dataset.theme = resolvedTheme;
+  root.style.colorScheme = resolvedTheme === "light" ? "light" : "dark";
+
+  // Prevent browser chrome & status bar color flash.
+  var themeColorHex = resolvedTheme === "light" ? "#f4fbf8" : (resolvedTheme === "oled" ? "#000000" : "#071310");
+  try {
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute("content", themeColorHex);
+  } catch (_) {}
+
+  // Instant response to system dark/light mode changes when set to system.
+  if (rawTheme === "system" && window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: light)");
+    var onSystemThemeChange = function () {
+      try {
+        var s = JSON.parse(localStorage.getItem(KEY) || "null");
+        if (!s || !s.values || s.values["appearance.theme"] === "system" || !s.values["appearance.theme"]) {
+          var nextT = mq.matches ? "light" : "dark";
+          root.dataset.theme = nextT;
+          root.style.colorScheme = nextT;
+          var nextThemeColor = document.querySelector('meta[name="theme-color"]');
+          if (nextThemeColor) nextThemeColor.setAttribute("content", nextT === "light" ? "#f4fbf8" : "#071310");
+        }
+      } catch (_) {}
+    };
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", onSystemThemeChange);
+    } else if (typeof mq.addListener === "function") {
+      mq.addListener(onSystemThemeChange);
+    }
+  }
+
   root.dataset.accent = String(pick("appearance.accent", "teal"));
   root.dataset.palette = String(pick("appearance.palette", "ocean"));
   root.dataset.background = String(pick("appearance.background", "mist"));

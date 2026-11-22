@@ -68,6 +68,21 @@ test("canonicalisation folds English contractions, SMS and casing", () => {
   assert.equal(canonicalize("TLM"), "tlm");
   assert.equal(canonicalize("timetbel bhejo plz"), "timetable show please");
   assert.equal(canonicalize("tommorow ka shedule"), "tomorrow ka schedule");
+  assert.equal(canonicalize("BEEE class"), "beee class", "the BEEE subject code survives repeated-letter cleanup");
+});
+
+test("BEEE shorthand resolves to its published class instead of the whole day", () => {
+  const cebContext = buildAnswerContext({
+    schedule,
+    roomSchedule,
+    group: "CEB",
+    profile: { ...ctx.profile, section: "CEB", branch: "Civil Engineering" },
+    now: ctx.now,
+    metadata: ctx.metadata,
+    datesheet
+  });
+  assert.equal(intentOf("beee class", cebContext), "SUBJECT_SCHEDULE");
+  assert.match(htmlOf("beee class", cebContext), /BASIC ELECTRICAL AND ELECTRONICS ENGINEERING/);
 });
 
 test("Hinglish and romanised Hindi are expanded to canonical English", () => {

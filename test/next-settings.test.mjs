@@ -110,7 +110,10 @@ test("settings open on a simple overview and keep technical controls under More 
   assert.match(app, /unlockAdminMode/);
   assert.match(app, /api\/admin\/ai\/unlock/);
   assert.match(app, /api\/admin\/ai\/status/);
-  assert.match(app, /adminProfile: state\.profile, selection:/);
+  const externalContext = app.slice(app.indexOf("function aiContextPayload()"), app.indexOf("async function askExternalAi("));
+  assert.match(externalContext, /profileLabel:\s*selectionLabel\(\)/);
+  assert.match(externalContext, /classes:\s*classesForDay\(clock\.day\)/);
+  assert.doesNotMatch(externalContext, /state\.profile|\b(?:crn|registrationNo|serialNo|studentName)\b/i);
   assert.doesNotMatch(app, /data-action="export-ics"|Export \.ics/);
   assert.match(app, /data-profile-lookup-query/);
   assert.match(app, /data-profile="serialNo"|profile-serial/);

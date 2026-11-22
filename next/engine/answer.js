@@ -22,13 +22,15 @@ import {
   isHappeningNow,
   parseTimeExpression,
   relativeStartLabel,
-  resolveQuestionDay
+  resolveQuestionDay,
+  weekdayIndex
 } from "./datetime.js";
 import { computeFreeRooms, formatFreeWindow, groupRooms, isRoomFree, zoneFromQuestion } from "./free-rooms.js";
 import { academicPeriodFor, dayOfWeek, holidayOn, upcomingHolidays } from "./calendar.js";
 import { filterNotices, noticeStats } from "./notices.js";
 import { searchPapers } from "./papers.js";
 import { searchSyllabus } from "./syllabus.js";
+import { examsOnDate, importantExamEventsForSelection } from "./exams.js";
 import {
   bestMatch,
   canonicalize,
@@ -52,19 +54,54 @@ export const MONTHS = Object.freeze({
 /** Subject-code and nickname expansions used only for matching real subjects. */
 const SUBJECT_ALIASES = Object.freeze({
   pps: ["programming", "problem", "solving"],
+  pp: ["programming", "problem"],
   c: ["programming"],
-  m1: ["math"], math1: ["math"], maths: ["math"], mathematics: ["math"], calculus: ["math"],
+  m1: ["math"], math1: ["math"], m2: ["math"], m3: ["math"], m4: ["math"],
+  maths: ["math"], mathematics: ["math"], calculus: ["math"], algebra: ["math"],
+  numerics: ["math"], numerical: ["math"], fym: ["math"], fymath: ["math"],
   phy: ["physics"], phys: ["physics"], physic: ["physics"],
-  chem: ["chemistry"], chemisty: ["chemistry"],
+  phyjics: ["physics"], phijiks: ["physics"], fiziks: ["physics"], fyziqs: ["physics"],
+  bhautiki: ["physics"], phijics: ["physics"], fyp: ["physics"], fyphys: ["physics"],
+  chem: ["chemistry"], chemisty: ["chemistry"], kemistry: ["chemistry"],
+  rasayan: ["chemistry"], rasaayan: ["chemistry"], fyc: ["chemistry"], fychem: ["chemistry"],
   eg: ["drawing"], ed: ["drawing"], edg: ["drawing"], drawing: ["drawing"], graphics: ["drawing"],
-  mp: ["manufacturing"], workshop: ["manufacturing"], wshop: ["manufacturing"],
+  mp: ["manufacturing"], workshop: ["manufacturing"], wshop: ["manufacturing"], mfg: ["manufacturing"],
+  mechanical: ["mechanical"],
   eco: ["economics"], econ: ["economics"],
   mcpd: ["mentoring"], mentoring: ["mentoring"],
   pec: ["english"], english: ["english"], communication: ["english"],
-  bee: ["electrical"], electrical: ["electrical"], electronics: ["electronics"],
-  business: ["business"], essentials: ["business"],
+  fye: ["english"], fyenglish: ["english"],
+  bee: ["electrical"], beee: ["electrical"], beeee: ["electrical"], eee: ["electrical"],
+  electrical: ["electrical"], elec: ["electrical"],
+  ece: ["electronics"], ec: ["electronics"], electronics: ["electronics"],
+  cse: ["computer"], cs: ["computer"], computer: ["computer"],
+  ce: ["civil"], civil: ["civil"],
+  env: ["environment"], envt: ["environment"], envsci: ["environment"],
+  ds: ["data"], dsa: ["data"], dsaa: ["data"],
+  os: ["operating"],
+  dbms: ["database"],
+  cn: ["network"], ntwk: ["network"],
+  hm: ["humanities"], humnt: ["humanities"],
   pns: ["probability"], prob: ["probability"], stats: ["statistics"], statistics: ["statistics"],
-  appl: ["app"], app: ["app"], applied: ["app"]
+  appl: ["app"], app: ["app"], applied: ["app"],
+  business: ["business"], essentials: ["business"],
+  thermd: ["thermodynamics"], thermo: ["thermodynamics"], td: ["thermodynamics"],
+  fluid: ["fluid"], fm: ["fluid"], hydraulics: ["fluid"],
+  strength: ["strength"], som: ["strength"], mechanics: ["mechanics"], mech: ["mechanics"],
+  signals: ["signals"], dsp: ["signals"], digital: ["digital"],
+  microprocessor: ["microprocessor"], mp8085: ["microprocessor"], mpu: ["microprocessor"],
+  embedded: ["embedded"], iot: ["iot"],
+  compiler: ["compiler"], automata: ["automata"], toc: ["automata"],
+  crypto: ["cryptography"], security: ["cryptography"],
+  ml: ["machine"], ai: ["artificial"], dl: ["deep"],
+  biomedical: ["biomedical"], bme: ["biomedical"],
+  textile: ["textile"], tex: ["textile"],
+  industrial: ["industrial"], ie: ["industrial"],
+  production: ["production"], pe: ["production"],
+  material: ["material"],
+  mcq: ["quiz"],
+  lab: ["practical"],
+  elective: ["elective"]
 });
 
 const ORDINALS = Object.freeze({
@@ -115,6 +152,73 @@ export function currentAndNext(classes, minutes) {
   const current = sorted.find((entry) => isHappeningNow(entry, minutes)) || null;
   const next = sorted.find((entry) => entry.start > minutes) || null;
   return { current, next };
+}
+
+/* ── exam-day awareness ───────────────────────────────────────────────── */
+
+function importantExams(ctx) {
+  return importantExamEventsForSelection({
+    datesheet: ctx.datesheet,
+    group: ctx.group,
+    branch: ctx.profile?.branch || ""
+  });
+}
+
+function examsForDate(ctx, dateISO) {
+  return dateISO ? examsOnDate(importantExams(ctx), dateISO) : [];
+}
+
+/** Next calendar date for a weekday name; today counts as offset 0. */
+function dateForWeekday(day, now) {
+  const target = DAY_NAMES.indexOf(day);
+  const base = DAY_NAMES.indexOf(now?.day);
+  if (target < 0 || base < 0) return now?.dateISO || "";
+  return addDays(now, (target - base + 7) % 7).dateISO;
+}
+
+function shortDate(iso) {
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
+}
+
+function examTimeLine(exam, clock = "12h") {
+  if (exam.start != null && exam.end != null) return `${humanTime(exam.start, clock)}–${humanTime(exam.end, clock)}`;
+  if (exam.start != null) return humanTime(exam.start, clock);
+  return exam.sessionRaw || "Time not listed";
+}
+
+function examCard(exam, ctx) {
+  const clock = ctx.clock || "12h";
+  const meta = [exam.category, exam.tab, exam.sessionNote].filter(Boolean).join(" · ");
+  return `<div class="answer-class">
+    <div class="answer-class-time">${escapeHtml(examTimeLine(exam, clock))}</div>
+    <div class="answer-class-body"><strong>${escapeHtml(exam.title)}</strong>${meta ? `<div class="answer-class-meta">${escapeHtml(meta)}</div>` : ""}</div>
+  </div>`;
+}
+
+function examDayResult(exams, ctx, { label = "", dateISO = "" } = {}) {
+  if (!exams.length) return null;
+  return {
+    html: `<p><strong>${escapeHtml(label || "Exam day")}${dateISO ? ` · ${escapeHtml(shortDate(dateISO))}` : ""}</strong></p>
+      ${exams.map((exam) => examCard(exam, ctx)).join("")}
+      <p class="answer-meta">The published exam date sheet replaces the class timetable on this day, so no lecture is listed. Confirm the sitting and venue on the official notice before travelling.</p>`,
+    intent: "EXAM_DAY",
+    confidence: 0.97,
+    plan: ["read the selected section's published date sheet", "match the asked date", "show only the verified sitting", "do not invent a lecture or venue"],
+    entities: { exams: exams.map((exam) => exam.title), dateISO }
+  };
+}
+
+/** First day at or after today that has an unexpired published paper. */
+function nextExamDay(ctx, now, horizon = 21) {
+  for (let offset = 0; offset <= horizon; offset += 1) {
+    const candidate = addDays(now, offset);
+    const exams = examsForDate(ctx, candidate.dateISO);
+    const live = offset > 0 ? exams : exams.filter((exam) => exam.end == null || exam.end > now.minutes);
+    if (live.length) return { ...candidate, exams: live };
+  }
+  return null;
 }
 
 export function freeBellSlots(classes) {
@@ -224,6 +328,8 @@ function wants(question, terms) {
 function nextClassResult(ctx) {
   const { schedule, group, subgroup, now } = ctx;
   if (!schedule?.length || !group) return null;
+  const todayExams = examsForDate(ctx, now.dateISO);
+  if (todayExams.length) return examDayResult(todayExams, ctx, { label: "Today is an exam day", dateISO: now.dateISO });
   const today = classesFor(schedule, group, now.day, subgroup);
   const { current, next } = currentAndNext(today, now.minutes);
   if (current && !next) {
@@ -250,7 +356,21 @@ function nextClassResult(ctx) {
       entities: { subject: next.subject, room: next.room, teacher: next.teacher, day: now.day }
     };
   }
-  const future = nextStudyDayWithClasses(schedule, group, subgroup, now);
+  // No more classes today. The next verified event may be an exam, not a lecture.
+  const examNext = nextExamDay(ctx, now);
+  const future = nextStudyDayWithClasses(schedule, group, subgroup, now, ctx);
+  if (examNext && (!future || examNext.dateISO <= future.dateISO)) {
+    const classDay = future ? classesFor(schedule, group, future.day, subgroup)[0] : null;
+    const tail = classDay
+      ? `<p class="answer-meta">Next published class after that: <strong>${escapeHtml(classDay.subject)}</strong> on ${escapeHtml(future.day)} at ${escapeHtml(humanTime(classDay.start, ctx.clock || "12h"))}.</p>`
+      : "";
+    const answer = examDayResult(examNext.exams, ctx, { label: `No more classes today · next is an exam on ${examNext.day}`, dateISO: examNext.dateISO });
+    return {
+      ...answer,
+      html: `${answer.html}${tail}`,
+      entities: { ...answer.entities, subject: classDay?.subject || "", room: classDay?.room || "", teacher: classDay?.teacher || "", day: future?.day || "" }
+    };
+  }
   if (future) {
     const dayClasses = classesFor(schedule, group, future.day, subgroup);
     const first = dayClasses[0];
@@ -260,7 +380,7 @@ function nextClassResult(ctx) {
         ${classCard(first, ctx)}${sourceLine(ctx)}`,
       intent: "NEXT_CLASS_LATER",
       confidence: 0.93,
-      plan: ["read the active section", "today has no remaining class", "check the next weekday release", "report only published entries"],
+      plan: ["read the active section", "today has no remaining class", "skip published exam days", "report only published entries"],
       entities: { subject: first.subject, room: first.room, teacher: first.teacher, day: future.day }
     };
   }
@@ -272,16 +392,21 @@ function nextClassResult(ctx) {
   };
 }
 
-function nextStudyDayWithClasses(schedule, group, subgroup, now) {
-  for (let offset = 1; offset <= 7; offset += 1) {
+function nextStudyDayWithClasses(schedule, group, subgroup, now, ctx = null) {
+  for (let offset = 1; offset <= 14; offset += 1) {
     const candidate = addDays(now, offset);
     if (!STUDY_DAYS.includes(candidate.day)) continue;
+    // A published exam day has no lecture to report.
+    if (ctx && examsForDate(ctx, candidate.dateISO).length) continue;
     if (classesFor(schedule, group, candidate.day, subgroup).length) return candidate;
   }
   return null;
 }
 
 function dayResult(day, ctx, label = "") {
+  const dateISO = dateForWeekday(day, ctx.now);
+  const exams = examsForDate(ctx, dateISO);
+  if (exams.length) return examDayResult(exams, ctx, { label: label || day, dateISO });
   const classes = classesFor(ctx.schedule, ctx.group, day, ctx.subgroup);
   const header = `<p><strong>${escapeHtml(label || day)} · ${escapeHtml(selectionLabel(ctx))}</strong></p>`;
   if (!classes.length) {
@@ -307,6 +432,11 @@ function dayResult(day, ctx, label = "") {
 
 function weekResult(ctx) {
   const blocks = STUDY_DAYS.map((day) => {
+    const dateISO = dateForWeekday(day, ctx.now);
+    const exams = examsForDate(ctx, dateISO);
+    if (exams.length) {
+      return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">Exam</span></p>${exams.map((exam) => examCard(exam, ctx)).join("")}</div>`;
+    }
     const classes = classesFor(ctx.schedule, ctx.group, day, ctx.subgroup);
     if (!classes.length) return "";
     return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong></p>${classes.map((entry) => classCard(entry, ctx)).join("")}</div>`;
@@ -331,6 +461,9 @@ function firstLastResult(question, ctx) {
   if (!wantsFirst && !wantsLast) return null;
   const target = resolveQuestionDay(question, ctx.now);
   const day = target?.day || ctx.now.day;
+  const dateISO = target?.date?.dateISO || dateForWeekday(day, ctx.now);
+  const exams = examsForDate(ctx, dateISO);
+  if (exams.length) return examDayResult(exams, ctx, { label: target?.label || day, dateISO });
   const classes = classesFor(ctx.schedule, ctx.group, day, ctx.subgroup);
   if (!classes.length) return dayResult(day, ctx, target?.label || "Today");
   const entry = wantsFirst ? classes[0] : classes[classes.length - 1];
@@ -350,6 +483,9 @@ function freePeriodResult(question, ctx) {
   if (!wants(question, VOCAB.period)) return null;
   const target = resolveQuestionDay(question, ctx.now);
   const day = target?.day || ctx.now.day;
+  const dateISO = target?.date?.dateISO || dateForWeekday(day, ctx.now);
+  const exams = examsForDate(ctx, dateISO);
+  if (exams.length) return examDayResult(exams, ctx, { label: target?.label || day, dateISO });
   const classes = classesFor(ctx.schedule, ctx.group, day, ctx.subgroup);
   const free = freeBellSlots(classes);
   const period = requestedPeriod(question);
@@ -1097,8 +1233,116 @@ function holidayResult(question, ctx) {
   };
 }
 
+function calculationResult(question) {
+  const text = canonicalize(question);
+  // CGPA to percentage (PTU formula: CGPA × 9.5)
+  const cgpaMatch = text.match(/(?:cgpa|cg\s*pa|grade\s*point)[\s:=]*(?:of|is|hai|h)?[\s:=]*(\d+(?:\.\d+)?)/)
+    || text.match(/(\d+(?:\.\d+)?)[\s:]*(?:cgpa|cg\s*pa)/);
+  if (cgpaMatch && (mentions(question, ["cgpa", "grade point", "cumulative"]) || /cgpa/i.test(question))) {
+    const cgpa = parseFloat(cgpaMatch[1]);
+    if (cgpa >= 0 && cgpa <= 10) {
+      const pct = (cgpa * 9.5).toFixed(2);
+      return {
+        html: `<p><strong>CGPA ${cgpa} → ${pct}%</strong></p>
+          <ul style="margin:6px 0 6px 18px;font-size:.92em">
+            <li>PTU formula: CGPA × 9.5</li>
+            <li>Grade: ${cgpa >= 9 ? "Outstanding" : cgpa >= 8 ? "Excellent" : cgpa >= 7 ? "Very Good" : cgpa >= 6 ? "Good" : cgpa >= 5 ? "Average" : "Below Average"}</li>
+            <li>Equivalent percentage: <strong>${pct}%</strong></li>
+          </ul>
+          <p class="answer-meta">PTU/IKGPTU standard formula. Actual marksheet may differ slightly.</p>`,
+        intent: "CGPA_CALC", confidence: 0.97,
+        plan: ["read CGPA value from query", "apply PTU formula ×9.5", "return result"],
+        entities: { cgpa, percentage: parseFloat(pct) }
+      };
+    }
+  }
+  // SGPA to percentage
+  const sgpaMatch = text.match(/(?:sgpa|s\.?g\.?p\.?a|semester\s*grade)[\s:=]*(?:of|is|hai|h)?[\s:=]*(\d+(?:\.\d+)?)/)
+    || text.match(/(\d+(?:\.\d+)?)[\s:]*(?:sgpa|s\.?g\.?p\.?a)/);
+  if (sgpaMatch && /sgpa|s\.?g\.?p\.?a|semester grade/i.test(question)) {
+    const sgpa = parseFloat(sgpaMatch[1]);
+    if (sgpa >= 0 && sgpa <= 10) {
+      const pct = (sgpa * 9.5).toFixed(2);
+      return {
+        html: `<p><strong>SGPA ${sgpa} → ${pct}%</strong> (PTU formula: SGPA × 9.5)</p>
+          <p class="answer-meta">This is the SGPA for a single semester. For overall percentage, use your CGPA.</p>`,
+        intent: "SGPA_CALC", confidence: 0.96,
+        plan: ["read SGPA value from query", "apply PTU formula ×9.5", "return result"],
+        entities: { sgpa, percentage: parseFloat(pct) }
+      };
+    }
+  }
+  // "How many classes can I miss / bunk?" (75% rule)
+  const bunkMatch = text.match(/(\d+)\s*(?:total|out\s+of|mein\s+se|classes?|lectures?)/);
+  const totalText = text.match(/(?:total|out\s+of|mein|me)\s*(\d+)/);
+  if (
+    /(?:bunk|miss|skip|absent|how\s+many.*(?:bunk|miss|skip|leave)|kitne.*(?:bunk|chhod|miss))/i.test(text) ||
+    mentions(question, ["how many classes can i miss", "how many can i bunk", "kitne classes bunk", "75 percent"]) ||
+    (/\battendance\b/i.test(text) && /\d+\s*(?:%|percent)/.test(text))
+  ) {
+    const total = parseInt((bunkMatch || totalText || [])[1] || "0", 10);
+    if (total > 0 && total <= 500) {
+      const minPresent = Math.ceil(total * 0.75);
+      const canMiss = total - minPresent;
+      return {
+        html: `<p><strong>75% attendance rule:</strong> Out of <strong>${total}</strong> classes, you must attend at least <strong>${minPresent}</strong>.</p>
+          <p>You can miss at most <strong>${canMiss}</strong> classes and still be eligible.</p>
+          <p class="answer-meta">Formula: required = ⌈total × 0.75⌉. Verify with your department — some teachers have stricter rules.</p>`,
+        intent: "ATTENDANCE_CALC", confidence: 0.95,
+        plan: ["read total classes from query", "apply 75% rule", "return safe result"],
+        entities: { total, minPresent, canMiss }
+      };
+    }
+    // "If I have X% attendance, can I miss more?" — percentage-based query
+    // Matches: "65% attendance", "attendance 65%", "meri 65 percent attendance", "65 percent hai"
+    const currentPctMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:%|percent|per\s*cent)\s*(?:attendance|attend)/)
+      || text.match(/(?:attendance|attend)\s*(?:is|hai|hain|meri|mera|h|=)?\s*(\d+(?:\.\d+)?)\s*(?:%|percent)/)
+      || ((/\battendance\b/i.test(text) || /\battend\b/i.test(text)) ? text.match(/(\d{2,3}(?:\.\d+)?)\s*(?:%|percent)/) : null);
+    if (currentPctMatch) {
+      const curPct = parseFloat(currentPctMatch[1]);
+      // Exactly 75 with "rule" context = explaining the rule, not personal attendance
+      const isRuleQuery = /\b(?:rule|law|policy|kya\s*hai|what\s*is|explain|matlab|means?)\b/i.test(text) && curPct === 75;
+      if (!isRuleQuery && curPct >= 0 && curPct <= 100 && curPct !== 75) {
+        const canMissMore = curPct > 75;
+        const deficit = curPct < 75 ? (75 - curPct).toFixed(1) : 0;
+        const buffer = curPct > 75 ? (curPct - 75).toFixed(1) : 0;
+        return {
+          html: `<p><strong>Your current attendance: ${curPct}%</strong></p>
+            <p>${canMissMore
+              ? `You are <strong>${buffer}%</strong> above the 75% minimum — you have some buffer.`
+              : `You are <strong>${deficit}%</strong> below the 75% requirement — you cannot miss any more classes.`
+            }</p>
+            <p class="answer-meta">To get an exact "how many classes can I miss" answer, tell me your total class count. Example: "I have 80 classes total and 65% attendance, how many can I miss?"</p>`,
+          intent: "ATTENDANCE_PCT", confidence: 0.93,
+          plan: ["read current attendance %", "compare to 75% threshold", "advise on buffer/deficit"],
+          entities: { currentPercentage: curPct }
+        };
+      }
+    }
+    // Generic rule without a number
+    return {
+      html: `<p><strong>75% attendance is mandatory</strong> at GNDEC (PTU/IKGPTU rule).</p>
+        <ul style="margin:6px 0 6px 18px;font-size:.92em">
+          <li>Must attend ≥ 75% of total classes each semester</li>
+          <li>60–74%: Medical/exceptional grounds (with proof)</li>
+          <li>Below 60%: Debarred from End-Semester exam</li>
+        </ul>
+        <p>Try: <em>"I have 80 classes total, how many can I miss?"</em></p>`,
+      intent: "ATTENDANCE_RULE", confidence: 0.92,
+      plan: ["explain 75% rule", "add PTU tiers", "invite follow-up with specific number"],
+      entities: {}
+    };
+  }
+  return null;
+}
+
 function attendanceResult(question, ctx) {
   if (!wants(question, VOCAB.attendance)) return null;
+  // Don't intercept teacher queries - "miss" is a title (ma'am/miss)
+  const text = canonicalize(question);
+  if (wants(text, ["who", "teacher", "faculty", "padhata", "teaches", "kaun"])) return null;
+  // Don't intercept subject queries - "skip" / "miss" might appear near a subject name
+  if (wants(text, VOCAB.subject) && !wants(text, ["absent", "attendance", "bunk", "shortage"])) return null;
   return {
     html: `<p><strong>Attendance is not tracked in Compass.</strong></p>
       <p>The timetable only describes when classes are published; it does not record who attended. Use the official college attendance system for your attendance percentage.</p>`,
@@ -1111,21 +1355,42 @@ function attendanceResult(question, ctx) {
 function smalltalkResult(question, ctx) {
   const text = canonicalize(question);
   const compact = text.replace(/\s+/g, " ").trim();
-  if (/^(?:hi+|hello+|hey+|namaste|good morning|good afternoon|good evening|hello ji|hi ji|yo|hola)(?: there| ji| bhai| bro)?$/.test(compact)) {
+  if (/^(?:hi+|hello+|hey+|namaste|good\s+morning|good\s+afternoon|good\s+evening|good\s+night|hello\s*ji|hi\s*ji|yo|hola|jai\s+hind|vande\s+mataram|sat\s+sri\s+akal|ram\s+ram|radhe\s+radhe|namaskar|waheguru|waheguru\s+ji)(?: there| ji| bhai| bro| yaar| dost)?$/.test(compact)) {
     return {
-      html: `<p><strong>Hello!</strong> I am Compass, the GNDEC timetable assistant.</p><p>Ask me about your next class, a room, a teacher, free rooms or the exam datesheet. I answer from verified college data and I do not guess.</p>`,
+      html: `<p><strong>Hello! 👋</strong> I'm Compass — your GNDEC timetable assistant.</p>
+        <p>Ask me anything about your schedule, like:</p>
+        <ul style="margin:8px 0;padding-left:18px;line-height:1.9">
+          <li>🕐 <em>"What is my next class?"</em></li>
+          <li>🏫 <em>"Which rooms are free now?"</em></li>
+          <li>📅 <em>"Kal ka timetable dikha"</em></li>
+          <li>👨‍🏫 <em>"Physics ka teacher kaun hai?"</em></li>
+          <li>📋 <em>"When is my ESE exam?"</em></li>
+        </ul>
+        <p class="answer-meta">I answer from verified GNDEC data only — no guessing, ever. Hinglish, Punjabi, Hindi and typos are fine!</p>`,
       intent: "GREETING", confidence: 0.99, plan: ["recognise a greeting", "offer verified topics"]
     };
   }
   if (/^(?:thanks|thank you|thx|ty|dhanyavad|shukriya|shukria|thanx)(?: so much| a lot| bhai)?$/.test(compact)) {
-    return { html: `<p>You're welcome. Ask again whenever you need a verified answer.</p>`, intent: "THANKS", confidence: 0.99, plan: ["recognise thanks"] };
+    return { html: `<p>You're welcome! 😊 Ask anything else about your timetable, rooms, teachers or exams.</p>`, intent: "THANKS", confidence: 0.99, plan: ["recognise thanks"] };
   }
   if (/^(?:bye|goodbye|see you|ok bye|chalo bye|phir milde|phir milte)$/.test(compact)) {
     return { html: `<p>See you. Your saved section and settings stay on this device.</p>`, intent: "BYE", confidence: 0.99, plan: ["recognise goodbye"] };
   }
   if (wants(question, VOCAB.capabilities) || /\bhow are you\b|\bwhat is your name\b|\bare you real\b|\bare you a bot\b/.test(compact)) {
     return {
-      html: `<p><strong>I am Compass.</strong> I run a deterministic engine over official GNDEC timetable, room, profile and datesheet data. I am not an LLM and I never invent a class, teacher or room.</p><p>You can ask: “What is my next class?”, “Where is Physics?”, “Which rooms are free at 2 PM?”, “Show my timetable for tomorrow”, or “When is my ESE exam?”</p><p class="answer-meta">Hinglish, Punjabi, Hindi, shortforms and typos are all fine.</p>`,
+      html: `<p><strong>I'm Compass 🧭</strong> — GNDEC's verified timetable assistant.</p>
+        <p>I run a deterministic engine over official GNDEC data. I'm <strong>not an LLM</strong> — I never guess.</p>
+        <p><strong>What I can do:</strong></p>
+        <ul style="margin:8px 0;padding-left:18px;line-height:1.9">
+          <li>📅 Timetable: today, tomorrow, any day, any section</li>
+          <li>🕐 Next/current class with time, room and teacher</li>
+          <li>🏫 Free rooms right now or at any time</li>
+          <li>👨‍🏫 Who teaches any subject</li>
+          <li>📋 Exam datesheets (ESE, MSE)</li>
+          <li>📢 College notices and past papers</li>
+          <li>🧮 CGPA → %, attendance bunk calculator</li>
+        </ul>
+        <p class="answer-meta">Accepts: English, Hinglish, Punjabi, Hindi, SMS shortforms, Devanagari, Gurmukhi.</p>`,
       intent: "CAPABILITIES", confidence: 0.98, plan: ["describe the verified engine", "list supported topics", "state the limitation honestly"]
     };
   }
@@ -1215,7 +1480,7 @@ export function suggestionsFor(intent = "") {
 
 /* ── main entry ───────────────────────────────────────────────────────── */
 
-function answerOnce(question, ctx, memory) {
+function answerOnce(question, ctx, memory, rawQuestion) {
   const text = canonicalize(question);
   if (!text) return null;
 
@@ -1241,11 +1506,72 @@ function answerOnce(question, ctx, memory) {
   const holidayEarly = holidayResult(text, ctx);
   if (holidayEarly) return holidayEarly;
 
-  const publishedSheet = publishedDatesheetResult(text, ctx);
+  // ESE (End Semester Exam) is official – skip published admin datesheets for it.
+  // ESE (End Semester Exam) is official – skip admin-published datesheets for it.
+  const _rawQ = rawQuestion || question;
+  const publishedSheet = /\bese\b|end.?semester/i.test(_rawQ) ? null : publishedDatesheetResult(text, ctx);
   if (publishedSheet) return publishedSheet;
 
-  const datesheetEarly = datesheetResult(text, ctx);
+  // Normalize 'mse' queries: mid-sem exam → check datesheet
+  const mseText = /\bmse\b/i.test(question) ? text.replace(/\bmse\b/g, 'exam') : text;
+  const datesheetEarly = datesheetResult(mseText, ctx);
   if (datesheetEarly) return datesheetEarly;
+
+  // ── Hostel / Fees / Result / Admit card — polite not-available (before schedule check) ─
+  const _rawQ2 = rawQuestion || question;
+  if (/\b(?:hostel|accommodation|mess|mess\s*food|dhaba|canteen|cafeteria)\b/i.test(_rawQ2)) {
+    return {
+      html: `<p><strong>Hostel &amp; mess information</strong> is not available in Compass.</p>
+<p>For hostel queries, contact the Hostel Warden or visit <a href="https://gndec.ac.in" target="_blank" rel="noopener noreferrer">gndec.ac.in</a>.</p>`,
+      intent: "HOSTEL_INFO", confidence: 0.88,
+      plan: ["detect hostel/mess query", "return polite not-available", "provide college website link"]
+    };
+  }
+  if (/\b(?:fees?|tuition|fee\s*structure|semester\s*fees?|how\s*much\s*(?:is|are)\s*(?:the\s*)?fees?)\b/i.test(_rawQ2)) {
+    return {
+      html: `<p><strong>Fee information</strong> is not available in Compass.</p>
+<p>For fee details, visit the <a href="https://gndec.ac.in" target="_blank" rel="noopener noreferrer">GNDEC official website</a> or contact the Accounts branch.</p>`,
+      intent: "FEES_INFO", confidence: 0.88,
+      plan: ["detect fees query", "return polite not-available", "direct to official source"]
+    };
+  }
+  if (/\b(?:result|marksheet|mark\s*sheet|marks?\s*card|grade\s*card|semester\s*result|result\s*kab|score\s*card)\b/i.test(_rawQ2)) {
+    return {
+      html: `<p><strong>Exam results and marksheets</strong> are published on the PTU portal.</p>
+<p>Check your result at <a href="https://ptu.ac.in" target="_blank" rel="noopener noreferrer">ptu.ac.in</a> or the official GNDEC notice board. Compass cannot access your personal marks.</p>`,
+      intent: "RESULT_INFO", confidence: 0.88,
+      plan: ["detect result/marksheet query", "return polite not-available", "direct to PTU portal"]
+    };
+  }
+  if (/\b(?:admit\s*card|hall\s*ticket|roll\s*slip|roll\s*number\s*slip|admit\s*slip)\b/i.test(_rawQ2)) {
+    return {
+      html: `<p><strong>Admit cards</strong> are issued by PTU and distributed through GNDEC.</p>
+<p>Contact your class teacher, department office, or check the official notice board for admit card distribution. Compass does not store admit card data.</p>`,
+      intent: "ADMIT_CARD_INFO", confidence: 0.88,
+      plan: ["detect admit card query", "return polite not-available", "provide contact guidance"]
+    };
+  }
+  if (/\b(?:scholarship|stipend|financial\s*aid|merit\s*scholarship|post\s*matric|pre\s*matric)\b/i.test(_rawQ2)) {
+    return {
+      html: `<p><strong>Scholarship information</strong> is managed by the Student Welfare branch at GNDEC.</p>
+<p>Contact the Student Welfare office or visit <a href="https://gndec.ac.in" target="_blank" rel="noopener noreferrer">gndec.ac.in</a> for details.</p>`,
+      intent: "SCHOLARSHIP_INFO", confidence: 0.85,
+      plan: ["detect scholarship query", "return polite not-available", "direct to student welfare"]
+    };
+  }
+  if (/\b(?:library|book\s*issue|return\s*book|library\s*card|librarian)\b/i.test(_rawQ2)
+    && !/\bclass\b/i.test(_rawQ2)) {
+    return {
+      html: `<p><strong>Library</strong> queries are outside Compass's scope.</p>
+<p>Visit the GNDEC Library directly or contact the librarian. Library hours: typically 9 AM – 5 PM on working days.</p>`,
+      intent: "LIBRARY_INFO", confidence: 0.82,
+      plan: ["detect library query", "return polite not-available", "provide timing hint"]
+    };
+  }
+
+  // ── Calculation answers that work without a schedule ───────────────────
+  const calcEarly = calculationResult(text);
+  if (calcEarly) return calcEarly;
 
   if (!ctx.schedule?.length) {
     return {
@@ -1277,12 +1603,20 @@ function answerOnce(question, ctx, memory) {
   if (freePeriod) return freePeriod;
 
   const nextIntent = wants(text, VOCAB.next) || /\bwhat class (?:do i have|is there)\b|\bdo i have (?:a )?class\b/.test(text);
-  if (nextIntent && wants(text, ["class", "lecture", "period", "slot"])) return nextClassResult(scopedCtx);
+  // If tomorrow/kal/parso is explicit, prefer dayResult over nextClassResult
+  const hasExplicitDay = wants(text, ["tomorrow", "kal", "parso", "day after tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+  if (nextIntent && wants(text, ["class", "lecture", "period", "slot"]) && !hasExplicitDay) return nextClassResult(scopedCtx);
+
+  // Single-word "free" → free rooms (most common student intent)
+  if (/^free$/.test(text.trim())) return freeRoomsResult("which rooms are free now", scopedCtx);
 
   if (wants(text, VOCAB.week)) return weekResult(scopedCtx);
 
   const day = resolveQuestionDay(text, scopedCtx.now);
   if (day) {
+    const dateISO = day.date?.dateISO || dateForWeekday(day.day, scopedCtx.now);
+    const exams = examsForDate(scopedCtx, dateISO);
+    if (exams.length) return examDayResult(exams, scopedCtx, { label: day.label || day.day, dateISO });
     // "Physics tomorrow?" should answer the subject, not the whole day.
     const subjectOnDay = subjectResult(text, scopedCtx, day);
     if (subjectOnDay && contentTokens(text).length) return subjectOnDay;
@@ -1299,7 +1633,41 @@ function answerOnce(question, ctx, memory) {
   if (subject) return subject;
 
   if (wants(text, ["timetable", "schedule"])) return weekResult(scopedCtx);
-  if (wants(text, ["classes", "class", "lecture", "period"])) return dayResult(scopedCtx.now.day, scopedCtx, "Today");
+  // "50 classes" is a quantity reference, not a schedule request
+  if (wants(text, ["classes", "class", "lecture", "period"]) && !/\b\d+\s+class/i.test(text)) return dayResult(scopedCtx.now.day, scopedCtx, "Today");
+
+  // Calculation answers (CGPA, 75% rule) — only when explicitly requested
+  // Guard: must have explicit CGPA keyword OR explicit bunk/miss + how many + number
+  const hasExplicitCgpa = /\bcgpa\b/i.test(question) || mentions(question, ["cgpa", "grade point", "cumulative grade"]);
+  const hasExplicitBunk = /\b(?:how\s+many.*(?:bunk|miss|skip|leave)|kitne.*(?:bunk|chhod|miss))\b/i.test(text)
+    && /\d/.test(text);
+  if (hasExplicitCgpa || hasExplicitBunk) {
+    const calc = calculationResult(question);
+    if (calc) return calc;
+  }
+
+  // ── Practical / lab query catch (when no specific subject matched)
+  if (mentions(question, ["practical", "practicals", "lab work", "prac"])) {
+    const labClasses = (scopedCtx.schedule || []).filter((e) =>
+      e.group === scopedCtx.group && e.day === scopedCtx.now.day &&
+      (e.type === "P" || /lab/i.test(e.subject))
+    );
+    if (labClasses.length) {
+      return {
+        html: `<p><strong>Practicals today:</strong></p>${labClasses.map((e) => classCard(e, scopedCtx)).join("")}`,
+        intent: "PRACTICAL_SCHEDULE", confidence: 0.88,
+        plan: ["find practical/lab entries for today", "return verified list"],
+        entities: {}
+      };
+    }
+    return {
+      html: `<p>No practicals or lab sessions found for today in the loaded timetable.</p>`,
+      intent: "PRACTICAL_SCHEDULE", confidence: 0.75,
+      plan: ["look for practicals", "none found today"],
+      entities: {}
+    };
+  }
+
   return null;
 }
 
@@ -1325,7 +1693,7 @@ export function answerLocally(question, ctx = {}, memory = null) {
   // Compound questions get one verified section each, never a merged guess.
   const clauses = splitClauses(text);
   if (clauses.length >= 2) {
-    const combined = combineAnswers(clauses.map((clause) => answerOnce(clause, ctx, memory)));
+    const combined = combineAnswers(clauses.map((clause) => answerOnce(clause, ctx, memory, question)));
     if (combined) {
       combined.suggestions = suggestionsFor(combined.intent);
       return withSuggestion(combined);
@@ -1333,8 +1701,8 @@ export function answerLocally(question, ctx = {}, memory = null) {
   }
 
   const expanded = applyMemory(text, memory);
-  const answer = answerOnce(expanded, ctx, memory)
-    || (expanded !== text ? answerOnce(text, ctx, memory) : null);
+  const answer = answerOnce(expanded, ctx, memory, question)
+    || (expanded !== text ? answerOnce(text, ctx, memory, question) : null);
   if (!answer) return null;
   return withSuggestion(answer);
 }

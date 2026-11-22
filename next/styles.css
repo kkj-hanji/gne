@@ -1,7 +1,11 @@
 /* ==========================================================================
    GNDEC Compass Next — design system
    No external fonts, no external CSS. Everything below is offline-safe.
+   font-display: optional (system fonts only — no external font loading)
    ========================================================================== */
+
+/* CSS cascade layers for better specificity management */
+@layer base, components, utilities;
 
 :root {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -12,12 +16,20 @@
   --radius-md: 16px;
   --radius-lg: 22px;
   --radius-xl: 30px;
+  --radius: var(--radius-md);
+  --surface-3: var(--surface-raised);
+  --text-1: var(--text);
+  --text-2: var(--text-soft);
+  --text-3: var(--muted);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .18), 0 8px 24px rgba(0, 0, 0, .12);
   --shadow-2: 0 24px 60px rgba(0, 0, 0, .28);
+  --shadow-topbar: 0 4px 24px rgba(0, 0, 0, .18);
   --sidebar-w: 264px;
   --topbar-h: 74px;
   --ease: cubic-bezier(.22, .8, .26, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
   --speed: 200ms;
+  --speed-fast: 140ms;
   --accent: #34d399;
   --accent-strong: #10b981;
   --accent-soft: rgba(52, 211, 153, .14);
@@ -26,22 +38,38 @@
   --warning: #fbbf24;
   --danger: #fb7185;
   --info: #60a5fa;
+  /* Typography scale */
+  --text-xs: 0.68rem;
+  --text-sm: 0.82rem;
+  --text-base: 0.92rem;
+  --text-lg: 1.05rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.55rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.75;
+  --tracking-tight: -0.03em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.06em;
+  --tracking-wider: 0.12em;
+  --tracking-widest: 0.18em;
 }
 
 [data-theme="dark"] {
   --bg: #06110e;
   --bg-deep: #030a08;
   --surface: rgba(255, 255, 255, .045);
-  --surface-2: rgba(255, 255, 255, .07);
+  --surface-2: rgba(255, 255, 255, .075);
   --surface-solid: #0a1a15;
   --surface-raised: #0e211b;
-  --border: rgba(255, 255, 255, .09);
-  --border-strong: rgba(255, 255, 255, .16);
-  --text: #eaf7f2;
-  --text-soft: #b9d6cc;
-  --muted: #82a49a;
+  --border: rgba(255, 255, 255, .10);
+  --border-strong: rgba(255, 255, 255, .18);
+  --text: #f0fbf6;
+  --text-soft: #c2ded5;
+  --muted: #8eaba1;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px rgba(0, 0, 0, .22);
   --shadow-2: 0 30px 80px rgba(0, 0, 0, .45);
+  --shadow-topbar: 0 4px 24px rgba(0, 0, 0, .35);
   color-scheme: dark;
 }
 
@@ -116,7 +144,7 @@
 
 * { box-sizing: border-box; }
 html {
-  font-size: calc(clamp(16px, calc(12px + 1vw), 18px) * var(--font-scale));
+  font-size: calc(clamp(15px, calc(13px + 0.6vw), 17px) * var(--font-scale));
   -webkit-text-size-adjust: auto;
   text-size-adjust: auto;
   scroll-behavior: smooth;
@@ -132,7 +160,8 @@ body {
     linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
   background-attachment: fixed;
   min-height: 100dvh;
-  line-height: 1.55;
+  line-height: var(--leading-normal);
+  letter-spacing: 0.01em;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -148,8 +177,14 @@ html[data-background="solid"] .class-card.is-now { background: var(--surface-sol
 body.is-dyslexic { font-family: "Atkinson Hyperlegible", "Verdana", ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; }
 
 h1, h2, h3, h4, p { margin: 0; }
+h1 { font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.1rem); font-weight: 800; letter-spacing: var(--tracking-tight); line-height: var(--leading-tight); }
+h2 { font-size: clamp(1.15rem, 1rem + 0.8vw, 1.45rem); font-weight: 750; letter-spacing: -0.02em; line-height: 1.3; }
+h3 { font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.35; }
+h4 { font-size: 0.9rem; font-weight: 700; line-height: 1.4; }
+p { line-height: var(--leading-normal); }
+
 [hidden] { display: none !important; }
-button, input, select, textarea { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; accent-color: var(--accent); }
 button { cursor: pointer; }
 a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 img, svg { display: block; }
@@ -158,17 +193,39 @@ img, svg { display: block; }
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 24%, transparent);
 }
-.is-strong-focus :focus-visible { outline-width: 3px; outline-color: var(--accent-ink); }
+.is-strong-focus :focus-visible {
+  outline-width: 3px;
+  outline-color: var(--accent-ink);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 35%, transparent);
+}
 
 .skip-link {
-  position: absolute; left: 12px; top: -60px; z-index: 100;
-  padding: 10px 16px; border-radius: 10px;
-  background: var(--accent); color: #04120d; font-weight: 700;
-  transition: top var(--speed) var(--ease);
+  position: absolute; left: 12px; top: -70px; z-index: 100;
+  padding: 10px 18px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #04120d; font-weight: 800; font-size: 0.88rem;
+  box-shadow: var(--shadow-2);
+  transition: top var(--speed) var(--ease), box-shadow var(--speed) var(--ease);
 }
-.skip-link:focus { top: 12px; }
+.skip-link:focus { top: 14px; }
+
+/* ── View Transitions ─────────────────────────────────────────────────── */
+
+@view-transition {
+  navigation: auto;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease);
+}
+.topbar { view-transition-name: compass-topbar; }
+.sidebar { view-transition-name: compass-sidebar; }
+.bottom-nav { view-transition-name: compass-bottom-nav; }
+main { view-transition-name: compass-main-content; }
 
 /* ── Shell ─────────────────────────────────────────────────────────────── */
 
@@ -409,6 +466,7 @@ main {
 .notice-privacy-note { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--warning); border-radius: 0 9px 9px 0; background: color-mix(in srgb, var(--warning) 9%, var(--surface)); }
 .today-notice .chip-row { margin-top: 9px; }
 .exam-datesheet-list { display: grid; }
+.exam-period-status { margin: 0 0 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); color: var(--text-soft); font-size: .84rem; line-height: 1.5; }
 .exam-other-group { border-top: 1px solid var(--border); margin-top: 12px; }
 .exam-other-group > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 2px; color: var(--text); cursor: pointer; font-size: .88rem; font-weight: 750; }
 .exam-other-group > summary span { color: var(--muted); font-size: .74rem; font-weight: 600; white-space: nowrap; }
@@ -494,6 +552,10 @@ main {
 .day-tab small { color: var(--muted); font-weight: 600; font-size: .68rem; }
 .day-tab.is-active { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent-ink); }
 .day-tab.is-today small { color: var(--accent-ink); }
+/* Exam day indicator on day tabs */
+.day-tab.has-exam { border-color: color-mix(in srgb, #f59e0b 55%, transparent); background: color-mix(in srgb, #f59e0b 8%, var(--surface)); }
+.day-tab.has-exam.is-active { background: color-mix(in srgb, #f59e0b 18%, var(--surface)); border-color: #f59e0b; }
+.exam-dot { font-size: .78rem; line-height: 1; margin-top: 1px; }
 
 .week-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
 .week-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 780px; }
@@ -1329,4 +1391,1238 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
   .scheme-table { min-width: 680px; font-size: .72rem; }
   .scheme-card .table-wrap { overflow-x: auto; }
   .scheme-course-detail dl { grid-template-columns: 1fr; }
+}
+
+
+/* ==========================================================================
+   COMPASS NEXT — Enhancement Pack 2.0
+   Added: animations, glassmorphism, offline banner, chat UX, perf hints
+   ========================================================================== */
+
+/* ── Bottom navigation — haptic press + active pill indicator ──────────── */
+.bottom-item { position: relative; transition: transform 140ms cubic-bezier(.22,.8,.26,1); }
+.bottom-item:active { transform: scale(0.9); }
+
+/* Active pill indicator */
+.bottom-item.is-active::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  transition: width 200ms cubic-bezier(.34,1.56,.64,1), border-radius 200ms;
+  z-index: 0;
+}
+.bottom-item:not(.is-active)::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  transition: width 200ms cubic-bezier(.34,1.56,.64,1);
+  z-index: 0;
+}
+.bottom-item span { position: relative; z-index: 1; }
+
+/* Badge support */
+.bot-badge {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── Chat / Ask UI — message animations + typing indicator ─────────────── */
+.chat-msg {
+  animation: msg-in 220ms cubic-bezier(.22,.8,.26,1) both;
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Typing indicator */
+.typing-indicator {
+  display: flex;
+  gap: 5px;
+  padding: 10px 16px;
+  align-items: center;
+}
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: typing-bounce 1.3s ease infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: none; opacity: 0.5; }
+  30% { transform: translateY(-7px); opacity: 1; }
+}
+
+/* Quick action chip press state */
+.chip:active, .ask-chip:active, .quick-chip:active, [class*="chip"]:active {
+  transform: scale(0.94);
+}
+.chip, .ask-chip, .quick-chip, [class*="chip"] {
+  transition: transform 140ms cubic-bezier(.22,.8,.26,1), box-shadow 140ms;
+}
+
+/* ── Glassmorphism cards (progressive enhancement) ─────────────────────── */
+@supports (backdrop-filter: blur(1px)) {
+  [data-theme="dark"] .hero-card,
+  [data-theme="dark"] .summary-card,
+  [data-theme="oled"] .hero-card,
+  [data-theme="oled"] .summary-card {
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+  }
+  [data-theme="light"] .hero-card,
+  [data-theme="light"] .summary-card {
+    background: rgba(255, 255, 255, 0.76);
+    backdrop-filter: blur(20px) saturate(1.9);
+    -webkit-backdrop-filter: blur(20px) saturate(1.9);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+  }
+}
+
+/* ── Scroll reveal (IntersectionObserver adds .is-visible) ─────────────── */
+
+/* ── Enhanced skeleton shimmer ─────────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0%,
+    var(--surface-2) 45%,
+    var(--surface) 90%
+  );
+  background-size: 1200px 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+/* ── Offline banner ─────────────────────────────────────────────────────── */
+.offline-banner {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(90vw, 420px);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--warning);
+  color: #0a1a15;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.22);
+  transform: translateX(-50%) translateY(-140%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 250ms cubic-bezier(.22,.8,.26,1), opacity 250ms;
+}
+.offline-banner::before {
+  content: '📡';
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.offline-banner.is-visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+/* ── Current class — pulse border ───────────────────────────────────────── */
+.answer-class.is-now {
+  border-left: 3px solid var(--accent);
+  padding-left: calc(var(--answer-class-pad, 12px) - 3px);
+  animation: class-pulse 2.4s ease infinite;
+}
+@keyframes class-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent); }
+  50%       { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@supports not (color-mix(in srgb, red 50%, transparent)) {
+  @keyframes class-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.3); }
+    50%       { box-shadow: 0 0 0 7px rgba(52,211,153,0); }
+  }
+}
+
+/* ── Modern focus rings ─────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-xs);
+}
+
+/* ── Custom slim scrollbar (Chromium) ───────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* ── content-visibility for heavy off-screen lists ──────────────────────── */
+.notices-list,
+.papers-list,
+.rooms-list,
+.answer-table {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 400px;
+}
+
+/* ── View transitions (progressive enhancement) ─────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (view-transition-name: none) {
+    ::view-transition-old(root) {
+      animation: 180ms ease-out both vt-fade-out;
+    }
+    ::view-transition-new(root) {
+      animation: 180ms ease-in both vt-fade-in;
+    }
+    @keyframes vt-fade-out {
+      to { opacity: 0; transform: scale(0.98); }
+    }
+    @keyframes vt-fade-in {
+      from { opacity: 0; transform: scale(0.98); }
+    }
+  }
+}
+
+/* ── Improved card hover states ─────────────────────────────────────────── */
+@media (hover: hover) {
+  .card:hover, .class-card:hover, .notice-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-2);
+    transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+  }
+}
+
+/* ── Smooth navigation transitions ─────────────────────────────────────── */
+.nav-item, .bottom-item {
+  transition: color var(--speed-fast) var(--ease),
+              background var(--speed-fast) var(--ease),
+              transform 140ms var(--ease);
+}
+
+
+/* ── Today Progress Bar ──────────────────────────────────────────────────── */
+/* .today-progress base — overridden by Pack 3.1 */
+/* .today-progress-bar base — overridden by Pack 3.1 */
+/* .today-progress-label base — overridden by Pack 3.1 */
+
+/* ── Improved Answer Bubble ──────────────────────────────────────────────── */
+.answer-bubble { border-radius: var(--radius-lg); padding: 14px 16px; background: var(--surface-2); border: 1px solid var(--border); }
+.answer-bubble .answer-class.is-now { animation: class-pulse 2s ease infinite; }
+
+/* ── PWA Install Banner ──────────────────────────────────────────────────── */
+
+/* ── Enhanced Quick Action Chips ─────────────────────────────────────────── */
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; font-size: var(--text-sm); cursor: pointer; transition: background var(--speed-fast) var(--ease), transform 120ms var(--ease), border-color var(--speed-fast) var(--ease); white-space: nowrap; }
+.chip:active { transform: scale(0.93); background: var(--surface-3); }
+.chip:hover { border-color: var(--accent-soft); }
+
+/* ── Typing Indicator ────────────────────────────────────────────────────── */
+.typing-indicator { display: flex; gap: 5px; align-items: center; padding: 10px 14px; }
+.typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-2); animation: typing-bounce 1.2s ease infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing-bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+/* ── Chat Message Entrance ───────────────────────────────────────────────── */
+.msg-in { animation: msg-in 240ms cubic-bezier(.22,.8,.26,1) both; }
+@keyframes msg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ── Empty State Illustration ────────────────────────────────────────────── */
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text-2); }
+.empty-state-icon { font-size: 3rem; margin-bottom: 12px; display: block; }
+.empty-state-title { font-size: var(--text-lg); font-weight: 600; color: var(--text-1); margin-bottom: 6px; }
+.empty-state-desc { font-size: var(--text-sm); line-height: 1.6; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPASS NEXT — Enhancement Pack 3.0
+   Modern scroll-driven animations, improved hero, better input UX, etc.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Scroll-Driven Animations (native CSS, no JS) ────────────────────────── */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .class-card, .notice-card, .answer-class, .exam-datesheet-row {
+      animation: scroll-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 20%;
+    }
+    @keyframes scroll-reveal {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: none; }
+    }
+  }
+}
+
+/* ── Progress bar (Pack 3.0 — superseded by Pack 3.1 below) ───────────────── */
+/* NOTE: Actual styles defined in Pack 3.1 today-progress section below */
+
+/* ── Hero card pulse for active class ────────────────────────────────────── */
+.hero-card {
+  position: relative;
+  overflow: hidden;
+}
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    color-mix(in oklch, var(--accent) 8%, transparent),
+    transparent 60%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Improved chat input focus ───────────────────────────────────────────── */
+#question-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--accent) 20%, transparent),
+    0 1px 4px color-mix(in oklch, var(--accent) 10%, transparent);
+}
+
+/* ── Chat send button micro-interaction ─────────────────────────────────── */
+#submit-btn {
+  transition: transform 120ms var(--ease), background 200ms var(--ease);
+}
+#submit-btn:active {
+  transform: scale(0.92);
+}
+
+/* ── Improved stat grid ──────────────────────────────────────────────────── */
+.stat {
+  transition: transform 200ms var(--ease), box-shadow 200ms var(--ease);
+}
+.stat:hover, .stat:focus-within {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat { transition: none; }
+  .stat:hover, .stat:focus-within { transform: none; }
+}
+
+/* ── Bottom nav active indicator ─────────────────────────────────────────── */
+.nav-item.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+}
+
+/* ── Smooth page transitions ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+  ::view-transition-old(root) {
+    animation: 180ms ease-out both vt-fade-out;
+  }
+  ::view-transition-new(root) {
+    animation: 220ms ease-in both vt-fade-in;
+  }
+  @keyframes vt-fade-out {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: translateY(-6px); }
+  }
+  @keyframes vt-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* ── Improved glassmorphism for cards ────────────────────────────────────── */
+@supports (backdrop-filter: blur(1px)) {
+  .hero-card, .card.glass {
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    background: color-mix(in oklch, var(--surface-2) 85%, transparent);
+  }
+}
+
+/* ── Badge animation for "Starting soon" ────────────────────────────────── */
+.badge-accent {
+  position: relative;
+}
+.badge-accent::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1.5px solid var(--accent);
+  opacity: 0;
+  animation: badge-ping 2s ease-out 1s infinite;
+}
+@keyframes badge-ping {
+  0% { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge-accent::after { animation: none; }
+}
+
+/* ── Announcement/notice card entrance ───────────────────────────────────── */
+.announcement {
+  border-radius: var(--radius-lg, 12px);
+  padding: 12px 16px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  border: 1px solid;
+  margin-bottom: 8px;
+}
+.announcement.is-info {
+  background: color-mix(in oklch, var(--info, #3b82f6) 10%, var(--surface-1));
+  border-color: color-mix(in oklch, var(--info, #3b82f6) 25%, transparent);
+}
+.announcement.is-warning {
+  background: color-mix(in oklch, var(--warn, #f59e0b) 10%, var(--surface-1));
+  border-color: color-mix(in oklch, var(--warn, #f59e0b) 25%, transparent);
+}
+
+/* ── Class card "now" pulse ──────────────────────────────────────────────── */
+.answer-class.is-now {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 8%, var(--surface-2));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .answer-class.is-now {
+    animation: class-now-glow 2.5s ease-in-out infinite;
+  }
+  @keyframes class-now-glow {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 25%, transparent); }
+    50% { box-shadow: 0 0 0 5px color-mix(in oklch, var(--accent) 0%, transparent); }
+  }
+}
+
+/* ── Focus rings (a11y) ──────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Faster skeleton shimmer ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    background: linear-gradient(90deg,
+      var(--surface-2) 25%,
+      color-mix(in oklch, var(--surface-3) 80%, transparent) 50%,
+      var(--surface-2) 75%
+    );
+    background-size: 300% 100%;
+    animation: skeleton-sweep 1.4s ease-in-out infinite;
+  }
+  @keyframes skeleton-sweep {
+    from { background-position: 100% 0; }
+    to { background-position: -100% 0; }
+  }
+}
+
+/* ── Contain intrinsic size for content-visibility ───────────────────────── */
+.notices-list, .papers-list {
+  contain-intrinsic-block-size: auto 400px;
+}
+.rooms-list {
+  contain-intrinsic-block-size: auto 300px;
+}
+.answer-table {
+  contain-intrinsic-block-size: auto 200px;
+}
+
+/* ── Print optimizations ─────────────────────────────────────────────────── */
+@media print {
+  .bottom-nav, .sidebar, .hero-actions, .btn, .chip,
+  .offline-banner, .install-banner { display: none !important; }
+  .card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+  body { color: #000; background: #fff; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPASS NEXT — Enhancement Pack 3.1 — Chat UX & Performance Fixes
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Chat shell layout fix (chips don't overlap composer) ────────────────── */
+.page-ask {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.chat-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.chat-window {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Composer always docked at bottom ────────────────────────────────────── */
+.composer {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Quick-action chips (now shown ABOVE composer, below chat) ───────────── */
+.ask-chips {
+  flex-shrink: 0;
+  padding: 10px 14px 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.ask-chips::-webkit-scrollbar { display: none; }
+.ask-chips .chip {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  padding: 5px 11px;
+}
+
+/* ── Chat message styling improvements ───────────────────────────────────── */
+.msg {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2px;
+  animation: msg-in 220ms cubic-bezier(0.22, 0.8, 0.26, 1) both;
+}
+.msg.user {
+  align-items: flex-end;
+}
+.msg.assistant {
+  align-items: flex-start;
+}
+.msg-bubble {
+  max-width: min(85%, 480px);
+  border-radius: 18px;
+  padding: 10px 14px;
+  line-height: 1.55;
+  font-size: 0.925rem;
+  word-break: break-word;
+}
+.msg.user .msg-bubble {
+  background: var(--accent);
+  color: color-mix(in oklch, var(--accent) 10%, #fff);
+  border-bottom-right-radius: 4px;
+}
+.msg.assistant .msg-bubble {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.msg-bubble ul {
+  margin: 6px 0;
+  padding-left: 16px;
+  line-height: 1.8;
+}
+.msg-bubble li {
+  margin-bottom: 2px;
+}
+.msg-meta {
+  font-size: 0.7rem;
+  color: var(--text-3, var(--text-2));
+  padding: 2px 4px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* ── Composer textarea auto-resize feel ─────────────────────────────────── */
+.composer-input {
+  field-sizing: content;
+  min-height: 2.5rem;
+  max-height: 8rem;
+  overflow-y: auto;
+  resize: none;
+  transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+  line-height: 1.5;
+}
+
+/* ── Smooth scroll for all scrollable regions ────────────────────────────── */
+.chat-window, .timetable-scroll, .rooms-list, .notices-list {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+/* ── Improved card spacing on mobile ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  .msg-bubble {
+    max-width: 92%;
+    font-size: 0.9rem;
+    padding: 9px 13px;
+  }
+  .chip {
+    font-size: 0.78rem;
+    padding: 5px 10px;
+  }
+  .stat-grid {
+    gap: 8px;
+  }
+}
+
+/* ── Microinteraction: button press feedback ─────────────────────────────── */
+.btn:active, .chip:active, .nav-item:active {
+  transform: scale(0.95);
+  transition: transform 80ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn:active, .chip:active, .nav-item:active {
+    transform: none;
+  }
+}
+
+/* ── Today progress bar (definitive — overrides Pack 2.0 & 3.0) ─────────── */
+.today-progress {
+  background: var(--surface-2, rgba(255,255,255,0.08));
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  margin: 10px 0 6px;
+  height: 7px;
+  padding: 0;
+}
+.today-progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 70%, #fff));
+  box-shadow: 0 0 10px color-mix(in oklch, var(--accent) 50%, transparent);
+  transition: width 700ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.today-progress-label {
+  font-size: 0.7rem;
+  color: var(--text-2);
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Quick-action chips above composer ───────────────────────────────────── */
+.chat-chips-row {
+  padding: 8px 12px 4px;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, black 24px, black calc(100% - 24px), transparent 100%);
+  transition: opacity 300ms, max-height 350ms cubic-bezier(.4,0,.6,1), padding 300ms;
+  max-height: 120px;
+}
+.chat-chips-row.hidden {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top: none;
+}
+.chat-chips-row::-webkit-scrollbar { display: none; }
+.chat-chips-row .chip {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  padding: 5px 11px;
+  white-space: nowrap;
+}
+
+/* ── Chat shell layout improvement ──────────────────────────────────────── */
+.chat-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.chat-window {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── Smooth focus ring on composer ──────────────────────────────────────── */
+.composer-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 40%, transparent);
+  border-color: var(--accent);
+}
+
+/* ── Message bubble improvements ─────────────────────────────────────────── */
+.msg.user .msg-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-lg, 14px) var(--radius-lg, 14px) 4px var(--radius-lg, 14px);
+  align-self: flex-end;
+}
+.msg.assistant .msg-bubble {
+  border-radius: 4px var(--radius-lg, 14px) var(--radius-lg, 14px) var(--radius-lg, 14px);
+}
+
+/* ── Send button ripple ───────────────────────────────────────────────────── */
+.send-button {
+  position: relative;
+  overflow: hidden;
+}
+.send-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 300ms;
+}
+.send-button:active::after { opacity: 1; }
+
+/* ── Improved card hover ─────────────────────────────────────────────────── */
+.card {
+  transition: box-shadow 200ms var(--ease), transform 200ms var(--ease);
+}
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+  }
+}
+
+/* ── Shimmer skeleton for loading ───────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3, rgba(255,255,255,0.15)) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius);
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Focus visible improvements ──────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Smooth page transition ──────────────────────────────────────────────── */
+#view {
+  animation: page-in 220ms cubic-bezier(.22,.8,.26,1) both;
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Room status pill colours ────────────────────────────────────────────── */
+.room-free  { color: var(--success, #22c55e); }
+.room-busy  { color: var(--error, #ef4444); }
+
+/* ── Better nav active indicator ────────────────────────────────────────── */
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 999px;
+}
+.nav-item { position: relative; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPASS NEXT — Enhancement Pack 4.0
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Better glassmorphism with fallback ─────────────────────────────────── */
+.glass {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: var(--surface-2); }
+}
+
+/* ── Responsive text with clamp() ───────────────────────────────────────── */
+h1, .page-title { font-size: clamp(1.2rem, 5vw, 1.8rem); }
+h2, .section-title { font-size: clamp(1rem, 4vw, 1.4rem); }
+.card-title { font-size: clamp(0.95rem, 3.5vw, 1.1rem); }
+
+/* ── Animated gradient accent line on header ────────────────────────────── */
+.app-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent) 60%, #fff), var(--accent));
+  background-size: 200% 100%;
+  animation: header-shimmer 3s linear infinite;
+}
+.app-header { position: relative; }
+@keyframes header-shimmer {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ── Better badge styling ───────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
+/* ── Chip improvements ──────────────────────────────────────────────────── */
+.chip {
+  transition: background 160ms var(--ease), transform 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+@media (hover: hover) {
+  .chip:hover {
+    transform: translateY(-1px) scale(1.03);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+}
+.chip:active { transform: scale(0.97); }
+
+/* ── Custom scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-2);
+}
+
+/* ── Hero card glow on today page ───────────────────────────────────────── */
+.hero-card {
+  border: 1px solid color-mix(in oklch, var(--accent) 25%, var(--border));
+  box-shadow: 0 0 24px color-mix(in oklch, var(--accent) 12%, transparent),
+              0 2px 8px rgba(0,0,0,0.12);
+}
+
+/* ── Class card now-playing pulse ───────────────────────────────────────── */
+.answer-class.is-now {
+  border-left: 3px solid var(--accent);
+  animation: now-pulse 2s ease-in-out infinite;
+}
+@keyframes now-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 30%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in oklch, var(--accent) 0%, transparent); }
+}
+
+/* ── Better loading spinner ─────────────────────────────────────────────── */
+.loading-spinner, [data-loading]::after {
+  border-top-color: var(--accent) !important;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* ── Error state styling ────────────────────────────────────────────────── */
+.error-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--error, #ef4444);
+}
+.error-state-icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+/* ── Focus-within card highlight ────────────────────────────────────────── */
+.card:focus-within {
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 40%, transparent);
+  border-color: color-mix(in oklch, var(--accent) 50%, var(--border));
+}
+
+/* ── Bottom sheet style overlays (mobile) ───────────────────────────────── */
+.sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface-1);
+  border-radius: var(--radius-lg, 14px) var(--radius-lg, 14px) 0 0;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
+  padding: 16px;
+  z-index: 300;
+  transform: translateY(100%);
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sheet.is-open { transform: none; }
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 999px;
+  margin: 0 auto 16px;
+}
+
+/* ── Improved table responsive ───────────────────────────────────────────── */
+.timetable-table, table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.timetable-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  z-index: 1;
+  font-weight: 600;
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 2px solid var(--border);
+}
+.timetable-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.timetable-table tr:last-child td { border-bottom: none; }
+@media (hover: hover) {
+  .timetable-table tr:hover td { background: var(--surface-2); }
+}
+
+/* ── Improved print styles ───────────────────────────────────────────────── */
+@media print {
+  .nav-bar, .app-header, .composer, .chat-chips-row, .send-button, .mic-button { display: none !important; }
+  body { background: white; color: black; }
+  .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  a { color: black; text-decoration: underline; }
+}
+
+/* ── Smooth number reveal animation ─────────────────────────────────────── */
+.stat-value {
+  display: inline-block;
+  animation: count-in 500ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes count-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.9); }
+  to { opacity: 1; transform: none scale(1); }
+}
+
+/* ── Better msg bubble tail ──────────────────────────────────────────────── */
+.msg { display: flex; flex-direction: column; }
+.msg.user { align-items: flex-end; }
+.msg.assistant { align-items: flex-start; }
+
+/* ── Microinteraction on send button ─────────────────────────────────────── */
+@keyframes send-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.88) rotate(-8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.send-button.sending { animation: send-pop 300ms cubic-bezier(0.4, 0, 0.6, 1); }
+
+/* ── Better voice recording indicator ───────────────────────────────────── */
+.mic-button.recording {
+  background: var(--error, #ef4444) !important;
+  color: white !important;
+  animation: mic-pulse 1s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+}
+
+/* ── Light mode overrides ────────────────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  .glass {
+    background: rgba(255,255,255,0.75);
+    border-color: rgba(0,0,0,0.08);
+  }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPASS NEXT — Enhancement Pack 5.0
+   Browser-testing fixes + UX polish
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Chat composer spacing above bottom nav (safe-area aware) ─────────── */
+.chat-shell {
+  /* Ensure shell accounts for bottom nav on all devices */
+  margin-bottom: 0;
+}
+.composer {
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  flex-shrink: 0;
+}
+
+/* ── Room data loading vs closed state ───────────────────────────────── */
+.room-data-loading {
+  color: var(--muted);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+.room-data-loading::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.room-data-closed {
+  color: var(--text-2);
+  font-size: 0.85rem;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* ── Send button animation hook ──────────────────────────────────────── */
+@keyframes send-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.85) rotate(-10deg); }
+  70%  { transform: scale(1.08) rotate(3deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.send-button.sending { animation: send-pop 350ms cubic-bezier(.4,0,.6,1) both; }
+
+/* ── Improved welcome message layout ─────────────────────────────────── */
+.msg.assistant .msg-bubble ul {
+  margin: 6px 0 6px 16px;
+  padding: 0;
+}
+.msg.assistant .msg-bubble ul li {
+  margin-bottom: 3px;
+  font-size: 0.9em;
+}
+.msg.assistant .msg-bubble p {
+  margin: 4px 0;
+}
+
+/* ── Copy button on messages ─────────────────────────────────────────── */
+.msg-copy-btn {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 160ms, background 160ms;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+.msg-bubble:hover .msg-copy-btn,
+.msg-bubble:focus-within .msg-copy-btn { opacity: 1; }
+.msg-copy-btn:hover { background: var(--surface-2); color: var(--accent); }
+.msg-bubble { position: relative; }
+
+/* ── Better nav active indicator ─────────────────────────────────────── */
+.nav-item {
+  position: relative;
+}
+.nav-item.active {
+  color: var(--accent);
+}
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px; height: 2px;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+/* ── Today page: Sunday/holiday closed indicator ─────────────────────── */
+.college-closed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: color-mix(in oklch, var(--muted) 15%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+  margin: 8px 0;
+}
+
+/* ── Better answer table spacing ─────────────────────────────────────── */
+.answer-class {
+  transition: background 200ms;
+}
+@media (hover: hover) {
+  .answer-class:hover {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+  }
+}
+
+/* ── Suggestion chips after AI response ──────────────────────────────── */
+.answer-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.answer-suggestion-chip {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+.answer-suggestion-chip:hover {
+  background: color-mix(in oklch, var(--accent) 12%, var(--surface-2));
+  border-color: color-mix(in oklch, var(--accent) 40%, var(--border));
+}
+
+/* ── Message timestamp refined ───────────────────────────────────────── */
+.msg-meta {
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Responsive chat on wide screens ─────────────────────────────────── */
+@media (min-width: 768px) {
+  .chat-shell {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+}
+
+/* ── Smooth focus indicator on chips ─────────────────────────────────── */
+.chip:focus-visible, .answer-suggestion-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Vibrant gradient on Today hero when class is active ─────────────── */
+.hero-card.has-active-class {
+  background: linear-gradient(135deg,
+    color-mix(in oklch, var(--accent) 12%, var(--surface-2)),
+    var(--surface-2)
+  );
+}
+
+/* ── Improved card-sub muted text ────────────────────────────────────── */
+.card-sub {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+/* ── PWA install prompt banner  ──────────────────────────────────────── */
+.pwa-prompt {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-h, 64px) + env(safe-area-inset-bottom, 0px) + 12px);
+  left: 12px; right: 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  z-index: 250;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  transform: translateY(120%);
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pwa-prompt.is-visible { transform: none; }
+.pwa-prompt-icon { font-size: 1.6rem; }
+.pwa-prompt-body { flex: 1; }
+.pwa-prompt-title { font-weight: 600; font-size: 0.9rem; }
+.pwa-prompt-desc { font-size: 0.78rem; color: var(--text-2); margin-top: 2px; }
+.pwa-prompt-btn {
+  font-size: 0.82rem;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 600;
+}
+.pwa-prompt-dismiss {
+  font-size: 0.75rem;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
 }
