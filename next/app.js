@@ -3206,10 +3206,8 @@ function welcomeMessage() {
   <li>🏫 Free rooms &amp; room availability</li>
   <li>👨‍🏫 Faculty &amp; teacher info</li>
   <li>📝 Exam dates &amp; datesheets</li>
-  <li>📊 The 75% attendance rule (not your attendance record)</li>
   <li>📚 Syllabus &amp; subjects</li>
   <li>🏖️ Holidays &amp; college calendar</li>
-  <li>🔢 CGPA &amp; marks calculation</li>
 </ul>
 <p style="font-size:0.82em;opacity:0.7;">I use only official timetable &amp; published data — I never guess or fabricate.</p>`,
     createdAt: new Date().toISOString(),
