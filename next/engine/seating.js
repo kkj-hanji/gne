@@ -145,7 +145,7 @@ export function seatingStudentForQuestion(question, records = [], profile = {}) 
     const best = named.filter((record) => normalizedText(record.name).length === longest);
     return best.length === 1 ? { status: "matched", record: best[0] } : { status: "ambiguous" };
   }
-  const ignored = new Set(["where", "which", "room", "exam", "paper", "seat", "seating", "sitting", "plan", "arrangement", "my", "mera", "meri", "mere", "for", "what", "is", "the", "tomorrow", "today", "please", "mse", "ese", "tell", "me", "find", "show", "do", "have", "hai", "ka", "ki", "ke", "in", "mein"]);
+  const ignored = new Set(["where", "which", "room", "rm", "location", "exam", "paper", "seat", "seating", "sitting", "plan", "plab", "arrangement", "class", "row", "my", "mine", "mera", "meri", "mere", "our", "hamara", "hamari", "hamare", "for", "what", "is", "the", "tomorrow", "today", "tmrw", "next", "please", "mse", "ese", "tell", "me", "find", "show", "do", "have", "hai", "ka", "ki", "ke", "in", "mein", "math", "maths", "mathematics", "physics", "chemistry", "english", "computer", "science", "programming", "python", "pps", "bee", "beee", "edg", "drawing", "graphics", "engineering", "mechanics", "electronics", "workshop", "subject"]);
   const partialTokens = text.split(" ").filter((token) => token.length >= 4 && !ignored.has(token));
   if (partialTokens.length) {
     const partial = records.filter((record) => {
@@ -155,6 +155,7 @@ export function seatingStudentForQuestion(question, records = [], profile = {}) 
     if (partial.length === 1) return { status: "matched", record: partial[0] };
     if (partial.length > 1) return { status: "ambiguous" };
   }
+  if (partialTokens.length && !/\b(?:my|mine|mera|meri|mere|our|hamara|hamari|hamare)\b/.test(text)) return { status: "not-found" };
   return { status: "active-profile", profile };
 }
 

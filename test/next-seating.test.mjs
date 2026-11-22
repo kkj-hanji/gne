@@ -91,6 +91,8 @@ test("seat lookup resolves exact or unique partial roster identities and chooses
   assert.equal(seatingStudentForQuestion(explicitOtherStudentQuestion, records, { crn: "2617070", name: "Kaushik Jain" }).record.crn, "2615231", "an exact name query can select a different verified student without switching device profile");
   assert.equal(seatingStudentForQuestion("2615231 sitting plan", records, { crn: "2617070" }).record.crn, "2615231");
   assert.equal(seatingStudentForQuestion("mohit sitting plan", records).status, "ambiguous");
+  assert.equal(seatingStudentForQuestion("unknownname sitting plan", records, { crn: "1234567" }).status, "not-found", "an unverified named student must not fall back to the active profile");
+  assert.equal(seatingStudentForQuestion("sitting plan for maths", records, { crn: "1234567" }).status, "active-profile");
   assert.equal(isSeatingQuestion("Aarav Singh which room", records), true, "an exact roster name plus a room question is recognized");
   assert.equal(isSeatingQuestion("CRN 1234567 room", records), true, "a CRN plus a room question is recognized");
 
