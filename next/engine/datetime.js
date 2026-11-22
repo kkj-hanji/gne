@@ -84,6 +84,16 @@ export function weekdayIndex(day) {
   return DAY_NAMES.indexOf(day);
 }
 
+/** Resolve a weekday tab to its next date from the current India calendar day. */
+export function dateForTimetableDay(day, clock) {
+  const todayIndex = weekdayIndex(clock?.day);
+  const selectedIndex = weekdayIndex(day);
+  if (todayIndex < 0 || selectedIndex < 0 || !/^\d{4}-\d{2}-\d{2}$/.test(String(clock?.dateISO || ""))) return "";
+  const date = new Date(`${clock.dateISO}T12:00:00Z`);
+  if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0, 10) !== clock.dateISO) return "";
+  return addDays(clock, (selectedIndex - todayIndex + 7) % 7).dateISO;
+}
+
 export function isWeekend(day) {
   return day === "Saturday" || day === "Sunday";
 }

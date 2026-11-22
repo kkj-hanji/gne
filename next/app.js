@@ -16,7 +16,7 @@ import {
   saveProfile, saveUserValues
 } from "./settings-store.js";
 import {
-  DAY_NAMES, STUDY_DAYS, addDays, formatDuration, formatHeaderDate, freeGapsBetweenClasses, getIndiaNow, humanTime,
+  DAY_NAMES, STUDY_DAYS, addDays, dateForTimetableDay, formatDuration, formatHeaderDate, freeGapsBetweenClasses, getIndiaNow, humanTime,
   nextStudyDay, relativeStartLabel, resolveQuestionDay, shouldLookAheadAtFive
 } from "./engine/datetime.js";
 import { mergeSchedules, readVerifiedFetTimetable } from "./engine/fet-parser.js";
@@ -38,6 +38,7 @@ import { answerFirstYearScheme, answerFirstYearSyllabus, buildSyllabusIndex, FIR
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
 import { normalizeProfileHistory, rememberProfile } from "./engine/profile-history.js";
+import { isSeatingQuestion, normalizeSeatingText, seatAnswerHtml, seatingStudentForQuestion, selectSeatingPlan } from "./engine/seating.js";
 import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examGroupForSection, examsOnDate, examTimeLabel, groupExamDatesheetEvents, importantExamEventsForSelection, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
@@ -113,6 +114,10 @@ const state = {
   adminTab: "notices",
   adminEditing: null,
   adminBusy: false,
+  adminSeatingPlans: [],
+  adminSeatingDraft: null,
+  adminSeatingBusy: false,
+  adminSeatingError: "",
   directoryTab: "faculty",
   directoryQuery: "",
   directoryStatus: "idle",
@@ -120,6 +125,7 @@ const state = {
   facultyStatus: "idle",
   facultyProfileSelected: "",
   students: [],
+  seatingNameIndex: new Set(),
   rosterGeneratedAt: "",
   profileLookupQuery: "",
   profileLookupMessage: "",
@@ -805,11 +811,13 @@ async function loadStudents({ quiet = false } = {}) {
   try {
     const data = await fetchJson("/api/legacy/data/student-roster-index.json", {}, 25000);
     state.students = Array.isArray(data?.records) ? data.records : [];
+    state.seatingNameIndex = new Set(state.students.map((record) => normalizeSeatingText(record?.name)).filter((name) => name.length >= 3));
     state.rosterGeneratedAt = String(data?.generatedAt || data?.schemaVersion || "");
     state.directoryStatus = "ready";
     syncProfileFromRoster({ silent: quiet || state.route !== "directory", renderOnChange: !quiet });
   } catch {
     state.students = [];
+    state.seatingNameIndex = new Set();
     state.directoryStatus = "error";
   }
   if (!quiet && state.route === "directory" && (state.directoryTab === "students" || state.directoryTab === "mentoring")) render();
@@ -882,7 +890,7 @@ function renderProfileLookupResults() {
 function renderRecentProfiles() {
   const history = profileLookupHistory();
   if (!history.length) return "";
-  return `<section class="profile-history" aria-label="Recent verified profiles"><div class="profile-history-head"><h3>Recent profiles</h3><span>Saved on this device</span></div><div class="profile-match-list">${history.map((record, index) => `<button class="profile-match profile-history-match" data-action="lookup-profile-history" data-profile-history-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>Search this profile again</span><small>${record.crn ? `CRN ${escapeHtml(record.crn)}` : "Roster matched by name"}</small></button>`).join("")}</div></section>`;
+  return `<details class="profile-history"><summary>Recent profiles <span>${history.length} saved on this device</span></summary><div class="profile-match-list" aria-label="Recent verified profiles">${history.map((record, index) => `<button class="profile-match profile-history-match" data-action="lookup-profile-history" data-profile-history-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>Search this profile again</span><small>${record.crn ? `CRN ${escapeHtml(record.crn)}` : "Roster matched by name"}</small></button>`).join("")}</div></details>`;
 }
 
 function queueProfileSuggestions(query) {
@@ -1231,8 +1239,10 @@ function renderSidebarNavigation() {
 function updateLiveClock() {
   const clock = now();
   const date = $("#topbar-clock-date");
+  const time = $("#topbar-clock-time");
   const element = $("#topbar-clock");
   if (date) date.textContent = formatHeaderDate(clock.dateISO);
+  if (time) time.textContent = `${clock.time} IST`;
   if (element) element.dateTime = clock.iso;
 }
 
@@ -1672,8 +1682,10 @@ function renderTimetable() {
       </div>
       <div class="day-tabs" style="margin-top:12px" role="tablist" aria-label="Day">
         ${days.map((day) => {
+          const papers = examsForDate(dateForTimetableDay(day, clock));
           const classCount = classesForDay(day).length;
-          return `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${classCount} class${classCount === 1 ? "" : "es"}</small></button>`;
+          const subtitle = papers.length ? `${papers.length} exam${papers.length === 1 ? "" : "s"}` : `${classCount} class${classCount === 1 ? "" : "es"}`;
+          return `<button class="day-tab ${papers.length ? "has-exam" : ""} ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${escapeHtml(subtitle)}</small></button>`;
         }).join("")}
       </div>
       <div style="margin-top:14px">${dayContent}</div>
@@ -1682,6 +1694,9 @@ function renderTimetable() {
 }
 
 function renderDayView(day, clock) {
+  const dateISO = dateForTimetableDay(day, clock);
+  const papers = examsForDate(dateISO);
+  if (papers.length) return `<section class="exam-timetable-day"><div class="exam-timetable-heading"><strong>Exam day · ${escapeHtml(shortExamDate(dateISO))}</strong><span>Published papers replace lectures on this date.</span></div><div class="exam-datesheet-list">${papers.map(examRowMarkup).join("")}</div></section>`;
   const classes = classesForDay(day).slice().sort((a, b) => a.start - b.start || a.end - b.end);
   if (!classes.length) return emptyState("☕", `No class on ${day}`, "The official release has no class for this section on this day.", `<button class="btn btn-sm" data-route="rooms">Find a free room</button>`);
   const gaps = new Map(freeGapsBetweenClasses(classes).map((gap) => [gap.start, gap]));
@@ -1704,7 +1719,11 @@ function renderDayView(day, clock) {
 }
 
 function renderAgenda() {
+  const clock = now();
   return STUDY_DAYS.map((day) => {
+    const dateISO = dateForTimetableDay(day, clock);
+    const papers = examsForDate(dateISO);
+    if (papers.length) return `<div class="answer-day agenda-exam-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${escapeHtml(shortExamDate(dateISO))} · ${papers.length} exam${papers.length === 1 ? "" : "s"}</span></p><div class="exam-datesheet-list">${papers.map(examRowMarkup).join("")}</div></div>`;
     const classes = classesForDay(day);
     if (!classes.length) return "";
     return `<div class="answer-day"><p><strong>${escapeHtml(day)}</strong> <span class="badge">${classes.length}</span></p>${classes.map((entry) => classCard(entry, v("timetable.clock"))).join("")}</div>`;
@@ -1714,17 +1733,27 @@ function renderAgenda() {
 function renderWeekGrid(clock) {
   const days = v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS;
   const starts = [...new Set([510, 570, 630, 690, 750, 810, 870, 930, ...state.schedule.filter((entry) => entry.group === state.group).map((entry) => entry.start)])].sort((a, b) => a - b);
-  const rows = starts.map((start) => {
+  return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => {
+    const dateISO = dateForTimetableDay(day, clock);
+    const papers = examsForDate(dateISO);
+    return `<th scope="col">${escapeHtml(day)}<small class="week-date">${escapeHtml(shortExamDate(dateISO))}${papers.length ? " · exam" : ""}</small></th>`;
+  }).join("")}</tr></thead><tbody>${starts.map((start, index) => {
     const end = start + 60;
-    return `<tr><th scope="row">${escapeHtml(humanTime(start, v("timetable.clock")))}</th>${days.map((day) => {
+    const cells = days.map((day) => {
+      const dateISO = dateForTimetableDay(day, clock);
+      const papers = examsForDate(dateISO);
+      if (papers.length) {
+        if (index) return "";
+        return `<td class="week-exam-cell" rowspan="${starts.length}"><div class="week-exam-list">${papers.map((exam) => `<div><strong>${escapeHtml(exam.title)}</strong><span>${escapeHtml(examTimeLabel(exam, humanTime))}</span></div>`).join("")}</div></td>`;
+      }
       const dayClasses = classesForDay(day);
       const entries = dayClasses.filter((entry) => entry.start < end && entry.end > start);
       const betweenClasses = !entries.length && dayClasses.some((entry) => entry.end <= start) && dayClasses.some((entry) => entry.start >= end);
       const gap = betweenClasses ? `<div class="week-gap">Break / no class listed</div>` : "";
       return `<td>${entries.map((entry) => `<div class="week-slot"><strong>${escapeHtml(entry.subject)}</strong><span>${escapeHtml(entry.room)}</span></div>`).join("")}${gap}</td>`;
-    }).join("")}</tr>`;
-  }).join("");
-  return `<div class="week-wrap"><table class="week-table"><caption class="visually-hidden">Weekly timetable for ${escapeHtml(selectionLabel())}</caption><thead><tr><th scope="col">Time</th>${days.map((day) => `<th scope="col">${escapeHtml(day)}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("");
+    return `<tr><th scope="row">${escapeHtml(humanTime(start, v("timetable.clock")))}</th>${cells}</tr>`;
+  }).join("")}</tbody></table></div>`;
 }
 
 /* ── Rooms ─────────────────────────────────────────────────────────────── */
@@ -2241,6 +2270,7 @@ const ADMIN_SCHEMAS = Object.freeze({
 
 const ADMIN_TABS = Object.freeze([
   ...Object.keys(ADMIN_SCHEMAS).map((id) => ({ id, title: ADMIN_SCHEMAS[id].title })),
+  { id: "seatings", title: "Sitting plans" },
   { id: "editors", title: "Editors" },
   { id: "audit", title: "Audit" }
 ]);
@@ -2287,6 +2317,13 @@ async function adminLoad({ silent = false } = {}) {
   try {
     const data = await adminRequest("/api/admin/content");
     state.adminData = data;
+    try {
+      const seating = await adminRequest("/api/admin/seatings");
+      state.adminSeatingPlans = Array.isArray(seating?.plans) ? seating.plans : [];
+      state.adminSeatingError = "";
+    } catch (error) {
+      state.adminSeatingError = String(error.message || "Sitting-plan storage is unavailable.");
+    }
     state.adminStatus = "ready";
     state.adminError = "";
   } catch (error) {
@@ -2369,6 +2406,7 @@ function renderAdminForm() {
 
 function renderAdminList() {
   const tab = state.adminTab;
+  if (tab === "seatings") return renderAdminSeatings();
   if (tab === "editors") return renderAdminEditors();
   if (tab === "audit") return renderAdminAudit();
   const schema = ADMIN_SCHEMAS[tab];
@@ -2423,6 +2461,39 @@ function renderAdminAudit() {
   </section>`;
 }
 
+function renderAdminSeatings() {
+  const draft = state.adminSeatingDraft;
+  const plans = state.adminSeatingPlans;
+  const validDraft = Boolean(draft?.ok && draft.seats?.length && draft.title?.trim() && draft.subject?.trim() && draft.date && draft.start && draft.end);
+  return `<section class="card admin-seatings-card">
+    <div class="card-head"><div><h2 class="card-title">Exam sitting plans</h2><p class="card-sub">Import a text-based PDF, review every CRN and room, then publish only the verified rows. The PDF itself stays on this device.</p></div><span class="badge">${plans.length} plan${plans.length === 1 ? "" : "s"}</span></div>
+    <div class="admin-seating-import">
+      <label class="btn btn-primary admin-file-label" for="admin-seating-pdf">Choose seating-plan PDF<input id="admin-seating-pdf" type="file" accept="application/pdf,.pdf" data-seating-file aria-describedby="admin-seating-help" /></label>
+      <span id="admin-seating-help" class="card-sub">Up to 1.5 MB and 50 pages. Scanned PDFs are rejected when text cannot be verified.</span>
+    </div>
+    ${state.adminSeatingError ? `<p class="admin-error" role="status">${escapeHtml(state.adminSeatingError)}</p>` : ""}
+    ${draft ? `<section class="admin-seating-draft" aria-labelledby="admin-seating-review-title">
+      <div class="card-head"><div><h3 id="admin-seating-review-title">${draft.processing ? "Reading PDF" : "Review before publishing"}</h3><p class="card-sub">${escapeHtml(draft.fileName || "Selected PDF")}${draft.pages ? ` · ${draft.pages} pages` : ""}${draft.rooms ? ` · ${draft.rooms} rooms` : ""}${draft.seats?.length ? ` · ${draft.seats.length.toLocaleString("en-IN")} assignments` : ""}</p></div><button class="btn btn-sm btn-ghost" data-action="admin-seating-clear">Clear</button></div>
+      <p id="admin-seating-progress" class="card-sub" role="status" aria-live="polite">${escapeHtml(draft.status || "")}</p>
+      ${draft.error ? `<p class="admin-error" role="alert">${escapeHtml(draft.error)}</p>` : ""}
+      ${draft.warnings?.length ? `<ul class="admin-seating-warnings">${draft.warnings.slice(0, 12).map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : ""}
+      ${draft.seats?.length ? `<div class="admin-seating-fields">
+        <div class="field"><label for="admin-seating-title">Plan title</label><input id="admin-seating-title" data-seating-field="title" value="${escapeHtml(draft.title || "")}" maxlength="220" /></div>
+        <div class="field"><label for="admin-seating-subject">Subject</label><input id="admin-seating-subject" data-seating-field="subject" value="${escapeHtml(draft.subject || "")}" maxlength="120" /></div>
+        <div class="field"><label for="admin-seating-date">Exam date</label><input id="admin-seating-date" type="date" data-seating-field="date" value="${escapeHtml(draft.date || "")}" /></div>
+        <div class="field"><label for="admin-seating-start">Start time</label><input id="admin-seating-start" type="time" data-seating-field="start" value="${escapeHtml(draft.start || "")}" /></div>
+        <div class="field"><label for="admin-seating-end">End time</label><input id="admin-seating-end" type="time" data-seating-field="end" value="${escapeHtml(draft.end || "")}" /></div>
+      </div>
+      ${draft.metadataHint ? `<p class="admin-seating-source">${escapeHtml(draft.metadataHint)} <a href="/notices" target="_blank" rel="noopener noreferrer">Review the saved MSE-II date-sheet transcription</a>.</p>` : `<p class="admin-seating-source">The PDF supplies room assignments, not the exam date or time. Enter those from the issued date sheet before publishing.</p>`}
+      <details class="admin-seating-preview"><summary>Review all ${draft.seats.length.toLocaleString("en-IN")} assignments</summary><div class="admin-seating-table-wrap"><table class="admin-seating-table"><thead><tr><th scope="col">CRN</th><th scope="col">Room</th></tr></thead><tbody>${draft.seats.map((seat) => `<tr><td>${escapeHtml(seat.crn)}</td><td>${escapeHtml(seat.room)}</td></tr>`).join("")}</tbody></table></div></details>
+      <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary" data-action="admin-seating-publish" ${!validDraft || state.adminSeatingBusy ? "disabled" : ""}>${state.adminSeatingBusy ? "Publishing…" : "Publish reviewed assignments"}</button><span class="card-sub">Only CRNs, rooms, subject and exam timing are sent to the private store.</span></div>` : ""}
+    </section>` : ""}
+    <div class="admin-seating-plans"><h3>Published plans</h3>
+      ${plans.length ? plans.map((plan) => `<article class="admin-item"><div class="admin-item-text"><strong>${escapeHtml(plan.title)}</strong><span>${escapeHtml(plan.date)} · ${escapeHtml(plan.rows)} assignments · ${escapeHtml(plan.sourceName || "source not named")}</span></div><span class="badge ${plan.published ? "badge-accent" : ""}">${plan.published ? "Live" : "Hidden"}</span><div class="admin-item-actions"><button class="btn btn-sm btn-danger" data-action="admin-seating-delete" data-id="${escapeHtml(plan.id)}">Remove</button></div></article>`).join("") : `<p class="card-sub">No sitting plans have been published.</p>`}
+    </div>
+  </section>`;
+}
+
 function renderAdmin() {
   if (!state.adminToken) {
     return `<div class="page page-admin">
@@ -2471,13 +2542,13 @@ function renderAdmin() {
     </div>
     ${renderAdminForm()}
     ${renderAdminList()}
-    <section class="card" style="margin-top:14px">
+    ${state.adminTab === "seatings" ? "" : `<section class="card" style="margin-top:14px">
       <div class="card-head"><div><h2 class="card-title">Upload a file</h2><p class="card-sub">PNG, JPEG, WebP, GIF or PDF up to 1.5 MB. Files are stored in the content store and served from this Worker.</p></div></div>
       <div class="admin-upload-row">
         <label class="btn btn-sm admin-file-label">Choose file<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.txt,.md,.csv" data-admin-file data-standalone="true" /></label>
         <span class="card-sub" id="admin-upload-status">Nothing uploaded in this session.</span>
       </div>
-    </section>
+    </section>`}
     <p class="card-sub" style="margin-top:12px">Every write is validated, bounded and recorded. Undo restores the previous version of a collection. The public site only ever reads published items.</p>
   </div>`;
 }
@@ -2513,6 +2584,117 @@ async function adminUpload(file, input) {
     toast(message, "error");
   } finally {
     if (input) input.value = "";
+  }
+}
+
+async function adminImportSeatingPdf(file, input) {
+  if (!file) return;
+  if (!state.adminToken) { toast("Sign in to the admin panel first.", "error"); return; }
+  state.adminSeatingDraft = { fileName: file.name, processing: true, status: "Preparing the local PDF reader…", seats: [], warnings: [], ok: false };
+  render();
+  try {
+    const [{ extractSeatingPdf }, { parseSeatingPlanText }] = await Promise.all([
+      import("./engine/seating-pdf.js"),
+      import("./engine/seating.js")
+    ]);
+    const extracted = await extractSeatingPdf(file, {
+      onProgress: ({ page, pages }) => {
+        const status = $("#admin-seating-progress");
+        if (status) status.textContent = `Reading page ${page} of ${pages} on this device…`;
+      }
+    });
+    const parsed = parseSeatingPlanText(extracted.text);
+    const knownMathsMse = /maths?.*(?:mse\s*[- ]?\s*(?:ii|2)|mse\s*[- ]?\s*(?:ii|2)).*2026/i.test(file.name);
+    const draft = {
+      fileName: file.name,
+      pages: extracted.pages,
+      rooms: parsed.rooms,
+      seats: parsed.seats,
+      warnings: parsed.warnings,
+      ok: parsed.ok,
+      error: parsed.error,
+      processing: false,
+      status: parsed.ok ? "Extraction totals match. Check the rows and exam details before publishing." : "This extraction needs correction before it can be published.",
+      title: knownMathsMse ? "Mathematics-I · MSE-II theory · 23 Nov 2026" : "",
+      subject: knownMathsMse ? "Mathematics-I" : "",
+      date: knownMathsMse ? "2026-11-23" : "",
+      start: knownMathsMse ? "09:15" : "",
+      end: knownMathsMse ? "10:45" : "",
+      category: knownMathsMse ? "MSE-II theory" : "Exam",
+      metadataHint: knownMathsMse ? "Date and time are prefilled from Compass’s existing MSE-II date-sheet transcription; verify them against the issued notice before publishing." : ""
+    };
+    state.adminSeatingDraft = draft;
+    if (!parsed.ok) toast("The PDF needs review; it has not been published.", "error");
+  } catch (error) {
+    state.adminSeatingDraft = { fileName: file.name, processing: false, status: "No data was uploaded.", seats: [], warnings: [], ok: false, error: String(error.message || "Could not read this PDF.") };
+    toast("Could not read the seating-plan PDF.", "error");
+  } finally {
+    if (input) input.value = "";
+    render();
+  }
+}
+
+function seatingTimeMinutes(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || ""));
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return hour <= 23 && minute <= 59 ? hour * 60 + minute : null;
+}
+
+async function adminPublishSeatingPlan() {
+  const draft = state.adminSeatingDraft;
+  if (!draft?.ok || state.adminSeatingBusy) return;
+  const formValue = (name) => $(`[data-seating-field="${name}"]`)?.value?.trim() || draft[name] || "";
+  const title = formValue("title");
+  const subject = formValue("subject");
+  const date = formValue("date");
+  const start = seatingTimeMinutes(formValue("start"));
+  const end = seatingTimeMinutes(formValue("end"));
+  if (!title || !subject || !date || start == null || end == null || end <= start) {
+    toast("Enter a title, subject, date, and valid start/end time.", "error");
+    return;
+  }
+  if (state.adminSeatingPlans.some((plan) => plan.date === date && String(plan.subject || "").toLowerCase() === subject.toLowerCase())) {
+    toast("A plan for this subject and date already exists. Remove it before importing a replacement.", "error");
+    return;
+  }
+  const slug = `${date}-${subject}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
+  state.adminSeatingBusy = true;
+  render();
+  try {
+    await adminRequest("/api/admin/seatings", {
+      method: "POST",
+      body: {
+        action: "upsert",
+        plan: { id: `seat-${slug}`, title, subject, date, start, end, category: draft.category || "Exam", sourceName: draft.fileName, seats: draft.seats }
+      }
+    });
+    state.adminSeatingDraft = null;
+    toast("Reviewed sitting plan published. Ask Compass can now look up one matching profile.", "success");
+    await adminLoad({ silent: true });
+  } catch (error) {
+    toast(String(error.message || "Could not publish this sitting plan."), "error");
+  } finally {
+    state.adminSeatingBusy = false;
+    render();
+  }
+}
+
+async function adminDeleteSeatingPlan(id) {
+  const plan = state.adminSeatingPlans.find((row) => row.id === id);
+  if (!plan || state.adminSeatingBusy) return;
+  if (!window.confirm(`Remove the published sitting plan “${plan.title}”? Its assignments will no longer be available to Ask Compass.`)) return;
+  state.adminSeatingBusy = true;
+  try {
+    await adminRequest("/api/admin/seatings", { method: "POST", body: { action: "delete", id } });
+    toast("Sitting plan removed.", "success");
+    await adminLoad({ silent: true });
+  } catch (error) {
+    toast(String(error.message || "Could not remove the plan."), "error");
+  } finally {
+    state.adminSeatingBusy = false;
+    render();
   }
 }
 
@@ -2981,6 +3163,60 @@ async function waitForVerifiedSchedule(maxMs = 4000) {
   return state.schedule.length > 0;
 }
 
+function seatingAnswer(message) {
+  return { html: `<p>${escapeHtml(message)}</p>`, intent: "SEATING_LOOKUP", confidence: 1, plan: ["local roster match", "published seating plan lookup"], entities: {}, source: "published seating plan" };
+}
+
+async function answerSeatingQuestion(question) {
+  if (!state.students.length) await loadStudents({ quiet: true });
+  const active = matchProfileRecord(state.students, state.profile);
+  if (!active?.crn) return seatingAnswer("Select and verify your student profile first. I can only look up a room from the published roster and your active profile.");
+
+  const target = seatingStudentForQuestion(question, state.students, state.profile);
+  if (target.status === "ambiguous") return seatingAnswer("I found more than one matching roster record. Search by the full CRN, select that profile in Settings, then ask again.");
+  if (target.status === "not-found") return seatingAnswer("That CRN is not in the roster available on this device. I did not send it to an external AI or guess a room.");
+  if (target.status === "matched" && String(target.record?.crn || "") !== String(active.crn)) {
+    return seatingAnswer("This request names a different roster profile. Switch to that verified profile in Settings before asking for its room.");
+  }
+
+  const crn = String(active.crn).replace(/\D/g, "");
+  const section = String(active.section || "").toUpperCase();
+  if (!/^\d{6,12}$/.test(crn) || !section || String(state.group || "").toUpperCase() !== section
+    || (state.subgroup && String(active.subsection || "").toUpperCase() !== String(state.subgroup).toUpperCase())) {
+    return seatingAnswer("Your verified profile and selected timetable section do not match. Select your roster section in Timetable, then ask again.");
+  }
+
+  try {
+    const listResponse = await fetch("/api/seatings", { cache: "no-store", headers: { Accept: "application/json" } });
+    if (!listResponse.ok) return seatingAnswer("Published sitting plans are temporarily unavailable. No room has been guessed.");
+    const list = await listResponse.json();
+    const selected = selectSeatingPlan(list?.plans, question, now());
+    if (selected.status === "none") return seatingAnswer("I could not find a published upcoming sitting plan that matches this exam.");
+    if (selected.status === "ambiguous") return seatingAnswer("More than one upcoming exam could match. Include the subject or exam date so I can choose the correct sitting plan.");
+
+    const response = await fetch("/api/seatings/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ planId: selected.plan.id, crn })
+    });
+    if (!response.ok) return seatingAnswer("The published seating service could not verify this assignment. Try again later.");
+    const result = await response.json();
+    if (String(state.profile?.crn || "").replace(/\D/g, "") !== crn || String(state.group || "").toUpperCase() !== section) {
+      return seatingAnswer("Your profile or timetable selection changed during lookup. Ask again to check the current selection.");
+    }
+    if (!result?.seat?.room || result.plan?.id !== selected.plan.id) return seatingAnswer("This published seating plan does not list a room for the active profile.");
+    const answerPlan = {
+      ...result.plan,
+      startLabel: result.plan.start == null ? "" : humanTime(result.plan.start, v("timetable.clock")),
+      endLabel: result.plan.end == null ? "" : humanTime(result.plan.end, v("timetable.clock"))
+    };
+    return { html: seatAnswerHtml(answerPlan, result.seat, escapeHtml), intent: "SEATING_LOOKUP", confidence: 1, plan: ["active profile verified against published roster", "one published assignment returned"], entities: {}, source: "published seating plan" };
+  } catch {
+    return seatingAnswer("Published sitting plans are temporarily unavailable. No room has been guessed.");
+  }
+}
+
 async function sendQuestion(rawQuestion) {
   const question = String(rawQuestion || "").trim().slice(0, 800);
   if (!question || state.busy) return;
@@ -3004,13 +3240,16 @@ async function sendQuestion(rawQuestion) {
       return;
     }
     if (!state.schedule.length) await waitForVerifiedSchedule();
-    const wantsFirstYearFacts = /\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline|scheme|credits?|marks?|marking|assessment|internal|external|continuous assessment|\bca\b|\bese\b|\bmse\b|mst|weightage|distribution|prerequisites?|workshop|physics|chemistry|maths?|mathematics|pps|python|edg|bee|beee|english|economics|mentoring)\b/i.test(question);
+    const seatingQuestion = isSeatingQuestion(question, state.seatingNameIndex, state.profile?.name || "");
+    const wantsFirstYearFacts = !seatingQuestion && /\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline|scheme|credits?|marks?|marking|assessment|internal|external|continuous assessment|\bca\b|\bese\b|\bmse\b|mst|weightage|distribution|prerequisites?|workshop|physics|chemistry|maths?|mathematics|pps|python|edg|bee|beee|english|economics|mentoring)\b/i.test(question);
     if (wantsFirstYearFacts) await Promise.all([loadFirstYearSyllabusKnowledge(), loadFirstYearSchemeKnowledge()]);
     const ctx = currentAnswerContext();
     let answer = null;
     let engine = "local";
     const previousMemory = [...state.chat.slice(0, thinkingIndex)].reverse()
       .find((message) => message.role === "assistant" && message.meta?.memory)?.meta.memory || null;
+
+    if (seatingQuestion) answer = await answerSeatingQuestion(question);
 
     const previousSyllabusCode = [...state.chat.slice(0, thinkingIndex)].reverse()
       .find((message) => message.role === "assistant" && message.meta?.entities?.syllabusCourseCode)?.meta.entities.syllabusCourseCode || "";
@@ -3031,14 +3270,14 @@ async function sendQuestion(rawQuestion) {
     });
     const syllabusAnswer = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, previousSyllabusCode, { semester: selectedSemester });
     const asksForSchemeFacts = /\b(?:credits?|marks?|assessment|internal|external|weightage|distribution|ca|ese|mse|mst|ltp)\b/i.test(question);
-    if (syllabusAnswer && !asksForSchemeFacts) {
+    if (!answer && syllabusAnswer && !asksForSchemeFacts) {
       answer = syllabusAnswer;
       engine = "local";
-    } else if (schemeAnswer && syllabusAnswer
+    } else if (!answer && schemeAnswer && syllabusAnswer
       && schemeAnswer.entities?.syllabusCourseCode === syllabusAnswer.entities?.syllabusCourseCode) {
       answer = { ...schemeAnswer, html: `${schemeAnswer.html}${syllabusAnswer.html}` };
       engine = "local";
-    } else if (schemeAnswer || syllabusAnswer) {
+    } else if (!answer && (schemeAnswer || syllabusAnswer)) {
       answer = schemeAnswer || syllabusAnswer;
       engine = "local";
     }
@@ -3903,6 +4142,8 @@ async function handleAction(action, element) {
     case "admin-sign-out":
       setAdminToken("");
       state.adminData = null;
+      state.adminSeatingPlans = [];
+      state.adminSeatingDraft = null;
       state.adminStatus = "signed-out";
       state.adminEditing = null;
       state.adminError = "";
@@ -3946,6 +4187,16 @@ async function handleAction(action, element) {
       break;
     case "admin-restore":
       await adminRestore(element.dataset.collection);
+      break;
+    case "admin-seating-publish":
+      await adminPublishSeatingPlan();
+      break;
+    case "admin-seating-delete":
+      await adminDeleteSeatingPlan(element.dataset.id || "");
+      break;
+    case "admin-seating-clear":
+      state.adminSeatingDraft = null;
+      render();
       break;
     case "admin-editor-add": {
       const name = ($("#admin-editor-name")?.value || "").trim();
@@ -4394,7 +4645,10 @@ function registerServiceWorker() {
     });
   }).catch(() => { /* offline shell still works from HTTP cache */ });
 
+  let hasSeenController = Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!navigator.serviceWorker.controller) return;
+    if (!hasSeenController) { hasSeenController = true; return; }
     if (state.reloading) return;
     state.reloading = true;
     location.reload();
@@ -4550,6 +4804,11 @@ function bindEvents() {
     render();
   });
 
+  document.addEventListener("input", (event) => {
+    const seatingField = event.target.closest("[data-seating-field]");
+    if (seatingField && state.adminSeatingDraft) state.adminSeatingDraft[seatingField.dataset.seatingField] = seatingField.value;
+  });
+
   document.addEventListener("change", (event) => {
     const paperDepartment = event.target.closest("[data-paper-department]");
     if (paperDepartment) {
@@ -4560,6 +4819,11 @@ function bindEvents() {
     const adminFile = event.target.closest("[data-admin-file]");
     if (adminFile) {
       adminUpload(adminFile.files?.[0], adminFile);
+      return;
+    }
+    const seatingFile = event.target.closest("[data-seating-file]");
+    if (seatingFile) {
+      adminImportSeatingPdf(seatingFile.files?.[0], seatingFile);
       return;
     }
     const setting = event.target.closest("[data-setting]");

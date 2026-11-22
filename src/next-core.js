@@ -27,9 +27,13 @@ import {
 } from "./content-store.js";
 import { officialNoticesResponse } from "./official-notices.js";
 import { ptuHolidaySourcesResponse } from "./ptu-holidays.js";
+import {
+  SeatingStoreError, deleteSeatingPlan, listAdminSeatingPlans,
+  listPublicSeatingPlans, lookupPublishedSeat, saveSeatingPlan
+} from "./seating-store.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.2.12";
+export const APP_VERSION = "2.2.13";
 export const BUILD_DATE = "2026-11-22";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
@@ -390,20 +394,64 @@ async function adminAiRequest(request, env, ctx, deps = {}) {
   return jsonResponse({ ok: true, expiresAt: unlocked.expiresAt });
 }
 
-async function readJsonBody(request) {
+async function readJsonBody(request, maxBytes = MAX_JSON_BODY) {
   const contentType = String(request.headers.get("Content-Type") || "");
   if (!/application\/json/i.test(contentType)) {
     throw new ContentError("Send JSON with Content-Type: application/json.");
   }
   const declared = Number(request.headers.get("Content-Length") || 0);
-  if (declared > MAX_JSON_BODY) throw new ContentError("The request body is too large.", 413);
+  if (declared > maxBytes) throw new ContentError("The request body is too large.", 413);
   const text = await request.text();
-  if (text.length > MAX_JSON_BODY) throw new ContentError("The request body is too large.", 413);
+  if (text.length > maxBytes) throw new ContentError("The request body is too large.", 413);
   try {
     return JSON.parse(text);
   } catch {
     throw new ContentError("The request body is not valid JSON.");
   }
+}
+
+function seatingErrorResponse(error) {
+  const status = error instanceof SeatingStoreError || error instanceof ContentError ? error.status : 500;
+  return jsonResponse({ error: status === 500 ? "The seating service could not complete this request." : error.message }, {
+    status,
+    headers: { "Cache-Control": "no-store", "Pragma": "no-cache" }
+  });
+}
+
+function sameOriginMutation(request) {
+  const origin = request.headers.get("Origin");
+  if (origin && origin !== new URL(request.url).origin) return false;
+  const fetchSite = request.headers.get("Sec-Fetch-Site");
+  return !fetchSite || fetchSite === "same-origin" || fetchSite === "none";
+}
+
+async function seatingAdminRequest(request, env) {
+  const auth = await requireAuth(env, request);
+  const method = request.method.toUpperCase();
+  if (method === "GET" || method === "HEAD") {
+    return jsonResponse({ plans: await listAdminSeatingPlans(env) }, { headers: { "Cache-Control": "no-store" } });
+  }
+  if (method !== "POST") return jsonResponse({ error: "Method not allowed." }, { status: 405, headers: { Allow: "GET, HEAD, POST" } });
+  if (!sameOriginMutation(request)) return jsonResponse({ error: "Cross-origin changes are not allowed." }, { status: 403 });
+  const body = await readJsonBody(request, 1_600_000);
+  const action = String(body?.action || "upsert").toLowerCase();
+  if (action === "delete") {
+    return jsonResponse({ ok: true, ...(await deleteSeatingPlan(env, body?.id, { actor: auth.actor })) }, { headers: { "Cache-Control": "no-store" } });
+  }
+  if (action === "upsert") {
+    return jsonResponse({ ok: true, plan: await saveSeatingPlan(env, body?.plan, { actor: auth.actor }) }, { headers: { "Cache-Control": "no-store" } });
+  }
+  throw new SeatingStoreError("Unknown sitting-plan action.");
+}
+
+async function seatingLookupRequest(request, env) {
+  if (request.method.toUpperCase() !== "POST") {
+    return jsonResponse({ error: "Method not allowed." }, { status: 405, headers: { Allow: "POST", "Cache-Control": "no-store" } });
+  }
+  if (!sameOriginMutation(request)) return jsonResponse({ error: "Cross-origin lookups are not allowed." }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  const body = await readJsonBody(request, 1200);
+  const result = await lookupPublishedSeat(env, body || {}, request);
+  return jsonResponse(result, { headers: { "Cache-Control": "no-store", "Pragma": "no-cache" } });
 }
 
 async function requireAuth(env, request) {
@@ -551,6 +599,27 @@ export async function handleRequest(request, env = {}, ctx = {}, deps = {}) {
     return securityHeaders(jsonResponse(versionPayload(env), {
       headers: { "Cache-Control": "public, max-age=120" }
     }));
+  }
+
+  if (url.pathname === "/api/seatings") {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return securityHeaders(jsonResponse({ error: "Method not allowed." }, { status: 405, headers: { Allow: "GET, HEAD", "Cache-Control": "no-store" } }));
+    }
+    try {
+      return securityHeaders(jsonResponse({ plans: await listPublicSeatingPlans(env) }, { headers: { "Cache-Control": "no-store", "Pragma": "no-cache" } }));
+    } catch (error) {
+      return securityHeaders(seatingErrorResponse(error));
+    }
+  }
+
+  if (url.pathname === "/api/seatings/lookup") {
+    try { return securityHeaders(await seatingLookupRequest(request, env)); }
+    catch (error) { return securityHeaders(seatingErrorResponse(error)); }
+  }
+
+  if (url.pathname === "/api/admin/seatings") {
+    try { return securityHeaders(await seatingAdminRequest(request, env)); }
+    catch (error) { return securityHeaders(seatingErrorResponse(error)); }
   }
 
   if (url.pathname === "/api/admin/ai/unlock" || url.pathname === "/api/admin/ai/status") {

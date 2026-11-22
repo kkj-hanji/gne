@@ -31,7 +31,9 @@ test("profile history is device-local and recent entries trigger a fresh roster 
   assert.match(profile, /data-profile-history-index=/);
   assert.match(app, /input\.value = record\.crn \|\| record\.name;\s*await lookupProfileFromSettings\(\)/);
   assert.match(app, /rememberVerifiedProfile\(record\)/);
-  assert.match(html, /aria-label="Current date in India"/);
-  assert.doesNotMatch(html, /topbar-clock-time/);
+  assert.match(profile, /<details class="profile-history">/);
+  assert.match(html, /aria-label="Current date and time in India"/);
+  assert.match(html, /topbar-clock-time/);
   assert.match(app, /formatHeaderDate\(clock\.dateISO\)/);
+  assert.match(app, /time\.textContent = `\$\{clock\.time\} IST`/);
 });

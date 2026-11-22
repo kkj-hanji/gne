@@ -140,6 +140,7 @@ test("the service worker precaches the real shell and isolates the legacy origin
   assert.ok(assets.includes("app.js"));
   assert.ok(assets.includes("styles.css"));
   assert.ok(assets.includes("engine/profile-history.js"), "the new profile picker works after an offline install");
+  assert.ok(assets.includes("engine/seating.js"), "local sitting-plan intent stays available offline");
   assert.equal(assets.includes("data/timetable-groups.html"), false, "large timetable HTML loads on demand");
   assert.equal(assets.includes("data/timetable-rooms.html"), false, "large room HTML loads on demand");
   for (const asset of new Set(assets)) {
@@ -164,7 +165,7 @@ test("the worker caches only its allowlisted public endpoints and respects priva
     const result = await privateWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
     await result.waitForLifetime();
     assert.equal(await result.response.text(), "sensitive");
-    const dataCache = await privateWorker.caches.open("compass-next-v3.1.2-data");
+    const dataCache = await privateWorker.caches.open("compass-next-v3.1.3-data");
     assert.equal((await dataCache.keys()).length, 0, `${cacheControl} responses are not stored`);
   }
 });
@@ -201,14 +202,35 @@ test("warm static assets stay cache-first and offline navigation falls back to t
   assert.equal(await second.response.text(), "module");
   assert.equal(calls, 1, "a warm launch does not revalidate every shell module");
 
-  const shell = await worker.caches.open("compass-next-v3.1.2-shell");
+  const shell = await worker.caches.open("compass-next-v3.1.3-shell");
   await shell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
   const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
-  const offlineShell = await offlineWorker.caches.open("compass-next-v3.1.2-shell");
+  const offlineShell = await offlineWorker.caches.open("compass-next-v3.1.3-shell");
   await offlineShell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
   const navigation = await offlineWorker.fetch("/today", { mode: "navigate" });
   assert.equal(await navigation.response.text(), "<main>offline shell</main>");
   await navigation.waitForLifetime();
+});
+
+test("shell trimming retains pinned startup assets while caching lazy PDF modules", async () => {
+  const worker = await createServiceWorker(async () => new Response("module", { headers: { "Content-Type": "text/javascript" } }));
+  const shell = await worker.caches.open("compass-next-v3.1.3-shell");
+  await shell.put("/index.html", new Response("pinned shell", { headers: { "Content-Type": "text/html" } }));
+  for (let index = 0; index < 120; index += 1) {
+    const result = await worker.fetch(`/lazy-${index}.js`);
+    await result.waitForLifetime();
+  }
+  const lazy = await worker.fetch("/vendor/pdf.min.mjs");
+  assert.equal(await lazy.response.text(), "module");
+  await lazy.waitForLifetime();
+  const keys = (await shell.keys()).map((request) => new URL(request.url).pathname);
+  assert.ok(keys.includes("/index.html"), "the pinned app shell cannot be evicted by lazy assets");
+  assert.ok(keys.includes("/vendor/pdf.min.mjs"), "PDF.js modules are runtime cached as static assets");
+  assert.equal(keys.length, 100, "the shell cache remains bounded");
+
+  const app = await read("../next/app.js");
+  assert.match(app, /let hasSeenController = Boolean\(navigator\.serviceWorker\.controller\)/);
+  assert.match(app, /if \(!hasSeenController\) \{ hasSeenController = true; return; \}/);
 });
 
 test("the public-data cache has a bounded entry count and retains recent offline data", async () => {
@@ -217,13 +239,13 @@ test("the public-data cache has a bounded entry count and retains recent offline
     const result = await worker.fetch(`/api/legacy/api/timetable?source=groups&version=${index}`);
     await result.waitForLifetime();
   }
-  const cache = await worker.caches.open("compass-next-v3.1.2-data");
+  const cache = await worker.caches.open("compass-next-v3.1.3-data");
   assert.equal((await cache.keys()).length, 80);
 
   const recent = new Response("saved datesheet", { headers: { "Cache-Control": "public", "X-Compass-Cached-At": String(Date.now() - 2 * 24 * 60 * 60 * 1000) } });
   await cache.put("/api/legacy/data/end-sem-datesheet.json", recent);
   const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
-  const offlineCache = await offlineWorker.caches.open("compass-next-v3.1.2-data");
+  const offlineCache = await offlineWorker.caches.open("compass-next-v3.1.3-data");
   await offlineCache.put("/api/legacy/data/end-sem-datesheet.json", recent);
   const offline = await offlineWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
   assert.equal(await offline.response.text(), "saved datesheet");
@@ -299,7 +321,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.2.12");
+  assert.equal(next.vars.APP_VERSION, "2.2.13");
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");

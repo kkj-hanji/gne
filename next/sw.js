@@ -2,7 +2,7 @@
  * The legacy app is served from another origin and is never controlled here.
  */
 
-const VERSION = "compass-next-v3.1.2";
+const VERSION = "compass-next-v3.1.3";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 
@@ -34,6 +34,7 @@ const SHELL_ASSETS = [
   "./engine/ics.js",
   "./engine/calendar.js",
   "./engine/exams.js",
+  "./engine/seating.js",
   "./engine/profile-lookup.js",
   "./engine/profile-history.js",
   "./engine/mentoring.js",
@@ -92,7 +93,7 @@ function isPublicApi(url) {
 }
 
 function isStatic(url) {
-  return /\.(?:css|js|html|svg|png|webmanifest|woff2?|json)$/i.test(url.pathname);
+  return /\.(?:css|m?js|html|svg|png|webmanifest|woff2?|json)$/i.test(url.pathname);
 }
 
 function canStoreResponse(request, response) {
@@ -160,10 +161,14 @@ async function putBounded(cache, request, response, maxEntries) {
   if (keys.length <= maxEntries) return;
   const entries = await Promise.all(keys.map(async (key) => {
     const cached = await cache.match(key);
-    return { key, timestamp: Number(cached?.headers.get("x-compass-cached-at")) || 0 };
+    const path = new URL(key.url).pathname;
+    const pinned = cache.name === SHELL_CACHE && SHELL_ASSETS.some((asset) => new URL(asset, self.location.origin).pathname === path);
+    return { key, pinned, timestamp: Number(cached?.headers.get("x-compass-cached-at")) || 0 };
   }));
-  entries.sort((a, b) => a.timestamp - b.timestamp);
-  await Promise.all(entries.slice(0, keys.length - maxEntries).map(({ key }) => cache.delete(key)));
+  const overflow = Math.max(0, entries.length - maxEntries);
+  const removable = entries.filter((entry) => !entry.pinned).sort((a, b) => a.timestamp - b.timestamp);
+  const excess = Math.min(overflow, removable.length);
+  await Promise.all(removable.slice(0, excess).map(({ key }) => cache.delete(key)));
 }
 
 async function storePublicResponse(cache, request, response, track) {
@@ -204,7 +209,7 @@ async function cacheFirst(request, cacheName, track) {
   if (cached && request.cache !== "reload") return taggedResponse(cached, "hit");
   const response = await fetch(request);
   if (response?.ok && request.method === "GET") {
-    track(putBounded(cache, request, response.clone(), MAX_SHELL_ENTRIES));
+    track(putBounded(cache, request, storedResponse(response.clone()), MAX_SHELL_ENTRIES));
   }
   return response;
 }
@@ -218,7 +223,7 @@ async function navigate(request, cacheName, track) {
   try {
     const response = await fetch(request);
     if (response?.ok && /text\/html/i.test(response.headers.get("content-type") || "") && !new URL(request.url).search) {
-      track(putBounded(cache, request, response.clone(), MAX_SHELL_ENTRIES));
+      track(putBounded(cache, request, storedResponse(response.clone()), MAX_SHELL_ENTRIES));
     }
     return response;
   } catch {
