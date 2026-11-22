@@ -24,6 +24,57 @@
   }
   function examGroup(e){const title=String(e.title||"").toLowerCase();return title.includes("chemistry")?"chemistry":title.includes("physics")?"physics":"general";}
   function eventMarkup(e){const group=examGroup(e);return `<article class="exam-event exam-event-${group}"><div class="exam-event-topline"><span class="exam-subject-tag">${group==="general"?"EXAM":group.toUpperCase()}</span><small>${esc(e.sections.join(", "))}</small></div><h3>${esc(e.title)}</h3><p class="exam-event-time"><strong>${date(e.date)}${e.endDate!==e.date?` – ${date(e.endDate)}`:""}</strong><br>${e.start===null?"In your respective lab turn":`${time(e.start)}–${time(e.end)}`}${e.report!==null?` · <strong>Report by ${time(e.report)}</strong>`:""}</p>${e.note?`<p class="exam-event-note">${esc(e.note)}</p>`:""}<p class="answer-source">${e.sourceUrl?`<a href="${esc(e.sourceUrl)}" target="_blank" rel="noopener noreferrer">View source notice</a> · `:""}${esc(e.source)}</p></article>`;}
+  const CHEMISTRY_SECTIONS=new Set(["CSA","CSB","CSC","CSD","CSE","CSF","ITA","ITB","ITC"]);
+  const PHYSICS_SECTIONS=new Set(["MEA","MEB","CEA","CEB","EEA","EEB","ECA","ECB","RAI"]);
+  function sectionCode(value){let code=String(value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/^D[1-4]/,"").replace(/[12]$/,"");if(CHEMISTRY_SECTIONS.has(code)||PHYSICS_SECTIONS.has(code))return code;return code.replace(/^CSE/,"CS").replace(/^ECE/,"EC");}
+  function selectedYear(value,code){const year=String(value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").match(/^D([1-4])/);if(year)return Number(year[1]);return CHEMISTRY_SECTIONS.has(code)||PHYSICS_SECTIONS.has(code)?1:null;}
+  function branchCode(code){return code.match(/^(?:CS|IT|ME|CE|EE|EC|RAI|BBA|MBA|BCA|MCA|BVOC|BCOM)/)?.[0]||"";}
+  function branchTab(code){return ({CS:"CSE",EC:"ECE",BCOM:"B.COM",BVOC:"B.VOC"})[code]||code;}
+  function validIsoDate(value){if(!/^20\d{2}-\d{2}-\d{2}$/.test(value||""))return false;const dateValue=new Date(value+"T00:00:00Z");return Number.isFinite(dateValue.valueOf())&&dateValue.toISOString().slice(0,10)===value;}
+  function safeTime(start,end){return Number.isInteger(start)&&Number.isInteger(end)&&start>=0&&end<=1440&&end>start?{start,end}:{start:null,end:null};}
+  function addCalendarDays(value,days){const dateValue=new Date(`${value}T00:00:00Z`);if(!Number.isFinite(dateValue.valueOf()))return "";dateValue.setUTCDate(dateValue.getUTCDate()+days);return dateValue.toISOString().slice(0,10);}
+  function selectedEvents(ctx){
+    const code=sectionCode(ctx.section),year=selectedYear(ctx.section,code),branch=branchCode(code),events=[];
+    if(!code)return events;
+    for(const e of data?.events||[])if(e.kind==="theory"&&e.sections.includes(ctx.section)&&validIsoDate(e.date))events.push({...e,category:"Published theory exam",sessionNote:"",sessionRaw:""});
+    for(const e of root.CompassMse2Theory?.entries||[])if(e.sections.includes(code)&&validIsoDate(e.date)){const times=safeTime(e.start,e.end);events.push({id:e.id,kind:"theory",title:e.label,date:e.date,endDate:e.date,...times,report:null,sections:e.sections,source:root.CompassMse2Theory.source.title,sourceUrl:root.CompassMse2Theory.source.url,note:"",category:"MSE-II theory",sessionNote:"",sessionRaw:""});}
+    const sheet=root.CompassEseDatesheet?.allEntries?.()||[];
+    for(const e of sheet){
+      if(!validIsoDate(e.date)||!year)continue;
+      const semester=Number(e.semesterNumber),entryYear=Number.isFinite(semester)&&semester>0?Math.ceil(semester/2):String(e.tabLabel||"").toLowerCase()==="applied sciences"?1:null;
+      if(entryYear!==year)continue;
+      const tab=String(e.tabLabel||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+      const cohort=String(e.qualifier||e.header||"").toLowerCase();
+      if(year===1&&(CHEMISTRY_SECTIONS.has(code)||PHYSICS_SECTIONS.has(code))){
+        if(tab!=="APPLIEDSCIENCES")continue;
+        if((cohort.includes("chemistry")&& !CHEMISTRY_SECTIONS.has(code))||(cohort.includes("physics")&&!PHYSICS_SECTIONS.has(code)))continue;
+      }else if(!branch||tab!==branchTab(branch).replace(/[^A-Z0-9]/g,""))continue;
+      const times=safeTime(e.sessionStart,e.sessionEnd),url=root.CompassEseDatesheet?.getData?.()?.source?.url||"";
+      const tabInfo=root.CompassEseDatesheet?.getData?.()?.tabs?.find(item=>item.label===e.tabLabel);
+      events.push({id:`ese-${e.tabId||e.tabLabel}-${e.date}-${e.subject}-${e.header||""}`,kind:"theory",title:e.subject||"Examination",date:e.date,endDate:e.date,...times,report:null,sections:[ctx.section],source:"Official tentative ESE datesheet",sourceUrl:url?`${url}${tabInfo?.gid?`#gid=${encodeURIComponent(tabInfo.gid)}`:""}`:"",note:e.sessionNote||"",category:"End-semester exam",sessionNote:e.sessionNote||"",sessionRaw:e.sessionRaw||""});
+    }
+    const unique=new Map();
+    for(const e of events){const key=`${e.date}|${String(e.title).toLowerCase()}|${e.start??""}|${e.end??""}`;if(!unique.has(key))unique.set(key,e);}
+    return [...unique.values()].sort((a,b)=>a.date.localeCompare(b.date)||(a.start??Number.MAX_SAFE_INTEGER)-(b.start??Number.MAX_SAFE_INTEGER)||a.title.localeCompare(b.title));
+  }
+  function eventStillAhead(event,ctx){const endDate=event.endDate||event.date;if(endDate<ctx.today)return false;if(event.date>ctx.today||endDate>ctx.today)return true;return event.end==null||event.end>ctx.minutes;}
+  function dateSheetMarkup(ctx,events,upcoming){
+    const profile=[ctx.section,ctx.subgroup].filter(Boolean).join(" / ")||"Choose a timetable";
+    const seatEvent=upcoming.find(event=>data?.events.some(published=>published.id===event.id));
+    const rowMarkup=e=>{
+      const ended=e.endDate<ctx.today||(e.endDate===ctx.today&&e.end!==null&&e.end<=ctx.minutes);
+      const live=e.date===ctx.today&&e.start!==null&&e.end!==null&&e.start<=ctx.minutes&&ctx.minutes<e.end;
+      const timing=e.start!==null&&e.end!==null?`${time(e.start)}–${time(e.end)}`:esc(e.sessionRaw||"Time not listed");
+      const meta=[e.category,e.sessionNote,ended?"Completed":live?"In progress":e.date>ctx.today||e.start!==null&&e.start>ctx.minutes?"Upcoming":""].filter(Boolean).join(" · ");
+      return `<article class="schedule-item exam-date-row${live?" current":""}${ended?" exam-ended":""}"><div class="schedule-time">${esc(date(e.date))}<span>${timing}</span>${e.report!==null?`<span>Report ${time(e.report)}</span>`:""}</div><div><div class="schedule-name">${esc(e.title)}</div><div class="schedule-sub">${esc(meta)}</div></div><div class="exam-date-source">${e.sourceUrl?`<a href="${esc(e.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(e.category==="End-semester exam"?"Official date sheet":"Source notice")} ↗</a>`:esc(e.source||"Published exam")}</div></article>`;
+    };
+    const rowsByDate=new Map();for(const event of events)rowsByDate.set(event.date,[...(rowsByDate.get(event.date)||[]),event]);
+    const schedule=[...rowsByDate].map(([day,items])=>`<section class="exam-date-day"><h3>${esc(date(day))}</h3><div class="schedule-list">${items.map(rowMarkup).join("")}</div></section>`).join("");
+    const seatPanel=seatEvent?`<div id="today-exam-seat" class="exam-seat-grid" role="status">Checking your exam seat…</div><div class="exam-card-actions"><button type="button" class="outline-button" data-exam-ask="my exam room ${esc(seatEvent.date)}">Ask about my seat</button></div>`:"";
+    const heading="Your exam date sheet";
+    const note="Auto shows this date sheet starting three days before the first exam, keeps it here through gaps between papers, then returns to your timetable after the final listed exam.";
+    return `<section class="day-section exam-date-sheet"><div class="section-header"><div><p class="eyebrow">PUBLISHED EXAM SCHEDULE</p><h2>${heading}</h2></div><span class="exam-count">${events.length} paper${events.length===1?"":"s"} · ${esc(profile)}</span></div>${seatPanel}${schedule||'<p class="empty-list">No published exam rows match this timetable.</p>'}<p class="panel-note">${note}</p></section>`;
+  }
   function context(q,context){return {...context,temporal:root.CompassBrainKernel?.resolveTemporalQuery?.(`${q} date`,context.today)};}
   async function seatFor(event,crn){
     const revision=data.revision,cacheKey=`${revision}/${event.id}/${crn}`;
@@ -78,18 +129,21 @@
     return `<section class="live-stack" aria-label="Live exam schedule"><article class="live-card now-card"><div class="card-kicker"><span class="live-dot" aria-hidden="true"></span><span>${live?"LIVE EXAM":focus?"NEXT EXAM":"EXAM STATUS"}</span><span class="kicker-end"> · ${esc(ctx.subgroup||ctx.section||"Choose a section")}</span></div><div class="class-state">${state}</div><div class="current-class">${focus?`<h2>${esc(focus.title)}</h2><p>${date(focus.date)}</p><div class="class-details"><span><strong>Exam</strong> ${time(focus.start)}–${time(focus.end)}</span><span><strong>Report</strong> ${focus.report===null?"Not published":time(focus.report)}</span></div><div id="today-exam-seat" class="exam-seat-grid" role="status">Checking your next exam seat…</div><div class="progress-wrap"><div class="progress-track" role="progressbar" aria-label="Exam time elapsed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(progress)}"><div style="width:${progress}%"></div></div><div class="progress-labels"><span>${time(focus.start)}</span><span>${time(focus.end)} · IST</span></div></div>`:`<p>${data?complete?"The published theory exam period is complete.":"No theory exam schedule is confirmed for your selected section.":"Exam information is unavailable. Check for updates or try again when connected."}</p>`}</div><div class="exam-card-actions">${focus?`<button type="button" class="outline-button" data-exam-ask="my exam room ${focus.date}">Ask about my seat</button>${focus.sourceUrl?`<a class="text-button" href="${esc(focus.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source notice ↗</a>`:""}`:""}</div></article><div class="next-grid">${nextCard(upcoming[1],"UP NEXT")}${nextCard(upcoming[2],"THEN")}</div></section><section class="day-section"><div class="section-header"><div><p class="eyebrow">${upcoming.length?"UPCOMING EXAMS":"PUBLISHED EXAMS"}</p><h2>Your exam schedule</h2></div><span class="exam-count">${upcoming.length} remaining · ${events.length} total</span></div><div class="schedule-list">${events.map(e=>{const ended=e.date<ctx.today||(e.date===ctx.today&&e.end<=ctx.minutes);return `<details class="exam-agenda-item${ended?" exam-ended":""}" data-exam-event="${esc(e.id)}"><summary><span class="schedule-time">${date(e.date)}<span>${time(e.start)}–${time(e.end)}</span></span><span><strong class="schedule-name">${esc(e.title)}</strong><span class="schedule-sub">${ended?"Completed":e.report!==null?`Report by ${time(e.report)}`:"Reporting time not published"}</span></span><span class="exam-row-action">Details <span aria-hidden="true">⌄</span></span></summary><div class="exam-agenda-detail">${e.note?`<p>${esc(e.note)}</p>`:""}<p class="answer-source">${esc(e.source)}</p>${e.sourceUrl?`<a class="text-button" href="${esc(e.sourceUrl)}" target="_blank" rel="noopener noreferrer">Read source notice ↗</a>`:""}<button class="text-button" type="button" data-exam-ask="my exam room ${e.date}">Check this exam's seating</button></div></details>`;}).join("")}</div><p class="panel-note">${mode==="auto"?"Auto view returns to your timetable after the final theory exam slot.":"Exam view is selected. You can switch to Auto or Timetable in Settings."}</p></section>`;
   }
   function render(){
-    if(!bridge)return;const ctx=bridge.context(),publication=data||{events:[]},active=domain.active(publication,ctx.section,ctx.today,ctx.minutes);
+    if(!bridge)return;const ctx=bridge.context();
     const mode=["auto","timetable","exam"].includes(ctx.todayView)?ctx.todayView:"auto";
-    const showExams=mode==="exam" || (mode==="auto" && active.examMode);
+    const selected=selectedEvents(ctx);
+    const upcoming=selected.filter(event=>eventStillAhead(event,ctx));
+    const autoStartDate=selected.length?addCalendarDays(selected[0].date,-3):"";
+    const showDateSheet=mode==="auto"&&autoStartDate&&ctx.today>=autoStartDate&&upcoming.length>0;
+    const showExams=mode==="exam"||showDateSheet;
+    const shownEvents=mode==="exam"?selected:showDateSheet?selected:[];
     const card=document.getElementById("today-exam-card");
-    const allTheory=publication.events.filter(e=>e.kind==="theory" && e.sections.includes(ctx.section)).sort((a,b)=>a.date.localeCompare(b.date)||a.start-b.start);
-    const upcoming=allTheory.filter(e=>e.date>ctx.today || (e.date===ctx.today && e.end>ctx.minutes));
-    if(card){card.hidden=!showExams;const open=[...card.querySelectorAll("details[open]")].map(e=>e.dataset.examEvent);const focused=card.contains(document.activeElement)?document.activeElement:null;const focusKey=focused?.getAttribute("data-exam-ask")||focused?.getAttribute("href");card.innerHTML=showExams?todayMarkup(ctx,allTheory,upcoming,mode):"";for(const details of card.querySelectorAll("details"))if(open.includes(details.dataset.examEvent))details.open=true;if(focusKey){const replacement=[...card.querySelectorAll("button,a")].find(e=>(e.getAttribute("data-exam-ask")||e.getAttribute("href"))===focusKey);replacement?.focus();}}
-    if(showExams && upcoming.length)renderTodaySeat(ctx,upcoming[0]);
+    if(card){card.hidden=!showExams;const open=[...card.querySelectorAll("details[open]")].map(e=>e.dataset.examEvent);const focused=card.contains(document.activeElement)?document.activeElement:null;const focusKey=focused?.getAttribute("data-exam-ask")||focused?.getAttribute("href");card.innerHTML=showDateSheet?dateSheetMarkup(ctx,selected,upcoming):mode==="exam"?dateSheetMarkup(ctx,shownEvents,upcoming):"";for(const details of card.querySelectorAll("details"))if(open.includes(details.dataset.examEvent))details.open=true;if(focusKey){const replacement=[...card.querySelectorAll("button,a")].find(e=>(e.getAttribute("data-exam-ask")||e.getAttribute("href"))===focusKey);replacement?.focus();}}
+    const seatEvent=upcoming.find(event=>data?.events.some(published=>published.id===event.id));if(showExams&&seatEvent)renderTodaySeat(ctx,seatEvent);
     const regular=document.getElementById("today-timetable-content");if(regular)regular.hidden=showExams;
     document.getElementById("today")?.classList.toggle("exam-mode-active",showExams);
-    const intro=document.getElementById("intro-copy");if(intro)intro.textContent=showExams?"Your exam dates, reporting times and confirmed seating.":ctx.section?`${date(ctx.today)} · ${[ctx.section,ctx.subgroup].filter(Boolean).join(" / ")} · Your timetable is live.`:"Set up this device to see your own timetable.";
-    const status=document.getElementById("exam-update-status");if(status){status.hidden=!showExams;status.textContent=!data?"Exam data is not available yet.":stale?"Saved exam publication · live check unavailable":"Exam updates checked on this device. Notices update automatically when published.";}
+    const intro=document.getElementById("intro-copy");if(intro)intro.textContent=showDateSheet?"Your published exam date sheet for the selected timetable.":showExams?"Published exam schedule for your selected timetable.":ctx.section?`${date(ctx.today)} · ${[ctx.section,ctx.subgroup].filter(Boolean).join(" / ")} · Your timetable is live.`:"Set up this device to see your own timetable.";
+    const status=document.getElementById("exam-update-status"),ese=root.CompassEseDatesheet?.getData?.();if(status){status.hidden=!showExams;status.textContent=ese?.stale?"Using the saved official date sheet; live updates could not be checked.":stale?"Saved exam publication · live check unavailable":"Exam rows follow the selected timetable and published source dates.";}
   }
   function init(adapter){bridge=adapter;try{setLiveData(JSON.parse(localStorage.getItem(key)||"null"));}catch{}render();refresh();
     document.addEventListener("click",event=>{const target=event.target.closest?.("[data-exam-ask]");if(target)bridge.ask(target.dataset.examAsk);});

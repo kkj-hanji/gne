@@ -40,10 +40,11 @@
         state.data = data;
         state.error = "";
         writeCache(data);
+        root.CompassExamDesk?.render();
         return data;
       } catch (error) {
         const cached = readCache();
-        if (cached?.tabs?.length) { state.data = { ...cached, stale: true }; state.error = error.message || "Live datesheet unavailable"; return state.data; }
+        if (cached?.tabs?.length) { state.data = { ...cached, stale: true }; state.error = error.message || "Live datesheet unavailable"; root.CompassExamDesk?.render(); return state.data; }
         state.error = error.message || "The official datesheet could not be loaded.";
         throw error;
       } finally { state.loading = null; }
@@ -224,5 +225,5 @@
     show();
   }
 
-  root.CompassEseDatesheet = Object.freeze({ load, show, render, init, matches, resolve, answer, formatDate, allEntries });
+  root.CompassEseDatesheet = Object.freeze({ load, show, render, init, matches, resolve, answer, formatDate, allEntries, getData: () => state.data });
 })(globalThis);

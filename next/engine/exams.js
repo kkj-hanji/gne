@@ -144,6 +144,29 @@ function compareExams(a, b) {
     || String(a.title).localeCompare(String(b.title));
 }
 
+function shiftISODate(dateISO, days) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateISO || "")) return "";
+  const date = new Date(`${dateISO}T00:00:00Z`);
+  if (!Number.isFinite(date.valueOf()) || date.toISOString().slice(0, 10) !== dateISO) return "";
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Activate the Today date sheet three days early and keep it through the final paper. */
+export function examDateSheetPeriod(events, { dateISO, minutes = 0, leadDays = 3 } = {}) {
+  const exams = [...(events || [])].sort(compareExams);
+  const firstDate = exams[0]?.date || "";
+  const startDate = shiftISODate(firstDate, -Math.max(0, Math.min(14, Number(leadDays) || 0)));
+  const remaining = exams.filter((event) => event.date > dateISO
+    || (event.date === dateISO && (event.end == null || event.end > minutes)));
+  return {
+    active: Boolean(startDate && dateISO >= startDate && remaining.length),
+    startDate,
+    exams,
+    remaining
+  };
+}
+
 /** Keep an in-progress sitting visible; advance as soon as its published start time arrives. */
 export function nextUpcomingExam(events, { dateISO, minutes = 0 } = {}) {
   return [...(events || [])]

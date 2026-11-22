@@ -16,6 +16,7 @@ const FACULTY_DIRECTORY_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 const SYLLABUS_INDEX_URL = "/data/first-year-syllabus-index.json";
 const DEVICE_STORAGE_KEY = "gndec-compass-device-v1";
 const SETTINGS_STORAGE_KEY = "gndec-compass-settings-v1";
+const TODAY_VIEW_AUTO_DEFAULT_KEY = "gndec-compass-today-view-auto-default-v1";
 const TIMETABLE_UPDATE_STORAGE_KEY = "gndec-compass-timetable-update-v1";
 const AI_ADMIN_VIEW_STORAGE_KEY = "gndec-compass-ai-admin-view-v1";
 const ADMIN_AI_MODE_STORAGE_KEY = "gndec-compass-admin-ai-mode-v1";
@@ -73,9 +74,16 @@ function defaultSettings() {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return defaultSettings();
-    const parsed = JSON.parse(raw);
-    return { ...defaultSettings(), ...(parsed && typeof parsed === "object" ? parsed : {}) };
+    const parsed = raw ? JSON.parse(raw) : null;
+    const settings = { ...defaultSettings(), ...(parsed && typeof parsed === "object" ? parsed : {}) };
+    if (localStorage.getItem(TODAY_VIEW_AUTO_DEFAULT_KEY) !== "1") {
+      settings.todayView = "auto";
+      try {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+        localStorage.setItem(TODAY_VIEW_AUTO_DEFAULT_KEY, "1");
+      } catch { /* retain Auto in memory if storage is unavailable */ }
+    }
+    return settings;
   } catch {
     return defaultSettings();
   }

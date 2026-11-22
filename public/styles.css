@@ -924,6 +924,12 @@ body.compact-timetable .transposed-cell {
 #today-exam-card .exam-detail-label { display: block; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px; }
 #today-exam-card .exam-room-value { color: var(--amber); font-size: 18px; }
 #today-exam-card .exam-seat-grid small { display: block; margin-top: 5px; color: var(--muted); }
+#today-exam-card .exam-date-sheet { margin-top: 0; }
+#today-exam-card .exam-date-row { grid-template-columns: minmax(128px, .42fr) minmax(0, 1fr) minmax(120px, auto); }
+#today-exam-card .exam-date-source { color: var(--muted); font-size: 12px; font-weight: 750; text-align: right; }
+#today-exam-card .exam-date-source a { color: var(--green); text-decoration: none; }
+#today-exam-card .exam-date-source a:hover { text-decoration: underline; }
+#today-exam-card .exam-date-row.exam-ended { opacity: .62; }
 #today-exam-card .exam-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 22px; }
 #today-exam-card .exam-card-actions button { width: auto; margin: 0; }
 #today-exam-card .exam-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
@@ -938,6 +944,8 @@ body.compact-timetable .transposed-cell {
 #today-exam-card .exam-agenda-detail { padding: 0 14px 18px; color: var(--muted); font-size: 13px; }
 #today-exam-card .exam-agenda-detail .text-button { margin-right: 16px; }
 @media(max-width:600px) {
+  #today-exam-card .exam-date-row { grid-template-columns: 86px minmax(0, 1fr); gap: 8px; padding: 13px 10px; }
+  #today-exam-card .exam-date-source { grid-column: 2; text-align: left; }
   #today.exam-mode-active .hero-status { width: 100%; justify-content: flex-start; }
   #today.exam-mode-active .hero-chip { max-width: 100%; white-space: normal; flex-wrap: wrap; }
   #today.exam-mode-active .hero-chip strong, #today.exam-mode-active .hero-chip-date { min-width: 0; overflow-wrap: anywhere; }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { examEventsForSelection, examsOnDate, nextUpcomingExam } from "../next/engine/exams.js";
+import { examDateSheetPeriod, examEventsForSelection, examsOnDate, nextUpcomingExam } from "../next/engine/exams.js";
 
 const ese = {
   source: { url: "https://docs.google.com/spreadsheets/d/test/edit" },
@@ -37,6 +37,20 @@ test("MSE-II exam day view contains only the selected section's published sittin
   assert.deepEqual(chemistryDay.map((event) => event.title), ["BEEE"]);
 });
 
+test("Today date sheet starts three days early, stays active on gap days, and ends after the final paper", () => {
+  const events = examEventsForSelection({ group: "CEA" }).filter((event) => !/workshop|practical|lab/i.test(`${event.category} ${event.title}`));
+  assert.equal(examDateSheetPeriod(events, { dateISO: "2026-11-19", minutes: 600 }).active, false);
+  const firstDay = examDateSheetPeriod(events, { dateISO: "2026-11-20", minutes: 600 });
+  assert.equal(firstDay.active, true);
+  assert.equal(firstDay.startDate, "2026-11-20");
+  assert.equal(firstDay.exams.length, 5);
+  const gapDay = examDateSheetPeriod(events, { dateISO: "2026-11-24", minutes: 600 });
+  assert.equal(gapDay.active, true);
+  assert.equal(gapDay.exams.some((event) => event.title === "PPS"), true);
+  assert.equal(examDateSheetPeriod(events, { dateISO: "2026-11-28", minutes: 749 }).active, true);
+  assert.equal(examDateSheetPeriod(events, { dateISO: "2026-11-28", minutes: 750 }).active, false);
+});
+
 test("official ESE datesheet narrows chemistry and physics group rows by the selected section", () => {
   const chemistry = examEventsForSelection({ datesheet: ese, group: "CSA" }).filter((event) => event.category === "End-semester exam");
   const physics = examEventsForSelection({ datesheet: ese, group: "MEB" }).filter((event) => event.category === "End-semester exam");
@@ -48,12 +62,13 @@ test("official ESE datesheet narrows chemistry and physics group rows by the sel
 
 test("only important theory/final date-sheets replace the timetable; workshops remain notice items", async () => {
   const app = await readFile(new URL("../next/app.js", import.meta.url), "utf8");
-  assert.match(app, /const examAgenda = examsForDate\(clock\.dateISO\)/);
+  assert.match(app, /const examPeriod = examDateSheetPeriod\(importantExamEvents\(\), clock\)/);
   assert.match(app, /function importantExamEvents\(\)/);
   assert.match(app, /if \(\/workshop\|practical\|lab\/\.test\(label\)\) return false/);
-  assert.match(app, /renderExamDayCard\(examAgenda, clock\.dateISO\)/);
+  assert.match(app, /renderExamPeriodCard\(examPeriod\.exams, clock, examPeriod\.startDate\)/);
   assert.match(app, /todayExamSittings\.length \? renderExamDayCard\(todayExamSittings, clock\.dateISO\)/);
   assert.match(app, /Today's exam date sheet/);
+  assert.match(app, /Your exam date sheet/);
   const notices = await readFile(new URL("../next/engine/notices.js", import.meta.url), "utf8");
   assert.match(notices, /mse2-workshops-2026-11/);
 });

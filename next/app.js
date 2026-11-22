@@ -37,7 +37,7 @@ import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine
 import { answerFirstYearScheme, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
-import { academicYearForSection, allPublishedExamEvents, examEventsForSelection, examGroupForSection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
+import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examEventsForSelection, examGroupForSection, examsOnDate, examTimeLabel, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
   dayOfWeek, holidayOn, holidaySummary, isOffDay, upcomingHolidays
@@ -1303,7 +1303,7 @@ function renderToday() {
   const clock = now();
   const info = nextClassInfo();
   const exam = nextExam();
-  const examAgenda = examsForDate(clock.dateISO);
+  const examPeriod = examDateSheetPeriod(importantExamEvents(), clock);
   const free = computeFreeRooms({
     roomSchedule: state.roomSchedule,
     day: clock.day,
@@ -1321,9 +1321,10 @@ function renderToday() {
   const hero = renderHero(info, clock, greeting + name);
   const freeRooms = v("today.freeRoomsCard") ? renderFreeRoomsCard(free, clock) : "";
   const timelineClock = lookAhead ? { ...clock, day: timelineDay, minutes: 0 } : clock;
-  const timeline = v("today.hero") === "timeline" ? "" : examAgenda.length
-    ? renderExamDayCard(examAgenda, clock.dateISO)
-    : renderTodayTimeline(timelineClasses, timelineClock, { lookAhead });
+  const timeline = examPeriod.active
+    ? renderExamPeriodCard(examPeriod.exams, clock, examPeriod.startDate)
+    : v("today.hero") === "timeline" ? ""
+      : renderTodayTimeline(timelineClasses, timelineClock, { lookAhead });
   const notices = v("today.noticesCard") ? renderNoticesCard() : "";
   const examCard = v("today.examCountdown") && exam ? renderExamCard(exam) : "";
   const announcements = v("today.noticesCard") ? activeAnnouncements() : [];
@@ -1500,6 +1501,24 @@ function renderExamDayCard(exams, dateISO) {
   return `<section class="card exam-day-card">
     <div class="card-head"><div><h2 class="card-title">Today's exam date sheet</h2><p class="card-sub">${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(audience || selectionLabel())} · selected-group exams only</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(exam.category.includes("workshop") ? "Workshop sheet" : exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
     <div class="timeline">${exams.map((exam) => `<div class="timeline-item"><div class="timeline-time">${escapeHtml(examTimeLabel(exam, humanTime))}</div><span class="timeline-dot" aria-hidden="true"></span><div class="timeline-body"><div class="timeline-subject">${escapeHtml(exam.title)}</div><div class="timeline-meta">${escapeHtml(exam.category)}${exam.tab ? ` · ${escapeHtml(exam.tab)}` : ""}${exam.sessionNote ? ` · ${escapeHtml(exam.sessionNote)}` : ""}</div></div></div>`).join("")}</div>
+  </section>`;
+}
+
+function renderExamPeriodCard(exams, clock, startDate) {
+  const sources = [...new Map(exams.filter((exam) => exam.sourceUrl).map((exam) => [exam.sourceUrl, exam])).values()];
+  const audience = [state.profile.name, state.group, examGroupForSection(state.group)].filter(Boolean).join(" · ");
+  const byDate = new Map();
+  for (const exam of exams) byDate.set(exam.date, [...(byDate.get(exam.date) || []), exam]);
+  const groups = [...byDate].map(([dateISO, rows]) => `<section class="exam-period-day"><h3>${escapeHtml(shortExamDate(dateISO))} · ${escapeHtml(dayOfWeek(dateISO))}</h3><div class="exam-datesheet-list">${rows.map((exam) => {
+    const complete = exam.date < clock.dateISO || (exam.date === clock.dateISO && exam.end != null && exam.end <= clock.minutes);
+    const inProgress = exam.date === clock.dateISO && exam.start != null && exam.start <= clock.minutes && (exam.end == null || clock.minutes < exam.end);
+    const status = complete ? "Completed" : inProgress ? "In progress" : "Upcoming";
+    const details = [exam.category, exam.tab, exam.sessionNote, examTimeLabel(exam, humanTime), status].filter(Boolean).join(" · ");
+    return `<article class="exam-datesheet-row${complete ? " is-complete" : ""}${inProgress ? " is-in-progress" : ""}"><time datetime="${escapeHtml(exam.date)}"><strong>${escapeHtml(shortExamDate(exam.date))}</strong><small>${escapeHtml(dayOfWeek(exam.date))}</small></time><div><h3>${escapeHtml(exam.title)}</h3><p>${escapeHtml(details)}</p></div>${exam.sourceUrl ? `<a class="chip" href="${escapeHtml(exam.sourceUrl)}" ${exam.sourceUrl.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>Source ↗</a>` : ""}</article>`;
+  }).join("")}</div></section>`).join("");
+  return `<section class="card exam-day-card exam-period-card">
+    <div class="card-head"><div><h2 class="card-title">Your exam date sheet</h2><p class="card-sub">${escapeHtml(audience || selectionLabel())} · Auto starts ${escapeHtml(shortExamDate(startDate))} and stays on the date sheet through the final paper.</p></div><div class="card-actions">${sources.map((exam) => `<a class="btn btn-sm" href="${escapeHtml(exam.sourceUrl)}" ${exam.sourceUrl.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(exam.category.includes("MSE") ? "MSE-II sheet" : "Official sheet")}</a>`).join("")}</div></div>
+    <div class="exam-period-groups">${groups}</div>
   </section>`;
 }
 

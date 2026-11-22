@@ -26,8 +26,8 @@ const sourceUnderTest = appSource.replace(
   "globalThis.__brainIntegrationTest = { state, answerWithoutAi, runCompassBrain, setCompassBrainV2Enabled, resetBrainConversation, buildScheduleIndex, sanitizeSchedule, parseFetTimetable, parseSyllabusText, parseStudentSectionText, pdfTextFromItems, compassQueryPlan, requestedTime, requestedTimetableDate, requestedOfficialTimetableView, namedPersonTimetableRequest, roomAvailabilityAnswer };\nfunction kbClean"
 );
 
-export function createAppHarness() {
-  const storage = new Map();
+export function createAppHarness(initialStorage = new Map()) {
+  const storage = new Map(initialStorage);
   const context = vm.createContext({
     console,
     DOMParser: class { parseFromString(html) { return parseHTML(html).document; } },

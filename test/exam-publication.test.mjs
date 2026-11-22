@@ -470,6 +470,20 @@ test("exam UI lives only on Today and the settings control persists the view",as
   assert.equal(renders,3);
 });
 
+test("Auto becomes the default for new and existing installations while later choices persist",()=>{
+  const fresh=createAppHarness();assert.equal(fresh.api.state.settings.todayView,"auto");
+  const key="gndec-compass-settings-v1",migrationKey="gndec-compass-today-view-auto-default-v1";
+  const existing=createAppHarness(new Map([[key,JSON.stringify({todayView:"timetable",clockMode:"24h",themeAccent:"azure"})]]));
+  assert.equal(existing.api.state.settings.todayView,"auto");
+  assert.equal(existing.api.state.settings.clockMode,"24h");
+  assert.equal(existing.api.state.settings.themeAccent,"azure");
+  assert.equal(JSON.parse(existing.storage.get(key)).todayView,"auto");
+  assert.equal(existing.storage.get(migrationKey),"1");
+  existing.api.state.settings.todayView="timetable";
+  existing.storage.set(key,JSON.stringify(existing.api.state.settings));
+  assert.equal(vm.runInContext("loadSettings().todayView",existing.context),"timetable");
+});
+
 test.skip("actual chat submit uses published seating with Roman language, date changes and profile changes",async()=>{
   const {document,window}=parseHTML(await readFile(new URL("../public/index.html",import.meta.url),"utf8"));
   const h=createAppHarness(),c=h.context;

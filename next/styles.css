@@ -419,6 +419,10 @@ main {
 .exam-datesheet-row time strong { font-size: .86rem; }
 .exam-datesheet-row time small, .exam-datesheet-row p { margin: 0; color: var(--muted); font-size: .75rem; }
 .exam-datesheet-row h3 { margin: 0 0 4px; font-size: .92rem; }
+.exam-period-groups { display: grid; gap: 12px; }
+.exam-period-day > h3 { margin: 12px 0 0; color: var(--accent-ink); font-size: .84rem; }
+.exam-datesheet-row.is-complete { opacity: .62; }
+.exam-datesheet-row.is-in-progress { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
 @media (max-width: 560px) { .exam-datesheet-row { grid-template-columns: 62px minmax(0, 1fr); gap: 9px; } .exam-datesheet-row > .chip { grid-column: 2; justify-self: start; } }
 .stat-label { color: var(--muted); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 750; }
 .stat-value { font-size: 1.35rem; font-weight: 800; letter-spacing: -.03em; margin-top: 4px; }
