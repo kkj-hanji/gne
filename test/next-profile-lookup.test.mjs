@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findProfileRosterMatches, matchProfileRecord, normalizeRosterName } from "../next/engine/profile-lookup.js";
+import { findProfileRosterMatches, matchProfileRecord, normalizeRosterName, profileSeatingCrn } from "../next/engine/profile-lookup.js";
 
 const roster = [
   { name: "Lovepreet Singh", crn: "2621101", registrationNo: "2621101", section: "ITA" },
@@ -13,6 +13,14 @@ test("profile lookup matches CRN exactly and only auto-matches a unique exact na
   assert.equal(matchProfileRecord(roster, { name: "Gurpreet Kaur" }), roster[2]);
   assert.equal(matchProfileRecord(roster, { name: "Lovepreet Singh" }), null, "duplicate exact names require a student choice");
   assert.equal(matchProfileRecord(roster, { name: "Gurpreet Kaur", crn: "9999999" }), null, "a wrong identifier must not fall back to a name");
+});
+
+test("today seating uses the active saved CRN while still preferring a matched roster record", () => {
+  assert.equal(profileSeatingCrn(roster, { crn: "2621101" }), "2621101");
+  assert.equal(profileSeatingCrn([], { name: "Kaushik Jain", crn: "2617070" }), "2617070", "an unavailable roster fetch must not hide an explicitly saved active CRN");
+  assert.equal(profileSeatingCrn([], { name: "Kaushik Jain" }), "");
+  assert.equal(profileSeatingCrn([], { crn: "261-7070" }), "2617070");
+  assert.equal(profileSeatingCrn([], { crn: "123" }), "");
 });
 
 test("interactive profile search offers exact or partial choices without changing the profile", () => {

@@ -26,6 +26,17 @@ export function matchProfileRecord(records = [], profile = {}) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+/**
+ * Resolve the active profile's CRN for a published seating lookup. A matched
+ * roster record supplies the canonical CRN; otherwise an explicitly saved
+ * CRN may still be checked against the published seating plan itself.
+ */
+export function profileSeatingCrn(records = [], profile = {}) {
+  const matchedCrn = matchProfileRecord(records, profile)?.crn;
+  const digits = String(matchedCrn || profile.crn || "").replace(/\D/g, "");
+  return /^\d{6,12}$/.test(digits) ? digits : "";
+}
+
 /** Exact CRN/name first; partial names return choices for the student to confirm. */
 export function findProfileRosterMatches(records = [], query = "") {
   const text = String(query).trim();

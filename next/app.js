@@ -36,7 +36,7 @@ import {
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
 import { answerFirstYearScheme, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
 import { formatDayScheduleCopy } from "./engine/chat-copy.js";
-import { findProfileRosterMatches, matchProfileRecord } from "./engine/profile-lookup.js";
+import { findProfileRosterMatches, matchProfileRecord, profileSeatingCrn } from "./engine/profile-lookup.js";
 import { normalizeProfileHistory, rememberProfile } from "./engine/profile-history.js";
 import { isSeatingQuestion, normalizeCrn, normalizeSeatingText, seatAnswerHtml, seatingStudentForQuestion, selectSeatingPlan } from "./engine/seating.js";
 import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examGroupForSection, examsOnDate, examTimeLabel, groupExamDatesheetEvents, importantExamEventsForSelection, nextUpcomingExam } from "./engine/exams.js";
@@ -173,6 +173,8 @@ const state = {
   listening: false,
   searchTimer: 0
 };
+
+let studentsLoadPromise = null;
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -807,19 +809,31 @@ async function loadFaculty() {
 }
 
 async function loadStudents({ quiet = false } = {}) {
-  state.directoryStatus = "loading";
-  if (!quiet) render();
+  if (studentsLoadPromise) {
+    await studentsLoadPromise;
+    if (!quiet && state.route === "directory" && (state.directoryTab === "students" || state.directoryTab === "mentoring")) render();
+    return;
+  }
+  state.directoryStatus = state.students.length ? "ready" : "loading";
+  if (!quiet && !state.students.length) render();
+  studentsLoadPromise = (async () => {
+    try {
+      const data = await fetchJson("/api/legacy/data/student-roster-index.json", {}, 25000);
+      state.students = Array.isArray(data?.records) ? data.records : [];
+      state.seatingNameIndex = new Set(state.students.map((record) => normalizeSeatingText(record?.name)).filter((name) => name.length >= 3));
+      state.rosterGeneratedAt = String(data?.generatedAt || data?.schemaVersion || "");
+      state.directoryStatus = "ready";
+      syncProfileFromRoster({ silent: quiet || state.route !== "directory", renderOnChange: !quiet });
+    } catch {
+      // Keep a roster that another successful request already loaded. A failed
+      // background refresh must not make a verified profile appear missing.
+      state.directoryStatus = state.students.length ? "ready" : "error";
+    }
+  })();
   try {
-    const data = await fetchJson("/api/legacy/data/student-roster-index.json", {}, 25000);
-    state.students = Array.isArray(data?.records) ? data.records : [];
-    state.seatingNameIndex = new Set(state.students.map((record) => normalizeSeatingText(record?.name)).filter((name) => name.length >= 3));
-    state.rosterGeneratedAt = String(data?.generatedAt || data?.schemaVersion || "");
-    state.directoryStatus = "ready";
-    syncProfileFromRoster({ silent: quiet || state.route !== "directory", renderOnChange: !quiet });
-  } catch {
-    state.students = [];
-    state.seatingNameIndex = new Set();
-    state.directoryStatus = "error";
+    await studentsLoadPromise;
+  } finally {
+    studentsLoadPromise = null;
   }
   if (!quiet && state.route === "directory" && (state.directoryTab === "students" || state.directoryTab === "mentoring")) render();
 }
@@ -837,7 +851,7 @@ function rosterRecordForProfile() {
 }
 
 function activeProfileCrn() {
-  return normalizeCrn(rosterRecordForProfile()?.crn);
+  return profileSeatingCrn(state.students, state.profile);
 }
 
 function profileLookupHistory() {
@@ -1469,7 +1483,7 @@ async function loadTodaySeating() {
   const info = nextClassInfo();
   const targets = todaySeatingTargets(info);
   if (!targets.length) return;
-  if (!state.students.length && (state.profile?.crn || state.profile?.name || state.profile?.registrationNo)) {
+  if (!state.students.length && !activeProfileCrn() && (state.profile?.crn || state.profile?.name || state.profile?.registrationNo)) {
     await loadStudents({ quiet: true });
   }
   const key = todaySeatingKey(info);

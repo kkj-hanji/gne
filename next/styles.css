@@ -314,8 +314,9 @@ main { view-transition-name: compass-main-content; }
 .topbar-title h1 { font-size: clamp(1.15rem, 1rem + .6vw, 1.45rem); letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .eyebrow { color: var(--muted); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; }
 .topbar-clock { display: grid; align-content: center; gap: 3px; margin-left: auto; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)); border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); font-size: .78rem; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.topbar-clock-date { font-size: .82rem; font-weight: 750; }
-.topbar-clock-time { color: var(--muted); font-size: .7rem; text-align: right; }
+.topbar-clock-date, .topbar-clock-time { font-size: .82rem; }
+.topbar-clock-date { font-weight: 750; }
+.topbar-clock-time { color: var(--muted); text-align: right; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 
 .icon-button {
@@ -982,8 +983,7 @@ kbd { font-family: var(--font-mono); font-size: .66rem; border: 1px solid var(--
   .topbar-title { grid-column: 2; grid-row: 1; }
   .topbar-actions { grid-column: 3; grid-row: 1; margin-left: 0; gap: 4px; }
   .topbar-clock { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 38px; margin: 0; padding: 6px 12px; font-size: .84rem; }
-  .topbar-clock-date { font-size: .86rem; }
-  .topbar-clock-time { font-size: .78rem; }
+  .topbar-clock-date, .topbar-clock-time { font-size: .86rem; }
   .stat-grid { grid-template-columns: minmax(0, 1fr); }
   .stat { display: flex; align-items: baseline; gap: 10px; }
   .stat-value { margin-top: 0; }
