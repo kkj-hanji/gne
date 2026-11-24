@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isSeatingQuestion, normalizeCrn, parseSeatingPlanText, seatAnswerHtml, seatingStudentForQuestion, selectSeatingPlan } from "../next/engine/seating.js";
+import { inferSeatingPlanMetadata, isSeatingQuestion, normalizeCrn, parseSeatingPlanText, seatAnswerHtml, seatingStudentForQuestion, selectSeatingPlan, selectSeatingPlanForExam } from "../next/engine/seating.js";
 import { handleRequest } from "../src/next-core.js";
+import { TRANSCRIBED_EXAMS } from "../next/engine/exams.js";
 
 const roomBlock = (room, crns, printed = crns.length) => `Room No. ${room}\nS. No. CRN\n${crns.map((crn, index) => `${index + 1} ${crn}`).join("\n")}\nSECTION ALLOTTED\nTOTAL STU. ${printed}\n`;
 
@@ -55,6 +56,25 @@ test("seating PDF text parser verifies each room total and rejects incomplete or
   assert.equal(parseSeatingPlanText("a scanned document with no selectable table").ok, false);
 });
 
+test("seating PDF layout preserves the physical row label as well as its numbered seat", () => {
+  const parsed = parseSeatingPlanText(roomBlock("A8 (Automobile block)", ["1234567", "2345678"]), {
+    layout: [[
+      { value: "Room No. A8 (Automobile block)", x: 100, y: 100 },
+      { value: "S.No", x: 10, y: 80 },
+      { value: "Row-I", x: 30, y: 80 },
+      { value: "Row-II", x: 60, y: 80 },
+      { value: "1", x: 10, y: 60 },
+      { value: "1234567", x: 30, y: 60 },
+      { value: "2345678", x: 60, y: 60 }
+    ]]
+  });
+  assert.equal(parsed.ok, true);
+  assert.deepEqual(parsed.seats.map(({ crn, row, rowLabel }) => [crn, row, rowLabel]), [
+    ["1234567", 1, "Row-I"],
+    ["2345678", 2, "Row-II"]
+  ]);
+});
+
 test("seating intent handles English, shorthand, misspelling, Hinglish and Hindi without catching timetable questions", () => {
   for (const question of [
     "Where is my exam room?",
@@ -106,9 +126,35 @@ test("seat lookup resolves exact or unique partial roster identities and chooses
   const html = seatAnswerHtml({ subject: "Maths", date: "2026-11-23", sourceName: "seating.pdf" }, { room: "<F-101>", row: 6 }, (value) => String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;"));
   assert.match(html, /&lt;F-101&gt;/);
   assert.match(html, /Row <strong>6<\/strong>/);
+  const locatedHtml = seatAnswerHtml({ subject: "PPS", date: "2026-11-25", sourceName: "pps-seating.pdf" }, { room: "A8", row: 4, rowLabel: "Row-I" }, (value) => String(value));
+  assert.match(locatedHtml, /Row-I &middot; Seat <strong>4<\/strong>/);
   const namedHtml = seatAnswerHtml({ subject: "Maths", date: "2026-11-23", sourceName: "seating.pdf" }, { room: "F-101", row: 2 }, (value) => String(value), "Mohitveer Singh (CRN 2615231)");
   assert.match(namedHtml, /Published seating for <strong>Mohitveer Singh \(CRN 2615231\)<\/strong>/);
   assert.match(namedHtml, /exact CRN in the verified roster/);
+});
+
+test("Today shows only the seating plan for the same exam date and matching paper/session", () => {
+  const plans = [
+    { id: "math-23", subject: "Mathematics-I", title: "Mathematics-I · MSE-II theory", date: "2026-11-23", start: 555, end: 645 },
+    { id: "pps-25", subject: "PPS", title: "PPS · MSE-II theory", date: "2026-11-25", start: 555, end: 645 }
+  ];
+  const maths = { title: "Mathematics-I", category: "MSE-II theory", date: "2026-11-23", start: 555, end: 645 };
+  const pps = { title: "PPS", category: "MSE-II theory", date: "2026-11-25", start: 555, end: 645 };
+  const missingPaper = { title: "Physics", category: "MSE-II theory", date: "2026-11-26", start: 765, end: 855 };
+  assert.equal(selectSeatingPlanForExam(plans, maths)?.id, "math-23");
+  assert.equal(selectSeatingPlanForExam(plans, pps)?.id, "pps-25");
+  assert.equal(selectSeatingPlanForExam(plans, missingPaper), null, "an earlier subject's plan never carries to a later exam");
+  assert.equal(selectSeatingPlanForExam([{ ...plans[1], subject: "MSE-II theory", title: "MSE-II theory" }], { ...pps, title: "MSE-II theory" })?.id, "pps-25", "a generic title can use one unique plan for the exact date and session");
+});
+
+test("admin PDF metadata matches a unique subject in the selected datesheet and supports replacing its plan", () => {
+  const inferred = inferSeatingPlanMetadata("Seating Plan For PPS MSE-II Nov 2026.pdf", TRANSCRIBED_EXAMS);
+  assert.equal(inferred.subject, "PPS");
+  assert.equal(inferred.date, "2026-11-25");
+  assert.equal(inferred.start, "09:15");
+  assert.equal(inferred.end, "10:45");
+  assert.equal(inferred.id, "seat-2026-11-25-pps");
+  assert.equal(inferSeatingPlanMetadata("unknown MSE-II seating.pdf", TRANSCRIBED_EXAMS), null);
 });
 
 test("seating API publishes privately, reveals one exact assignment, and deletes it", async () => {
@@ -116,7 +162,7 @@ test("seating API publishes privately, reveals one exact assignment, and deletes
   const plan = {
     id: "seat-math-20261123", title: "Mathematics-I MSE-II", subject: "Mathematics-I", date: "2026-11-23",
     start: 555, end: 645, category: "MSE-II theory", sourceName: "maths-seating.pdf",
-    seats: [{ crn: "1234567", room: "F-101", row: 6 }, { crn: "2345678", room: "G-204", row: 1 }]
+    seats: [{ crn: "1234567", room: "F-101", row: 6, rowLabel: "Row-IV" }, { crn: "2345678", room: "G-204", row: 1 }]
   };
 
   assert.equal((await handleRequest(req("/api/admin/seatings"), e, ctx())).status, 401);
@@ -135,7 +181,7 @@ test("seating API publishes privately, reveals one exact assignment, and deletes
   const lookup = await handleRequest(jsonReq("/api/seatings/lookup", { planId: plan.id, crn: "1234567" }, "", { "CF-Connecting-IP": "203.0.113.8" }), e, ctx());
   assert.equal(lookup.status, 200);
   const result = await lookup.json();
-  assert.deepEqual(result.seat, { room: "F-101", row: 6 });
+  assert.deepEqual(result.seat, { room: "F-101", row: 6, rowLabel: "Row-IV" });
   assert.doesNotMatch(JSON.stringify(result), /1234567|2345678|G-204/);
 
   const badCrn = await handleRequest(jsonReq("/api/seatings/lookup", { planId: plan.id, crn: "123" }), e, ctx());

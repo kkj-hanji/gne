@@ -16,12 +16,98 @@ export function normalizeSeatingText(value) {
   return normalizedText(value);
 }
 
+/** Infer seating-plan metadata only from a subject with one datesheet match. */
+export function inferSeatingPlanMetadata(fileName, exams = []) {
+  const text = normalizedText(fileName);
+  const subjects = [
+    ["Mathematics-I", /\bmaths?\b|\bmathematics?\b/],
+    ["PPS", /\bpps\b|programming\s+(?:for\s+)?problem\s+solving/],
+    ["BEEE", /\bbeee?\b|basic\s+electrical/],
+    ["EDG · Engineering Drawing", /\bedg\b|engineering\s+drawing/],
+    ["Physics", /\bphysics\b/],
+    ["Chemistry", /\bchemistry\b/],
+    ["Economics", /\beconomics?\b/],
+    ["English", /\benglish\b/]
+  ];
+  const subject = subjects.find(([, pattern]) => pattern.test(text))?.[0] || "";
+  if (!subject) return null;
+  const matches = exams.filter((exam) => {
+    const title = normalizedText(exam.title);
+    const wanted = normalizedText(subject);
+    return title === wanted || (subject === "Mathematics-I" && title.includes("mathematics"))
+      || (subject.startsWith("EDG") && title.includes("engineering drawing"));
+  });
+  const unique = [...new Map(matches.map((exam) => [`${exam.date}|${exam.start}|${exam.end}|${normalizedText(exam.title)}`, exam])).values()];
+  if (unique.length !== 1) return null;
+  const exam = unique[0];
+  if (exam.start == null || exam.end == null || !/mse\s*[-–]?\s*(?:ii|2)/i.test(exam.category || "")) return null;
+  const dateLabel = new Date(`${exam.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const id = `seat-${exam.date}-${normalizedText(subject).replace(/\s+/g, "-")}`;
+  return {
+    id, subject, date: exam.date,
+    start: `${String(Math.floor(exam.start / 60)).padStart(2, "0")}:${String(exam.start % 60).padStart(2, "0")}`,
+    end: `${String(Math.floor(exam.end / 60)).padStart(2, "0")}:${String(exam.end % 60).padStart(2, "0")}`,
+    category: exam.category,
+    title: `${exam.title} · ${exam.category} · ${dateLabel}`,
+    hint: `Matched ${exam.title} to ${exam.category} on ${dateLabel}.`
+  };
+}
+
+/** Match only a plan for this paper's date and, when supplied, exact session. */
+export function selectSeatingPlanForExam(plans = [], exam = {}) {
+  const sameDate = plans.filter((plan) => plan?.date === exam.date && plan.published !== false);
+  const examText = normalizedText(`${exam.title || ""} ${exam.category || ""}`);
+  const tokens = normalizedText(exam.title || "").split(" ").filter((token) => token.length > 2 && !["exam", "paper", "theory", "mse", "ese"].includes(token));
+  const ranked = sameDate.map((plan) => {
+    const planText = normalizedText(`${plan.subject || ""} ${plan.title || ""}`);
+    const subjectScore = tokens.filter((token) => planText.includes(token)).length + (examText && planText.includes(examText) ? 10 : 0);
+    const sameSession = exam.start != null && exam.end != null && plan.start === exam.start && plan.end === exam.end;
+    return { plan, score: subjectScore + (sameSession ? 2 : 0), subjectScore, sameSession };
+  }).sort((a, b) => b.score - a.score);
+  if (!ranked.length) return null;
+  if (ranked[0].subjectScore > 0) return ranked.length === 1 || ranked[0].score > ranked[1].score ? ranked[0].plan : null;
+  const sameSession = ranked.filter((entry) => entry.sameSession);
+  return sameSession.length === 1 ? sameSession[0].plan : null;
+}
+
+function physicalRowsFromLayout(layout) {
+  const labelsByCrn = new Map();
+  for (const page of Array.isArray(layout) ? layout : []) {
+    const items = (Array.isArray(page) ? page : []).map((item) => ({
+      value: String(item?.value || "").trim(),
+      x: Number(item?.x) || 0,
+      y: Number(item?.y) || 0
+    })).filter((item) => item.value);
+    const roomHeadings = items.filter((item) => /^Room\s+No\.\s*.+$/i.test(item.value)).sort((a, b) => b.y - a.y);
+    const headerRows = items.filter((item) => /^S\s*\.\s*No\.?$/i.test(item.value)).map((serial) => ({
+      y: serial.y,
+      columns: items.filter((item) => Math.abs(item.y - serial.y) < 1.5 && /^Row-[IVX]+$/i.test(item.value))
+    })).filter((header) => header.columns.length > 0);
+
+    for (const crnItem of items.filter((item) => /^\d{6,12}$/.test(item.value))) {
+      const heading = roomHeadings.filter((candidate) => candidate.y > crnItem.y)
+        .sort((a, b) => a.y - b.y)[0];
+      if (!heading) continue;
+      const roomIndex = roomHeadings.indexOf(heading);
+      const nextHeading = roomHeadings[roomIndex + 1];
+      if (nextHeading && crnItem.y <= nextHeading.y) continue;
+      const header = headerRows
+        .filter((row) => row.y < heading.y && row.y > crnItem.y && (!nextHeading || row.y > nextHeading.y))
+        .sort((a, b) => (a.y - crnItem.y) - (b.y - crnItem.y))[0];
+      if (!header) continue;
+      const nearestColumn = [...header.columns].sort((a, b) => Math.abs(a.x - crnItem.x) - Math.abs(b.x - crnItem.x))[0];
+      if (nearestColumn && Math.abs(nearestColumn.x - crnItem.x) <= 45) labelsByCrn.set(crnItem.value, nearestColumn.value);
+    }
+  }
+  return labelsByCrn;
+}
+
 /**
  * Convert text extracted from a seating-plan PDF into CRN-to-room assignments.
  * Only the numbered seat table is read; summary counts and other numbers are
  * ignored. A printed total must match every room before the plan is publishable.
  */
-export function parseSeatingPlanText(value) {
+export function parseSeatingPlanText(value, { layout = [] } = {}) {
   const text = String(value || "").replace(/\u0000/g, "");
   if (!text.trim()) return { ok: false, error: "No selectable text was found. Scanned PDFs need OCR and cannot be imported safely yet.", seats: [], rooms: 0, warnings: [] };
   if (text.length > 12_000_000) return { ok: false, error: "This PDF has too much text to process in the browser.", seats: [], rooms: 0, warnings: [] };
@@ -85,10 +171,15 @@ export function parseSeatingPlanText(value) {
 
   const countedRooms = roomNames.size;
   const ok = warnings.length === 0 && countedRooms === headings.length && seats.length > 0;
+  const physicalRows = physicalRowsFromLayout(layout);
+  const locatedSeats = seats.map((seat) => {
+    const rowLabel = physicalRows.get(seat.crn);
+    return rowLabel ? { ...seat, rowLabel } : seat;
+  });
   return {
     ok,
     error: ok ? "" : "Review the extraction warnings and correct the PDF or table before publishing.",
-    seats,
+    seats: locatedSeats,
     rooms: countedRooms,
     warnings
   };
@@ -196,5 +287,8 @@ export function selectSeatingPlan(plans = [], question, { dateISO, minutes = 0 }
 
 export function seatAnswerHtml(plan, seat, escapeHtml = (value) => String(value), studentLabel = "") {
   const assignmentFor = studentLabel ? `Published seating for <strong>${escapeHtml(studentLabel)}</strong>` : "Your published seating plan";
-  return `<p><strong>${escapeHtml(plan.subject || plan.title)}</strong> &middot; ${escapeHtml(plan.date)}${plan.start != null && plan.end != null ? ` &middot; ${escapeHtml(String(plan.startLabel || ""))}${plan.startLabel ? "&ndash;" : ""}${escapeHtml(String(plan.endLabel || ""))}` : ""}</p><p>${assignmentFor} lists <strong>${escapeHtml(seat.room)}</strong>${seat.row ? ` &middot; Row <strong>${escapeHtml(String(seat.row))}</strong>` : ""}${seat.section ? ` &middot; ${escapeHtml(seat.section)}` : ""}.</p><p class="answer-source">Source: ${escapeHtml(plan.sourceName || "uploaded seating plan")}. Assignment matched by exact CRN in the verified roster.</p>`;
+  const position = seat.rowLabel
+    ? ` &middot; ${escapeHtml(seat.rowLabel)}${seat.row != null ? ` &middot; Seat <strong>${escapeHtml(String(seat.row))}</strong>` : ""}`
+    : seat.row != null ? ` &middot; Row <strong>${escapeHtml(String(seat.row))}</strong>` : "";
+  return `<p><strong>${escapeHtml(plan.subject || plan.title)}</strong> &middot; ${escapeHtml(plan.date)}${plan.start != null && plan.end != null ? ` &middot; ${escapeHtml(String(plan.startLabel || ""))}${plan.startLabel ? "&ndash;" : ""}${escapeHtml(String(plan.endLabel || ""))}` : ""}</p><p>${assignmentFor} lists <strong>${escapeHtml(seat.room)}</strong>${position}${seat.section ? ` &middot; ${escapeHtml(seat.section)}` : ""}.</p><p class="answer-source">Source: ${escapeHtml(plan.sourceName || "uploaded seating plan")}. Assignment matched by exact CRN in the verified roster.</p>`;
 }

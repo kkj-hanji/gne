@@ -5,11 +5,13 @@ const MAX_PAGES = 50;
 
 function pageTextLines(items) {
   const rows = [];
+  const positionedItems = [];
   for (const item of items || []) {
     const value = String(item?.str || "").trim();
     if (!value) continue;
     const x = Number(item.transform?.[4]) || 0;
     const y = Number(item.transform?.[5]) || 0;
+    positionedItems.push({ x, y, width: Number(item.width) || 0, value });
     let row = rows.find((candidate) => Math.abs(candidate.y - y) < 1.25);
     if (!row) {
       row = { y, items: [] };
@@ -17,7 +19,10 @@ function pageTextLines(items) {
     }
     row.items.push({ x, value });
   }
-  return rows.sort((a, b) => b.y - a.y).map((row) => row.items.sort((a, b) => a.x - b.x).map((item) => item.value).join(" "));
+  return {
+    text: rows.sort((a, b) => b.y - a.y).map((row) => row.items.sort((a, b) => a.x - b.x).map((item) => item.value).join(" ")).join("\n"),
+    layout: positionedItems
+  };
 }
 
 /** Extract selectable PDF text on this device. The PDF bytes never leave the browser. */
@@ -38,16 +43,19 @@ export async function extractSeatingPdf(file, { onProgress = () => {} } = {}) {
   }
 
   const pages = [];
+  const layout = [];
   try {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
-      pages.push(pageTextLines(content.items).join("\n"));
+      const extractedPage = pageTextLines(content.items);
+      pages.push(extractedPage.text);
+      layout.push(extractedPage.layout);
       page.cleanup();
       onProgress({ page: pageNumber, pages: document.numPages });
     }
   } finally {
     await document.destroy();
   }
-  return { text: pages.join("\n\n"), pages: pages.length };
+  return { text: pages.join("\n\n"), pages: pages.length, layout };
 }

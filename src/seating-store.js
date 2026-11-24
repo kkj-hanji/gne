@@ -56,12 +56,14 @@ function validatePlan(raw = {}) {
     const crn = normalizeCrn(entry?.crn);
     const room = clean(entry?.room, 120);
     const section = clean(entry?.section, 60);
+    const rowLabel = clean(entry?.rowLabel, 24);
     const row = entry?.row == null || entry.row === "" ? null : Number(entry.row);
     if (!crn || !room) throw new SeatingStoreError("Each seat row needs a valid CRN and room.");
     if (row != null && (!Number.isInteger(row) || row < 1 || row > 999)) throw new SeatingStoreError("A seat row number must be between 1 and 999.");
+    if (rowLabel && !/^Row-[IVX]+$/i.test(rowLabel)) throw new SeatingStoreError("A seating row label is not valid.");
     if (seen.has(crn)) throw new SeatingStoreError("A CRN appears more than once in this sitting plan.");
     seen.add(crn);
-    return { crn, room, ...(row != null ? { row } : {}), ...(section ? { section } : {}) };
+    return { crn, room, ...(row != null ? { row } : {}), ...(rowLabel ? { rowLabel } : {}), ...(section ? { section } : {}) };
   });
   const fallback = `${clean(raw.category, 40)}-${subject}-${date}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const id = planId(raw.id, fallback);
@@ -166,6 +168,6 @@ export async function lookupPublishedSeat(env, { planId: id, crn }, request) {
   const seat = (plan.seats || []).find((row) => row.crn === normalized);
   return {
     plan: summary(plan),
-    seat: seat ? { room: seat.room, ...(seat.row != null ? { row: seat.row } : {}), ...(seat.section ? { section: seat.section } : {}) } : null
+    seat: seat ? { room: seat.room, ...(seat.row != null ? { row: seat.row } : {}), ...(seat.rowLabel ? { rowLabel: seat.rowLabel } : {}), ...(seat.section ? { section: seat.section } : {}) } : null
   };
 }
