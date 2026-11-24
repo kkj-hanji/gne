@@ -5,7 +5,7 @@
     "facultyDirectory": "https://gndec.ac.in/faculty/",
     "provenance": "Department names, Heads of Department, contact details, notices, and syllabus documents are read from public GNDEC pages. A missing value stays missing; Compass does not infer an appointment or a document."
   },
-  "checkedAt": "2026-11-22T00:38:48.779Z",
+  "checkedAt": "2026-11-24T04:57:12.267Z",
   "departments": [
     {
       "id": "ce",
@@ -23,7 +23,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:36.370Z",
+      "checkedAt": "2026-11-24T04:56:59.738Z",
       "syllabusErrors": []
     },
     {
@@ -43,7 +43,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:36.957Z",
+      "checkedAt": "2026-11-24T04:57:00.310Z",
       "syllabusErrors": []
     },
     {
@@ -63,7 +63,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:36.740Z",
+      "checkedAt": "2026-11-24T04:57:00.424Z",
       "syllabusErrors": []
     },
     {
@@ -82,7 +82,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:37.237Z",
+      "checkedAt": "2026-11-24T04:57:01.067Z",
       "syllabusErrors": []
     },
     {
@@ -101,7 +101,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:37.212Z",
+      "checkedAt": "2026-11-24T04:57:00.965Z",
       "syllabusErrors": []
     },
     {
@@ -121,7 +121,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:37.849Z",
+      "checkedAt": "2026-11-24T04:57:01.191Z",
       "syllabusErrors": []
     },
     {
@@ -141,7 +141,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:38.081Z",
+      "checkedAt": "2026-11-24T04:57:01.564Z",
       "syllabusErrors": []
     },
     {
@@ -161,7 +161,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:38.065Z",
+      "checkedAt": "2026-11-24T04:57:01.575Z",
       "syllabusErrors": []
     },
     {
@@ -181,7 +181,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:37.709Z",
+      "checkedAt": "2026-11-24T04:57:01.201Z",
       "syllabusErrors": []
     },
     {
@@ -202,11 +202,20 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-22T00:38:39.339Z",
+      "checkedAt": "2026-11-24T04:57:03.753Z",
       "syllabusErrors": []
     }
   ],
   "notices": [
+    {
+      "id": "examination-form-schedule-regular-reappear-nov-2026",
+      "title": "Examination Form Schedule (Regular & Reappear) – Nov-2026",
+      "url": "https://erp.gndec.ac.in/noticeboard/examination-form-schedule-regular-reappear-%E2%80%93-nov-2026",
+      "author": "coe_office",
+      "publishedAt": "2026-11-23",
+      "category": "Examination",
+      "source": "https://erp.gndec.ac.in/noticeboard"
+    },
     {
       "id": "struck-off-notice-45-12-11-26",
       "title": "Struck_off_Notice 45_12.11.26",
@@ -376,15 +385,6 @@
       "author": "administrator",
       "publishedAt": "2026-08-04",
       "category": "Admissions",
-      "source": "https://erp.gndec.ac.in/noticeboard"
-    },
-    {
-      "id": "struck-off-notice-43-25-07-26-pdf",
-      "title": "Struck_off_Notice_43_25.07.26.pdf",
-      "url": "https://erp.gndec.ac.in/noticeboard/struck-off-notice-43-250726pdf",
-      "author": "administrator",
-      "publishedAt": "2026-07-28",
-      "category": "Notice",
       "source": "https://erp.gndec.ac.in/noticeboard"
     }
   ],
@@ -1334,5 +1334,5 @@
   },
   "noticeboardError": "",
   "unavailableDepartments": [],
-  "seededAt": "2026-11-22T00:38:48.779Z"
+  "seededAt": "2026-11-24T04:57:12.267Z"
 }
