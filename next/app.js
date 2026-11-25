@@ -21,7 +21,7 @@ import {
 } from "./engine/datetime.js";
 import { mergeSchedules, readVerifiedFetTimetable } from "./engine/fet-parser.js";
 import { computeFreeRooms, formatFreeWindow, groupRooms, nextFreeRoomSlot, roomZone, zoneFromQuestion } from "./engine/free-rooms.js";
-import { answerLocally, buildAnswerContext, escapeHtml, FALLBACK_REFUSAL, classesFor } from "./engine/answer.js";
+import { answerLocally, buildAnswerContext, combineQuestionAnswers, escapeHtml, FALLBACK_REFUSAL, classesFor, splitCompoundQuestions, tooManyQuestionsAnswer } from "./engine/answer.js";
 import { brainSuggestions, loadBrainScripts, runBrain } from "./engine/brain-bridge.js";
 import {
   clearAppCaches, clearSnapshots, deleteSnapshot, getSnapshot, listSnapshots,
@@ -34,11 +34,12 @@ import {
   NOTICE_CATEGORIES, TRANSCRIBED_NOTICES, filterNotices, isRecent, mergeNotices, noticeStats, slugify
 } from "./engine/notices.js";
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
-import { answerFirstYearScheme, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
-import { formatDayScheduleCopy } from "./engine/chat-copy.js";
+import { answerBareSemesterOptions, answerFirstYearCourseOptions, answerFirstYearScheme, answerFirstYearSemesterMismatch, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
+import { chatQuestionToRetry, formatChatMessageCopy, htmlToChatText, writeChatClipboard } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord, profileSeatingCrn } from "./engine/profile-lookup.js";
 import { normalizeProfileHistory, rememberProfile } from "./engine/profile-history.js";
-import { inferSeatingPlanMetadata, isSeatingQuestion, normalizeCrn, normalizeSeatingText, seatAnswerHtml, seatingStudentForQuestion, selectSeatingPlan, selectSeatingPlanForExam } from "./engine/seating.js";
+import { answerPersonQuestion, parsePersonQuestion } from "./engine/people.js";
+import { inferSeatingPlanMetadata, isSeatingQuestion, normalizeCrn, normalizeSeatingText, seatAnswerHtml, seatingStudentForQuestion, selectSeatingPlan, selectSeatingPlanForExam, seatingEntryForExam, seatingPlanTargetId, seatingTargetsForInfo } from "./engine/seating.js";
 import { academicYearForSection, allPublishedExamEvents, examDateSheetPeriod, examGroupForSection, examsOnDate, examTimeLabel, groupExamDatesheetEvents, importantExamEventsForSelection, nextUpcomingExam } from "./engine/exams.js";
 import {
   ACADEMIC_PERIODS, CALENDAR_SOURCE, HOLIDAYS_2026, HOLIDAY_SOURCE, academicPeriodFor,
@@ -48,6 +49,7 @@ import { PTU_HOLIDAYS_2027, PTU_RESTRICTED_HOLIDAYS_2026, PTU_RESTRICTED_HOLIDAY
 import { PTU_HOLIDAY_SOURCE_SEED } from "./data/ptu-holiday-sources.js";
 
 const CHAT_KEY = "gndec-compass-next-chat-v1";
+const CHAT_SCROLL_RUNS = new WeakMap();
 const SELECTION_KEY = "gndec-compass-next-selection-v1";
 const LEGACY_GROUP_KEY = "gndec-compass-group-v3";
 const LEGACY_SUBGROUP_KEY = "gndec-compass-subgroup-v3";
@@ -96,6 +98,7 @@ const state = {
   contentStatus: "idle",
   campus: { notices: [], syllabus: [], departments: [], checkedAt: "" },
   campusStatus: "idle",
+  campusPromise: null,
   papers: { records: [], loadedAt: "", sources: [] },
   papersStatus: "idle",
   noticeQuery: "",
@@ -118,7 +121,7 @@ const state = {
   adminSeatingDraft: null,
   adminSeatingBusy: false,
   adminSeatingError: "",
-  todaySeating: { key: "", status: "idle", entries: [] },
+  todaySeating: { key: "", status: "idle", entries: [], checkedAt: 0 },
   directoryTab: "faculty",
   directoryQuery: "",
   directoryStatus: "idle",
@@ -394,7 +397,7 @@ function clearPresetUndo() {
 function renderPresetRow() {
   return `<div class="preset-row">${PRESETS.map((preset) => {
     const active = state.activePreset === preset.id;
-    return `<button class="preset${active ? " is-active" : ""}" data-action="preset" data-preset="${preset.id}" aria-pressed="${active}"><strong>${escapeHtml(preset.title)}</strong><small>${active ? "Applied · click again to undo" : escapeHtml(preset.description)}</small></button>`;
+    return `<button type="button" class="preset${active ? " is-active" : ""}" data-action="preset" data-preset="${preset.id}" aria-pressed="${active}"><strong>${escapeHtml(preset.title)}</strong><small>${active ? "Applied · click again to undo" : escapeHtml(preset.description)}</small></button>`;
   }).join("")}</div>`;
 }
 
@@ -658,19 +661,27 @@ async function loadContent() {
 }
 
 async function loadCampus() {
+  if (state.campusStatus === "ready") return state.campus;
+  if (state.campusPromise) return state.campusPromise;
   state.campusStatus = "loading";
-  try {
-    const data = await fetchJson("/api/legacy/data/campus.json", {}, 20000);
-    state.campus = {
-      notices: Array.isArray(data?.notices) ? data.notices : [],
-      syllabus: Array.isArray(data?.syllabus) ? data.syllabus : [],
-      departments: Array.isArray(data?.departments) ? data.departments : [],
-      checkedAt: String(data?.checkedAt || "")
-    };
-    state.campusStatus = "ready";
-  } catch {
-    state.campusStatus = "error";
-  }
+  const pending = (async () => {
+    try {
+      const data = await fetchJson("/api/legacy/data/campus.json", {}, 20000);
+      state.campus = {
+        notices: Array.isArray(data?.notices) ? data.notices : [],
+        syllabus: Array.isArray(data?.syllabus) ? data.syllabus : [],
+        departments: Array.isArray(data?.departments) ? data.departments : [],
+        checkedAt: String(data?.checkedAt || "")
+      };
+      state.campusStatus = "ready";
+    } catch {
+      state.campusStatus = "error";
+    }
+    return state.campus;
+  })();
+  state.campusPromise = pending;
+  try { return await pending; }
+  finally { if (state.campusPromise === pending) state.campusPromise = null; }
 }
 
 async function loadPapers() {
@@ -903,13 +914,13 @@ async function lookupProfileFromSettings() {
 function renderProfileLookupResults() {
   const root = $("[data-profile-lookup-results]");
   if (!root) return;
-  root.innerHTML = `${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}`;
+  root.innerHTML = `${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button type="button" class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}`;
 }
 
 function renderRecentProfiles() {
   const history = profileLookupHistory();
   if (!history.length) return "";
-  return `<details class="profile-history"><summary>Recent profiles <span>${history.length} saved on this device</span></summary><div class="profile-match-list" aria-label="Recent verified profiles">${history.map((record, index) => `<button class="profile-match profile-history-match" data-action="lookup-profile-history" data-profile-history-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>Search this profile again</span><small>${record.crn ? `CRN ${escapeHtml(record.crn)}` : "Roster matched by name"}</small></button>`).join("")}</div></details>`;
+  return `<details class="profile-history"><summary>Recent profiles <span>${history.length} saved on this device</span></summary><div class="profile-match-list" aria-label="Recent verified profiles">${history.map((record, index) => `<button type="button" class="profile-match profile-history-match" data-action="lookup-profile-history" data-profile-history-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>Search this profile again</span><small>${record.crn ? `CRN ${escapeHtml(record.crn)}` : "Roster matched by name"}</small></button>`).join("")}</div></details>`;
 }
 
 function queueProfileSuggestions(query) {
@@ -1037,7 +1048,7 @@ function importantExamEvents() {
   return importantExamEventsForSelection({ datesheet: state.datesheet, group: state.group, branch: state.profile.branch });
 }
 
-function examSeatInlineMarkup(entry) {
+function examSeatInlineMarkup(entry, { hero = false } = {}) {
   if (!entry) return "";
   let detail = "Checking the published room and row&hellip;";
   if (entry.status === "matched") {
@@ -1049,7 +1060,7 @@ function examSeatInlineMarkup(entry) {
   else if (entry.status === "missing") detail = "No assignment for this profile appears in the published plan.";
   else if (entry.status === "unavailable") detail = "Published seating is temporarily unavailable.";
   else if (entry.status === "profile-missing") detail = 'Verify your student profile in <a href="/settings">Settings</a> to show your room and row.';
-  return `<p class="exam-seat-inline" role="status"><strong>Your seating</strong><span>${detail}</span></p>`;
+  return `<p class="exam-seat-inline${hero ? " hero-seat-inline" : ""}" role="status"><strong>Your seating</strong><span>${detail}</span></p>`;
 }
 
 function examRowMarkup(exam, seatEntry = null) {
@@ -1058,9 +1069,7 @@ function examRowMarkup(exam, seatEntry = null) {
 
 function renderExamDatesheetSections(exams, seatEntries = []) {
   const groups = groupExamDatesheetEvents(exams);
-  const entryFor = (exam) => seatEntries.find((entry) => entry.exam?.id && exam.id
-    ? entry.exam.id === exam.id
-    : entry.exam?.date === exam.date && normalizeSeatingText(entry.exam?.title) === normalizeSeatingText(exam.title));
+  const entryFor = (exam) => seatingEntryForExam(seatEntries, exam);
   return groups.length ? `<div class="exam-datesheet-sections">${groups.map((group) => `<section class="exam-datesheet-section"><h3>${escapeHtml(group.label)}</h3><div class="exam-datesheet-list">${group.events.map((exam) => examRowMarkup(exam, entryFor(exam))).join("")}</div></section>`).join("")}</div>` : "";
 }
 
@@ -1106,7 +1115,7 @@ function examModeInfo(clock) {
     period,
     exams: period.today,
     today: period.today,
-    primary: period.today[0] || period.next,
+    primary: period.remaining[0] || period.next,
     day: clock
   };
 }
@@ -1250,7 +1259,10 @@ function updateChrome() {
   syncSeoHead();
 }
 
-const MOBILE_NAV_ICONS = Object.freeze({ today: "◉", ask: "✧", timetable: "▦", rooms: "▤", teachers: "♙", notices: "▤", papers: "▧", syllabus: "▤", calendar: "▦", directory: "♧", compare: "⇄" });
+function navigationIconMarkup(route) {
+  const svg = $(`.nav-item[data-route="${route}"] .nav-icon svg`);
+  return svg?.outerHTML || "<span aria-hidden=\"true\">•</span>";
+}
 
 function renderMobileNavigation() {
   const nav = $("#bottom-nav");
@@ -1260,7 +1272,7 @@ function renderMobileNavigation() {
   const count = Math.max(1, Math.min(5, Number(v("nav.bottomItems")) || 4));
   nav.innerHTML = routes.slice(0, count).map((route) => {
     const label = ROUTES[route]?.title || route;
-    return `<button type="button" class="bottom-item ${state.route === route ? "is-active" : ""}" data-route="${route}" aria-label="${escapeHtml(label)}" ${state.route === route ? 'aria-current="page"' : ""}><span aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><span>${escapeHtml(label === "Ask Compass" ? "Ask" : label)}</span></button>`;
+    return `<button type="button" class="bottom-item ${state.route === route ? "is-active" : ""}" data-route="${route}" aria-label="${escapeHtml(label)}" ${state.route === route ? 'aria-current="page"' : ""}><span class="bottom-item-icon" aria-hidden="true">${navigationIconMarkup(route)}</span><span>${escapeHtml(label === "Ask Compass" ? "Ask" : label)}</span></button>`;
   }).join("");
 }
 
@@ -1447,10 +1459,10 @@ function renderToday() {
   </div>`;
 }
 
+const TODAY_SEATING_REFRESH_MS = 60_000;
+
 function todaySeatingTargets(info) {
-  if (info.kind === "exam" && info.today?.length) return info.today.slice(0, 4);
-  const upcoming = info.kind === "exam" ? info.period?.next : info.kind === "exam-soon" ? info.primary : null;
-  return upcoming ? [upcoming] : [];
+  return seatingTargetsForInfo(info, nextExam());
 }
 
 function todaySeatingKey(info) {
@@ -1466,7 +1478,17 @@ function todaySeatingEntries(info) {
   const loaded = state.todaySeating.key === key ? state.todaySeating : null;
   if (loaded?.status === "ready") return loaded.entries;
   const status = loaded?.status || "loading";
-  return targets.map((exam) => ({ status, exam }));
+  return targets.map((exam) => {
+    const cachedEntry = status === "loading" ? seatingEntryForExam(loaded?.entries, exam) : null;
+    return cachedEntry || { status, exam };
+  });
+}
+
+function readyTodaySeatingEntry(exam) {
+  const info = nextClassInfo();
+  const key = todaySeatingKey(info);
+  if (state.todaySeating.key !== key || state.todaySeating.status !== "ready") return null;
+  return seatingEntryForExam(state.todaySeating.entries, exam);
 }
 
 function todayPlanForExam(plans, exam) {
@@ -1481,41 +1503,62 @@ async function loadTodaySeating() {
     await loadStudents({ quiet: true });
   }
   const key = todaySeatingKey(info);
-  if (state.todaySeating.key === key && ["loading", "ready", "unavailable", "profile-missing"].includes(state.todaySeating.status)) return;
+  const cached = state.todaySeating.key === key ? state.todaySeating : null;
+  const age = Date.now() - Number(cached?.checkedAt || 0);
+  if (cached?.status === "loading") return;
+  if (cached && age < TODAY_SEATING_REFRESH_MS && ["ready", "unavailable", "profile-missing"].includes(cached.status)) return;
   const crn = activeProfileCrn();
-  if (!crn) {
-    state.todaySeating = { key, status: "profile-missing", entries: [] };
-    if (state.route === "today") render();
-    return;
-  }
-  state.todaySeating = { key, status: "loading", entries: [] };
+  state.todaySeating = { key, status: "loading", entries: cached?.entries || [], checkedAt: cached?.checkedAt || 0 };
   try {
     const response = await fetch("/api/seatings", { cache: "no-store", headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("seating unavailable");
     const data = await response.json();
     const plans = Array.isArray(data?.plans) ? data.plans : [];
     const entries = [];
+    const lookups = new Map();
     for (const exam of targets) {
       const plan = todayPlanForExam(plans, exam);
       if (!plan) { entries.push({ status: "no-plan", exam }); continue; }
-      const lookup = await fetch("/api/seatings/lookup", {
-        method: "POST", cache: "no-store",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ planId: plan.id, crn })
-      });
-      if (!lookup.ok) throw new Error("seat lookup unavailable");
-      const result = await lookup.json();
+      if (!crn) { entries.push({ status: "profile-missing", exam, plan }); continue; }
+      const previous = seatingEntryForExam(cached?.entries, exam);
+      const samePublishedRevision = previous?.plan?.id === plan.id
+        && Number(previous.plan.revision || 0) === Number(plan.revision || 0)
+        && ["matched", "missing"].includes(previous.status);
+      if (samePublishedRevision) {
+        entries.push({ ...previous, exam, plan });
+        continue;
+      }
+      const lookupKey = `${plan.id}|${plan.revision || 0}|${crn}`;
+      let result = lookups.get(lookupKey);
+      if (!result) {
+        const lookup = await fetch("/api/seatings/lookup", {
+          method: "POST", cache: "no-store",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ planId: plan.id, crn })
+        });
+        if (!lookup.ok) throw new Error("seat lookup unavailable");
+        result = await lookup.json();
+        lookups.set(lookupKey, result);
+      }
       entries.push(result?.seat?.room && result.plan?.id === plan.id
         ? { status: "matched", exam, plan: result.plan, seat: result.seat }
         : { status: "missing", exam, plan });
     }
     if (todaySeatingKey(nextClassInfo()) !== key) return;
-    state.todaySeating = { key, status: "ready", entries };
+    state.todaySeating = { key, status: "ready", entries, checkedAt: Date.now() };
   } catch {
     if (todaySeatingKey(nextClassInfo()) !== key) return;
-    state.todaySeating = { key, status: "unavailable", entries: [] };
+    state.todaySeating = cached?.status === "ready"
+      ? { ...cached, checkedAt: Date.now() }
+      : { key, status: "unavailable", entries: [], checkedAt: Date.now() };
   }
   if (state.route === "today") render();
+}
+
+function examHeroSeatingMarkup(info) {
+  if (info.kind !== "exam" && info.kind !== "exam-soon") return "";
+  const entry = info.primary ? seatingEntryForExam(todaySeatingEntries(info), info.primary) : null;
+  return ["matched", "missing"].includes(entry?.status) ? examSeatInlineMarkup(entry, { hero: true }) : "";
 }
 
 function renderHero(info, clock, greeting) {
@@ -1524,6 +1567,7 @@ function renderHero(info, clock, greeting) {
       <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(heroDateLabel(info, clock))}</span></div>
       <h2 class="hero-title">${escapeHtml(selectionLabel())}</h2>
       <p class="hero-meta">${todaySummary(info)}</p>
+      ${examHeroSeatingMarkup(info)}
       <div class="hero-actions">${heroActions()}</div>
       <div class="hero-side">${dataChip()}</div>
     </section>`;
@@ -1533,6 +1577,7 @@ function renderHero(info, clock, greeting) {
       <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge">${escapeHtml(heroDateLabel(info, clock))}</span></div>
       <h2 class="hero-title">${escapeHtml(selectionLabel())}</h2>
       <p class="hero-meta">${todaySummary(info)}</p>
+      ${examHeroSeatingMarkup(info)}
       <div class="hero-actions">${heroActions()}</div>
       <div class="hero-side">${dataChip()}</div>
     </section>`;
@@ -1542,7 +1587,7 @@ function renderHero(info, clock, greeting) {
       <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span></div>
       <h2 class="hero-title">Loading your verified timetable…</h2>
       <p class="hero-meta">Compass is reading the official GNDEC release. It will never show a guessed class.</p>
-      <div class="hero-actions"><button class="btn" data-action="refresh-data">Check now</button><button class="btn btn-ghost" data-route="settings">Open settings</button></div>
+      <div class="hero-actions"><button type="button" class="btn" data-action="refresh-data">Check now</button><button type="button" class="btn btn-ghost" data-route="settings">Open settings</button></div>
       <div class="hero-side">${dataChip()}</div>
     </section>`;
   }
@@ -1572,7 +1617,7 @@ function renderHero(info, clock, greeting) {
     const start = primary.start != null ? humanTime(primary.start, v("timetable.clock")) : "";
     const end = primary.end != null ? humanTime(primary.end, v("timetable.clock")) : "";
     meta = `${shortExamDate(primary.date)}${start ? ` · ${start}${end ? `–${end}` : ""}` : ""} · ${primary.category || "Exam"} · no lecture that day`;
-    actions = `<a class="btn btn-primary" href="/calendar#exam-datesheet">Open date sheet</a><button class="btn" data-route="timetable">Timetable</button>`;
+    actions = `<a class="btn btn-primary" href="/calendar#exam-datesheet">Open date sheet</a><button type="button" class="btn" data-route="timetable">Timetable</button>`;
   } else if (info.kind === "exam") {
     const primary = info.primary;
     const isToday = Boolean(info.today?.length);
@@ -1584,7 +1629,7 @@ function renderHero(info, clock, greeting) {
       ? `${shortExamDate(primary.date)}${start ? ` · ${start}${end ? `–${end}` : ""}` : ""} · ${primary.category || "Exam"}${isToday ? "" : " · next paper"}`
       : "";
     meta = when;
-    actions = `<a class="btn btn-primary" href="/calendar#exam-datesheet">Open date sheet</a><button class="btn" data-route="timetable">Timetable</button>`;
+    actions = `<a class="btn btn-primary" href="/calendar#exam-datesheet">Open date sheet</a><button type="button" class="btn" data-route="timetable">Timetable</button>`;
   } else if (info.kind === "none") {
     eyebrow = "No more classes today";
     title = "Your schedule stays on today";
@@ -1595,13 +1640,14 @@ function renderHero(info, clock, greeting) {
     meta = "No class is published for your section in the loaded release.";
   }
   if (v("today.leaveNow") && info.kind === "next" && info.entry.start - info.clock.minutes <= 25) {
-    actions = `<button class="btn btn-primary" data-action="open-rooms">Find a room nearby</button>${actions}`;
+    actions = `<button type="button" class="btn btn-primary" data-action="open-rooms">Find a room nearby</button>${actions}`;
   }
   const heroClass = info.kind === "current" ? "hero-card has-active-class" : (info.kind === "exam" || info.kind === "exam-soon") ? "hero-card has-exam-day" : "hero-card";
   return `<section class="${heroClass}">
     <div class="hero-top"><span class="hero-eyebrow">${escapeHtml(greeting)}</span><span class="badge badge-accent">${escapeHtml(eyebrow)}</span><span class="badge">${escapeHtml(heroDateLabel(info, clock))}</span></div>
     <h2 class="hero-title">${escapeHtml(title)}</h2>
     <p class="hero-meta">${escapeHtml(meta)}</p>
+    ${examHeroSeatingMarkup(info)}
     <div class="hero-actions">${actions}</div>
     <div class="hero-side">${v("today.freshnessBadge") ? dataChip() : ""}<span>·</span><span>${escapeHtml(selectionLabel())}</span></div>
   </section>`;
@@ -1635,9 +1681,9 @@ function todaySummary(info) {
 }
 
 function heroActions() {
-  return `<button class="btn btn-primary" data-route="ask">Ask Compass</button>
-    <button class="btn" data-route="timetable">Timetable</button>
-    <button class="btn btn-ghost" data-route="rooms">Free rooms</button>`;
+  return `<button type="button" class="btn btn-primary" data-route="ask">Ask Compass</button>
+    <button type="button" class="btn" data-route="timetable">Timetable</button>
+    <button type="button" class="btn btn-ghost" data-route="rooms">Free rooms</button>`;
 }
 
 function renderTodayTimeline(classes, clock, { lookAhead = false } = {}) {
@@ -1655,7 +1701,7 @@ function renderTodayTimeline(classes, clock, { lookAhead = false } = {}) {
   slots.sort((a, b) => a.start - b.start);
   const visible = slots.filter((entry) => entry.end > clock.minutes).slice(0, 16);
   const list = visible.length ? visible : slots.slice(0, 16);
-  if (!list.length) return `<section class="card"><div class="card-head"><div><h2 class="card-title">Today</h2><p class="card-sub">No class published for ${escapeHtml(clock.day)}.</p></div></div>${emptyState("☕", "Nothing scheduled", "The official weekly timetable has no class for your section today.", `<button class="btn btn-sm" data-route="timetable">Open timetable</button>`)}</section>`;
+  if (!list.length) return `<section class="card"><div class="card-head"><div><h2 class="card-title">Today</h2><p class="card-sub">No class published for ${escapeHtml(clock.day)}.</p></div></div>${emptyState("☕", "Nothing scheduled", "The official weekly timetable has no class for your section today.", `<button type="button" class="btn btn-sm" data-route="timetable">Open timetable</button>`)}</section>`;
   for (const entry of list) {
     const isNow = entry.start <= clock.minutes && clock.minutes < entry.end;
     rows.push(`<div class="timeline-item${isNow ? " is-now" : ""}${entry.free ? " is-free" : ""}">
@@ -1668,18 +1714,18 @@ function renderTodayTimeline(classes, clock, { lookAhead = false } = {}) {
     </div>`);
   }
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">${lookAhead ? "Next study day" : "Today"} · ${escapeHtml(clock.day)}</h2><p class="card-sub">${classes.length} published class${classes.length === 1 ? "" : "es"} · ${escapeHtml(selectionLabel())}${lookAhead ? " · automatic look-ahead after 5:00 PM" : ""}</p></div><div class="card-actions"><button class="btn btn-sm" data-route="timetable">Full view</button></div></div>
+    <div class="card-head"><div><h2 class="card-title">${lookAhead ? "Next study day" : "Today"} · ${escapeHtml(clock.day)}</h2><p class="card-sub">${classes.length} published class${classes.length === 1 ? "" : "es"} · ${escapeHtml(selectionLabel())}${lookAhead ? " · automatic look-ahead after 5:00 PM" : ""}</p></div><div class="card-actions"><button type="button" class="btn btn-sm" data-route="timetable">Full view</button></div></div>
     <div class="timeline">${rows.join("")}</div>
   </section>`;
 }
 
 function renderFreeRoomsCard(result, clock) {
   if (result.error) {
-    return `<section class="card"><div class="card-head"><div><h2 class="card-title">Free rooms</h2><p class="card-sub">${escapeHtml(result.error)}</p></div></div>${emptyState("🚪", "Room data not ready", "Compass needs the official room timetable before it can show free rooms.", `<button class="btn btn-sm" data-route="rooms">Open rooms</button>`)}</section>`;
+    return `<section class="card"><div class="card-head"><div><h2 class="card-title">Free rooms</h2><p class="card-sub">${escapeHtml(result.error)}</p></div></div>${emptyState("🚪", "Room data not ready", "Compass needs the official room timetable before it can show free rooms.", `<button type="button" class="btn btn-sm" data-route="rooms">Open rooms</button>`)}</section>`;
   }
   const top = result.rooms.slice(0, 6);
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Free rooms right now</h2><p class="card-sub">${result.rooms.length} published room${result.rooms.length === 1 ? "" : "s"} free for the next hour</p></div><div class="card-actions"><button class="btn btn-sm" data-route="rooms">All rooms</button></div></div>
+    <div class="card-head"><div><h2 class="card-title">Free rooms right now</h2><p class="card-sub">${result.rooms.length} published room${result.rooms.length === 1 ? "" : "s"} free for the next hour</p></div><div class="card-actions"><button type="button" class="btn btn-sm" data-route="rooms">All rooms</button></div></div>
     ${top.length ? `<div class="room-grid">${top.map((item) => `<article class="room-card"><div class="room-name">${escapeHtml(item.room)}</div><div class="room-zone">${escapeHtml(item.zone)}</div><div class="room-free">${escapeHtml(formatFreeWindow(item, v("timetable.clock")))}</div></article>`).join("")}</div>` : emptyState("⌛", "All rooms are busy", `Every published room has a class at ${humanTime(clock.minutes)}.`)}
   </section>`;
 }
@@ -1688,6 +1734,8 @@ function renderExamCard(exam) {
   const groupLabel = examGroupForSection(state.group);
   const profileLabel = [state.profile.name, state.group, groupLabel].filter(Boolean).join(" · ");
   const official = exam.sourceUrl ? `<a class="chip" href="${escapeHtml(exam.sourceUrl)}" target="_blank" rel="noopener noreferrer">Official source ↗</a>` : "";
+  const seatEntry = readyTodaySeatingEntry(exam);
+  const seating = ["matched", "missing"].includes(seatEntry?.status) ? examSeatInlineMarkup(seatEntry, { hero: true }) : "";
   return `<section class="card">
     <div class="card-head"><div><h2 class="card-title">Next exam</h2><p class="card-sub">${escapeHtml(profileLabel || "Based on the selected timetable")} · ${escapeHtml(exam.category)}</p></div></div>
     <a class="exam-next-link" href="/calendar#exam-datesheet" aria-label="Open the full date sheet for ${escapeHtml(exam.title)}">
@@ -1696,6 +1744,7 @@ function renderExamCard(exam) {
       <span class="exam-next-meta">${escapeHtml(exam.tab || exam.sourceNote || exam.sourceLabel || "Published date sheet")}${exam.sessionRaw ? ` · ${escapeHtml(exam.sessionRaw)}` : exam.start != null ? ` · ${escapeHtml(examTimeLabel(exam, humanTime))}` : ""}</span>
       <span class="exam-next-open">View full datesheet <span aria-hidden="true">→</span></span>
     </a>
+    ${seating}
     ${official ? `<div class="chip-row exam-source-row">${official}</div>` : ""}
   </section>`;
 }
@@ -1726,7 +1775,7 @@ function renderNoticesCard() {
   const notices = allNotices().slice(0, 4);
   if (!notices.length) return "";
   return `<section class="card">
-    <div class="card-head"><div><h2 class="card-title">Latest notices</h2><p class="card-sub">Official updates · fresh notices stay pinned for two days</p></div><div class="card-actions"><button class="btn btn-sm" data-route="notices">All notices</button></div></div>
+    <div class="card-head"><div><h2 class="card-title">Latest notices</h2><p class="card-sub">Official updates · fresh notices stay pinned for two days</p></div><div class="card-actions"><button type="button" class="btn btn-sm" data-route="notices">All notices</button></div></div>
     <div class="today-notice-list">${notices.map((notice) => `<article class="today-notice${notice.pinned ? " is-pinned" : ""}"><div class="today-notice-top"><span class="badge">${escapeHtml(notice.category)}</span>${notice.pinned ? `<span class="badge badge-accent">New · pinned</span>` : ""}<time datetime="${escapeHtml(notice.date)}">${escapeHtml(dayMonth(notice.date))}</time></div><h3 class="today-notice-title">${notice.url ? `<a href="${escapeHtml(notice.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(notice.title)}</a>` : escapeHtml(notice.title)}</h3>${notice.body ? `<p class="today-notice-summary">${escapeHtml(notice.body)}</p>` : ""}${notice.privacyNote ? `<p class="notice-privacy-note">${escapeHtml(notice.privacyNote)}</p>` : ""}${notice.attachments?.length ? `<div class="chip-row">${notice.attachments.slice(0, 3).map((file) => `<a class="chip" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(file.label)} ↗</a>`).join("")}</div>` : ""}</article>`).join("")}</div>
   </section>`;
 }
@@ -1779,13 +1828,13 @@ function renderTimetable() {
         </select>
       </div>
     </div>
-    ${!state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see your week.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : `
+    ${!state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see your week.", `<button type="button" class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : `
     <div class="card" style="padding:14px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
         <div class="segmented" role="tablist" aria-label="Timetable view">
-          <button class="segment ${view === "day" ? "is-active" : ""}" data-action="tt-view" data-view="day" role="tab" aria-selected="${view === "day"}">Day</button>
-          <button class="segment ${view === "week" ? "is-active" : ""}" data-action="tt-view" data-view="week" role="tab" aria-selected="${view === "week"}">Week</button>
-          <button class="segment ${view === "agenda" ? "is-active" : ""}" data-action="tt-view" data-view="agenda" role="tab" aria-selected="${view === "agenda"}">Agenda</button>
+          <button type="button" class="segment ${view === "day" ? "is-active" : ""}" data-action="tt-view" data-view="day" role="tab" aria-selected="${view === "day"}">Day</button>
+          <button type="button" class="segment ${view === "week" ? "is-active" : ""}" data-action="tt-view" data-view="week" role="tab" aria-selected="${view === "week"}">Week</button>
+          <button type="button" class="segment ${view === "agenda" ? "is-active" : ""}" data-action="tt-view" data-view="agenda" role="tab" aria-selected="${view === "agenda"}">Agenda</button>
         </div>
         <span class="badge badge-accent">${escapeHtml(selectionLabel())}</span>
       </div>
@@ -1793,7 +1842,7 @@ function renderTimetable() {
         ${days.map((day) => {
           const classCount = classesForDay(day).length;
           const subtitle = `${classCount} class${classCount === 1 ? "" : "es"}`;
-          return `<button class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${escapeHtml(subtitle)}</small></button>`;
+          return `<button type="button" class="day-tab ${day === state.day ? "is-active" : ""} ${day === clock.day ? "is-today" : ""}" data-action="tt-day" data-day="${day}" role="tab" aria-selected="${day === state.day}">${escapeHtml(day.slice(0, 3))}<small>${escapeHtml(subtitle)}</small></button>`;
         }).join("")}
       </div>
       <div style="margin-top:14px">${dayContent}</div>
@@ -1803,7 +1852,7 @@ function renderTimetable() {
 
 function renderDayView(day, clock) {
   const classes = classesForDay(day).slice().sort((a, b) => a.start - b.start || a.end - b.end);
-  if (!classes.length) return emptyState("☕", `No class on ${day}`, "The official release has no class for this section on this day.", `<button class="btn btn-sm" data-route="rooms">Find a free room</button>`);
+  if (!classes.length) return emptyState("☕", `No class on ${day}`, "The official release has no class for this section on this day.", `<button type="button" class="btn btn-sm" data-route="rooms">Find a free room</button>`);
   const gaps = new Map(freeGapsBetweenClasses(classes).map((gap) => [gap.start, gap]));
   let blocks = classes.map((entry) => {
     const next = classes.find((candidate) => candidate.start > entry.start && candidate.start >= entry.end);
@@ -1883,15 +1932,15 @@ function renderRooms() {
         <div class="field"><label for="room-day">Day</label><select id="room-day" data-room-day>${DAY_NAMES.map((day) => `<option value="${day}" ${day === state.roomDay ? "selected" : ""}>${day}${day === clock.day && state.roomDayAuto ? " · Today" : ""}</option>`).join("")}</select></div>
         <div class="field"><label for="room-time">Start time</label><input id="room-time" type="time" value="${escapeHtml(state.roomTime || `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}`)}" data-room-time /></div>
         <div class="field room-duration-field"><label for="room-duration">Keep free for</label><select id="room-duration" data-room-duration>${[30, 60, 90, 120].map((value) => `<option value="${value}" ${String(duration) === String(value) ? "selected" : ""}>${formatDuration(value)}</option>`).join("")}</select><small class="room-duration-help">Only rooms free for this whole duration appear.</small></div>
-        <button class="btn btn-sm" data-action="room-now">Use current time</button>
+        <button type="button" class="btn btn-sm" data-action="room-now">Use current time</button>
       </div>
       <p class="room-live-note" role="status"><span class="sync-dot is-live" aria-hidden="true"></span>${state.roomTime ? `Checking ${escapeHtml(state.roomDay)} at ${escapeHtml(currentTimeLabel)} · custom time` : `Using current time · ${escapeHtml(currentTimeLabel)} · updates every 30 seconds while this page is open`}</p>
       <div class="chip-row" style="margin-top:12px">
-        ${zoneOptions.map((zone) => `<button class="chip ${state.roomZone === zone ? "is-active" : ""}" data-action="room-zone" data-zone="${escapeHtml(zone)}">${escapeHtml(zone || "All areas")}</button>`).join("")}
+        ${zoneOptions.map((zone) => `<button type="button" class="chip ${state.roomZone === zone ? "is-active" : ""}" data-action="room-zone" data-zone="${escapeHtml(zone)}">${escapeHtml(zone || "All areas")}</button>`).join("")}
       </div>
       <p class="card-sub" style="margin-top:12px">${result.error ? escapeHtml(result.error) : `${result.rooms.length} room${result.rooms.length === 1 ? "" : "s"} free on ${escapeHtml(state.roomDay)} at ${escapeHtml(currentTimeLabel)} for at least ${escapeHtml(formatDuration(duration))}.`}</p>
     </div>
-    ${result.error ? emptyState("🚪", "No verified availability", result.error, `<button class="btn btn-sm" data-action="refresh-data">Load room data</button>`) : groups.length ? `<div class="stack" style="margin-top:14px">${groups.map((group) => `<section class="card"><div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} free room${group.count === 1 ? "" : "s"}</p></div></div><div class="room-grid">${group.rooms.map((room) => {
+    ${result.error ? emptyState("🚪", "No verified availability", result.error, `<button type="button" class="btn btn-sm" data-action="refresh-data">Load room data</button>`) : groups.length ? `<div class="stack" style="margin-top:14px">${groups.map((group) => `<section class="card"><div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} free room${group.count === 1 ? "" : "s"}</p></div></div><div class="room-grid">${group.rooms.map((room) => {
       const item = result.rooms.find((entry) => entry.room === room);
       return `<article class="room-card"><div style="display:flex;align-items:flex-start"><div class="room-name">${escapeHtml(room)}</div></div><div class="room-zone">${escapeHtml(roomZone(room))}</div>${v("rooms.showFreeUntil") ? `<div class="room-free">${escapeHtml(formatFreeWindow(item, v("timetable.clock")))}</div>` : ""}${v("rooms.showNextClass") && item?.nextClass ? `<div class="room-next">Next: ${escapeHtml(item.nextClass.subject)} at ${escapeHtml(humanTime(item.nextClass.start, v("timetable.clock")))}</div>` : ""}</article>`;
     }).join("")}</div></section>`).join("")}</div>` : emptyState("✅", "No free room in this window", "Every published room in this area has a class. Try a shorter window or another area.")}
@@ -1981,12 +2030,12 @@ function renderTeachers() {
       <div class="field"><label for="teacher-search">Search a teacher</label><input id="teacher-search" type="search" value="${escapeHtml(state.teacherQuery)}" placeholder="Type a teacher name, e.g. Sharma…" data-teacher-search autocomplete="off" /></div>
       <p class="card-sub" style="margin-top:8px">${query ? `${matches.length} of ${all.length} teachers match “${escapeHtml(state.teacherQuery)}”.` : "Choose a teacher to open their full weekly timetable."}</p>
     </div>
-    ${selected ? `<div class="card" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div class="directory-card-head">${facultyAvatar(facultyRecordForTeacher(selected), selected)}<div><h2 class="card-title">${escapeHtml(selected)}</h2><p class="card-sub">${entries.length} published class${entries.length === 1 ? "" : "es"} across ${new Set(entries.map((entry) => entry.group)).size} section${new Set(entries.map((entry) => entry.group)).size === 1 ? "" : "s"}</p></div></div><button class="btn btn-sm btn-ghost" data-action="clear-teacher">Clear</button></div>${dayRows || emptyState("▦", "No classes published", "The official release has no class for this teacher.")}` : ""}
-    ${!selected && !state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see teacher timetables.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : ""}
+    ${selected ? `<div class="card" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div class="directory-card-head">${facultyAvatar(facultyRecordForTeacher(selected), selected)}<div><h2 class="card-title">${escapeHtml(selected)}</h2><p class="card-sub">${entries.length} published class${entries.length === 1 ? "" : "es"} across ${new Set(entries.map((entry) => entry.group)).size} section${new Set(entries.map((entry) => entry.group)).size === 1 ? "" : "s"}</p></div></div><button type="button" class="btn btn-sm btn-ghost" data-action="clear-teacher">Clear</button></div>${dayRows || emptyState("▦", "No classes published", "The official release has no class for this teacher.")}` : ""}
+    ${!selected && !state.schedule.length ? emptyState("▦", "Timetable not loaded", "Pull the verified official release to see teacher timetables.", `<button type="button" class="btn btn-primary" data-action="refresh-data">Load timetable</button>`) : ""}
     ${!selected && state.schedule.length ? (matches.length ? `<div class="directory-grid" style="margin-top:14px">${matches.slice(0, 120).map((name) => {
       const count = teacherEntries(name).length;
       const faculty = facultyRecordForTeacher(name);
-      return `<button class="card directory-card" data-teacher="${escapeHtml(name)}" style="text-align:left"><div class="directory-card-head">${facultyAvatar(faculty, name)}<div><h3 class="directory-name">${escapeHtml(name)}</h3><p class="directory-meta">${count} published class${count === 1 ? "" : "es"}</p></div></div></button>`;
+      return `<button type="button" class="card directory-card" data-teacher="${escapeHtml(name)}" style="text-align:left"><div class="directory-card-head">${facultyAvatar(faculty, name)}<div><h3 class="directory-name">${escapeHtml(name)}</h3><p class="directory-meta">${count} published class${count === 1 ? "" : "es"}</p></div></div></button>`;
     }).join("")}</div>${matches.length > 120 ? `<p class="card-sub" style="margin-top:10px">Showing the first 120 teachers. Narrow the search to see more.</p>` : ""}` : emptyState("🔎", "No matching teacher", `No published teacher name contains “${escapeHtml(state.teacherQuery)}”.`)) : ""}
   </div>`;
 }
@@ -2042,11 +2091,11 @@ function renderNotices() {
     <div class="filter-bar">
       <input type="search" value="${escapeHtml(state.noticeQuery)}" placeholder="Search notices, subjects, dates…" data-notice-search aria-label="Search notices" />
       <div class="chip-row" role="group" aria-label="Filter by category">
-        <button class="chip chip-button ${state.noticeCategory ? "" : "is-active"}" data-action="notice-category" data-category="">All ${stats.total}</button>
-        ${categories.map((name) => `<button class="chip chip-button ${state.noticeCategory === name ? "is-active" : ""}" data-action="notice-category" data-category="${escapeHtml(name)}">${escapeHtml(name)} ${stats.byCategory[name]}</button>`).join("")}
+        <button type="button" class="chip chip-button ${state.noticeCategory ? "" : "is-active"}" data-action="notice-category" data-category="">All ${stats.total}</button>
+        ${categories.map((name) => `<button type="button" class="chip chip-button ${state.noticeCategory === name ? "is-active" : ""}" data-action="notice-category" data-category="${escapeHtml(name)}">${escapeHtml(name)} ${stats.byCategory[name]}</button>`).join("")}
       </div>
     </div>
-    ${state.contentStatus === "error" && state.campusStatus === "error" ? emptyState("⚠", "Notice sources unavailable", "Neither the campus directory nor the content store answered. Nothing was guessed.", `<button class="btn btn-primary" data-action="retry-notices">Try again</button>`) : ""}
+    ${state.contentStatus === "error" && state.campusStatus === "error" ? emptyState("⚠", "Notice sources unavailable", "Neither the campus directory nor the content store answered. Nothing was guessed.", `<button type="button" class="btn btn-primary" data-action="retry-notices">Try again</button>`) : ""}
     ${filtered.length ? `<div class="notice-list">${filtered.slice(0, 120).map((notice) => noticeCard(notice)).join("")}</div>` : `<section class="card">${emptyState("📌", "No matching notice", state.noticeQuery || state.noticeCategory ? `Nothing matches this filter. Clear the search to see all ${stats.total} notices.` : "The verified notice feed is empty right now. The official college site still has every notice.", `<a class="btn" href="https://erp.gndec.ac.in/notice" target="_blank" rel="noopener noreferrer">Open the official notice board ↗</a>`)}</section>`}
     <p class="card-sub" style="margin-top:14px">Sources: GNDEC campus directory, ERP notice board, the published notice list and user-supplied transcriptions. Newest first. Nothing is generated.</p>
   </div>`;
@@ -2074,7 +2123,7 @@ function renderPapers() {
       </select>
     </div>
     ${loading ? `<section class="card"><p class="card-sub">Loading the official question-bank index…</p></section>` : ""}
-    ${state.papersStatus === "error" ? emptyState("⚠", "Question-bank index unavailable", "The published index could not be loaded. Nothing was invented.", `<button class="btn btn-primary" data-action="retry-papers">Try again</button>`) : ""}
+    ${state.papersStatus === "error" ? emptyState("⚠", "Question-bank index unavailable", "The published index could not be loaded. Nothing was invented.", `<button type="button" class="btn btn-primary" data-action="retry-papers">Try again</button>`) : ""}
     ${!loading && results.length ? grouped.map((group) => `<section class="card" style="margin-bottom:14px"><div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} document${group.count === 1 ? "" : "s"} · official GNDEC PDF</p></div></div><div class="paper-grid">${group.papers.map((paper) => `<a class="paper-card" href="${escapeHtml(paper.url)}" target="_blank" rel="noopener noreferrer"><strong>${escapeHtml(paper.subject)}</strong>${paper.code ? `<span class="paper-code">${escapeHtml(paper.code)}</span>` : ""}<small>Open official PDF ↗</small></a>`).join("")}</div></section>`).join("") : ""}
     ${!loading && !results.length && state.papersStatus !== "error" ? `<section class="card">${emptyState("📄", "No matching question bank", papers.length ? "Try a shorter subject name or clear the department filter." : "No department currently publishes a question bank that Compass can verify. Ask an admin to upload one from Settings → Admin.")}</section>` : ""}
     <p class="card-sub" style="margin-top:12px">Sources are recorded when the index is built. Only official <code>*.gndec.ac.in</code> PDFs are indexed automatically. ${state.papers.loadedAt ? `Index built ${escapeHtml(shortDate(state.papers.loadedAt))}.` : ""}</p>
@@ -2160,7 +2209,7 @@ function renderFirstYearSchemeCard() {
       <div class="page-actions"><span class="badge">${(scheme.courses || []).length} courses</span><a class="btn btn-sm" href="${escapeHtml(FIRST_YEAR_SCHEME_SOURCE)}" target="_blank" rel="noopener noreferrer">Official PDF ↗</a></div>
     </div>
     ${contextBits.length ? `<p class="scheme-context"><strong>Your selection:</strong> ${escapeHtml(contextBits.join(" · "))}${choice === "auto" && inferred.semesterSource === "academic-calendar" ? " · current term follows the published first-year academic calendar" : ""}${choice === "auto" && inferred.semesterSource === "academic-calendar-estimate" ? " · semester is a calendar estimate because no published first-year period covers this date" : ""}</p>` : `<p class="scheme-context">Set your section in Settings or Timetable to highlight your group and semester.</p>`}
-    <div class="scheme-semester-picker" role="group" aria-label="Choose which first-year semester to show">${choiceButtons.map(([value, label]) => `<button class="chip chip-button ${choice === value ? "is-active" : ""}" data-action="scheme-semester" data-semester="${value}" aria-pressed="${choice === value}">${label}</button>`).join("")}</div>
+    <div class="scheme-semester-picker" role="group" aria-label="Choose which first-year semester to show">${choiceButtons.map(([value, label]) => `<button type="button" class="chip chip-button ${choice === value ? "is-active" : ""}" data-action="scheme-semester" data-semester="${value}" aria-pressed="${choice === value}">${label}</button>`).join("")}</div>
     ${primary}
     ${extra ? `<details class="scheme-other-details"><summary>Show the other first-year semester and group</summary>${alternateGroup ? `<h3>Semester ${semester} · other group</h3><div class="scheme-groups">${alternateGroup}</div>` : ""}${otherSemester}</details>` : ""}
     <p class="answer-meta"><strong>Assessment limits in this PDF:</strong> it publishes the CA/internal total and ESE/external total. It does not define an MSE-1/MSE-2 split, assignment marks, or a universal internal sub-component breakdown, so Compass will not invent those. Course-specific exam rules appear under “Course rules”.</p>
@@ -2184,12 +2233,12 @@ function renderSyllabus() {
     <div class="filter-bar">
       <input type="search" value="${escapeHtml(state.syllabusQuery)}" placeholder="Search department, batch, semester…" data-syllabus-search aria-label="Search syllabus" />
       <div class="chip-row" role="group" aria-label="Filter by department">
-        <button class="chip chip-button ${active ? "" : "is-active"}" data-action="syllabus-department" data-department="">All</button>
-        ${departments.map((name) => `<button class="chip chip-button ${active === name ? "is-active" : ""}" data-action="syllabus-department" data-department="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join("")}
+        <button type="button" class="chip chip-button ${active ? "" : "is-active"}" data-action="syllabus-department" data-department="">All</button>
+        ${departments.map((name) => `<button type="button" class="chip chip-button ${active === name ? "is-active" : ""}" data-action="syllabus-department" data-department="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join("")}
       </div>
     </div>
     ${loading ? `<section class="card"><p class="card-sub">Loading the published syllabus index…</p></section>` : ""}
-    ${state.campusStatus === "error" && !docs.length ? emptyState("⚠", "Syllabus index unavailable", "The department syllabus index could not be loaded. Nothing was invented.", `<button class="btn btn-primary" data-action="retry-syllabus">Try again</button>`) : ""}
+    ${state.campusStatus === "error" && !docs.length ? emptyState("⚠", "Syllabus index unavailable", "The department syllabus index could not be loaded. Nothing was invented.", `<button type="button" class="btn btn-primary" data-action="retry-syllabus">Try again</button>`) : ""}
     ${visibleGroups.map((group) => `<section class="card syllabus-group" style="margin-bottom:14px">
       <div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} document${group.count === 1 ? "" : "s"}${group.semesters.length ? ` · semesters ${group.semesters.join(", ")}` : ""}</p></div></div>
       <ul class="doc-list">${group.docs.map((doc) => `<li><a href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc.label)}</a>${doc.semester ? `<span class="badge">Sem ${escapeHtml(doc.semester)}</span>` : ""}${doc.external ? `<span class="badge">External</span>` : ""}</li>`).join("")}</ul>
@@ -2485,7 +2534,7 @@ function renderAdminForm() {
   const item = editing.item || {};
   const isEdit = Boolean(item.id);
   return `<section class="card admin-form-card">
-    <div class="card-head"><div><h2 class="card-title">${isEdit ? "Edit" : "New"} ${escapeHtml(schema.title.replace(/s$/, "").toLowerCase())}</h2><p class="card-sub">${escapeHtml(schema.hint)}</p></div><button class="btn btn-sm btn-ghost" data-action="admin-cancel">Cancel</button></div>
+    <div class="card-head"><div><h2 class="card-title">${isEdit ? "Edit" : "New"} ${escapeHtml(schema.title.replace(/s$/, "").toLowerCase())}</h2><p class="card-sub">${escapeHtml(schema.hint)}</p></div><button type="button" class="btn btn-sm btn-ghost" data-action="admin-cancel">Cancel</button></div>
     <form id="admin-form" class="admin-form" novalidate>
       <div class="admin-form-grid">${schema.fields.map((field) => adminFieldHtml(field, item)).join("")}</div>
       <div class="admin-upload-row">
@@ -2512,8 +2561,8 @@ function renderAdminList() {
     <div class="card-head">
       <div><h2 class="card-title">${escapeHtml(schema.title)}</h2><p class="card-sub">${items.length} item${items.length === 1 ? "" : "s"} · ${items.filter((item) => item.published !== false).length} published</p></div>
       <div class="card-actions">
-        <button class="btn btn-sm" data-action="admin-restore" data-collection="${tab}">Undo last change</button>
-        <button class="btn btn-primary btn-sm" data-action="admin-new" data-collection="${tab}">New</button>
+        <button type="button" class="btn btn-sm" data-action="admin-restore" data-collection="${tab}">Undo last change</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="admin-new" data-collection="${tab}">New</button>
       </div>
     </div>
     ${items.length ? `<div class="admin-list">${items.slice().sort((a, b) => String(b.updatedAt || b.date || "").localeCompare(String(a.updatedAt || a.date || ""))).map((item) => `<div class="admin-item">
@@ -2525,9 +2574,9 @@ function renderAdminList() {
       ${item.pinned ? `<span class="badge badge-warn">Pinned</span>` : ""}
       <div class="admin-item-actions">
         ${item.url ? `<a class="btn btn-sm btn-ghost" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a>` : ""}
-        <button class="btn btn-sm" data-action="admin-toggle" data-collection="${tab}" data-id="${escapeHtml(item.id)}">${item.published === false ? "Publish" : "Unpublish"}</button>
-        <button class="btn btn-sm" data-action="admin-edit" data-collection="${tab}" data-id="${escapeHtml(item.id)}">Edit</button>
-        <button class="btn btn-sm btn-danger" data-action="admin-delete" data-collection="${tab}" data-id="${escapeHtml(item.id)}">Delete</button>
+        <button type="button" class="btn btn-sm" data-action="admin-toggle" data-collection="${tab}" data-id="${escapeHtml(item.id)}">${item.published === false ? "Publish" : "Unpublish"}</button>
+        <button type="button" class="btn btn-sm" data-action="admin-edit" data-collection="${tab}" data-id="${escapeHtml(item.id)}">Edit</button>
+        <button type="button" class="btn btn-sm btn-danger" data-action="admin-delete" data-collection="${tab}" data-id="${escapeHtml(item.id)}">Delete</button>
       </div>
     </div>`).join("")}</div>` : `<p class="card-sub">Nothing published in this collection yet. Use “New” to add the first verified entry.</p>`}
   </section>`;
@@ -2542,9 +2591,9 @@ function renderAdminEditors() {
       <div class="field"><label for="admin-editor-name">Editor name</label><input id="admin-editor-name" placeholder="Friend or classmate" autocomplete="off" /></div>
       <div class="field"><label for="admin-editor-token">Editor token (16+ characters)</label><input id="admin-editor-token" type="password" autocomplete="new-password" /></div>
     </div>
-    <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="admin-editor-add">Add editor</button><span class="card-sub">Share the token privately. It is never shown again.</span></div>` : ""}
+    <div class="chip-row" style="margin-top:12px"><button type="button" class="btn btn-primary btn-sm" data-action="admin-editor-add">Add editor</button><span class="card-sub">Share the token privately. It is never shown again.</span></div>` : ""}
     <div class="admin-list" style="margin-top:14px">
-      ${editors.length ? editors.map((editor) => `<div class="admin-item"><div class="admin-item-text"><strong>${escapeHtml(editor.name)}</strong><span>Added ${escapeHtml(shortDate(editor.createdAt))}${editor.active === false ? " · disabled" : ""}</span></div><div class="admin-item-actions">${owner ? `<button class="btn btn-sm btn-danger" data-action="admin-editor-remove" data-name="${escapeHtml(editor.name)}">Remove</button>` : ""}</div></div>`).join("") : `<p class="card-sub">No editor tokens yet. The owner token alone can publish.</p>`}
+      ${editors.length ? editors.map((editor) => `<div class="admin-item"><div class="admin-item-text"><strong>${escapeHtml(editor.name)}</strong><span>Added ${escapeHtml(shortDate(editor.createdAt))}${editor.active === false ? " · disabled" : ""}</span></div><div class="admin-item-actions">${owner ? `<button type="button" class="btn btn-sm btn-danger" data-action="admin-editor-remove" data-name="${escapeHtml(editor.name)}">Remove</button>` : ""}</div></div>`).join("") : `<p class="card-sub">No editor tokens yet. The owner token alone can publish.</p>`}
     </div>
   </section>`;
 }
@@ -2569,7 +2618,7 @@ function renderAdminSeatings() {
     </div>
     ${state.adminSeatingError ? `<p class="admin-error" role="status">${escapeHtml(state.adminSeatingError)}</p>` : ""}
     ${draft ? `<section class="admin-seating-draft" aria-labelledby="admin-seating-review-title">
-      <div class="card-head"><div><h3 id="admin-seating-review-title">${draft.processing ? "Reading PDF" : draft.autoPublishing ? "Publishing verified plan" : draft.published ? "Plan published" : "Review before publishing"}</h3><p class="card-sub">${escapeHtml(draft.fileName || "Selected PDF")}${draft.pages ? ` · ${draft.pages} pages` : ""}${draft.rooms ? ` · ${draft.rooms} rooms` : ""}${draft.seats?.length ? ` · ${draft.seats.length.toLocaleString("en-IN")} assignments` : ""}</p></div><button class="btn btn-sm btn-ghost" data-action="admin-seating-clear">Clear</button></div>
+      <div class="card-head"><div><h3 id="admin-seating-review-title">${draft.processing ? "Reading PDF" : draft.autoPublishing ? "Publishing verified plan" : draft.published ? "Plan published" : "Review before publishing"}</h3><p class="card-sub">${escapeHtml(draft.fileName || "Selected PDF")}${draft.pages ? ` · ${draft.pages} pages` : ""}${draft.rooms ? ` · ${draft.rooms} rooms` : ""}${draft.seats?.length ? ` · ${draft.seats.length.toLocaleString("en-IN")} assignments` : ""}</p></div><button type="button" class="btn btn-sm btn-ghost" data-action="admin-seating-clear">Clear</button></div>
       <p id="admin-seating-progress" class="card-sub" role="status" aria-live="polite">${escapeHtml(draft.status || "")}</p>
       ${draft.error ? `<p class="admin-error" role="alert">${escapeHtml(draft.error)}</p>` : ""}
       ${draft.warnings?.length ? `<ul class="admin-seating-warnings">${draft.warnings.slice(0, 12).map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : ""}
@@ -2582,10 +2631,10 @@ function renderAdminSeatings() {
       </div>
       ${draft.metadataHint ? `<p class="admin-seating-source">${escapeHtml(draft.metadataHint)} <a href="/notices" target="_blank" rel="noopener noreferrer">Review notices</a>.</p>` : `<p class="admin-seating-source">The date and time could not be matched uniquely from the selected profile’s datesheet. Enter them from the issued date sheet before publishing.</p>`}
       <details class="admin-seating-preview"><summary>Review all ${draft.seats.length.toLocaleString("en-IN")} assignments</summary><div class="admin-seating-table-wrap"><table class="admin-seating-table"><thead><tr><th scope="col">CRN</th><th scope="col">Room</th><th scope="col">Room row &amp; seat</th></tr></thead><tbody>${draft.seats.map((seat) => `<tr><td>${escapeHtml(seat.crn)}</td><td>${escapeHtml(seat.room)}</td><td>${escapeHtml(seat.rowLabel ? `${seat.rowLabel}${seat.row != null ? ` · Seat ${seat.row}` : ""}` : String(seat.row ?? ""))}</td></tr>`).join("")}</tbody></table></div></details>
-      <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary" data-action="admin-seating-publish" ${!validDraft || state.adminSeatingBusy || draft.autoPublishing ? "disabled" : ""}>${state.adminSeatingBusy || draft.autoPublishing ? "Publishing…" : "Publish reviewed assignments"}</button><span class="card-sub">The PDF stays on this device; only parsed assignments and exam details are sent to the private store.</span></div>` : ""}
+      <div class="chip-row" style="margin-top:12px"><button type="button" class="btn btn-primary" data-action="admin-seating-publish" ${!validDraft || state.adminSeatingBusy || draft.autoPublishing ? "disabled" : ""}>${state.adminSeatingBusy || draft.autoPublishing ? "Publishing…" : "Publish reviewed assignments"}</button><span class="card-sub">The PDF stays on this device; only parsed assignments and exam details are sent to the private store.</span></div>` : ""}
     </section>` : ""}
     <div class="admin-seating-plans"><h3>Published plans</h3>
-      ${plans.length ? plans.map((plan) => `<article class="admin-item"><div class="admin-item-text"><strong>${escapeHtml(plan.title)}</strong><span>${escapeHtml(plan.date)} · ${escapeHtml(plan.rows)} assignments · ${escapeHtml(plan.sourceName || "source not named")}</span></div><span class="badge ${plan.published ? "badge-accent" : ""}">${plan.published ? "Live" : "Hidden"}</span><div class="admin-item-actions"><button class="btn btn-sm btn-danger" data-action="admin-seating-delete" data-id="${escapeHtml(plan.id)}">Remove</button></div></article>`).join("") : `<p class="card-sub">No sitting plans have been published.</p>`}
+      ${plans.length ? plans.map((plan) => `<article class="admin-item"><div class="admin-item-text"><strong>${escapeHtml(plan.title)}</strong><span>${escapeHtml(plan.date)} · ${escapeHtml(plan.rows)} assignments · ${escapeHtml(plan.sourceName || "source not named")}</span></div><span class="badge ${plan.published ? "badge-accent" : ""}">${plan.published ? "Live" : "Hidden"}</span><div class="admin-item-actions"><button type="button" class="btn btn-sm btn-danger" data-action="admin-seating-delete" data-id="${escapeHtml(plan.id)}">Remove</button></div></article>`).join("") : `<p class="card-sub">No sitting plans have been published.</p>`}
     </div>
   </section>`;
 }
@@ -2609,8 +2658,8 @@ function renderAdmin() {
 
   if (state.adminStatus === "error") {
     return `<div class="page page-admin">
-      <div class="page-head"><div class="page-head-text"><h2 class="page-title">Admin</h2><p class="page-sub">The admin API did not accept this session.</p></div><div class="page-actions"><button class="btn btn-sm" data-action="admin-sign-out">Sign out</button></div></div>
-      <section class="card">${emptyState("🔐", "Admin session expired", state.adminError || "Sign in again with a valid token. Nothing was changed.", `<button class="btn btn-primary" data-action="admin-sign-out">Sign in again</button>`)}</section>
+      <div class="page-head"><div class="page-head-text"><h2 class="page-title">Admin</h2><p class="page-sub">The admin API did not accept this session.</p></div><div class="page-actions"><button type="button" class="btn btn-sm" data-action="admin-sign-out">Sign out</button></div></div>
+      <section class="card">${emptyState("🔐", "Admin session expired", state.adminError || "Sign in again with a valid token. Nothing was changed.", `<button type="button" class="btn btn-primary" data-action="admin-sign-out">Sign in again</button>`)}</section>
     </div>`;
   }
 
@@ -2627,13 +2676,13 @@ function renderAdmin() {
       <div class="page-actions">
         <span class="badge">Revision ${escapeHtml(String(meta?.revision || 0))}</span>
         <span class="badge ${state.adminData?.configured ? "badge-accent" : "badge-warn"}">${state.adminData?.configured ? "Store connected" : "Store not configured"}</span>
-        <button class="btn btn-sm" data-action="admin-refresh">Refresh</button>
-        <button class="btn btn-sm" data-action="admin-sign-out">Sign out</button>
+        <button type="button" class="btn btn-sm" data-action="admin-refresh">Refresh</button>
+        <button type="button" class="btn btn-sm" data-action="admin-sign-out">Sign out</button>
       </div>
     </div>
     <div class="filter-bar">
       <div class="chip-row" role="tablist" aria-label="Admin sections">
-        ${tabs.map((tab) => `<button class="chip chip-button ${active.id === tab.id ? "is-active" : ""}" data-action="admin-tab" data-tab="${tab.id}" role="tab" aria-selected="${active.id === tab.id}">${escapeHtml(tab.title)}${ADMIN_SCHEMAS[tab.id] ? ` ${adminItems(tab.id).length}` : ""}</button>`).join("")}
+        ${tabs.map((tab) => `<button type="button" class="chip chip-button ${active.id === tab.id ? "is-active" : ""}" data-action="admin-tab" data-tab="${tab.id}" role="tab" aria-selected="${active.id === tab.id}">${escapeHtml(tab.title)}${ADMIN_SCHEMAS[tab.id] ? ` ${adminItems(tab.id).length}` : ""}</button>`).join("")}
       </div>
     </div>
     ${renderAdminForm()}
@@ -2754,8 +2803,7 @@ async function adminPublishSeatingPlan() {
     toast("Enter a title, subject, date, and valid start/end time.", "error");
     return;
   }
-  const slug = `${date}-${subject}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
-  const targetId = draft.planId && draft.date === date && draft.subject === subject ? draft.planId : `seat-${slug}`;
+  const targetId = seatingPlanTargetId(state.adminSeatingPlans, { subject, date, start, end });
   const existingPlan = state.adminSeatingPlans.find((plan) => plan.id === targetId);
   state.adminSeatingBusy = true;
   render();
@@ -2768,6 +2816,7 @@ async function adminPublishSeatingPlan() {
       }
     });
     state.adminSeatingDraft = null;
+    state.todaySeating = { ...state.todaySeating, checkedAt: 0 };
     toast("Sitting plan published. Ask Compass can now look up a verified profile.", "success");
     await adminLoad({ silent: true });
   } catch (error) {
@@ -2959,7 +3008,7 @@ function studentRow(record) {
     <td>${escapeHtml(record.section || "")}${record.subsection ? ` · ${escapeHtml(record.subsection)}` : ""}</td>
     <td>${escapeHtml(record.branch || "")}</td>
     <td>${escapeHtml(record.mentor || "—")}${record.mentorVenue || record.venue ? `<br /><small>${escapeHtml(record.mentorVenue || record.venue)}</small>` : ""}</td>
-    <td><button class="btn btn-sm" data-action="use-student" data-student="${escapeHtml(key)}">Use</button></td>
+    <td><button type="button" class="btn btn-sm" data-action="use-student" data-student="${escapeHtml(key)}">Use</button></td>
   </tr>`;
 }
 
@@ -2995,7 +3044,7 @@ function renderDirectory() {
       <div class="page-actions"><span class="badge">${escapeHtml(total ? `${total} published records` : "On-device search")}</span></div>
     </div>
     <div class="tabs" role="tablist" aria-label="Directory section">
-      ${tabs.map(([id, label, count]) => `<button class="tab ${tab === id ? "is-active" : ""}" role="tab" aria-selected="${tab === id}" data-directory-tab="${id}">${escapeHtml(label)}${count ? ` <small>${count}</small>` : ""}</button>`).join("")}
+      ${tabs.map(([id, label, count]) => `<button type="button" class="tab ${tab === id ? "is-active" : ""}" role="tab" aria-selected="${tab === id}" data-directory-tab="${id}">${escapeHtml(label)}${count ? ` <small>${count}</small>` : ""}</button>`).join("")}
     </div>
     <div class="card" style="margin-top:12px">
       <div class="field"><label for="directory-search" class="visually-hidden">Search ${escapeHtml(tab)}</label>
@@ -3004,7 +3053,7 @@ function renderDirectory() {
       <p class="card-sub" style="margin-top:8px">${tab === "faculty" ? "Names and public contact details come from the official GNDEC faculty directory." : tab === "students" ? "Student records stay in this browser. Compass never uploads a name, CRN or registration number." : tab === "mentoring" ? "Every mentoring group and mentor published in the student roster, grouped with its section and venue." : "Text is extracted from the official first-year syllabus PDF. Always confirm the authoritative PDF before relying on a page."}</p>
     </div>
     ${loading ? `<section class="card" style="margin-top:14px"><p class="card-sub">Loading the verified ${escapeHtml(tab)} data…</p></section>` : ""}
-    ${failed ? emptyState("⚠", "Directory unavailable", "The official record could not be loaded. Nothing was guessed or stored.", `<button class="btn btn-primary" data-action="retry-directory">Try again</button>`) : ""}
+    ${failed ? emptyState("⚠", "Directory unavailable", "The official record could not be loaded. Nothing was guessed or stored.", `<button type="button" class="btn btn-primary" data-action="retry-directory">Try again</button>`) : ""}
     ${!loading && !failed && tab === "faculty" ? `<p class="card-sub" style="margin:14px 0 8px">${records.length} of ${total} faculty${query ? ` matching “${escapeHtml(state.directoryQuery)}”` : ""}. Select a photo or name to view the full public profile.</p><div class="directory-grid">${records.slice(0, 60).map(facultyCard).join("")}</div>${records.length > 60 ? `<p class="card-sub" style="margin-top:10px">Showing the first 60. Narrow the search to see more.</p>` : ""}${facultyProfileDialog(facultyRecord)}` : ""}
     ${!loading && !failed && tab === "students" ? (query.length < 2 ? emptyState("🔎", "Search a student", "Enter at least 2 letters of a name, CRN or registration number. Results are computed on this device and never sent anywhere.") : records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} match${records.length === 1 ? "" : "es"}</h2><p class="card-sub">Showing at most 50 records from the published roster. Mentor details are published by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Student</th><th>Section</th><th>Branch</th><th>Mentor</th><th>Profile</th></tr></thead><tbody>${records.slice(0, 50).map(studentRow).join("")}</tbody></table></div></section>` : emptyState("🗂", "No matching student", `Nothing in the published roster matches “${state.directoryQuery}”. Check the CRN or spelling.`)) : ""}
     ${!loading && !failed && tab === "mentoring" ? (records.length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">${records.length} mentoring group${records.length === 1 ? "" : "s"}</h2><p class="card-sub">Grouped from ${state.students.length} published roster records. Venue and phone are printed by the college.</p></div></div><div class="table-wrap"><table class="week-table directory-table"><thead><tr><th>Mentoring group</th><th>Section</th><th>Mentor</th><th>Contact</th><th>Students</th></tr></thead><tbody>${records.map(mentoringRow).join("")}</tbody></table></div></section>` : emptyState("🧑‍🏫", "No matching mentoring group", `Nothing in the published roster matches “${state.directoryQuery}”.`)) : ""}
@@ -3067,7 +3116,7 @@ function compareColumn(group, entries, label) {
 
 function renderCompare() {
   const groups = state.groups;
-  if (!groups.length) return `<div class="page page-compare"><div class="page-head"><div class="page-head-text"><h2 class="page-title">Compare sections</h2><p class="page-sub">Load the verified timetable to compare any two sections.</p></div></div>${emptyState("⚖", "Timetable not loaded", "Compare needs the official section timetable. It is loaded from the verified release.", `<button class="btn btn-primary" data-action="refresh-data">Load timetable</button>`)}</div>`;
+  if (!groups.length) return `<div class="page page-compare"><div class="page-head"><div class="page-head-text"><h2 class="page-title">Compare sections</h2><p class="page-sub">Load the verified timetable to compare any two sections.</p></div></div>${emptyState("⚖", "Timetable not loaded", "Compare needs the official section timetable. It is loaded from the verified release.", `<button type="button" class="btn btn-primary" data-action="refresh-data">Load timetable</button>`)}</div>`;
   if (!groups.includes(state.compareA)) state.compareA = state.group && groups.includes(state.group) ? state.group : groups[0];
   if (!groups.includes(state.compareB)) state.compareB = groups.find((group) => group !== state.compareA) || state.compareA;
   const day = compareDay();
@@ -3086,7 +3135,7 @@ function renderCompare() {
         <div class="field"><label for="compare-a">Section A</label><select id="compare-a" data-compare-a>${groups.map((group) => `<option value="${escapeHtml(group)}" ${group === state.compareA ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></div>
         <div class="field"><label for="compare-b">Section B</label><select id="compare-b" data-compare-b>${groups.map((group) => `<option value="${escapeHtml(group)}" ${group === state.compareB ? "selected" : ""}>${escapeHtml(group)}</option>`).join("")}</select></div>
         <div class="field"><label for="compare-day">Day</label><select id="compare-day" data-compare-day>${(v("timetable.showWeekends") ? [...STUDY_DAYS, "Saturday", "Sunday"] : STUDY_DAYS).map((name) => `<option value="${name}" ${name === day ? "selected" : ""}>${name}</option>`).join("")}</select></div>
-        <button class="btn btn-sm" data-action="swap-compare">Swap</button>
+        <button type="button" class="btn btn-sm" data-action="swap-compare">Swap</button>
       </div>
     </div>
     ${sameSubject ? `<p class="card-sub" style="margin-top:10px">Both selectors show ${escapeHtml(state.compareA)}. Pick a different section to see shared free time.</p>` : ""}
@@ -3116,8 +3165,8 @@ function renderAsk() {
         <span class="brand-mark" style="width:36px;height:36px;border-radius:11px" aria-hidden="true"><svg viewBox="0 0 48 48" width="22" height="22"><path d="M24 4 31 24 24 44 17 24Z" fill="currentColor"/><circle cx="24" cy="24" r="4.5" fill="var(--bg)"/></svg></span>
         <div class="chat-head-title"><strong>Ask Compass</strong>${adminMode ? `<small>${escapeHtml(engineBadge())}</small>` : ""}</div>
         <div class="chat-head-actions">
-          ${adminMode ? `<button class="btn btn-sm" data-action="toggle-engine" title="Switch engine">${v("ask.engine") === "auto" ? "Auto" : "Local"}</button>` : ""}
-          <button class="btn btn-sm" data-action="clear-chat">Clear</button>
+          ${adminMode ? `<button type="button" class="btn btn-sm" data-action="toggle-engine" title="Switch engine">${v("ask.engine") === "auto" ? "Auto" : "Local"}</button>` : ""}
+          <button type="button" class="btn btn-sm" data-action="clear-chat">Clear</button>
         </div>
       </div>
       <div class="chat-window" id="chat-window" aria-live="polite" aria-label="Conversation"></div>
@@ -3130,13 +3179,13 @@ function renderAsk() {
           "CGPA 8.5 to percentage": "cgpa 8.5 to percentage",
           "How many classes can I miss?": "how many classes can I miss"
         };
-        return `<button class="chip" data-ask-question="${escapeHtml(queryMap[q] || q)}">${escapeHtml(q)}</button>`;
+        return `<button type="button" class="chip" data-ask-question="${escapeHtml(queryMap[q] || q)}">${escapeHtml(q)}</button>`;
       }).join("")}</div>`}
       <div class="composer">
         <div class="composer-row">
           <textarea class="composer-input" id="question-input" rows="1" placeholder="Ask about your next class, a room, a teacher, free rooms or exams…" aria-label="Question"></textarea>
-          ${v("ask.voice") ? `<button class="mic-button" id="mic-button" data-action="voice" aria-label="Dictate a question"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>` : ""}
-          <button class="send-button" id="send-button" data-action="send" aria-label="Send question"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 12 20 4l-4 16-4-6-8-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+          ${v("ask.voice") ? `<button type="button" class="mic-button" id="mic-button" data-action="voice" aria-label="Dictate a question"><svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>` : ""}
+          <button type="button" class="send-button" id="send-button" data-action="send" aria-label="Send question"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 12 20 4l-4 16-4-6-8-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="composer-hint"><span>Enter to send · Shift+Enter for a new line</span><span>Use a follow-up like “unit 2” or “what about tomorrow?”</span></div>
       </div>
@@ -3150,6 +3199,42 @@ function engineBadge() {
   if (state.brainState === "ready") return "Brain 2.2 + 1.2 + local fallback";
   if (state.brainState === "loading") return "Loading verified Brain…";
   return "Deterministic Brain + local fallback";
+}
+
+function scrollChatToBottom(windowEl) {
+  if (!windowEl) return;
+  const activeRun = CHAT_SCROLL_RUNS.get(windowEl);
+  const run = { previousBehavior: activeRun?.previousBehavior ?? windowEl.style.scrollBehavior };
+  CHAT_SCROLL_RUNS.set(windowEl, run);
+  windowEl.style.scrollBehavior = "auto";
+  const placeAtBottom = () => {
+    windowEl.scrollTop = Math.max(0, windowEl.scrollHeight - windowEl.clientHeight);
+  };
+  const finish = () => {
+    if (CHAT_SCROLL_RUNS.get(windowEl) !== run) return;
+    windowEl.style.scrollBehavior = run.previousBehavior;
+    CHAT_SCROLL_RUNS.delete(windowEl);
+  };
+  placeAtBottom();
+  if (typeof requestAnimationFrame !== "function") {
+    finish();
+    return;
+  }
+  let previousHeight = -1;
+  let stableFrames = 0;
+  let frames = 0;
+  const settle = () => {
+    if (CHAT_SCROLL_RUNS.get(windowEl) !== run) return;
+    if (windowEl.isConnected === false) { finish(); return; }
+    const height = windowEl.scrollHeight;
+    placeAtBottom();
+    stableFrames = height === previousHeight ? stableFrames + 1 : 0;
+    previousHeight = height;
+    frames += 1;
+    if (frames >= 10 || (frames >= 3 && stableFrames >= 2)) { finish(); return; }
+    requestAnimationFrame(settle);
+  };
+  requestAnimationFrame(settle);
 }
 
 function renderChatMessages({ forceScroll = false } = {}) {
@@ -3171,7 +3256,7 @@ function renderChatMessages({ forceScroll = false } = {}) {
   windowEl.innerHTML = state.chat.map((message, index) => chatMessageHtml(message, index)).join("");
   const sendButton = $("#send-button");
   if (sendButton) sendButton.disabled = state.busy;
-  if (forceScroll || v("ask.autoScroll")) windowEl.scrollTop = windowEl.scrollHeight;
+  if (forceScroll || v("ask.autoScroll")) scrollChatToBottom(windowEl);
 }
 
 function welcomeMessage() {
@@ -3207,13 +3292,13 @@ function chatMessageHtml(message, index) {
     ? `<details class="answer-meta"><summary>Why this answer</summary><ol>${meta.plan.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></details>` : "";
   const suggestions = message.meta?.suggestions || [];
   const suggestionHtml = (message.role === "assistant" && suggestions.length && !["WELCOME","GREETING","BYE","CAPABILITIES"].includes(message.meta?.intent))
-    ? `<div class="answer-suggestions">${suggestions.slice(0,3).map((s) => `<button class="answer-suggestion-chip" data-ask-question="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("")}</div>`
+    ? `<div class="answer-suggestions">${suggestions.slice(0,3).map((s) => `<button type="button" class="answer-suggestion-chip" data-ask-question="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("")}</div>`
     : "";
   return `<article class="msg ${message.role}" data-message-index="${index}">
     <div class="msg-bubble">${sanitizeHtml(message.html)}${suggestionHtml}</div>
     <div class="msg-meta">${badges.join("")}<time>${escapeHtml(messageTime(message.createdAt))}</time></div>
     ${why}
-    <div class="msg-actions">${message.role === "assistant" ? `<button class="msg-action" data-action="copy-message" data-index="${index}">Copy</button>` : ""}<button class="msg-action" data-action="ask-again" data-index="${index}">Ask again</button></div>
+    <div class="msg-actions">${message.role === "assistant" ? `<button type="button" class="msg-action" data-action="copy-message" data-index="${index}">Copy</button>` : ""}<button type="button" class="msg-action" data-action="ask-again" data-index="${index}">Ask again</button></div>
   </article>`;
 }
 
@@ -3311,16 +3396,48 @@ async function answerSeatingQuestion(question) {
   }
 }
 
+function answerFirstYearQuestion(question, { semester, group, section, previousCourse, now: clockNow }) {
+  const options = { semester, group, section, now: clockNow, previousCourse };
+  const mismatch = answerFirstYearSemesterMismatch(question, state.firstYearScheme);
+  const syllabus = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, previousCourse, { semester });
+  const scheme = answerFirstYearScheme(question, state.firstYearScheme, options);
+  const asksForSchemeFacts = /\b(?:credits?|marks?|assessment|internal|external|weightage|distribution|ca|ese|mse|mst|ltp)\b/i.test(question);
+  if (mismatch) return mismatch;
+  if (syllabus && !asksForSchemeFacts) return syllabus;
+  if (scheme && syllabus && scheme.entities?.syllabusCourseCode === syllabus.entities?.syllabusCourseCode) {
+    return { ...scheme, html: `${scheme.html}${syllabus.html}` };
+  }
+  if (scheme || syllabus) return scheme || syllabus;
+  return answerFirstYearCourseOptions(question, state.firstYearSyllabusCourses, { semester })
+    || answerBareSemesterOptions(question);
+}
+
 async function sendQuestion(rawQuestion) {
-  const question = String(rawQuestion || "").trim().slice(0, 800);
+  const question = String(rawQuestion || "").trim();
   if (!question || state.busy) return;
+  const questionTooLong = question.length > 800;
+  const visibleQuestion = questionTooLong ? `${question.slice(0, 797)}…` : question;
   state.busy = true;
-  state.chat.push({ role: "user", html: `<p>${escapeHtml(question)}</p>`, createdAt: new Date().toISOString() });
+  state.chat.push({ role: "user", html: `<p>${escapeHtml(visibleQuestion)}</p>`, createdAt: new Date().toISOString() });
   saveChat();
   const thinking = { role: "assistant", html: `<div class="thinking"><span class="dots"><span></span><span></span><span></span></span> Checking verified data…</div>`, createdAt: new Date().toISOString(), meta: { intent: "THINKING", engine: "local" } };
   state.chat.push(thinking);
   renderChatMessages({ forceScroll: true });
   const thinkingIndex = state.chat.length - 1;
+
+  if (questionTooLong) {
+    state.chat[thinkingIndex] = {
+      role: "assistant",
+      html: `<p><strong>That prompt is over 800 characters.</strong></p><p>I did not truncate it or answer only part of it. Please shorten it or split it into smaller questions.</p>`,
+      createdAt: new Date().toISOString(),
+      meta: { intent: "TOO_LONG", confidence: 1, plan: ["check prompt length", "avoid silently dropping text", "ask for a shorter prompt"], suggestions: [] }
+    };
+    state.busy = false;
+    saveChat();
+    renderChatMessages({ forceScroll: true });
+    updateChatHead();
+    return;
+  }
 
   try {
     if (question.toUpperCase() === "KKJ") {
@@ -3335,16 +3452,18 @@ async function sendQuestion(rawQuestion) {
     }
     if (!state.schedule.length) await waitForVerifiedSchedule();
     const seatingQuestion = isSeatingQuestion(question, state.seatingNameIndex, state.profile?.name || "");
-    const wantsFirstYearFacts = !seatingQuestion && /\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline|scheme|credits?|marks?|marking|assessment|internal|external|continuous assessment|\bca\b|\bese\b|\bmse\b|mst|weightage|distribution|prerequisites?|workshop|physics|chemistry|maths?|mathematics|pps|python|edg|bee|beee|english|economics|mentoring)\b/i.test(question);
+    const personQuestion = seatingQuestion ? null : parsePersonQuestion(question);
+    const wantsHodDirectory = /\b(?:hod|head\s+of\s+(?:the\s+)?department)\b/i.test(question);
+    if (wantsHodDirectory && state.campusStatus !== "ready") await loadCampus();
+    if (personQuestion?.role === "student" && !state.students.length) await loadStudents({ quiet: true });
+    if (personQuestion?.role === "faculty" && state.facultyStatus === "idle") await loadFaculty();
+    const wantsFirstYearFacts = /\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline|scheme|subject|subjects|credits?|marks?|marking|assessment|internal|external|continuous assessment|\bca\b|\bese\b|\bmse\b|mst|weightage|distribution|prerequisites?|workshop|physics|chemistry|maths?|mathematics|pps|python|edg|bee|beee|english|economics|mentoring)\b|\bmath(?:ematics)?s?\s*[- ]?(?:11|12|21|ii|i|1|2)\b|\bpps\s*(?:sem(?:ester)?\s*)?(?:ii|2)\b/i.test(question);
     if (wantsFirstYearFacts) await Promise.all([loadFirstYearSyllabusKnowledge(), loadFirstYearSchemeKnowledge()]);
     const ctx = currentAnswerContext();
     let answer = null;
     let engine = "local";
     const previousMemory = [...state.chat.slice(0, thinkingIndex)].reverse()
       .find((message) => message.role === "assistant" && message.meta?.memory)?.meta.memory || null;
-
-    if (seatingQuestion) answer = await answerSeatingQuestion(question);
-
     const previousSyllabusCode = [...state.chat.slice(0, thinkingIndex)].reverse()
       .find((message) => message.role === "assistant" && message.meta?.entities?.syllabusCourseCode)?.meta.entities.syllabusCourseCode || "";
     const firstYear = inferFirstYearContext({
@@ -3355,25 +3474,64 @@ async function sendQuestion(rawQuestion) {
     const selectedSemester = ["1", "2"].includes(state.schemeSemesterChoice)
       ? state.schemeSemesterChoice
       : state.schemeSemesterChoice === "all" ? "" : firstYear.semester;
-    const schemeAnswer = answerFirstYearScheme(question, state.firstYearScheme, {
+    const firstYearOptions = {
       semester: selectedSemester,
       group: firstYear.group,
       section: state.profile.section || state.group,
-      now: now(),
-      previousCourse: previousSyllabusCode
-    });
-    const syllabusAnswer = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, previousSyllabusCode, { semester: selectedSemester });
-    const asksForSchemeFacts = /\b(?:credits?|marks?|assessment|internal|external|weightage|distribution|ca|ese|mse|mst|ltp)\b/i.test(question);
-    if (!answer && syllabusAnswer && !asksForSchemeFacts) {
-      answer = syllabusAnswer;
+      now: now()
+    };
+    const compound = splitCompoundQuestions(question, ctx);
+    const isCompound = compound.clauses.length > 1;
+    if (compound.overflow) {
+      answer = tooManyQuestionsAnswer();
+    } else if (isCompound) {
+      const parts = compound.clauses.map((part) => ({
+        question: part,
+        seating: isSeatingQuestion(part, state.seatingNameIndex, state.profile?.name || ""),
+        person: parsePersonQuestion(part)
+      }));
+      if (parts.some((part) => part.person?.role === "student") && !state.students.length) await loadStudents({ quiet: true });
+      if (parts.some((part) => part.person?.role === "faculty") && state.facultyStatus === "idle") await loadFaculty();
+      const answers = [];
+      const unresolved = [];
+      let turnMemory = previousMemory;
+      let previousCourse = previousSyllabusCode;
+      for (const part of parts) {
+        let partAnswer = null;
+        if (part.seating) partAnswer = await answerSeatingQuestion(part.question);
+        else if (part.person) {
+          partAnswer = answerPersonQuestion(part.person, {
+            students: state.students,
+            faculty: state.faculty,
+            schedule: effectiveSchedule(),
+            group: state.group,
+            subgroup: state.subgroup
+          });
+        } else {
+          partAnswer = answerFirstYearQuestion(part.question, { ...firstYearOptions, previousCourse })
+            || answerLocally(part.question, ctx, turnMemory);
+        }
+        answers.push(partAnswer);
+        if (!partAnswer) unresolved.push(part.question);
+        if (partAnswer?.entities?.syllabusCourseCode) previousCourse = partAnswer.entities.syllabusCourseCode;
+        if (partAnswer?.entities) turnMemory = { ...turnMemory, ...partAnswer.entities };
+      }
+      answer = combineQuestionAnswers(answers, unresolved);
+    } else if (seatingQuestion) answer = await answerSeatingQuestion(question);
+    else if (personQuestion && personQuestion.role !== "ambiguous") {
+      answer = answerPersonQuestion(personQuestion, {
+        students: state.students,
+        faculty: state.faculty,
+        schedule: effectiveSchedule(),
+        group: state.group,
+        subgroup: state.subgroup
+      });
       engine = "local";
-    } else if (!answer && schemeAnswer && syllabusAnswer
-      && schemeAnswer.entities?.syllabusCourseCode === syllabusAnswer.entities?.syllabusCourseCode) {
-      answer = { ...schemeAnswer, html: `${schemeAnswer.html}${syllabusAnswer.html}` };
-      engine = "local";
-    } else if (!answer && (schemeAnswer || syllabusAnswer)) {
-      answer = schemeAnswer || syllabusAnswer;
-      engine = "local";
+    }
+
+    if (!answer && !isCompound) {
+      answer = answerFirstYearQuestion(question, { ...firstYearOptions, previousCourse: previousSyllabusCode });
+      if (answer) engine = "local";
     }
 
     // Resolve supported factual questions against the selected local data
@@ -3381,6 +3539,11 @@ async function sendQuestion(rawQuestion) {
     // described as lecture days when a timetable contains a conflicting row.
     if (!answer) {
       answer = answerLocally(question, ctx, previousMemory);
+    }
+
+    if (!answer && personQuestion?.role === "ambiguous") {
+      answer = answerPersonQuestion(personQuestion);
+      engine = "local";
     }
 
     if (!answer && v("ask.engine") === "auto" && !v("privacy.localOnly")) {
@@ -3411,7 +3574,7 @@ async function sendQuestion(rawQuestion) {
 
     if (!answer) {
       answer = {
-        html: FALLBACK_REFUSAL + `<div class="chip-row" style="margin-top:10px">${suggestedQuestions().slice(0, 3).map((chip) => `<button class="chip" data-ask-question="${escapeHtml(chip)}">${escapeHtml(chip)}</button>`).join("")}</div>`,
+        html: FALLBACK_REFUSAL + `<div class="chip-row" style="margin-top:10px">${suggestedQuestions().slice(0, 3).map((chip) => `<button type="button" class="chip" data-ask-question="${escapeHtml(chip)}">${escapeHtml(chip)}</button>`).join("")}</div>`,
         intent: "REFUSAL",
         confidence: 0,
         plan: ["no verified local match", "no factual guess", "offer supported topics"]
@@ -3813,23 +3976,23 @@ function renderSettings() {
     </div>
     ${overview ? `<div class="settings-overview">
       ${renderProfileCard()}
-      <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">Theme, colours, timetable and language.</p></div><button class="btn btn-sm" data-action="reset-section" data-category="appearance">Reset appearance</button></div>${everydayFlags.map(renderFlagRow).join("")}</section>
+      <section class="card quick-settings"><div class="card-head"><div><h2 class="card-title">Everyday preferences</h2><p class="card-sub">Theme, colours, timetable and language.</p></div><button type="button" class="btn btn-sm" data-action="reset-section" data-category="appearance">Reset appearance</button></div>${everydayFlags.map(renderFlagRow).join("")}</section>
       <details class="card settings-advanced" ${state.settingsMoreOpen ? "open" : ""}><summary><span><strong>More settings</strong><small>Optional controls and additional app tools</small></span><span aria-hidden="true">＋</span></summary>
         ${renderPresetRow()}
         ${!adminMode ? `<p class="settings-admin-hint">Privacy, Data & offline, and Advanced & Labs appear after the verified owner unlocks Admin AI mode with <code>KKJ</code> in Ask Compass. Publishing still requires a separate token.</p>` : `<p class="settings-admin-hint is-active">Admin mode active · privileged settings are visible on this device.</p>`}
-        <nav class="settings-category-grid" aria-label="Additional settings">${allowedCategories.map((category) => `<button class="settings-nav-item" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)} <span aria-hidden="true">›</span></button>`).join("")}</nav>
+        <nav class="settings-category-grid" aria-label="Additional settings">${allowedCategories.map((category) => `<button type="button" class="settings-nav-item" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)} <span aria-hidden="true">›</span></button>`).join("")}</nav>
         <details class="settings-special"><summary>Special option · App versions & backups</summary>${renderVersionCard()}</details>
       </details>
     </div>` : `<div class="settings-layout">
       <nav class="settings-side" aria-label="Settings sections">
-        <button class="settings-nav-item" data-action="settings-category" data-category="overview">Settings home</button>
-        ${visibleCategories.map((category) => `<button class="settings-nav-item ${category.id === active?.id ? "is-active" : ""}" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)}</button>`).join("")}
+        <button type="button" class="settings-nav-item" data-action="settings-category" data-category="overview">Settings home</button>
+        ${visibleCategories.map((category) => `<button type="button" class="settings-nav-item ${category.id === active?.id ? "is-active" : ""}" data-action="settings-category" data-category="${category.id}">${escapeHtml(category.title)}</button>`).join("")}
       </nav>
       <div class="settings-content">
         ${renderPresetRow()}
         ${query ? `<p class="card-sub">${flags.length} matching control${flags.length === 1 ? "" : "s"}</p>` : ""}
         ${active ? `<section class="setting-section card" id="settings-${active.id}">
-          <div class="setting-section-head"><div><h2>${escapeHtml(active.title)}</h2><p>${escapeHtml(active.description)}</p></div><button class="btn btn-sm" data-action="reset-section" data-category="${active.id}">Reset section</button></div>
+          <div class="setting-section-head"><div><h2>${escapeHtml(active.title)}</h2><p>${escapeHtml(active.description)}</p></div><button type="button" class="btn btn-sm" data-action="reset-section" data-category="${active.id}">Reset section</button></div>
           ${active.id === "data" ? renderStorageCard() : ""}
           ${flags.length ? flags.map((flag) => renderFlagRow(flag)).join("") : `<p class="card-sub">No control matches “${escapeHtml(query)}”.</p>`}
           ${active.id === "labs" && v("labs.flagInspector") ? renderFlagInspector() : ""}
@@ -3844,7 +4007,7 @@ function renderFlagRow(flag) {
   if (flag.type === "action") {
     return `<div class="setting-row" id="setting-${flag.id}">
       <div class="setting-text"><div class="setting-label">${escapeHtml(flag.title)}${flag.badge ? ` <span class="badge">${escapeHtml(flag.badge)}</span>` : ""}</div><div class="setting-desc">${escapeHtml(flag.description)}</div></div>
-      <div class="setting-control"><button class="btn btn-sm ${flag.risk === "high" ? "btn-danger" : ""}" data-action="flag-action" data-flag="${flag.id}">Run</button></div>
+      <div class="setting-control"><button type="button" class="btn btn-sm ${flag.risk === "high" ? "btn-danger" : ""}" data-action="flag-action" data-flag="${flag.id}">Run</button></div>
     </div>`;
   }
   const available = isFlagAvailable(flag, state.values);
@@ -3874,12 +4037,12 @@ function renderFlagRow(flag) {
 
 function renderBottomOrderControl(value) {
   const order = String(value || "").split(",").filter((route) => NAV_BOTTOM_ROUTES.includes(route));
-  return `<div class="bottom-order-list" aria-label="Reorder mobile destinations">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "•"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="bottom-nav-move" data-order-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="bottom-nav-move" data-order-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">The first selected number of destinations appears on the phone bar. Settings stays in the side menu.</p>`;
+  return `<div class="bottom-order-list" aria-label="Reorder mobile destinations">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${navigationIconMarkup(route)}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="bottom-nav-move" data-order-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="bottom-nav-move" data-order-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">The first selected number of destinations appears on the phone bar. Settings stays in the side menu.</p>`;
 }
 
 function renderSideOrderControl(value) {
   const order = String(value || "").split(",").filter((route) => NAV_SIDE_ROUTES.includes(route));
-  return `<div class="bottom-order-list" aria-label="Reorder side menu pages">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${MOBILE_NAV_ICONS[route] || "⚙"}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="side-nav-move" data-order-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="side-nav-move" data-order-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">This changes the page order in the desktop menu and the menu drawer on phones. Your mobile shortcut bar has its own order setting above.</p>`;
+  return `<div class="bottom-order-list" aria-label="Reorder side menu pages">${order.map((route, index) => `<div class="bottom-order-row"><span class="bottom-order-number">${index + 1}</span><span class="bottom-order-icon" aria-hidden="true">${navigationIconMarkup(route)}</span><strong>${escapeHtml(ROUTES[route]?.title || route)}</strong><span class="bottom-order-actions"><button type="button" data-action="side-nav-move" data-order-route="${route}" data-direction="up" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} up" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-action="side-nav-move" data-order-route="${route}" data-direction="down" aria-label="Move ${escapeHtml(ROUTES[route]?.title || route)} down" ${index === order.length - 1 ? "disabled" : ""}>↓</button></span></div>`).join("")}</div><p class="setting-note">This changes the page order in the desktop menu and the menu drawer on phones. Your mobile shortcut bar has its own order setting above.</p>`;
 }
 
 function renderVersionCard() {
@@ -3900,22 +4063,22 @@ function renderVersionCard() {
         <strong>Compass Next · v${escapeHtml(version?.app?.version || APP_VERSION)}</strong>
         <small>This is the app you are using now.</small>
       </div>
-      <button class="build-card" data-action="open-previous" ${v("experience.previousBuild") ? "" : "hidden"}>
+      <button type="button" class="build-card" data-action="open-previous" ${v("experience.previousBuild") ? "" : "hidden"}>
         <span class="badge">Previous</span>
         <strong>${escapeHtml(previous?.label || "Previous generation")}</strong>
         <small>${escapeHtml(previous?.note || "Opens separately; its saved settings are not shared.")}</small>
       </button>
-      <button class="build-card" data-action="open-legacy">
+      <button type="button" class="build-card" data-action="open-legacy">
         <span class="badge">Classic app</span>
         <strong>GNDEC Compass</strong>
         <small>Opens the classic site separately. It has its own saved data.</small>
       </button>
     </div>
     <div class="chip-row" style="margin-top:14px">
-      <button class="btn btn-sm" data-action="refresh-data">Check for updates</button>
-      <button class="btn btn-sm" data-action="export-data">Export data</button>
-      <button class="btn btn-sm" data-action="import-data">Import data</button>
-      <button class="btn btn-sm" data-action="open-admin" ${v("experience.adminLink") ? "" : "hidden"}>Admin & publishing</button>
+      <button type="button" class="btn btn-sm" data-action="refresh-data">Check for updates</button>
+      <button type="button" class="btn btn-sm" data-action="export-data">Export data</button>
+      <button type="button" class="btn btn-sm" data-action="import-data">Import data</button>
+      <button type="button" class="btn btn-sm" data-action="open-admin" ${v("experience.adminLink") ? "" : "hidden"}>Admin & publishing</button>
     </div>
     <details class="version-details"><summary>Technical details</summary><div class="version-grid">
       <dl class="version-cell"><dt>Build date</dt><dd>${escapeHtml(version?.app?.build || "not available")}</dd></dl>
@@ -3926,7 +4089,7 @@ function renderVersionCard() {
     </div><p class="card-sub">Classic app address: <code>${escapeHtml(state.legacyUrl)}</code></p></details>
     <div class="snapshot-list">
       <strong class="snapshot-heading">Offline timetable backups</strong>
-      ${snapshots.length ? snapshots.map((snapshot) => `<div class="snapshot-row"><span><strong>Revision ${escapeHtml(snapshot.version || "unknown")}</strong> <time>saved ${escapeHtml(shortDate(snapshot.createdAt))}</time> · ${snapshot.entries || snapshot.scheduleCount || 0} classes</span><button class="btn btn-sm" data-action="restore-snapshot" data-id="${escapeHtml(snapshot.id)}">Restore</button><button class="btn btn-sm btn-ghost" data-action="delete-snapshot" data-id="${escapeHtml(snapshot.id)}" aria-label="Delete backup saved ${escapeHtml(shortDate(snapshot.createdAt))}">Delete</button></div>`).join("") : `<p class="card-sub">No offline backup yet. Compass saves a verified timetable here when it updates.</p>`}
+      ${snapshots.length ? snapshots.map((snapshot) => `<div class="snapshot-row"><span><strong>Revision ${escapeHtml(snapshot.version || "unknown")}</strong> <time>saved ${escapeHtml(shortDate(snapshot.createdAt))}</time> · ${snapshot.entries || snapshot.scheduleCount || 0} classes</span><button type="button" class="btn btn-sm" data-action="restore-snapshot" data-id="${escapeHtml(snapshot.id)}">Restore</button><button type="button" class="btn btn-sm btn-ghost" data-action="delete-snapshot" data-id="${escapeHtml(snapshot.id)}" aria-label="Delete backup saved ${escapeHtml(shortDate(snapshot.createdAt))}">Delete</button></div>`).join("") : `<p class="card-sub">No offline backup yet. Compass saves a verified timetable here when it updates.</p>`}
     </div>
   </div>`;
 }
@@ -3935,8 +4098,8 @@ function renderProfileCard() {
   const profile = state.profile;
   return `<div class="card" style="margin:14px 0">
     <div class="card-head"><div><h2 class="card-title">Find your student profile</h2><p class="card-sub">Start typing your name, CRN, registration number, or serial number. Choose a roster suggestion to fill your section, subgroup and mentor on this device.</p></div></div>
-    <div class="profile-lookup"><label class="visually-hidden" for="profile-lookup">Your name, CRN, registration, or serial number</label><input id="profile-lookup" data-profile-lookup-query value="${escapeHtml(state.profileLookupQuery || profile.name || profile.crn || "")}" placeholder="Start with your name, CRN, registration, or serial" autocomplete="off" /><button class="btn btn-primary" data-action="lookup-profile">Find my profile</button></div>
-    <div data-profile-lookup-results aria-live="polite">${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}</div>
+    <div class="profile-lookup"><label class="visually-hidden" for="profile-lookup">Your name, CRN, registration, or serial number</label><input id="profile-lookup" data-profile-lookup-query value="${escapeHtml(state.profileLookupQuery || profile.name || profile.crn || "")}" placeholder="Start with your name, CRN, registration, or serial" autocomplete="off" /><button type="button" class="btn btn-primary" data-action="lookup-profile">Find my profile</button></div>
+    <div data-profile-lookup-results aria-live="polite">${state.profileLookupMessage ? `<p class="profile-lookup-message" role="status">${escapeHtml(state.profileLookupMessage)}</p>` : ""}${state.profileLookupMatches.length ? `<div class="profile-match-list" aria-label="Choose your matching student profile">${state.profileLookupMatches.map((record, index) => `<button type="button" class="profile-match" data-action="choose-profile-match" data-profile-index="${index}"><strong>${escapeHtml(record.name || "Student")}</strong><span>${escapeHtml([record.branch, record.section, record.subsection].filter(Boolean).join(" · "))}</span><small>CRN ${escapeHtml(record.crn || "not published")}</small></button>`).join("")}</div>` : ""}</div>
     ${renderRecentProfiles()}
     ${profile.rosterVersion ? `<p class="profile-verified"><span class="badge badge-accent">Roster matched</span> ${escapeHtml(profile.name || "Student")} · ${escapeHtml([profile.section, profile.subsection].filter(Boolean).join(" / ") || "Section not listed")}${profile.mentor ? ` · Mentor ${escapeHtml(profile.mentor)}` : ""}${state.rosterGeneratedAt ? ` · roster ${escapeHtml(shortDate(state.rosterGeneratedAt))}` : ""}</p>` : `<p class="profile-verified">Your profile stays on this device. A name is applied only when the roster match is unambiguous.</p>`}
     <div class="profile-grid profile-main-grid">
@@ -3957,7 +4120,7 @@ function renderProfileCard() {
       </div>
     </section>
     <p class="card-sub" style="margin-top:10px">Manual mentor details apply only when the official timetable leaves those fields blank. Verified roster details take precedence.</p>
-    <div class="chip-row" style="margin-top:12px"><button class="btn btn-primary btn-sm" data-action="save-profile">Save profile</button><button class="btn btn-sm" data-action="use-profile-section">Use profile section</button></div>
+    <div class="chip-row" style="margin-top:12px"><button type="button" class="btn btn-primary btn-sm" data-action="save-profile">Save profile</button><button type="button" class="btn btn-sm" data-action="use-profile-section">Use profile section</button></div>
   </div>`;
 }
 
@@ -3965,9 +4128,9 @@ function renderStorageCard() {
   return `<div class="card" style="margin:14px 0">
     <div class="card-head"><div><h2 class="card-title">Device storage</h2><p class="card-sub" id="storage-summary">Checking…</p></div></div>
     <div class="chip-row">
-      <button class="btn btn-sm" data-action="persist-storage">Make offline storage persistent</button>
-      <button class="btn btn-sm" data-action="clear-cache">Clear app cache</button>
-      <button class="btn btn-sm" data-action="download-offline">Download offline data</button>
+      <button type="button" class="btn btn-sm" data-action="persist-storage">Make offline storage persistent</button>
+      <button type="button" class="btn btn-sm" data-action="clear-cache">Clear app cache</button>
+      <button type="button" class="btn btn-sm" data-action="download-offline">Download offline data</button>
     </div>
   </div>`;
 }
@@ -3981,8 +4144,8 @@ function renderDangerZone() {
   return `<div class="card danger-zone" style="margin-top:14px">
     <div class="card-head"><div><h2 class="card-title">Danger zone</h2><p class="card-sub">These actions only touch this device.</p></div></div>
     <div class="chip-row">
-      <button class="btn btn-sm btn-danger" data-action="delete-all">Delete everything</button>
-      <button class="btn btn-sm" data-action="reset-all">Reset all settings</button>
+      <button type="button" class="btn btn-sm btn-danger" data-action="delete-all">Delete everything</button>
+      <button type="button" class="btn btn-sm" data-action="reset-all">Reset all settings</button>
     </div>
   </div>`;
 }
@@ -4096,7 +4259,7 @@ function renderCommandResults(query = "") {
   }
   const visible = [...items, ...entityItems].slice(0, 14);
   root.dataset.active = "0";
-  root.innerHTML = visible.length ? visible.map((item, index) => `<button class="command-item ${index === 0 ? "is-active" : ""}" data-command-index="${index}"><span>${escapeHtml(item.label)}</span><span class="cmd-kind">${escapeHtml(item.kind)}</span></button>`).join("") : `<div class="empty" style="padding:24px"><p class="empty-text">No command matches that.</p></div>`;
+  root.innerHTML = visible.length ? visible.map((item, index) => `<button type="button" class="command-item ${index === 0 ? "is-active" : ""}" data-command-index="${index}"><span>${escapeHtml(item.label)}</span><span class="cmd-kind">${escapeHtml(item.kind)}</span></button>`).join("") : `<div class="empty" style="padding:24px"><p class="empty-text">No command matches that.</p></div>`;
   root._items = visible;
 }
 
@@ -4407,17 +4570,18 @@ async function handleAction(action, element) {
     case "copy-message": {
       const message = state.chat[Number(element.dataset.index)];
       if (message) {
-        const text = formatDayScheduleCopy(message, {
+        const text = formatChatMessageCopy(message, {
           ...(message.meta?.copyContext || { group: state.group, subgroup: state.subgroup, dateISO: now().dateISO }),
           schedule: effectiveSchedule()
-        }) || message.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-        navigator.clipboard?.writeText(text).then(() => toast("Copied.")).catch(() => toast("Copy failed.", "error"));
+        }, document);
+        writeChatClipboard(text).then(() => toast("Copied.")).catch(() => toast("Copy failed.", "error"));
       }
       break;
     }
     case "ask-again": {
-      const message = state.chat[Number(element.dataset.index)];
-      if (message) sendQuestion(message.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300));
+      const index = Number(element.dataset.index);
+      const question = chatQuestionToRetry(state.chat, index);
+      if (question) sendQuestion(htmlToChatText(question.html, document).slice(0, 300));
       break;
     }
     case "send": {
@@ -5290,7 +5454,7 @@ document.addEventListener('keydown', (kbEvent) => {
 init().catch((error) => {
   console.error("[Compass] boot failed", error);
   const view = $("#view");
-  if (view) view.innerHTML = `<div class="card" style="margin-top:24px">${emptyState("⚠", "Compass could not start", "The verified data could not be loaded. Your legacy build is still available.", `<button class="btn btn-primary" data-action="open-legacy">Open legacy build</button>`)}</div>`;
+  if (view) view.innerHTML = `<div class="card" style="margin-top:24px">${emptyState("⚠", "Compass could not start", "The verified data could not be loaded. Your legacy build is still available.", `<button type="button" class="btn btn-primary" data-action="open-legacy">Open legacy build</button>`)}</div>`;
 });
 
 // Expose a tiny diagnostic surface for tests and the Labs panel.

@@ -15,6 +15,78 @@ test("the topbar clock gives the date and current time the same readable size", 
   assert.match(css, /\.topbar-clock-date, \.topbar-clock-time \{ font-size: \.86rem; \}/);
 });
 
+test("Ask restores the last message in a bounded desktop conversation pane", async () => {
+  const app = await read("../next/app.js");
+  const css = await read("../next/styles.css");
+  assert.match(app, /function scrollChatToBottom\(windowEl\)/);
+  assert.match(app, /windowEl\.scrollTop = Math\.max\(0, windowEl\.scrollHeight - windowEl\.clientHeight\)/);
+  assert.match(app, /requestAnimationFrame\(settle\)/);
+  assert.match(app, /if \(forceScroll \|\| v\("ask\.autoScroll"\)\) scrollChatToBottom\(windowEl\)/);
+  const desktopAsk = css.slice(css.lastIndexOf("@media (min-width: 981px)"));
+  assert.match(desktopAsk, /body:has\(\.page-ask\) \{[^}]*height: 100dvh; overflow: hidden;/);
+  assert.match(desktopAsk, /\.app-shell:has\(\.page-ask\) main \{[\s\S]*?min-height: 0;[\s\S]*?overflow: hidden;/);
+  assert.match(desktopAsk, /\.app-shell:has\(\.page-ask\) #view \{ flex: 1 1 auto; min-height: 0; overflow: hidden; \}/);
+  assert.match(desktopAsk, /\.app-shell:has\(\.page-ask\) \.chat-window \{[\s\S]*?min-height: 0;[\s\S]*?overflow-y: auto;/);
+});
+
+test("Ask rejects overlong prompts explicitly instead of silently answering a truncated prefix", async () => {
+  const app = await read("../next/app.js");
+  const sendQuestion = app.slice(app.indexOf("async function sendQuestion("), app.indexOf("function updateChatHead("));
+  assert.match(sendQuestion, /const question = String\(rawQuestion \|\| ""\)\.trim\(\);/);
+  assert.match(sendQuestion, /const questionTooLong = question\.length > 800/);
+  assert.match(sendQuestion, /if \(questionTooLong\) \{[\s\S]*?intent: "TOO_LONG"[\s\S]*?return;/);
+  assert.match(sendQuestion, /I did not truncate it or answer only part of it/);
+  assert.doesNotMatch(sendQuestion, /String\(rawQuestion[^\n]*\.slice\(0, 800\)/);
+});
+
+test("explicit student and faculty questions resolve locally before the optional Brain", async () => {
+  const app = await read("../next/app.js");
+  assert.match(app, /const personQuestion = seatingQuestion \? null : parsePersonQuestion\(question\)/);
+  assert.match(app, /personQuestion\?\.role === "student".*?await loadStudents\(\{ quiet: true \}\)/s);
+  assert.match(app, /personQuestion\?\.role === "faculty".*?await loadFaculty\(\)/s);
+  const explicitPerson = app.indexOf('personQuestion && personQuestion.role !== "ambiguous"');
+  const localAnswer = app.indexOf("answer = answerLocally(question, ctx, previousMemory)");
+  const ambiguousPerson = app.indexOf('personQuestion?.role === "ambiguous"');
+  const brain = app.indexOf("runBrain(question, ctx)");
+  assert.ok(explicitPerson >= 0 && explicitPerson < localAnswer, "role-specific person lookup runs before generic local teacher matching");
+  assert.ok(localAnswer < ambiguousPerson && ambiguousPerson < brain, "name-only choices appear before the optional Brain can guess a role");
+});
+
+test("HOD questions wait for the official campus directory and never fall through to room matching", async () => {
+  const app = await read("../next/app.js");
+  const answer = await read("../next/engine/answer.js");
+  const hodPrefetch = app.indexOf("if (wantsHodDirectory && state.campusStatus !== \"ready\") await loadCampus()");
+  const contextBuild = app.indexOf("const ctx = currentAnswerContext()", hodPrefetch);
+  assert.ok(hodPrefetch >= 0 && contextBuild > hodPrefetch, "the live official directory is loaded before AI routing");
+  assert.match(answer, /intent: "DEPARTMENT_UNAVAILABLE"/);
+  assert.match(answer, /refuse to substitute a room or teacher/);
+});
+
+test("official course shorthand and bare semester choices resolve before timetable fuzzy matching", async () => {
+  const app = await read("../next/app.js");
+  const courseOptions = app.indexOf("function answerFirstYearQuestion");
+  const genericSchedule = app.indexOf("answer = answerLocally(question, ctx, previousMemory)");
+  assert.ok(courseOptions >= 0 && courseOptions < genericSchedule, "Math/PPS course identity wins before the weekly timetable alias matcher");
+  assert.match(app, /answerFirstYearCourseOptions\(question, state\.firstYearSyllabusCourses, \{ semester \}\)/);
+  assert.match(app, /answerBareSemesterOptions\(question\)/);
+  assert.ok(app.indexOf("else if (isCompound)") < app.indexOf("if (!answer && !isCompound)"), "compound course and schedule questions are handled before single-course routing");
+});
+
+test("compound Ask prompts keep course facts, timetable answers and selectable choices together", async () => {
+  const app = await read("../next/app.js");
+  const engine = await read("../next/engine/answer.js");
+  const compoundStart = app.indexOf("else if (isCompound)");
+  const compoundEnd = app.indexOf("else if (seatingQuestion)", compoundStart);
+  const compoundRouter = app.slice(compoundStart, compoundEnd);
+  assert.ok(compoundStart >= 0 && compoundEnd > compoundStart);
+  assert.match(app, /splitCompoundQuestions\(question, ctx\)/);
+  assert.match(app, /if \(compound\.overflow\) \{[\s\S]*?tooManyQuestionsAnswer\(\)/);
+  assert.match(compoundRouter, /answerFirstYearQuestion\(part\.question/);
+  assert.match(compoundRouter, /answerLocally\(part\.question, ctx, turnMemory\)/);
+  assert.match(compoundRouter, /combineQuestionAnswers\(answers, unresolved\)/);
+  assert.match(engine, /suggestions: \[\.\.\.new Set\(valid\.flatMap/);
+});
+
 async function createServiceWorker(fetcher) {
   const source = await read("../next/sw.js");
   const origin = "https://app.test";
@@ -144,8 +216,11 @@ test("the service worker precaches the real shell and isolates the legacy origin
   const assets = [...sw.matchAll(/"\.\/([^"]+)"/g)].map((match) => match[1]).filter(Boolean);
   assert.ok(assets.includes("index.html"));
   assert.ok(assets.includes("app.js"));
+  assert.ok(assets.includes("engine/chat-copy.js"), "chat formatting remains available after an offline install");
+  assert.ok(assets.includes("engine/college.js"), "bundled college facts remain available offline");
   assert.ok(assets.includes("styles.css"));
   assert.ok(assets.includes("engine/profile-history.js"), "the new profile picker works after an offline install");
+  assert.ok(assets.includes("engine/people.js"), "student/faculty intent routing works after an offline install");
   assert.ok(assets.includes("engine/seating.js"), "local sitting-plan intent stays available offline");
   assert.equal(assets.includes("data/timetable-groups.html"), false, "large timetable HTML loads on demand");
   assert.equal(assets.includes("data/timetable-rooms.html"), false, "large room HTML loads on demand");
@@ -171,7 +246,7 @@ test("the worker caches only its allowlisted public endpoints and respects priva
     const result = await privateWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
     await result.waitForLifetime();
     assert.equal(await result.response.text(), "sensitive");
-    const dataCache = await privateWorker.caches.open("compass-next-v3.1.8-data");
+    const dataCache = await privateWorker.caches.open("compass-next-v3.1.25-data");
     assert.equal((await dataCache.keys()).length, 0, `${cacheControl} responses are not stored`);
   }
 });
@@ -208,19 +283,38 @@ test("warm static assets stay cache-first and offline navigation falls back to t
   assert.equal(await second.response.text(), "module");
   assert.equal(calls, 1, "a warm launch does not revalidate every shell module");
 
-  const shell = await worker.caches.open("compass-next-v3.1.8-shell");
+  const shell = await worker.caches.open("compass-next-v3.1.25-shell");
   await shell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
   const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
-  const offlineShell = await offlineWorker.caches.open("compass-next-v3.1.8-shell");
+  const offlineShell = await offlineWorker.caches.open("compass-next-v3.1.25-shell");
   await offlineShell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
   const navigation = await offlineWorker.fetch("/today", { mode: "navigate" });
   assert.equal(await navigation.response.text(), "<main>offline shell</main>");
   await navigation.waitForLifetime();
 });
 
+test("online navigations refresh corrected notice pages before using offline cache", async () => {
+  let online = true;
+  const worker = await createServiceWorker(async () => {
+    if (!online) throw new Error("offline");
+    return new Response("<main>current datesheet</main>", { headers: { "Content-Type": "text/html" } });
+  });
+  const shell = await worker.caches.open("compass-next-v3.1.25-shell");
+  await shell.put("/notices/mse2-theory-2026.html", new Response("<main>stale app shell</main>", { headers: { "Content-Type": "text/html" } }));
+
+  const onlineNavigation = await worker.fetch("/notices/mse2-theory-2026.html", { mode: "navigate" });
+  assert.equal(await onlineNavigation.response.text(), "<main>current datesheet</main>");
+  await onlineNavigation.waitForLifetime();
+
+  online = false;
+  const offlineNavigation = await worker.fetch("/notices/mse2-theory-2026.html", { mode: "navigate" });
+  assert.equal(await offlineNavigation.response.text(), "<main>current datesheet</main>", "the corrected document remains available offline after a successful refresh");
+  await offlineNavigation.waitForLifetime();
+});
+
 test("shell trimming retains pinned startup assets while caching lazy PDF modules", async () => {
   const worker = await createServiceWorker(async () => new Response("module", { headers: { "Content-Type": "text/javascript" } }));
-  const shell = await worker.caches.open("compass-next-v3.1.8-shell");
+  const shell = await worker.caches.open("compass-next-v3.1.25-shell");
   await shell.put("/index.html", new Response("pinned shell", { headers: { "Content-Type": "text/html" } }));
   for (let index = 0; index < 120; index += 1) {
     const result = await worker.fetch(`/lazy-${index}.js`);
@@ -245,13 +339,13 @@ test("the public-data cache has a bounded entry count and retains recent offline
     const result = await worker.fetch(`/api/legacy/api/timetable?source=groups&version=${index}`);
     await result.waitForLifetime();
   }
-  const cache = await worker.caches.open("compass-next-v3.1.8-data");
+  const cache = await worker.caches.open("compass-next-v3.1.25-data");
   assert.equal((await cache.keys()).length, 80);
 
   const recent = new Response("saved datesheet", { headers: { "Cache-Control": "public", "X-Compass-Cached-At": String(Date.now() - 2 * 24 * 60 * 60 * 1000) } });
   await cache.put("/api/legacy/data/end-sem-datesheet.json", recent);
   const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
-  const offlineCache = await offlineWorker.caches.open("compass-next-v3.1.8-data");
+  const offlineCache = await offlineWorker.caches.open("compass-next-v3.1.25-data");
   await offlineCache.put("/api/legacy/data/end-sem-datesheet.json", recent);
   const offline = await offlineWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
   assert.equal(await offline.response.text(), "saved datesheet");
@@ -327,7 +421,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.2.18");
+  assert.equal(next.vars.APP_VERSION, "2.2.35");
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");
@@ -350,8 +444,8 @@ test("the first-year scheme semester choice is persistent and shared with Ask Co
   assert.match(app, /data-action="scheme-semester"/);
   assert.match(app, /storageSet\(SCHEME_SEMESTER_KEY, semester\)/);
   assert.match(app, /const selectedSemester = \["1", "2"\]\.includes\(state\.schemeSemesterChoice\)/);
-  assert.match(app, /answerFirstYearSyllabus\([^\n]+\{ semester: selectedSemester \}\)/);
-  assert.match(app, /answerFirstYearScheme\(question, state\.firstYearScheme, \{\s*semester: selectedSemester/s);
+  assert.match(app, /answerFirstYearSyllabus\(question, state\.firstYearSyllabusCourses, previousCourse, \{ semester \}\)/);
+  assert.match(app, /answerFirstYearScheme\(question, state\.firstYearScheme, options\)/);
   assert.match(css, /\.scheme-semester-picker/);
   assert.match(css, /\.scheme-card \.table-wrap \{ overflow-x: auto; \}/);
 });

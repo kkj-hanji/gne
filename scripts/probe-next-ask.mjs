@@ -70,9 +70,7 @@ const queries = [
   "room f 108 free?",
   "where is math lab",
   "free labs right now",
-  "and tomorrow?",
-  "who teaches it?",
-  "what about its room?"
+  "and tomorrow?"
 ];
 
 let failures = 0;
@@ -85,7 +83,14 @@ for (const query of queries) {
 
 // Follow-up memory uses the previous verified entities only.
 const first = answerLocally("who teaches physics", ctx);
-const follow = answerLocally("and where?", ctx, first?.memory);
+const teacherFollow = answerLocally("who teaches it?", ctx, first?.memory);
+const follow = answerLocally("what about its room?", ctx, teacherFollow?.memory);
+const followupsPass = teacherFollow?.intent === "SUBJECT_TEACHERS"
+  && /DR PARAMJIT SINGH/.test(teacherFollow.html)
+  && follow?.intent === "SUBJECT_ROOMS"
+  && /F108/.test(follow.html);
+if (!followupsPass) failures += 1;
 console.log(`\nfollow-up: ${follow?.intent} → ${follow?.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 90)}`);
 
 console.log(`\n${queries.length - failures}/${queries.length} queries handled locally.`);
+if (failures) process.exitCode = 1;

@@ -20,7 +20,7 @@ import {
   currentAndNext, escapeHtml, freeBellSlots, keywordsOf, normalizeQuestion
 } from "../next/engine/answer.js";
 import { buildIcs, firstMonday } from "../next/engine/ics.js";
-import { answerFirstYearScheme, answerFirstYearSyllabus, inferFirstYearContext, parseFirstYearSyllabus, resolveFirstYearSchemeCourse } from "../next/engine/syllabus.js";
+import { answerBareSemesterOptions, answerFirstYearCourseOptions, answerFirstYearScheme, answerFirstYearSemesterMismatch, answerFirstYearSyllabus, inferFirstYearContext, parseFirstYearSyllabus, resolveFirstYearSchemeCourse } from "../next/engine/syllabus.js";
 import {
   digestCopy, dueReminder, isQuietTime, notificationCopy, reminderWindow
 } from "../next/engine/reminders.js";
@@ -38,6 +38,44 @@ test("official first-year syllabus supports course and remembered unit follow-up
   const pps = answerFirstYearSyllabus("PPS syllabus", courses);
   assert.equal(pps?.entities.syllabusCourseCode, "ESC103");
   assert.match(pps.html, /Programming for Problem Solving/i);
+  const ppsTwo = answerFirstYearSyllabus("PPS semester 2 syllabus", courses);
+  assert.equal(ppsTwo?.entities.syllabusCourseCode, "ESC105", "the user's PPS semester 2 shorthand means the official Python course");
+  assert.match(ppsTwo?.html || "", /Programming Fundamentals using Python/);
+  assert.equal(answerFirstYearSyllabus("PPS 2 syllabus", courses)?.entities.syllabusCourseCode, "ESC105");
+  assert.equal(answerFirstYearSyllabus("Programming for Problem Solving semester 2 syllabus", courses), null, "an exact PPS title must not fall through to the semester 2 Python course");
+  const python = answerFirstYearSyllabus("Programming Fundamentals using Python semester 2 syllabus", courses);
+  assert.equal(python?.entities.syllabusCourseCode, "ESC105");
+  assert.match(python?.html || "", /Programming Fundamentals using Python/);
+  assert.equal(answerFirstYearCourseOptions("Programming Fundamentals using Python", courses)?.entities.syllabusCourseCode, "ESC105");
+  const semesterProgramming = answerFirstYearSyllabus("programming semester 2 syllabus", courses);
+  assert.equal(semesterProgramming?.entities.syllabusCourseCode, "ESC105", "a generic programming question may be narrowed by an explicit semester");
+  const genericProgramming = answerFirstYearSyllabus("programming syllabus", courses);
+  assert.equal(genericProgramming?.intent, "SYLLABUS_COURSE_AMBIGUOUS");
+  assert.deepEqual(genericProgramming?.suggestions, [
+    "Programming for Problem Solving semester 1 syllabus",
+    "Programming Fundamentals using Python semester 2 syllabus"
+  ]);
+  for (const shorthand of ["PPS 2", "PPS semester 2", "PPS sem 2", "PPS sem two", "PPS second semester"]) {
+    const options = answerFirstYearCourseOptions(shorthand, courses);
+    assert.equal(options?.entities.syllabusCourseCode, "ESC105", shorthand);
+    assert.match(options?.html || "", /Programming Fundamentals using Python/);
+  }
+  for (const shorthand of ["math 2", "math ii", "math semester 2", "math semester two", "math second semester"]) {
+    const options = answerFirstYearCourseOptions(shorthand, courses, { semester: "1" });
+    assert.equal(options?.entities.syllabusCourseCode, "BSC104", shorthand);
+    assert.match(options?.html || "", /Mathematics-II/);
+  }
+  const unclearMath = answerFirstYearCourseOptions("math 11", courses, { semester: "1" });
+  assert.equal(unclearMath?.intent, "COURSE_DISAMBIGUATION");
+  assert.deepEqual(unclearMath?.suggestions, ["Mathematics-I semester 1", "Mathematics-II semester 2"]);
+  const unclearMathSyllabus = answerFirstYearSyllabus("math 11 syllabus", courses, "", { semester: "1" });
+  assert.equal(unclearMathSyllabus?.intent, "SYLLABUS_COURSE_AMBIGUOUS");
+  assert.deepEqual(unclearMathSyllabus?.suggestions, [
+    "Mathematics-I semester 1 syllabus",
+    "Mathematics-II semester 2 syllabus"
+  ]);
+  assert.equal(answerBareSemesterOptions("sem 2")?.intent, "SEMESTER_OPTIONS");
+  assert.deepEqual(answerBareSemesterOptions("sem two")?.entities, { firstYearSemester: "2" });
   const followup = answerFirstYearSyllabus("unit 2", courses, "ESC103");
   assert.match(followup.html, /Unit 2:/);
   assert.equal(followup.entities.syllabusCourseCode, "ESC103");
@@ -92,6 +130,7 @@ test("first-year scheme answers credits, CA/ESE marks and the semester-specific 
   assert.match(maths.html, /60 marks/);
   assert.match(maths.html, /100 marks/);
   assert.match(maths.html, /95%/);
+  assert.equal(answerFirstYearScheme("math 11 marks", scheme, { semester: "1" })?.intent, "FIRST_YEAR_COURSE_DISAMBIGUATION");
 
   const edg = answerFirstYearScheme("EDG marks distribution", scheme, { semester: "1" });
   assert.equal(edg?.entities.syllabusCourseCode, "ESC102");
@@ -110,6 +149,28 @@ test("first-year scheme answers credits, CA/ESE marks and the semester-specific 
   assert.match(mse.html, /does <strong>not<\/strong> publish/);
   assert.match(mse.html, /MSE-1 \/ MSE-2/);
   assert.equal(answerFirstYearScheme("PPS unit 2 syllabus", scheme), null);
+  assert.equal(answerFirstYearScheme("PPS", scheme), null, "a subject name alone must not trigger an unsolicited marks card");
+  assert.equal(answerFirstYearScheme("PPS semester 2", scheme), null, "a subject plus semester alone is still a clarification request");
+  const ppsTwoMarks = answerFirstYearScheme("PPS semester 2 marks", scheme);
+  assert.equal(ppsTwoMarks?.entities.syllabusCourseCode, "ESC105", "PPS semester 2 shorthand resolves to Python ESC105");
+  assert.match(ppsTwoMarks?.html || "", /Programming Fundamentals using Python/);
+  assert.equal(answerFirstYearScheme("PPS 2 marks", scheme)?.entities.syllabusCourseCode, "ESC105");
+  assert.equal(answerFirstYearScheme("PPS sem two marks", scheme)?.entities.syllabusCourseCode, "ESC105");
+  assert.equal(answerFirstYearSemesterMismatch("PPS semester 2 syllabus", scheme), null);
+  const longTitleMismatch = answerFirstYearSemesterMismatch("PROGRAMMING FOR PROBLEM SOLVING semester 2 marks", scheme);
+  assert.equal(longTitleMismatch?.entities.syllabusCourseCode, "ESC103");
+  assert.deepEqual(longTitleMismatch?.suggestions, [
+    "Programming for Problem Solving semester 1 marks",
+    "Programming Fundamentals using Python semester 2 marks"
+  ]);
+  assert.equal(answerFirstYearScheme("PROGRAMMING FOR PROBLEM SOLVING semester 2 marks", scheme, { semester: "1" }), null);
+  const pythonMarks = answerFirstYearScheme("PROGRAMMING FUNDAMENTALS USING PYTHON semester 2 marks", scheme, { semester: "1" });
+  assert.equal(pythonMarks?.entities.syllabusCourseCode, "ESC105");
+  assert.match(pythonMarks?.html || "", /Programming Fundamentals using Python/);
+  const genericProgrammingMarks = answerFirstYearScheme("programming semester 2 marks", scheme, { semester: "1" });
+  assert.equal(genericProgrammingMarks?.entities.syllabusCourseCode, "ESC105");
+  assert.equal(answerFirstYearSemesterMismatch("PPS semester 2", scheme), null);
+  assert.equal(answerFirstYearSemesterMismatch("PPS syllabus", scheme), null);
   assert.equal(answerFirstYearScheme("quantum mechanics credits", scheme), null);
 
   const semesterMath = answerFirstYearSyllabus("maths syllabus", parseFirstYearSyllabus(
@@ -439,6 +500,48 @@ test("local answers use the active section, day and time", () => {
   const teacher = answerLocally("Who teaches Physics?", ctx);
   assert.equal(teacher.intent, "SUBJECT_TEACHERS");
   assert.match(teacher.html, /DR PARAMJIT SINGH/);
+
+  const subjectOnly = answerLocally("PPS", ctx);
+  assert.equal(subjectOnly.intent, "SUBJECT_OPTIONS");
+  assert.equal(subjectOnly.entities.syllabusCourseCode, "ESC103");
+  assert.deepEqual(subjectOnly.suggestions, [
+    "Programming for Problem Solving semester 1 marks",
+    "Programming for Problem Solving semester 1 syllabus",
+    "All teachers for Programming for Problem Solving"
+  ]);
+  assert.doesNotMatch(subjectOnly.html, /\b(?:marks|credits|CA|ESE)\b/i);
+  const subjectAndSemester = answerLocally("PPS semester 2", ctx);
+  assert.equal(subjectAndSemester.intent, "SUBJECT_OPTIONS");
+  assert.equal(subjectAndSemester.entities.syllabusCourseCode, "ESC105");
+  assert.match(subjectAndSemester.html, /Programming Fundamentals using Python/);
+  assert.equal(answerLocally("PPS sem two", ctx).entities.syllabusCourseCode, "ESC105");
+
+  const mathTwoOptions = answerLocally("math ii", ctx);
+  assert.equal(mathTwoOptions.intent, "SUBJECT_OPTIONS");
+  assert.equal(mathTwoOptions.entities.syllabusCourseCode, "BSC104");
+  assert.match(mathTwoOptions.html, /Mathematics-II/);
+  assert.doesNotMatch(mathTwoOptions.html, /MATH I|SUKHMINDER/);
+  assert.equal(answerLocally("math 2", ctx).entities.syllabusCourseCode, "BSC104");
+  assert.equal(answerLocally("math semester 2", ctx).entities.syllabusCourseCode, "BSC104");
+  assert.equal(answerLocally("math semester two", ctx).entities.syllabusCourseCode, "BSC104");
+  const mathTwoTeacher = answerLocally("Who teaches Mathematics-II?", ctx);
+  assert.equal(mathTwoTeacher.intent, "SUBJECT_NOT_LISTED");
+  assert.match(mathTwoTeacher.html, /No teacher is listed for Mathematics-II/);
+  assert.doesNotMatch(mathTwoTeacher.html, /MATH I|SUKHMINDER/);
+  const wrongPythonTeacher = answerLocally("All teachers for Programming Fundamentals using Python", ctx);
+  assert.equal(wrongPythonTeacher.intent, "SUBJECT_NOT_LISTED");
+  assert.match(wrongPythonTeacher.html, /Programming Fundamentals using Python/);
+  assert.doesNotMatch(wrongPythonTeacher.html, /PROGRAMMING FOR PROBLEM SOLVING|NAVJOT SINGH/);
+
+  const allPpsSchedule = [
+    { group: "CEA", day: "Monday", start: 510, end: 570, subject: "PPS", teacher: "MS USER TEACHER", room: "G101", cohorts: "CEA1" },
+    { group: "MEB", day: "Tuesday", start: 510, end: 570, subject: "PPS", teacher: "MS OTHER TEACHER", room: "G102", cohorts: "" }
+  ];
+  const multiplePpsTeachers = context({ subgroup: "CEA1", schedule: allPpsSchedule, allSchedule: allPpsSchedule });
+  const allPpsTeachers = answerLocally("All teachers for PPS", multiplePpsTeachers);
+  assert.equal(allPpsTeachers.intent, "SUBJECT_TEACHERS");
+  assert.ok(allPpsTeachers.html.indexOf("Your timetable teacher") < allPpsTeachers.html.indexOf("MS USER TEACHER"));
+  assert.ok(allPpsTeachers.html.indexOf("MS USER TEACHER") < allPpsTeachers.html.indexOf("MS OTHER TEACHER"), "the active timetable teacher is listed first across all published sections");
 
   const first = answerLocally("What is my first class today?", ctx);
   assert.equal(first.intent, "FIRST_CLASS");

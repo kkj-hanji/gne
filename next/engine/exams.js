@@ -14,8 +14,8 @@ export function examGroupForSection(value) {
 const theory = (id, group, date, subject, start, end, sections) => Object.freeze({
   id, category: "MSE-II theory", title: subject, date, start, end, sections, group,
   sourceLabel: "Applied Sciences · transcribed",
-  // Use the deployed extensionless route to avoid an extra .html redirect.
-  sourceUrl: "/notices/mse2-theory-2026",
+  // Link to the exact bundled page so the PWA never has to guess an SPA route.
+  sourceUrl: "/notices/mse2-theory-2026.html",
   sourceNote: "Transcribed from user-supplied notice APS/11/2368. Verify any later revision."
 });
 

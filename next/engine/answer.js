@@ -31,6 +31,7 @@ import { filterNotices, noticeStats } from "./notices.js";
 import { searchPapers } from "./papers.js";
 import { searchSyllabus } from "./syllabus.js";
 import { examsOnDate, importantExamEventsForSelection } from "./exams.js";
+import { answerCollegeQuestion } from "./college.js";
 import {
   bestMatch,
   canonicalize,
@@ -516,6 +517,86 @@ function subjectEntries(ctx) {
   return (ctx.schedule || []).filter((entry) => entry && entry.group === ctx.group);
 }
 
+function courseCodeFromQuestion(question = "") {
+  const raw = String(question || "").toLowerCase();
+  if (/\besc103\b/.test(raw)) return "ESC103";
+  if (/\besc105\b/.test(raw)) return "ESC105";
+  if (/\bpps\s*(?:(?:semester|sem)\s*(?:ii|2|two|second)|(?:ii|2|two|second)(?:\s*(?:semester|sem))?)\b/.test(raw)) return "ESC105";
+  if (/\b(?:python|programming fundamentals)\b/.test(raw)) return "ESC105";
+  if (/\b(?:pps|programming for problem solving|problem solving)\b/.test(raw)) return "ESC103";
+  if (/\b(?:maths?|mathematics)\s*[- ]?(?:11|12|21)\b/.test(raw)) return "AMBIGUOUS_MATH";
+  const mathLevel = raw.match(/\b(?:maths?|mathematics)\s*[- ]?(ii|i|2|1)\b/);
+  if (mathLevel) return /^(?:ii|2)$/.test(mathLevel[1]) ? "BSC104" : "BSC102";
+  const mathSemester = raw.match(/\b(?:maths?|mathematics)\s+(?:semester|sem)\s*[- ]?(1|2|one|two|first|second)\b/)
+    || raw.match(/\b(?:maths?|mathematics)\s+(first|second)\s+semester\b/);
+  if (mathSemester) return /^(?:2|two|second)$/i.test(mathSemester[1]) ? "BSC104" : "BSC102";
+  return "";
+}
+
+function courseCodeFromScheduleSubject(subject = "") {
+  const text = canonicalize(subject);
+  if (/\b(?:python|fundamentals)\b/.test(text)) return "ESC105";
+  if (/\b(?:pps|problem solving)\b/.test(text)) return "ESC103";
+  const mathLevel = text.match(/\b(?:maths?|mathematics)\s*[- ]?(ii|i|2|1)\b/);
+  if (mathLevel) return /^(?:ii|2)$/.test(mathLevel[1]) ? "BSC104" : "BSC102";
+  return "";
+}
+
+const FIRST_YEAR_COURSE_LABELS = Object.freeze({
+  ESC103: { title: "Programming for Problem Solving", semester: "1" },
+  ESC105: { title: "Programming Fundamentals using Python", semester: "2" },
+  BSC102: { title: "Mathematics-I", semester: "1" },
+  BSC104: { title: "Mathematics-II", semester: "2" }
+});
+
+function firstYearSubjectOptions(code) {
+  const course = FIRST_YEAR_COURSE_LABELS[code];
+  if (!course) return null;
+  const semester = ` semester ${course.semester}`;
+  return {
+    html: `<p><strong>${escapeHtml(course.title)} &middot; ${escapeHtml(code)}${semester ? ` &middot; Semester ${escapeHtml(course.semester)}` : ""}</strong></p><p>What would you like to know? Choose a verified option below.</p>`,
+    intent: "SUBJECT_OPTIONS",
+    confidence: 0.96,
+    plan: ["resolve the exact course identity", "offer marks and syllabus options", "keep adjacent courses separate"],
+    entities: { subject: course.title, syllabusCourseCode: code, requestedSemester: course.semester },
+    suggestions: [`${course.title}${semester} marks`, `${course.title}${semester} syllabus`, `All teachers for ${course.title}`]
+  };
+}
+function unavailableCourseAnswer(question, ctx, code) {
+  const titles = {
+    ESC103: "Programming for Problem Solving",
+    ESC105: "Programming Fundamentals using Python",
+    BSC102: "Mathematics-I",
+    BSC104: "Mathematics-II"
+  };
+  if (code === "AMBIGUOUS_MATH") {
+    return {
+      html: `<p><strong>I couldn't tell which Mathematics course you meant.</strong></p><p>Choose Mathematics-I or Mathematics-II; their timetable rows and scheme entries are different.</p>`,
+      intent: "COURSE_DISAMBIGUATION", confidence: 1,
+      plan: ["recognize an unclear mathematics level", "offer two verified course choices", "wait for the user's selection"],
+      entities: {},
+      suggestions: ["Mathematics-I semester 1", "Mathematics-II semester 2"]
+    };
+  }
+  const title = titles[code];
+  if (!title) return null;
+  const asksTeacher = wants(question, ["who", "teacher", "teachers", "faculty", "teaches", "sir", "maam", "mam"]);
+  const asksRoom = wants(question, ["where", "room", "venue", "location"]);
+  const detail = asksTeacher
+    ? `No teacher is listed for ${escapeHtml(title)} in the loaded weekly timetable for ${escapeHtml(selectionLabel(ctx))}. I did not substitute a teacher from a different course.`
+    : asksRoom
+      ? `No room is listed for ${escapeHtml(title)} in the loaded weekly timetable for ${escapeHtml(selectionLabel(ctx))}. I did not substitute a room from a different course.`
+      : `${escapeHtml(title)} has no matching row in the loaded weekly timetable for ${escapeHtml(selectionLabel(ctx))}. I did not substitute another course's classes.`;
+  const semester = code === "BSC104" || code === "ESC105" ? "2" : "1";
+  return {
+    html: `<p>${detail}</p>${sourceLine(ctx)}`,
+    intent: "SUBJECT_NOT_LISTED", confidence: 1,
+    plan: ["resolve the exact official course identity", "check only timetable rows for that course", "refuse to substitute a similar title"],
+    entities: { subject: title, syllabusCourseCode: code },
+    suggestions: [`${title} semester ${semester} syllabus`, `${title} semester ${semester} marks`]
+  };
+}
+
 function subjectWords(subject) {
   return canonicalize(subject).split(" ").filter(Boolean);
 }
@@ -545,8 +626,13 @@ function subjectScore(token, subject) {
 export function matchSubjects(question, entries = []) {
   const tokens = contentTokens(question);
   if (!tokens.length) return [];
+  const requestedCourse = courseCodeFromQuestion(question);
+  if (requestedCourse === "AMBIGUOUS_MATH") return [];
+  const candidates = requestedCourse
+    ? (Array.isArray(entries) ? entries : []).filter((entry) => courseCodeFromScheduleSubject(entry?.subject) === requestedCourse)
+    : entries;
   const scores = new Map();
-  for (const entry of entries) {
+  for (const entry of candidates) {
     if (!entry?.subject) continue;
     let score = 0;
     for (const token of tokens) score = Math.max(score, subjectScore(token, entry.subject));
@@ -565,7 +651,7 @@ function subjectResult(question, ctx, dayTarget = null) {
   if (!tokens.length || !ctx.schedule?.length) return null;
   const entries = subjectEntries(ctx);
   const matched = matchSubjects(question, entries);
-  if (!matched.length) return null;
+  if (!matched.length) return unavailableCourseAnswer(question, ctx, courseCodeFromQuestion(question));
   const subjects = matched.map((item) => item.subject);
   const all = entries.filter((entry) => subjects.includes(entry.subject));
   const target = dayTarget || resolveQuestionDay(question, ctx.now);
@@ -597,13 +683,21 @@ function subjectResult(question, ctx, dayTarget = null) {
     };
   }
   if (wantsWho) {
-    const teachers = [...new Set(unique.map((entry) => entry.teacher).filter((name) => name && !/not listed/i.test(name)))];
+    const selectedRows = classesFor(ctx.schedule, ctx.group, dayTarget?.day || "", ctx.subgroup)
+      .filter((entry) => subjects.includes(entry.subject));
+    const selectedTeachers = [...new Set(selectedRows.map((entry) => entry.teacher).filter((name) => name && !/not listed/i.test(name)))];
+    const allRows = [...(Array.isArray(ctx.allSchedule) ? ctx.allSchedule : ctx.schedule || []), ...entries];
+    const teacherRows = allRows.filter((entry) => subjects.includes(entry?.subject) && (!dayTarget || entry.day === dayTarget.day));
+    const teachers = [...new Set(teacherRows.map((entry) => entry.teacher).filter((name) => name && !/not listed/i.test(name)))];
+    const orderedTeachers = [...selectedTeachers, ...teachers.filter((name) => !selectedTeachers.includes(name))];
     return {
-      html: `<p><strong>${escapeHtml(subjects.join(", "))}</strong>${teachers.length ? ` is taught by ${escapeHtml(teachers.join(", "))}.` : " does not list a teacher in the official release."}</p>
-        ${unique.map((entry) => classCard(entry, ctx)).join("")}${sourceLine(ctx)}`,
+      html: `${selectedTeachers.length ? `<p><strong>Your timetable teacher${selectedTeachers.length === 1 ? "" : "s"}:</strong> ${escapeHtml(selectedTeachers.join(", "))}.</p>` : ""}
+        <p><strong>All teachers listed for ${escapeHtml(subjects.join(", "))}</strong>${orderedTeachers.length ? `: ${escapeHtml(orderedTeachers.join(", "))}.` : " are not listed in the official release."}</p>
+        <p class="answer-meta">Published timetable names across sections; your selected timetable teacher appears first when listed.</p>
+        ${selectedRows.map((entry) => classCard(entry, ctx)).join("")}${sourceLine(ctx)}`,
       intent: "SUBJECT_TEACHERS", confidence: 0.93,
       plan: ["match the subject tokens", "filter the active section", "collect published teacher names only"],
-      entities: { subject: subjects[0], teacher: teachers[0], day: target?.day }
+      entities: { subject: subjects[0], teacher: selectedTeachers[0] || orderedTeachers[0], day: target?.day }
     };
   }
   if (wantsWhen) {
@@ -626,8 +720,43 @@ function subjectResult(question, ctx, dayTarget = null) {
   };
 }
 
+function subjectOptionsResult(question, ctx) {
+  const text = canonicalize(question);
+  if (/\b(?:who|what|where|when|how|teacher|teachers|faculty|professor|sir|maam|mam|teach|taught|syllabus|unit|chapter|topic|marks?|credits?|assessment|internal|external|weightage|distribution|ca|ese|mse|mst|ltp|scheme|timetable|schedule|class|room|time|timing|day|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text)) return null;
+  const exactCourse = courseCodeFromQuestion(question);
+  if (exactCourse === "AMBIGUOUS_MATH") {
+    return {
+      html: `<p><strong>I couldn't tell which Mathematics course you meant.</strong></p><p>Choose Mathematics-I or Mathematics-II; their semester and timetable entries are different.</p>`,
+      intent: "COURSE_DISAMBIGUATION", confidence: 1,
+      plan: ["recognize an unclear mathematics level", "offer two verified course choices", "wait for the user's selection"],
+      entities: {},
+      suggestions: ["Mathematics-I semester 1", "Mathematics-II semester 2"]
+    };
+  }
+  if (exactCourse) return firstYearSubjectOptions(exactCourse);
+  const matched = matchSubjects(question, subjectEntries(ctx));
+  if (matched.length !== 1) return null;
+  const tokens = contentTokens(question);
+  if (!tokens.length || !tokens.every((token) => subjectScore(token, matched[0].subject) >= 0.84)) return null;
+
+  const subject = matched[0].subject;
+  const semester = text.match(/\b(?:semester|sem)\s*[- ]?([1-8])\b/)?.[1]
+    || String(question || "").toLowerCase().match(/\b([1-8])(?:st|nd|rd|th)\s*sem(?:ester)?\b/)?.[1]
+    || "";
+  const semesterLabel = semester ? ` semester ${semester}` : "";
+  return {
+    html: `<p><strong>${escapeHtml(subject)}${semesterLabel ? ` · ${escapeHtml(semesterLabel.trim())}` : ""}</strong></p><p>What would you like to know? Choose a verified option below.</p>`,
+    intent: "SUBJECT_OPTIONS",
+    confidence: 0.94,
+    plan: ["match the subject in the active timetable", "offer marks, syllabus and teacher questions without assuming which one was requested"],
+    entities: { subject, requestedSemester: semester },
+    suggestions: [`${subject}${semesterLabel} marks`, `${subject}${semesterLabel} syllabus`, `All teachers for ${subject}`]
+  };
+}
+
 function teacherResult(question, ctx) {
   if (!wants(question, ["teacher", "faculty", "professor", "sir", "maam", "mam", "who", "teaches", "padhata", "padhta"])) return null;
+  if (courseCodeFromQuestion(question)) return null;
   const tokens = contentTokens(question);
   if (!tokens.length) return null;
   const scoped = subjectEntries(ctx);
@@ -1167,11 +1296,38 @@ function departmentResult(question, ctx) {
   const text = canonicalize(question);
   if (!wants(text, ["hod", "head of department", "department", "dept", "branch"])) return null;
   const departments = Array.isArray(ctx.departments) ? ctx.departments : [];
-  if (!departments.length) return null;
-  const lower = text;
-  const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = departments.find((dept) => dept?.name && lower.includes(String(dept.name).toLowerCase()))
-    || departments.find((dept) => dept?.short && new RegExp(`\\b${escapeRe(String(dept.short).toLowerCase())}\\b`).test(lower));
+  if (!departments.length) {
+    if (!wants(text, ["hod", "head of department"])) return null;
+    return {
+      html: `<p><strong>The official department directory is not loaded right now.</strong></p><p>I cannot verify a Head of Department from the timetable. Try the <a href="https://gndec.ac.in/faculty/" target="_blank" rel="noopener noreferrer">official GNDEC Faculty directory</a>.</p>`,
+      intent: "DEPARTMENT_UNAVAILABLE", confidence: 1,
+      plan: ["recognize an HOD lookup", "check the live department directory", "refuse to substitute a room or teacher"]
+    };
+  }
+  const normalized = (value) => canonicalize(value).replace(/\bsciences\b/g, "science").replace(/\s+/g, " ").trim();
+  const query = ` ${normalized(text).replace(/\bdepartments?\b/g, " ").replace(/\s+/g, " ").trim()} `;
+  const aliases = {
+    applied: ["applied science", "applied sciences", "appsc"],
+    architecture: ["school of architecture", "architecture"]
+  };
+  const matches = departments.filter((dept) => {
+    if (!dept || typeof dept !== "object") return false;
+    const names = [dept.name, ...(aliases[String(dept.id || "").toLowerCase()] || [])].filter(Boolean);
+    if (names.some((name) => query.includes(` ${normalized(name)} `))) return true;
+    const codes = [dept.short, dept.id].filter(Boolean).map(normalized);
+    const queryTokens = query.trim().split(/\s+/);
+    return codes.some((code) => code.length >= 2 && queryTokens.includes(code));
+  });
+  if (matches.length > 1) {
+    const choices = matches.slice(0, 4);
+    return {
+      html: `<p><strong>I found more than one department match.</strong></p><p>Choose a department so I can check the correct official record.</p>`,
+      intent: "DEPARTMENT_AMBIGUOUS", confidence: 1,
+      plan: ["match the requested department against the official directory", "preserve multiple possible departments", "ask the user to choose"],
+      entities: {}, suggestions: choices.map((department) => `HOD ${department.name}`)
+    };
+  }
+  const match = matches[0];
   if (!match) return null;
   const hod = match.hod || {};
   if (!hod.name) {
@@ -1186,7 +1342,9 @@ function departmentResult(question, ctx) {
       <p class="answer-meta">${hod.email ? `${escapeHtml(hod.email)} · ` : ""}${hod.phone ? `${escapeHtml(hod.phone)} · ` : ""}${hod.verified === false ? "not verified" : "verified from the official department page"}</p>
       ${contentSource(hod.sourceUrl || match.homepage, "Official department page")}`,
     intent: "DEPARTMENT", confidence: 0.92,
-    plan: ["read the official campus directory", "match the department", "link the department page"]
+    plan: ["read the official campus directory", "match the department", "link the department page"],
+    entities: { department: match.name, departmentId: match.id || "", person: hod.name },
+    suggestions: [`${match.name} HOD email`, `${match.name} HOD phone`, `Official ${match.name} department page`]
   };
 }
 
@@ -1413,14 +1571,18 @@ function isFollowUp(text) {
  * Expand a short follow-up with the subject/day/room of the previous answer.
  * Only entities that were actually published are reused.
  */
-function applyMemory(text, memory) {
+function applyMemory(text, memory, ctx = {}) {
   if (!memory || !isFollowUp(text)) return text;
   let expanded = text;
-  const hasSubject = Boolean(matchSubjects(text, memory.subjectEntries || []).length);
+  const hasSubject = Boolean(courseCodeFromQuestion(text) || matchSubjects(text, subjectEntries(ctx)).length);
+  const temporalWords = new Set([...DAY_NAMES, ...Object.keys(MONTHS), "today", "tomorrow", "yesterday", "tonight", "now", "parso", "aaj", "kal"]);
+  const requestWords = new Set(["who", "what", "where", "when", "why", "how", "about", "teach", "teaches", "taught", "teacher", "teachers", "room", "rooms", "time", "timing", "which", "show", "tell", "find", "list", "it", "its", "this", "that", "there", "same"]);
+  const unmatchedTargets = contentTokens(text).filter((token) => !temporalWords.has(token) && !requestWords.has(token) && !/^\d/.test(token) && !/^\d{1,2}(?::\d{2})?(?:am|pm)?$/i.test(token));
+  const hasUnmatchedTarget = unmatchedTargets.length > 0 && !hasSubject;
   const explicitDay = Boolean(resolveQuestionDay(text));
-  if (memory.subject && !hasSubject && wants(text, ["where", "room", "who", "teacher", "when", "time", "which", "kaun", "kab", "kahan", "kithe"])) {
+  if (memory.subject && !hasSubject && !hasUnmatchedTarget && wants(text, ["where", "room", "who", "teacher", "when", "time", "which", "kaun", "kab", "kahan", "kithe"])) {
     expanded = `${memory.subject} ${expanded}`;
-  } else if (memory.subject && !hasSubject && /^(?:and|what about|aur|uska|uski|uske)\b/.test(text) && !explicitDay) {
+  } else if (memory.subject && !hasSubject && !hasUnmatchedTarget && /^(?:and|what about|aur|uska|uski|uske)\b/.test(text)) {
     expanded = `${memory.subject} ${expanded}`;
   }
   if (memory.day && !explicitDay && /\b(?:and|what about|us din|that day|then|phir|fer)\b/.test(text)) {
@@ -1429,25 +1591,84 @@ function applyMemory(text, memory) {
   return expanded;
 }
 
-function splitClauses(text) {
-  const pieces = canonicalize(text)
-    .split(/\s+(?:and|aur|plus|also|then|&)\s+|[,;]\s*/)
-    .map((piece) => piece.trim())
-    .filter((piece) => piece.length >= 3);
-  return [...new Set(pieces)].slice(0, 3);
+const MAX_COMPOUND_QUESTIONS = 8;
+const SHARED_PREDICATES = Object.freeze([
+  ["schedule", /\b(?:timetable|schedule|weekly|tt)\b/],
+  ["next-class", /\b(?:next|upcoming|current|class|lecture|period)\b/],
+  ["teacher", /\b(?:teacher|teaches|teach|faculty|professor|who|padhata|padhta)\b/],
+  ["room", /\b(?:room|rooms|where|venue|location|kahan|kahaan|kidhar|kithay|kithe|kamra)\b/],
+  ["time", /\b(?:when|time|timing|kab|kado)\b/],
+  ["exam", /\b(?:exam|datesheet|date sheet|paper|mse|ese|mst)\b/],
+  ["syllabus", /\b(?:syllabus|unit|units|chapter|chapters|topic|topics)\b/],
+  ["marks", /\b(?:marks?|credits?|assessment|weightage|distribution|ca|ese|mse|mst)\b/],
+  ["free-rooms", /\b(?:free|available|vacant|khali)\b/],
+  ["profile", /\b(?:profile|mentor|crn|registration|my section|my group)\b/]
+]);
+
+export function splitCompoundQuestions(question, ctx = {}) {
+  const raw = String(question || "");
+  const lines = raw.split(/\r?\n+/).map((line) => line.trim()).filter(Boolean);
+  const separatedLines = lines.length > 1 && lines.every((line) => {
+    const normalized = canonicalize(line);
+    return normalized.split(/\s+/).length >= 2
+      && (SHARED_PREDICATES.some(([, pattern]) => pattern.test(normalized)) || resolveQuestionDay(normalized, ctx.now));
+  });
+  const source = (separatedLines ? lines.join("; ") : raw.replace(/\r?\n+/g, " "))
+    .replace(/[!?;]+/g, "; ")
+    .replace(/\.\s+(?=[\p{L}])/gu, "; ");
+  const pieces = source
+    .split(/\s+(?:and|aur|plus|also|then|&)\s+|[,;]\s*/i)
+    .map((piece) => canonicalize(piece).trim())
+    .filter((piece) => piece.length >= 3 && !/^(?:please|kindly|plz|pls|please kindly|kindly please)$/i.test(piece));
+  const clauses = [...new Set(pieces)];
+  if (clauses.length < 2) return { clauses, overflow: false };
+
+  const fullText = canonicalize(question);
+  const predicates = SHARED_PREDICATES.filter(([, pattern]) => pattern.test(fullText));
+  if (predicates.length === 1) {
+    const [name, pattern] = predicates[0];
+    const predicateClauses = clauses.filter((clause) => pattern.test(clause));
+    const datedClauses = clauses.filter((clause) => resolveQuestionDay(clause, ctx.now));
+    const isDayExpansion = ["schedule", "next-class"].includes(name) && datedClauses.length === clauses.length;
+    if (!isDayExpansion && (predicateClauses.length === 1 || name === "profile")) {
+      return { clauses: [fullText], overflow: false };
+    }
+    if (isDayExpansion && predicateClauses.length === 1) {
+      const expanded = clauses.map((clause) => resolveQuestionDay(clause, ctx.now) && !pattern.test(clause) ? `${clause} timetable` : clause);
+      return { clauses: [...new Set(expanded)], overflow: false };
+    }
+  }
+  return { clauses: clauses.slice(0, MAX_COMPOUND_QUESTIONS), overflow: clauses.length > MAX_COMPOUND_QUESTIONS };
 }
 
-function combineAnswers(answers) {
-  const valid = answers.filter(Boolean);
-  if (valid.length < 2) return null;
-  const intents = new Set(valid.map((answer) => answer.intent));
-  if (intents.size < 2) return null;
+export function tooManyQuestionsAnswer() {
   return {
-    html: `<div class="answer-multi">${valid.map((answer) => `<div class="answer-part">${answer.html}</div>`).join("")}</div>`,
-    intent: "MULTI",
+    html: `<p><strong>I found more than ${MAX_COMPOUND_QUESTIONS} separate questions.</strong></p><p>I have not skipped the extra parts. Please split them into smaller prompts; I can answer up to ${MAX_COMPOUND_QUESTIONS} parts at a time.</p>`,
+    intent: "TOO_MANY_QUESTIONS", confidence: 1,
+    plan: ["count independent requests", "stop before silently dropping a question", "ask for a smaller bounded prompt"],
+    entities: {}, suggestions: []
+  };
+}
+
+export function combineQuestionAnswers(answers, unresolved = []) {
+  const seen = new Set();
+  const valid = answers.filter((answer) => {
+    if (!answer || seen.has(answer.html)) return false;
+    seen.add(answer.html);
+    return true;
+  });
+  if (!valid.length || (valid.length < 2 && !unresolved.length)) return null;
+  const partial = unresolved.length > 0;
+  const unresolvedHtml = partial
+    ? `<section class="answer-unresolved"><p><strong>I could not verify every part of that prompt.</strong></p><p>Please rephrase or ask these parts separately:</p><ul>${unresolved.map((part) => `<li>${escapeHtml(part)}</li>`).join("")}</ul></section>`
+    : "";
+  return {
+    html: `<div class="answer-multi">${valid.map((answer) => `<div class="answer-part">${answer.html}</div>`).join("")}</div>${unresolvedHtml}`,
+    intent: partial ? "MULTI_PARTIAL" : "MULTI",
     confidence: Math.min(...valid.map((answer) => answer.confidence)),
     plan: [...new Set(valid.flatMap((answer) => answer.plan))].slice(0, 8),
-    entities: Object.assign({}, ...valid.map((answer) => answer.entities || {}))
+    entities: {},
+    suggestions: [...new Set(valid.flatMap((answer) => Array.isArray(answer.suggestions) ? answer.suggestions : []))].slice(0, 3)
   };
 }
 
@@ -1494,10 +1715,11 @@ function answerOnce(question, ctx, memory, rawQuestion) {
   // syllabus links, mentors, departments, the calendar and the datesheet all
   // come from their own verified source.
   const contentAnswer = noticesResult(text, ctx)
+    || departmentResult(text, ctx)
+    || answerCollegeQuestion(text)
     || papersResult(text, ctx)
     || syllabusResult(text, ctx)
-    || mentoringResult(text, ctx)
-    || departmentResult(text, ctx);
+    || mentoringResult(text, ctx);
   if (contentAnswer) return contentAnswer;
 
   const academic = academicCalendarResult(text, ctx);
@@ -1563,9 +1785,9 @@ function answerOnce(question, ctx, memory, rawQuestion) {
     && !/\bclass\b/i.test(_rawQ2)) {
     return {
       html: `<p><strong>Library</strong> queries are outside Compass's scope.</p>
-<p>Visit the GNDEC Library directly or contact the librarian. Library hours: typically 9 AM – 5 PM on working days.</p>`,
+<p>Compass has no verified current library hours. Check the official contact page or call the GNDEC Central Library.</p>`,
       intent: "LIBRARY_INFO", confidence: 0.82,
-      plan: ["detect library query", "return polite not-available", "provide timing hint"]
+      plan: ["detect library query", "avoid an unverified hours claim", "direct to the official contact page"]
     };
   }
 
@@ -1691,16 +1913,31 @@ export function answerLocally(question, ctx = {}, memory = null) {
   if (!text) return null;
 
   // Compound questions get one verified section each, never a merged guess.
-  const clauses = splitClauses(text);
+  const parsedQuestions = splitCompoundQuestions(question, ctx);
+  if (parsedQuestions.overflow) return withSuggestion(tooManyQuestionsAnswer());
+  const clauses = parsedQuestions.clauses;
   if (clauses.length >= 2) {
-    const combined = combineAnswers(clauses.map((clause) => answerOnce(clause, ctx, memory, question)));
+    let turnMemory = memory;
+    const answers = [];
+    const unresolved = [];
+    for (const clause of clauses) {
+      const expanded = applyMemory(clause, turnMemory, ctx);
+      const answer = answerOnce(expanded, ctx, turnMemory, clause)
+        || (expanded !== clause ? answerOnce(clause, ctx, turnMemory, clause) : null);
+      answers.push(answer);
+      if (!answer) unresolved.push(clause);
+      else if (answer.entities) turnMemory = { ...turnMemory, ...answer.entities };
+    }
+    const combined = combineQuestionAnswers(answers, unresolved);
     if (combined) {
-      combined.suggestions = suggestionsFor(combined.intent);
       return withSuggestion(combined);
     }
   }
 
-  const expanded = applyMemory(text, memory);
+  const subjectOptions = subjectOptionsResult(question, ctx);
+  if (subjectOptions) return withSuggestion(subjectOptions);
+
+  const expanded = applyMemory(text, memory, ctx);
   const answer = answerOnce(expanded, ctx, memory, question)
     || (expanded !== text ? answerOnce(text, ctx, memory, question) : null);
   if (!answer) return null;

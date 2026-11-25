@@ -2,7 +2,7 @@
  * The legacy app is served from another origin and is never controlled here.
  */
 
-const VERSION = "compass-next-v3.1.8";
+const VERSION = "compass-next-v3.1.25";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 
@@ -28,7 +28,9 @@ const SHELL_ASSETS = [
   "./engine/fet-parser.js",
   "./engine/free-rooms.js",
   "./engine/answer.js",
+  "./engine/college.js",
   "./engine/brain-bridge.js",
+  "./engine/chat-copy.js",
   "./engine/storage.js",
   "./engine/reminders.js",
   "./engine/ics.js",
@@ -37,6 +39,7 @@ const SHELL_ASSETS = [
   "./engine/seating.js",
   "./engine/profile-lookup.js",
   "./engine/profile-history.js",
+  "./engine/people.js",
   "./engine/mentoring.js",
   "./engine/notices.js",
   "./engine/papers.js",
@@ -216,10 +219,6 @@ async function cacheFirst(request, cacheName, track) {
 
 async function navigate(request, cacheName, track) {
   const cache = await caches.open(cacheName);
-  if (request.cache !== "reload") {
-    const cached = await cache.match(request) || await cache.match("./index.html") || await cache.match("./");
-    if (cached) return taggedResponse(cached, "hit");
-  }
   try {
     const response = await fetch(request);
     if (response?.ok && /text\/html/i.test(response.headers.get("content-type") || "") && !new URL(request.url).search) {
@@ -227,7 +226,7 @@ async function navigate(request, cacheName, track) {
     }
     return response;
   } catch {
-    return (await cache.match("./index.html")) || (await cache.match("./")) || Response.error();
+    return (await cache.match(request)) || (await cache.match("./index.html")) || (await cache.match("./")) || Response.error();
   }
 }
 

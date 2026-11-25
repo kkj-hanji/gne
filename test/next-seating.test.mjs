@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { inferSeatingPlanMetadata, isSeatingQuestion, normalizeCrn, parseSeatingPlanText, seatAnswerHtml, seatingStudentForQuestion, selectSeatingPlan, selectSeatingPlanForExam } from "../next/engine/seating.js";
+import { inferSeatingPlanMetadata, isSeatingQuestion, normalizeCrn, parseSeatingPlanText, seatAnswerHtml, seatingEntryForExam, seatingStudentForQuestion, selectSeatingPlan, selectSeatingPlanForExam, seatingPlanTargetId, seatingTargetsForInfo } from "../next/engine/seating.js";
 import { handleRequest } from "../src/next-core.js";
 import { TRANSCRIBED_EXAMS } from "../next/engine/exams.js";
 
@@ -147,14 +147,47 @@ test("Today shows only the seating plan for the same exam date and matching pape
   assert.equal(selectSeatingPlanForExam([{ ...plans[1], subject: "MSE-II theory", title: "MSE-II theory" }], { ...pps, title: "MSE-II theory" })?.id, "pps-25", "a generic title can use one unique plan for the exact date and session");
 });
 
-test("admin PDF metadata matches a unique subject in the selected datesheet and supports replacing its plan", () => {
+test("Today keeps every published paper in the active datesheet period linked to its own seating lookup", () => {
+  const maths = { id: "math-23", title: "Mathematics-I", category: "MSE-II theory", date: "2026-11-23", start: 555, end: 645 };
+  const pps = { id: "pps-25", title: "PPS", category: "MSE-II theory", date: "2026-11-25", start: 555, end: 645 };
+  const physics = { id: "physics-26", title: "Physics", category: "MSE-II theory", date: "2026-11-26", start: 765, end: 855 };
+  const targets = seatingTargetsForInfo({ kind: "exam", period: { exams: [maths, pps, physics] }, today: [] }, physics);
+  assert.deepEqual(targets.map((exam) => exam.id), ["math-23", "pps-25", "physics-26"]);
+
+  const plans = [
+    { id: "seat-math", subject: "Mathematics-I", date: maths.date, start: maths.start, end: maths.end },
+    { id: "seat-pps", subject: "PPS", date: pps.date, start: pps.start, end: pps.end }
+  ];
+  assert.equal(selectSeatingPlanForExam(plans, maths)?.id, "seat-math");
+  assert.equal(selectSeatingPlanForExam(plans, pps)?.id, "seat-pps");
+  assert.equal(selectSeatingPlanForExam(plans, physics), null);
+  const entries = targets.map((exam) => ({ exam, status: "no-plan" }));
+  assert.equal(seatingEntryForExam(entries, maths)?.exam.id, "math-23");
+  assert.equal(seatingEntryForExam(entries, pps)?.exam.id, "pps-25");
+  assert.equal(seatingEntryForExam(entries, physics)?.exam.id, "physics-26");
+
+  const splitSession = { id: "split-afternoon", title: pps.title, category: pps.category, date: pps.date, start: 765, end: 855 };
+  const sameDayTargets = seatingTargetsForInfo({ kind: "exam", period: { exams: [pps, splitSession] } });
+  assert.equal(sameDayTargets.length, 2, "distinct papers or sessions on one day stay distinct");
+});
+
+test("admin PDF metadata matches a unique subject and session, preserving distinct same-day sittings", () => {
   const inferred = inferSeatingPlanMetadata("Seating Plan For PPS MSE-II Nov 2026.pdf", TRANSCRIBED_EXAMS);
   assert.equal(inferred.subject, "PPS");
   assert.equal(inferred.date, "2026-11-25");
   assert.equal(inferred.start, "09:15");
   assert.equal(inferred.end, "10:45");
-  assert.equal(inferred.id, "seat-2026-11-25-pps");
+  assert.equal(inferred.id, "seat-2026-11-25-pps-0915-1045");
   assert.equal(inferSeatingPlanMetadata("unknown MSE-II seating.pdf", TRANSCRIBED_EXAMS), null);
+
+  const existing = [
+    { id: "seat-2026-11-25-pps", subject: "PPS", date: "2026-11-25", start: 555, end: 645 },
+    { id: "seat-2026-11-23-mathematics-i", subject: "Mathematics-I", date: "2026-11-23", start: 555, end: 645 }
+  ];
+  assert.equal(seatingPlanTargetId(existing, { subject: "PPS", date: "2026-11-25", start: 555, end: 645 }), "seat-2026-11-25-pps", "re-uploading the same sitting reuses its current record");
+  const edgMorning = seatingPlanTargetId(existing, { subject: "EDG", date: "2026-11-28", start: 660, end: 750 });
+  const edgAfternoon = seatingPlanTargetId(existing, { subject: "EDG", date: "2026-11-28", start: 780, end: 870 });
+  assert.notEqual(edgMorning, edgAfternoon, "same-day sittings for one subject get separate IDs");
 });
 
 test("seating API publishes privately, reveals one exact assignment, and deletes it", async () => {
@@ -226,7 +259,13 @@ test("Ask and the profile/date UI route seating queries locally and keep profile
   assert.match(app, /seatAnswerHtml\(answerPlan, result\.seat, escapeHtml, studentLabel\)/);
   assert.match(app, /if \(!answer && v\("ask\.engine"\) === "auto"/);
   assert.match(app, /Your active profile changed during lookup/);
-  assert.match(app, /class="exam-seat-inline"/);
+  assert.match(app, /class="exam-seat-inline/);
+  assert.match(app, /function examHeroSeatingMarkup\(info\)/);
+  assert.match(app, /return \["matched", "missing"\]\.includes\(entry\?\.status\)/);
+  assert.match(app, /primary: period\.remaining\[0\] \|\| period\.next/);
+  const todaySeatingLoader = app.slice(app.indexOf("async function loadTodaySeating()"), app.indexOf("function examHeroSeatingMarkup"));
+  assert.ok(todaySeatingLoader.indexOf('if (!plan) { entries.push({ status: "no-plan", exam }); continue; }') < todaySeatingLoader.indexOf('if (!crn) { entries.push({ status: "profile-missing", exam, plan }); continue; }'), "papers without plans are identified even before profile lookup");
+  assert.match(app, /state\.todaySeating = \{ \.\.\.state\.todaySeating, checkedAt: 0 \}/);
   assert.doesNotMatch(app, /This request names a different roster profile/);
   assert.doesNotMatch(app, /today-seating-card/);
   assert.match(app, /data-admin-sign-in-form/);

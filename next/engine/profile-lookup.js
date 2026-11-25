@@ -8,18 +8,22 @@ function normalizedIdentifier(value = "") {
   return String(value).replace(/\D/g, "");
 }
 
+function rosterSerialIdentifiers(record = {}) {
+  return [record.serialNo, record.currentSerialNo, record.newSerialNo, ...(Array.isArray(record.oldSerialNos) ? record.oldSerialNos : [])]
+    .map(normalizedIdentifier).filter(Boolean);
+}
+
 /** Exact identifiers win. A saved name auto-matches only one exact roster name. */
 export function matchProfileRecord(records = [], profile = {}) {
   const crn = normalizedIdentifier(profile.crn);
   const registration = normalizedIdentifier(profile.registrationNo);
-  const serial = normalizedIdentifier(profile.serialNo || profile.currentSerialNo);
+  const serial = normalizedIdentifier(profile.serialNo || profile.currentSerialNo || profile.newSerialNo);
   const name = normalizeRosterName(profile.name);
   const matches = records.filter((record) => {
     if (crn || registration || serial) {
       const recordCrn = normalizedIdentifier(record?.crn);
       const recordRegistration = normalizedIdentifier(record?.registrationNo);
-      const recordSerial = normalizedIdentifier(record?.serialNo || record?.currentSerialNo);
-      return (crn && recordCrn === crn) || (registration && recordRegistration === registration) || (serial && recordSerial === serial);
+      return (crn && recordCrn === crn) || (registration && recordRegistration === registration) || (serial && rosterSerialIdentifiers(record).includes(serial));
     }
     return name && normalizeRosterName(record?.name) === name;
   });
@@ -43,7 +47,7 @@ export function findProfileRosterMatches(records = [], query = "") {
   const digits = normalizedIdentifier(text);
   if (digits.length >= 2 && digits.length === text.replace(/\s/g, "").length) {
     const ranked = records.map((record, index) => {
-      const ids = [record?.crn, record?.registrationNo, record?.serialNo, record?.currentSerialNo].map(normalizedIdentifier).filter(Boolean);
+      const ids = [record?.crn, record?.registrationNo, ...rosterSerialIdentifiers(record)].map(normalizedIdentifier).filter(Boolean);
       const exact = ids.some((value) => value === digits);
       const prefix = ids.some((value) => value.startsWith(digits));
       return { record, index, rank: exact ? 0 : prefix ? 1 : 2 };

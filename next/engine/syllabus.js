@@ -151,6 +151,7 @@ export function answerFirstYearSyllabus(question = "", courses = [], previousCou
   const asksSyllabus = /syllabus|unit|units|chapter|chapters|topic|topics|contents|course outline/i.test(normalized);
   const aliases = [
     ["programming for problem solving", ["pps", "programming", "problem solving"]],
+    ["programming fundamentals using python", ["python", "programming fundamentals", "programming"]],
     ["engineering drawing and graphics", ["edg", "drawing", "graphics"]],
     ["manufacturing practices", ["workshop", "mp", "manufacturing"]],
     ["mathematics", ["math", "maths", "mathematics"]],
@@ -159,20 +160,69 @@ export function answerFirstYearSyllabus(question = "", courses = [], previousCou
     ["basic electrical and electronics engineering", ["bee", "beee", "electrical"]]
   ];
   const explicitCode = courses.find((course) => new RegExp(`\\b${course.code}\\b`, "i").test(normalized));
+  const ppsSemesterTwo = isPpsSemesterTwoShorthand(question)
+    ? courses.find((course) => course.code === "ESC105")
+    : null;
+  const explicitSemester = semesterNumberInQuestion(question);
+  const malformedMathLevel = /\b(?:maths?|mathematics)\s*[- ]?(?:11|12|21)\b/i.test(question);
+  if (asksSyllabus && malformedMathLevel) {
+    const candidates = ["BSC102", "BSC104"].map((code) => courses.find((course) => course.code === code)).filter(Boolean);
+    if (candidates.length === 2) {
+      return {
+        html: `<p><strong>I couldn't tell which Mathematics course you meant by that number.</strong></p><p>Choose Mathematics-I or Mathematics-II to see its official syllabus.</p>`,
+        intent: "SYLLABUS_COURSE_AMBIGUOUS",
+        confidence: 1,
+        plan: ["recognize an unclear mathematics level", "offer both official course titles", "wait for the user's choice"],
+        entities: {},
+        suggestions: candidates.map((course) => `${firstYearCourseTitle(course)} semester ${course.semester} syllabus`)
+      };
+    }
+  }
   const mathLevel = normalized.match(/\b(?:math(?:ematics)?|maths)\s*[- ]?\s*(i{1,3}|1|2)\b/)?.[1];
   const mathRoman = mathLevel === "1" ? "i" : mathLevel === "2" ? "ii" : mathLevel;
   const asksMath = /\b(?:math(?:ematics)?|maths)\b/.test(normalized);
   // Apply the semester default only to an ambiguous math request. Otherwise
   // unit-only follow-ups such as "unit 6" must reuse the previous course,
   // rather than being silently captured by Mathematics for the active term.
-  const wantedMath = mathRoman || (asksMath && asksSyllabus ? (semester === "2" ? "ii" : semester === "1" ? "i" : "") : "");
-  const explicit = explicitCode || courses.find((course) => {
-    const title = course.title.toLowerCase();
-    if (wantedMath && title.includes("mathematics")) return new RegExp(`(?:^|\\s)${wantedMath}$`).test(title.trim());
-    return normalized.includes(title) || aliases.some(([canonical, words]) => title.includes(canonical) && words.some((word) => new RegExp(`\\b${word}\\b`, "i").test(normalized)));
+  const syllabusSemester = explicitSemester || semester;
+  const wantedMath = mathRoman || (asksMath && asksSyllabus ? (syllabusSemester === "2" ? "ii" : syllabusSemester === "1" ? "i" : "") : "");
+  const explicitTitleMatches = courses.filter((course) => {
+    const title = canonicalize(course.title);
+    return title.length >= 7 && ` ${canonicalize(normalized)} `.includes(` ${title} `);
   });
-  const course = explicit || courses.find((item) => item.code === previousCourse);
+  const explicit = explicitCode
+    || ppsSemesterTwo
+    || (wantedMath ? courses.find((course) => {
+      const title = course.title.toLowerCase();
+      return title.includes("mathematics") && new RegExp(`(?:^|\\s)${wantedMath}$`).test(title.trim());
+    }) : null)
+    || (explicitTitleMatches.length === 1 ? explicitTitleMatches[0] : null);
+  const aliasCandidates = explicit ? [] : courses.filter((course) => {
+    const title = course.title.toLowerCase();
+    return aliases.some(([canonical, words]) => title.includes(canonical)
+      && words.some((word) => new RegExp(`\\b${word}\\b`, "i").test(normalized)));
+  });
+  const requestedSemester = explicitSemester || semester;
+  const semesterCandidates = requestedSemester
+    ? aliasCandidates.filter((course) => courseSemesterStatus(course, requestedSemester) !== false)
+    : aliasCandidates;
+  const aliasMatch = semesterCandidates.length === 1 ? semesterCandidates[0]
+    : !requestedSemester && aliasCandidates.length === 1 ? aliasCandidates[0]
+      : null;
+  if (!explicit && !aliasMatch && (semesterCandidates.length > 1 || explicitTitleMatches.length > 1)) {
+    const candidates = (explicitTitleMatches.length > 1 ? explicitTitleMatches : semesterCandidates).slice(0, 3);
+    return {
+      html: `<p><strong>“${escapeHtml(question)}” matches more than one course in the official first-year syllabus.</strong></p><p>Choose the exact course to see its syllabus.</p>`,
+      intent: "SYLLABUS_COURSE_AMBIGUOUS",
+      confidence: 0.85,
+      plan: ["match the requested words against official course titles and aliases", "keep multiple course matches separate", "ask the user to choose a course"],
+      entities: {},
+      suggestions: candidates.map((course) => `${course.title}${course.semester ? ` semester ${course.semester}` : ""} syllabus`)
+    };
+  }
+  const course = explicit || aliasMatch || courses.find((item) => item.code === previousCourse);
   if (!course) return null;
+  if (explicitSemester && courseSemesterStatus(course, explicitSemester) === false) return null;
   if (!asksSyllabus) return null;
   const unitMatch = normalized.match(/\b(?:unit|u)\s*(?:-|number|no\.?\s*)?([1-9])\b/)
     || normalized.match(/\b(unit|chapter)\s+(one|two|three|four|five|six|seven|eight|nine)\b/);
@@ -249,6 +299,40 @@ function courseScore(course, text, tokens) {
   return score;
 }
 
+function semesterNumberInQuestion(question = "") {
+  const raw = String(question || "").toLowerCase();
+  const wordSemesters = { one: "1", first: "1", two: "2", second: "2" };
+  const explicit = raw.match(/\b(?:semester|sem)\s*[-:]?\s*([1-8]|one|two|first|second)\b/)
+    || raw.match(/\b([1-8])(?:st|nd|rd|th)\s*sem(?:ester)?\b/)
+    || raw.match(/\b(first|second)\s*sem(?:ester)?\b/);
+  if (explicit) return wordSemesters[explicit[1]] || explicit[1];
+  const ppsShortSemester = raw.match(/\b(?:pps|esc103|programming\s+for\s+problem\s+solving)\s+(ii|i|[12]|one|two|first|second)\b/);
+  if (!ppsShortSemester) return "";
+  return wordSemesters[ppsShortSemester[1]] || (/^(?:ii|2)$/i.test(ppsShortSemester[1]) ? "2" : /^(?:i|1)$/i.test(ppsShortSemester[1]) ? "1" : ppsShortSemester[1]);
+}
+
+function isPpsSemesterTwoShorthand(question = "") {
+  return /\bpps\s*(?:(?:semester|sem)\s*(?:ii|2|two|second)|(?:ii|2|two|second)(?:\s*(?:semester|sem))?)\b/i.test(String(question || ""));
+}
+
+function courseSemesterNumbers(course = {}) {
+  if (Array.isArray(course.semesters)) return course.semesters.map(Number).filter((value) => Number.isInteger(value) && value > 0);
+  const printed = String(course.semester || "");
+  return [...new Set((printed.match(/\b[1-8]\b/g) || []).map(Number))];
+}
+
+function courseSemesterStatus(course, semester) {
+  if (!semester) return null;
+  const semesters = courseSemesterNumbers(course);
+  return semesters.length ? semesters.includes(Number(semester)) : null;
+}
+
+function firstYearCourseTitle(course = {}) {
+  if (course.code === "BSC102") return "Mathematics-I";
+  if (course.code === "BSC104") return "Mathematics-II";
+  return cleanText(course.title || course.code);
+}
+
 /**
  * Resolve a course from any spelling. Math-I and Math-II are disambiguated from
  * an explicit level first, then from the student's semester. When neither is
@@ -260,20 +344,55 @@ export function resolveFirstYearSchemeCourse(question = "", scheme = null, { sem
   const raw = String(question || "").toLowerCase();
   const text = canonicalize(question);
   const tokens = text.split(" ").filter(Boolean);
+  const explicitSemester = semesterNumberInQuestion(question);
+  const requestedSemester = explicitSemester || semester;
+  const selectCourse = (course) => {
+    if (!course) return { course: null, candidates: [] };
+    if (explicitSemester && courseSemesterStatus(course, explicitSemester) === false) {
+      return { course: null, candidates: [], mismatchCourse: course, requestedSemester: explicitSemester };
+    }
+    return { course, candidates: [] };
+  };
 
   const explicitCode = courses.find((course) => new RegExp(`\\b${String(course.code).toLowerCase()}\\b`).test(text));
-  if (explicitCode) return { course: explicitCode, candidates: [] };
+  if (explicitCode) return selectCourse(explicitCode);
+
+  if (isPpsSemesterTwoShorthand(question)) {
+    return selectCourse(courses.find((course) => course.code === "ESC105") || null);
+  }
 
   const level = text.match(/\b(?:math|maths|mathematics)\s*[- ]?\s*(ii|2|i|1)\b/)?.[1]
     || raw.match(/\bm\s*[- ]?(ii|2|i|1)\b/)?.[1];
   const mathMentioned = /\b(?:math|maths|mathematics)\b/.test(text) || Boolean(raw.match(/\bm\s*[- ]?[12]\b/));
   if (mathMentioned) {
     const byCode = (code) => courses.find((course) => course.code === code) || null;
-    if (level && /^(?:ii|2)$/i.test(level)) return { course: byCode("BSC104"), candidates: [] };
-    if (level) return { course: byCode("BSC102"), candidates: [] };
-    if (semester === "2") return { course: byCode("BSC104"), candidates: [] };
-    if (semester === "1") return { course: byCode("BSC102"), candidates: [] };
+    if (/\b(?:maths?|mathematics)\s*[- ]?(?:11|12|21)\b/i.test(raw)) {
+      return { course: null, candidates: [byCode("BSC102"), byCode("BSC104")].filter(Boolean), ambiguousMath: true, malformedMath: true };
+    }
+    if (level && /^(?:ii|2)$/i.test(level)) return selectCourse(byCode("BSC104"));
+    if (level) return selectCourse(byCode("BSC102"));
+    if (requestedSemester === "2") return selectCourse(byCode("BSC104"));
+    if (requestedSemester === "1") return selectCourse(byCode("BSC102"));
     return { course: null, candidates: [byCode("BSC102"), byCode("BSC104")].filter(Boolean), ambiguousMath: true };
+  }
+
+  // A complete course title or multiword course alias is stronger evidence
+  // than a shared single-word alias such as "programming". Check that exact
+  // identity before filtering candidates to the requested semester, otherwise
+  // PPS can silently become the separate Python course in semester 2.
+  const exactNames = courses.filter((course) => {
+    const names = [course.title, ...(SCHEME_ALIASES[course.code] || [])]
+      .map(canonicalize)
+      .filter((name) => name.length >= 7 && name.split(" ").length > 1);
+    return names.some((name) => ` ${text} `.includes(` ${name} `));
+  });
+  if (exactNames.length === 1) return selectCourse(exactNames[0]);
+  if (exactNames.length > 1) {
+    const inSemester = explicitSemester
+      ? exactNames.filter((course) => courseSemesterStatus(course, explicitSemester) !== false)
+      : [];
+    if (inSemester.length === 1) return selectCourse(inSemester[0]);
+    return { course: null, candidates: (inSemester.length ? inSemester : exactNames).slice(0, 4) };
   }
 
   const ranked = courses
@@ -282,14 +401,26 @@ export function resolveFirstYearSchemeCourse(question = "", scheme = null, { sem
     .sort((a, b) => b.score - a.score);
   if (!ranked.length) {
     const previous = courses.find((course) => course.code === previousCourse);
-    return { course: previous || null, candidates: [] };
+    return selectCourse(previous || null);
+  }
+  if (explicitSemester) {
+    const inSemester = ranked.filter((entry) => courseSemesterStatus(entry.course, explicitSemester) !== false);
+    if (inSemester.length === 1) return selectCourse(inSemester[0].course);
+    if (inSemester.length > 1 && inSemester[0].score - (inSemester[1]?.score || 0) >= 0.08) {
+      return selectCourse(inSemester[0].course);
+    }
+    if (!inSemester.length && ranked.length === 1) {
+      return { course: null, candidates: [], mismatchCourse: ranked[0].course, requestedSemester: explicitSemester };
+    }
+    if (inSemester.length > 1) return { course: null, candidates: inSemester.slice(0, 4).map((entry) => entry.course) };
+    return { course: null, candidates: ranked.slice(0, 4).map((entry) => entry.course) };
   }
   if (ranked.length > 1 && semester) {
     const inSemester = ranked.filter((entry) => (entry.course.semesters || []).includes(Number(semester)));
-    if (inSemester.length === 1) return { course: inSemester[0].course, candidates: [] };
+    if (inSemester.length === 1) return selectCourse(inSemester[0].course);
   }
   if (ranked.length === 1 || ranked[0].score - (ranked[1]?.score || 0) >= 0.08) {
-    return { course: ranked[0].course, candidates: [] };
+    return selectCourse(ranked[0].course);
   }
   return { course: null, candidates: ranked.slice(0, 4).map((entry) => entry.course) };
 }
@@ -454,7 +585,9 @@ export function answerFirstYearScheme(question = "", scheme = null, { semester =
   }
 
   const resolved = resolveFirstYearSchemeCourse(question, scheme, { semester, previousCourse });
-  if (resolved.course) {
+  const asksCourseFacts = SCHEME_TOPIC.test(text)
+    || /\b(?:credits?|marks?|marking|assessment|internal|external|continuous assessment|ca|ese|mse|mst|weightage|distribution|total|passing|pass|minimum|duration|prerequisites?|practical|theory|ltp)\b/i.test(raw);
+  if (resolved.course && asksCourseFacts) {
     return {
       html: schemeCourseHtml(resolved.course, { semester, group, asksMse }),
       intent: "FIRST_YEAR_SCHEME_COURSE", confidence: 0.94,
@@ -462,7 +595,17 @@ export function answerFirstYearScheme(question = "", scheme = null, { semester =
       entities: { syllabusCourseCode: resolved.course.code, firstYearSemester: semester, firstYearGroup: group }
     };
   }
-  if (resolved.candidates?.length) {
+  if (resolved.candidates?.length && asksCourseFacts) {
+    if (resolved.malformedMath) {
+      return {
+        html: `<p><strong>I couldn't tell whether “math ${escapeHtml(String(question).match(/\b(?:maths?|mathematics)\s*[- ]?(11|12|21)\b/i)?.[1] || "11")}” means Mathematics-I or Mathematics-II.</strong></p><p>Choose the exact course before I show its marks.</p>`,
+        intent: "FIRST_YEAR_COURSE_DISAMBIGUATION",
+        confidence: 1,
+        plan: ["detect an invalid or unclear course number", "offer the two verified mathematics courses", "do not choose one from the timetable alias"],
+        entities: { firstYearSemester: semester, firstYearGroup: group },
+        suggestions: resolved.candidates.map((course) => `${course.title} semester ${(course.semesters || []).join("/")} marks`)
+      };
+    }
     return {
       html: `<p><strong>${resolved.ambiguousMath ? "Mathematics-I and Mathematics-II are two different courses" : "That shortform matches more than one course"}</strong></p>
         ${resolved.ambiguousMath ? `<p>Mathematics-I (BSC102) is the semester 1 course and Mathematics-II (BSC104) is the semester 2 course. Your semester is not known here, so both are shown.${semester ? "" : " Select your section/subgroup in Timetable or tell me your semester."}</p>` : ""}
@@ -497,6 +640,118 @@ export function answerFirstYearScheme(question = "", scheme = null, { semester =
     intent: "FIRST_YEAR_SCHEME", confidence: 0.93,
     plan: ["read the verified first-year scheme bundle", "group by published semester and group", "state the published assessment limitation"],
     entities: { firstYearSemester: semester, firstYearGroup: group }
+  };
+}
+
+/** Refuse to pass off one semester's verified course as another's. */
+export function answerFirstYearSemesterMismatch(question = "", scheme = null) {
+  const requestedSemester = semesterNumberInQuestion(question);
+  if (!requestedSemester) return null;
+  const resolved = resolveFirstYearSchemeCourse(question, scheme, { semester: "" });
+  const course = resolved.course || resolved.mismatchCourse;
+  if (!course || courseSemesterStatus(course, requestedSemester) !== false) return null;
+  const publishedSemesters = courseSemesterNumbers(course);
+  if (!publishedSemesters.length) return null;
+  const asksSyllabus = /\b(?:syllabus|unit|units|chapter|chapters|topic|topics|course outline|contents)\b/i.test(question);
+  const asksMarks = /\b(?:credits?|marks?|marking|assessment|internal|external|weightage|distribution|ca|ese|mse|mst|ltp)\b/i.test(question);
+  const requestedFact = asksSyllabus ? "syllabus" : asksMarks ? "marks" : "";
+  const relatedCourses = schemeCourseList(scheme).filter((candidate) => candidate.code !== course.code
+    && courseSemesterStatus(candidate, requestedSemester) === true
+    && courseScore(candidate, canonicalize(course.title), canonicalize(course.title).split(" ")) >= 0.82);
+  const suggestions = requestedFact
+    ? [
+      `${course.title} semester ${publishedSemesters[0]} ${requestedFact}`,
+      ...relatedCourses.slice(0, 2).map((candidate) => `${candidate.title} semester ${requestedSemester} ${requestedFact}`)
+    ]
+    : [
+      `${course.title} semester ${publishedSemesters[0]} marks`,
+      `${course.title} semester ${publishedSemesters[0]} syllabus`,
+      `All teachers for ${course.title}`
+    ];
+  return {
+    html: `<p><strong>${escapeHtml(course.title || course.code)} is not listed for Semester ${escapeHtml(requestedSemester)} in the verified first-year scheme.</strong></p><p>The source lists this course for Semester ${publishedSemesters.map(escapeHtml).join(" and ")}. I have not substituted that entry for your Semester ${escapeHtml(requestedSemester)} request.${relatedCourses.length ? ` A separate related course, ${escapeHtml(relatedCourses[0].title)} (${escapeHtml(relatedCourses[0].code)}), is listed for Semester ${escapeHtml(requestedSemester)}.` : ""}</p><p>Choose a verified option below.</p><p class="answer-source">Official source: <a href="${FIRST_YEAR_SCHEME_SOURCE}" target="_blank" rel="noopener noreferrer">Applied Sciences study scheme &amp; syllabus</a>.</p>`,
+    intent: "FIRST_YEAR_SEMESTER_MISMATCH",
+    confidence: 1,
+    plan: ["match the requested course", "compare its printed semester with the requested semester", "decline to return a different semester's data"],
+    entities: { syllabusCourseCode: course.code, requestedSemester, publishedSemesters },
+    suggestions: [...new Set(suggestions)].slice(0, 3)
+  };
+}
+
+function subjectOptionsForCourse(course) {
+  const semester = String(course.semester || "");
+  const semesterLabel = semester ? ` semester ${semester}` : "";
+  const title = firstYearCourseTitle(course);
+  return {
+    html: `<p><strong>${escapeHtml(title)} &middot; ${escapeHtml(course.code)}${semesterLabel ? ` &middot; Semester ${escapeHtml(semester)}` : ""}</strong></p><p>What would you like to know? Choose a verified option below.</p>`,
+    intent: "SUBJECT_OPTIONS",
+    confidence: 0.96,
+    plan: ["resolve the exact first-year course from the published scheme", "offer marks and syllabus without assuming which was requested"],
+    entities: { subject: title, syllabusCourseCode: course.code, requestedSemester: semester },
+    suggestions: [`${title}${semesterLabel} marks`, `${title}${semesterLabel} syllabus`, `All teachers for ${title}`]
+  };
+}
+/** Interpret standalone course shorthand only when it identifies a verified course. */
+export function answerFirstYearCourseOptions(question = "", courses = [], { semester = "" } = {}) {
+  if (!Array.isArray(courses) || !courses.length) return null;
+  const raw = String(question || "").toLowerCase().replace(/[?!.,]+$/g, "").replace(/\s+/g, " ").trim();
+  if (/\b(?:syllabus|unit|units|chapter|chapters|topic|topics|marks?|credits?|assessment|teacher|teachers|faculty|who|where|when|class|timetable|schedule|room|exam)\b/i.test(raw)) return null;
+
+  const exactTitle = courses.find((course) => canonicalize(course.title) === canonicalize(raw));
+  if (exactTitle) return subjectOptionsForCourse(exactTitle);
+
+  // Explicit shorthand defined by the student: PPS 2 / PPS sem 2 means the
+  // published second-semester Python course ESC105.
+  if (isPpsSemesterTwoShorthand(raw)) {
+    const python = courses.find((course) => course.code === "ESC105");
+    return python ? subjectOptionsForCourse(python) : null;
+  }
+
+  const mathPrefix = /^(?:maths?|mathematics)/i;
+  if (!mathPrefix.test(raw)) return null;
+  const first = courses.find((course) => course.code === "BSC102");
+  const second = courses.find((course) => course.code === "BSC104");
+  const malformed = /^(?:maths?|mathematics)\s*[- ]?(?:11|12|21)(?:\s+(?:semester|sem)\s*(?:[12]|one|two|first|second))?$/i.test(raw);
+  const level = /^(?:maths?|mathematics)\s*[- ]?(ii|i|2|1)$/i.exec(raw)?.[1]?.toLowerCase() || "";
+  const semesterMatch = /^(?:maths?|mathematics)\s+(?:semester|sem)\s*[- ]?(1|2|one|two|first|second)$/i.exec(raw)
+    || /^(?:maths?|mathematics)\s+(first|second)\s+semester$/i.exec(raw);
+  if (malformed || !level && !semesterMatch && !["1", "2"].includes(String(semester))) {
+    const candidates = [first, second].filter(Boolean);
+    if (candidates.length !== 2) return null;
+    return {
+      html: `<p><strong>I couldn't tell which Mathematics course you meant${malformed ? " by that number" : ""}.</strong></p><p>Choose Mathematics-I or Mathematics-II below.</p>`,
+      intent: "COURSE_DISAMBIGUATION",
+      confidence: 1,
+      plan: ["recognize an unclear course number", "offer the two verified mathematics courses", "wait for the user's selection"],
+      entities: {},
+      suggestions: candidates.map((course) => `${firstYearCourseTitle(course)} semester ${course.semester}`)
+    };
+  }
+  const semValue = semesterMatch?.[1]?.toLowerCase() || "";
+  const semesterFromWord = { one: "1", first: "1", two: "2", second: "2" }[semValue];
+  const requestedSemester = semesterFromWord || (/^[12]$/.test(semValue) ? semValue : "")
+    || (level ? (/^(?:ii|2)$/.test(level) ? "2" : "1") : String(semester));
+  const course = requestedSemester === "2" ? second : first;
+  return course ? subjectOptionsForCourse(course) : null;
+}
+
+/** Ask for the missing subject/action when a user only types “sem 2”. */
+export function answerBareSemesterOptions(question = "") {
+  const raw = String(question || "").toLowerCase().replace(/[?!.,]+$/g, "").replace(/\s+/g, " ").trim();
+  const match = /^(?:sem(?:ester)?\s*[- ]?(1|2|one|two|first|second)|(1|2|one|two|first|second)(?:st|nd)?\s*sem(?:ester)?|(first|second)\s+semester)$/.exec(raw);
+  if (!match) return null;
+  const semesterToken = match[1] || match[2] || match[3];
+  const semester = { one: "1", first: "1", two: "2", second: "2" }[semesterToken] || semesterToken;
+  const suggestions = semester === "2"
+    ? ["Semester 2 subjects", "Mathematics-II semester 2 syllabus", "PPS semester 2 syllabus"]
+    : ["Semester 1 subjects", "Mathematics-I semester 1 syllabus", "PPS semester 1 syllabus"];
+  return {
+    html: `<p><strong>Semester ${semester}.</strong> What do you want to see: the subject list, or a particular course's syllabus?</p>`,
+    intent: "SEMESTER_OPTIONS",
+    confidence: 1,
+    plan: ["understand sem as semester", "ask for the course or information type", "offer published semester-specific choices"],
+    entities: { firstYearSemester: semester },
+    suggestions
   };
 }
 

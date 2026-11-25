@@ -134,7 +134,7 @@ const PHRASES = [
   ["\\b(?:exam\\s*hall|exam\\s*room|exam\\s*venue|exam\\s*centre|center)\\b", "exam room"],
   // Fees / hostel (should return not-found gracefully)
   // Fees / hostel / result (should return not-found gracefully)
-  ["\\b(?:hostel|mess|canteen|cafeteria|accommodation)\\b", "hostel"],
+  ["\\b(?:hostel|mess|accommodation)\\b", "hostel"],
   ["\\b(?:fees?|tuition|fee\\s*structure)\\b", "fees"],
   ["\\b(?:result|marksheet|mark\\s*sheet|grade\\s*card)\\b", "result"],
   ["\\b(?:admit\\s*card|hall\\s*ticket|roll\\s*slip)\\b", "admit card"],
@@ -620,5 +620,6 @@ export const QUERY_STOPWORDS = Object.freeze(new Set([
 export function contentTokens(question = "") {
   return canonicalize(question)
     .split(" ")
+    .map((token) => token.replace(/^\.+|\.+$/g, ""))
     .filter((token) => token.length >= 2 && !QUERY_STOPWORDS.has(token) && !/^\d{1,2}$/.test(token));
 }

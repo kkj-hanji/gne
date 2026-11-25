@@ -115,8 +115,14 @@ test("Indic script is transliterated deterministically without a model", () => {
 
 test("subject codes and nicknames stay meaningful", () => {
   assert.deepEqual(contentTokens("PPS ka teacher kaun hai"), ["pps"]);
+  assert.deepEqual(contentTokens("PPS."), ["pps"]);
   assert.deepEqual(contentTokens("BEE dept faculty"), ["bee", "dept"]);
   assert.ok(contentTokens("MCPD class").includes("mcpd"));
+});
+
+test("campus place names are not collapsed into a different facility", () => {
+  assert.equal(canonicalize("GNDEC canteen"), "gndec canteen");
+  assert.equal(canonicalize("college cafeteria"), "college cafeteria");
 });
 
 test("mentions and fuzzy matching tolerate realistic typos", () => {
@@ -185,6 +191,91 @@ test("broken SMS-style input still routes", () => {
   assert.equal(intentOf("exm dateshet kab"), "DATESHEET");
 });
 
+test("generated case, whitespace and punctuation variants preserve core intents", () => {
+  const examples = [
+    ["What is my next class", "NEXT_CLASS"],
+    ["where is physics", "SUBJECT_ROOMS"],
+    ["who teaches PPS", "SUBJECT_TEACHERS"],
+    ["which rooms are free now", "FREE_ROOMS"],
+    ["exam datesheet", "DATESHEET"],
+    ["my section and mentor", "PROFILE"]
+  ];
+  const mutations = [
+    (text) => text,
+    (text) => text.toUpperCase(),
+    (text) => `  ${text.replaceAll(" ", "   ")}  `,
+    (text) => `!!${text}??`,
+    (text) => text.replaceAll(" ", "\n"),
+    (text) => `PLEASE, ${text}.`
+  ];
+  let tested = 0;
+  for (const [query, expectedIntent] of examples) for (const mutate of mutations) {
+    const variant = mutate(query);
+    assert.equal(intentOf(variant), expectedIntent, variant);
+    tested += 1;
+  }
+  assert.equal(tested, 36);
+});
+
+test("compound prompts keep same-intent day requests across language and punctuation variants", () => {
+  const prompts = [
+    "today and tomorrow timetable",
+    "TODAY   schedule AND   TOMORROW schedule!!!",
+    "today timetable; tomorrow timetable?",
+    "aaj ka timetable aur kal ka timetable",
+    "today schedule. tomorrow schedule"
+  ];
+  for (const prompt of prompts) {
+    const answer = answerLocally(prompt, ctx);
+    assert.equal(answer?.intent, "MULTI", prompt);
+    assert.match(answer.html, /Today|Monday/, prompt);
+    assert.match(answer.html, /Tomorrow|Tuesday/, prompt);
+    assert.match(answer.html, /MATH I/, prompt);
+    assert.match(answer.html, /PROGRAMMING FOR PROBLEM SOLVING/, prompt);
+  }
+  const separateLines = answerLocally("today timetable\nwho teaches PPS", ctx);
+  assert.equal(separateLines?.intent, "MULTI");
+  assert.match(separateLines.html, /MATH I/);
+  assert.match(separateLines.html, /MS SIMRAN/);
+  assert.equal(intentOf("what is my next\nclass"), "NEXT_CLASS", "a visual line wrap does not create a new request");
+});
+
+test("compound prompts answer up to eight clauses and disclose any unverified part", () => {
+  const five = answerLocally("today timetable and tomorrow timetable and Wednesday timetable and Thursday timetable and Friday timetable", ctx);
+  assert.equal(five?.intent, "MULTI");
+  for (const day of ["Today", "Tomorrow", "Wednesday", "Thursday", "Friday"]) assert.match(five.html, new RegExp(day));
+
+  const partial = answerLocally("today timetable and tomorrow timetable and quantum basket weaving", ctx);
+  assert.equal(partial?.intent, "MULTI_PARTIAL");
+  assert.match(partial.html, /MATH I/);
+  assert.match(partial.html, /quantum basket weaving/i);
+  assert.match(partial.html, /could not verify every part/i);
+
+  const eight = answerLocally("today timetable and tomorrow timetable and Wednesday timetable and Thursday timetable and Friday timetable and Saturday timetable and Sunday timetable and Monday timetable", ctx);
+  assert.equal(eight?.intent, "MULTI");
+  for (const day of ["Today", "Tomorrow", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"]) assert.match(eight.html, new RegExp(day));
+
+  const nine = answerLocally("today timetable and tomorrow timetable and Monday timetable and Tuesday timetable and Wednesday timetable and Thursday timetable and Friday timetable and Saturday timetable and Sunday timetable", ctx);
+  assert.equal(nine?.intent, "TOO_MANY_QUESTIONS");
+  assert.match(nine.html, /eight|8/);
+  assert.match(nine.html, /split/i);
+});
+
+test("one shared subject predicate applies to every named subject", () => {
+  const answer = answerLocally("who teaches math and physics", ctx);
+  assert.equal(answer?.intent, "SUBJECT_TEACHERS");
+  assert.match(answer.html, /DR GAGANDEEP KAUR LOTEY/);
+  assert.match(answer.html, /DR PARAMJIT SINGH/);
+});
+
+test("an explicitly named new subject overrides the previous answer context", () => {
+  const math = answerLocally("who teaches math", ctx);
+  const physics = answerLocally("who teaches physics", ctx, math.memory);
+  assert.equal(physics?.intent, "SUBJECT_TEACHERS");
+  assert.match(physics.html, /DR PARAMJIT SINGH/);
+  assert.doesNotMatch(physics.html, /DR GAGANDEEP KAUR LOTEY/);
+});
+
 test("subject codes and nicknames are matched to real subjects only", () => {
   assert.match(htmlOf("PPS teacher"), /PROGRAMMING FOR PROBLEM SOLVING/);
   const edgCtx = buildAnswerContext({
@@ -215,6 +306,117 @@ test("follow-up memory reuses only published entities", () => {
   assert.equal(follow.intent, "SUBJECT_ROOMS");
   assert.match(follow.html, /F108/);
   assert.equal(follow.memory.subject, "PHYSICS");
+
+  const impliedTeacher = answerLocally("who teaches it?", ctx, first.memory);
+  assert.equal(impliedTeacher?.intent, "SUBJECT_TEACHERS");
+  assert.match(impliedTeacher.html, /DR PARAMJIT SINGH/);
+  const impliedRoom = answerLocally("what about its room?", ctx, impliedTeacher.memory);
+  assert.equal(impliedRoom?.intent, "SUBJECT_ROOMS");
+  assert.match(impliedRoom.html, /F108/);
+});
+
+test("HOD questions resolve singular, plural and short department names before room fuzzy matching", () => {
+  const departments = [{
+    id: "applied", name: "Applied Sciences", short: "AS", homepage: "https://appsc.gndec.ac.in/",
+    hod: { name: "Dr. Harpreet Kaur Grewal", email: "applied@gndec.ac.in", phone: "0161-5064531", verified: true, sourceUrl: "https://appsc.gndec.ac.in/" }
+  }];
+  const noisy = buildAnswerContext({ ...ctx, departments, schedule: [
+    ...schedule,
+    { id: "chem-lab", group: "CEA", day: "Monday", start: 750, end: 810, subject: "CHEMISTRY", teacher: "DR RAJVIR KAUR", room: "CHEM LAB 2 (MATERIAL SCIENCE LAB)", type: "L", cohorts: "" }
+  ] });
+  for (const query of ["hod applied science", "HOD Applied Sciences", "who is head of department of applied science", "HOD AppSc", "HOD AS"]) {
+    const answer = answerLocally(query, noisy);
+    assert.equal(answer?.intent, "DEPARTMENT", query);
+    assert.match(answer.html, /Dr\. Harpreet Kaur Grewal/);
+    assert.doesNotMatch(answer.html, /CHEM LAB 2|CHEMISTRY/);
+    assert.match(answer.html, /appsc\.gndec\.ac\.in/);
+    assert.deepEqual(answer.suggestions, [
+      "Applied Sciences HOD email",
+      "Applied Sciences HOD phone",
+      "Official Applied Sciences department page"
+    ]);
+    assert.doesNotMatch(answer.suggestions.join(" "), /room|free now/i);
+  }
+
+  const unpublished = answerLocally("HOD Applied Science", buildAnswerContext({ ...ctx, departments: [{ id: "applied", name: "Applied Sciences", short: "AS", homepage: "https://appsc.gndec.ac.in/" }] }));
+  assert.equal(unpublished?.intent, "DEPARTMENT_NO_HOD");
+  assert.match(unpublished.html, /No verified head-of-department detail/);
+
+  const offline = answerLocally("HOD Applied Science", buildAnswerContext({ ...ctx, departments: [] }));
+  assert.equal(offline?.intent, "DEPARTMENT_UNAVAILABLE");
+  assert.doesNotMatch(offline.html, /CHEM LAB 2|CHEMISTRY/);
+});
+
+test("college questions use bundled official facts and refuse stale or missing details", () => {
+  const about = answerLocally("about GNDEC", ctx);
+  assert.equal(about?.intent, "COLLEGE_OVERVIEW");
+  assert.match(about.html, /established in 1956/);
+  assert.match(about.html, /gndec\.ac\.in/);
+
+  const history = answerLocally("when was the college founded", ctx);
+  assert.equal(history?.intent, "COLLEGE_HISTORY");
+  assert.match(history.html, /8 April 1956/);
+  assert.match(history.html, /Rajendra Prasad/);
+
+  const address = answerLocally("GNDEC address and contact", ctx);
+  assert.equal(address?.intent, "COLLEGE_CONTACT");
+  assert.match(address.html, /Gill Park, Gill Road, Ludhiana 141006/);
+  assert.match(address.html, /0161 5064501/);
+
+  const courses = answerLocally("courses offered at GNDEC", ctx);
+  assert.equal(courses?.intent, "COLLEGE_COURSES");
+  assert.match(courses.html, /Robotics and Artificial Intelligence/);
+  assert.match(courses.html, /published intake 300/);
+  assert.match(courses.html, /checked 2026-11-24/);
+  assert.equal(answerLocally("what courses are available at GNDEC", ctx)?.intent, "COLLEGE_COURSES");
+  assert.equal(answerLocally("which courses are offered", ctx)?.intent, "COLLEGE_COURSES");
+
+  const library = answerLocally("GNDEC library hours", ctx);
+  assert.equal(library?.intent, "COLLEGE_HOURS_UNVERIFIED");
+  assert.match(library.html, /does not publish current library hours/);
+  assert.match(library.html, /0161 5064597/);
+  assert.doesNotMatch(library.html, /9 AM.*5 PM/);
+
+  const hostel = answerLocally("GNDEC hostel availability", ctx);
+  assert.equal(hostel?.intent, "COLLEGE_HOSTEL");
+  assert.match(hostel.html, /2024 information brochure/);
+  assert.match(hostel.html, /subject to availability/);
+  assert.match(hostel.html, /do not include current vacancy/);
+
+  const canteen = answerLocally("GNDEC canteen", ctx);
+  assert.equal(canteen?.intent, "COLLEGE_CANTEEN");
+  assert.match(canteen.html, /2022 official information brochure/);
+  assert.match(canteen.html, /does not verify current opening hours/);
+
+  const facilities = answerLocally("college campus facilities", ctx);
+  assert.equal(facilities?.intent, "COLLEGE_FACILITIES");
+  assert.match(facilities.html, /swimming pool/);
+  assert.match(facilities.html, /dated publication/);
+
+  const fees = answerLocally("B.Tech fees at GNDEC", ctx);
+  assert.equal(fees?.intent, "COLLEGE_FEES");
+  assert.match(fees.html, /does not guess college fees/);
+  assert.match(fees.html, /admission and fee information/);
+
+  const admitCard = answerLocally("GNDEC admit card", ctx);
+  assert.equal(admitCard?.intent, "COLLEGE_ADMIT_CARD");
+  assert.match(admitCard.html, /session-specific/);
+
+  const placements = answerLocally("GNDEC placement rate", ctx);
+  assert.equal(placements?.intent, "COLLEGE_PLACEMENTS");
+  assert.match(placements.html, /not bundled/);
+  assert.match(placements.html, /0161 5064511/);
+
+  const directions = answerLocally("distance from railway station to GNDEC", ctx);
+  assert.equal(directions?.intent, "COLLEGE_CONTACT");
+  assert.match(directions.html, /7 km from Ludhiana Railway Station/);
+  assert.match(directions.html, /Use a current map for the route/);
+
+  const unverifiedPlacements = answerLocally("what is the GNDEC placement rate", ctx);
+  assert.equal(unverifiedPlacements?.intent, "COLLEGE_PLACEMENTS");
+  assert.match(unverifiedPlacements.html, /not bundled/);
+  assert.doesNotMatch(unverifiedPlacements.html, /\d+\s*(?:lakh|%|package)/i, "stale placement metrics are not invented");
+  assert.equal(answerLocally("GNDEC timetable", ctx)?.intent, "WEEK_SCHEDULE", "college context does not steal timetable questions");
 });
 
 test("room questions never confuse a time with a room code", () => {

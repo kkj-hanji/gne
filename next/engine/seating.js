@@ -16,6 +16,28 @@ export function normalizeSeatingText(value) {
   return normalizedText(value);
 }
 
+function timeIdPart(minutes) {
+  const value = Number(minutes);
+  return Number.isInteger(value) && value >= 0 && value < 1440
+    ? `${String(Math.floor(value / 60)).padStart(2, "0")}${String(value % 60).padStart(2, "0")}`
+    : "";
+}
+
+/** Keep separate same-subject sittings distinct while reusing an exact existing plan. */
+export function seatingPlanTargetId(plans = [], { subject = "", date = "", start = null, end = null } = {}) {
+  const subjectKey = normalizedText(subject);
+  const existing = (Array.isArray(plans) ? plans : []).find((plan) => plan?.date === date
+    && normalizedText(plan?.subject) === subjectKey
+    && Number(plan?.start) === Number(start)
+    && Number(plan?.end) === Number(end));
+  if (existing?.id) return existing.id;
+  const slug = subjectKey.replace(/\s+/g, "-").slice(0, 64);
+  const startPart = timeIdPart(start);
+  const endPart = timeIdPart(end);
+  const session = startPart && endPart ? `-${startPart}-${endPart}` : "";
+  return `seat-${date}-${slug}${session}`;
+}
+
 /** Infer seating-plan metadata only from a subject with one datesheet match. */
 export function inferSeatingPlanMetadata(fileName, exams = []) {
   const text = normalizedText(fileName);
@@ -42,7 +64,7 @@ export function inferSeatingPlanMetadata(fileName, exams = []) {
   const exam = unique[0];
   if (exam.start == null || exam.end == null || !/mse\s*[-–]?\s*(?:ii|2)/i.test(exam.category || "")) return null;
   const dateLabel = new Date(`${exam.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-  const id = `seat-${exam.date}-${normalizedText(subject).replace(/\s+/g, "-")}`;
+  const id = seatingPlanTargetId([], { subject, date: exam.date, start: exam.start, end: exam.end });
   return {
     id, subject, date: exam.date,
     start: `${String(Math.floor(exam.start / 60)).padStart(2, "0")}:${String(exam.start % 60).padStart(2, "0")}`,
@@ -68,6 +90,34 @@ export function selectSeatingPlanForExam(plans = [], exam = {}) {
   if (ranked[0].subjectScore > 0) return ranked.length === 1 || ranked[0].score > ranked[1].score ? ranked[0].plan : null;
   const sameSession = ranked.filter((entry) => entry.sameSession);
   return sameSession.length === 1 ? sameSession[0].plan : null;
+}
+
+/** Seat lookups shown on Today follow its whole active datesheet period. */
+export function seatingTargetsForInfo(info = {}, upcomingExam = null) {
+  let candidates = [];
+  if (info.kind === "exam") candidates = info.period?.exams || info.today || [];
+  else if (info.kind === "exam-soon") candidates = info.exams?.length ? info.exams : info.primary ? [info.primary] : [];
+  else if (upcomingExam) candidates = [upcomingExam];
+  const unique = new Map();
+  for (const exam of Array.isArray(candidates) ? candidates : []) {
+    if (!exam?.date) continue;
+    const key = exam.id || `${exam.date}|${normalizedText(exam.title)}|${exam.start ?? ""}|${exam.end ?? ""}`;
+    if (!unique.has(key)) unique.set(key, exam);
+  }
+  return [...unique.values()].slice(0, 40);
+}
+
+/** Match a rendered exam row back to its saved lookup without conflating sessions. */
+export function seatingEntryForExam(entries = [], exam = {}) {
+  return (Array.isArray(entries) ? entries : []).find((entry) => {
+    const target = entry?.exam;
+    if (!target) return false;
+    if (target.id && exam.id) return target.id === exam.id;
+    return target.date === exam.date
+      && normalizedText(target.title) === normalizedText(exam.title)
+      && (target.start == null || exam.start == null || target.start === exam.start)
+      && (target.end == null || exam.end == null || target.end === exam.end);
+  }) || null;
 }
 
 function physicalRowsFromLayout(layout) {
