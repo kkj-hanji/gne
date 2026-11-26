@@ -5,7 +5,7 @@
     "facultyDirectory": "https://gndec.ac.in/faculty/",
     "provenance": "Department names, Heads of Department, contact details, notices, and syllabus documents are read from public GNDEC pages. A missing value stays missing; Compass does not infer an appointment or a document."
   },
-  "checkedAt": "2026-11-24T04:57:12.267Z",
+  "checkedAt": "2026-11-26T03:02:37.055Z",
   "departments": [
     {
       "id": "ce",
@@ -23,7 +23,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:56:59.738Z",
+      "checkedAt": "2026-11-26T03:02:24.057Z",
       "syllabusErrors": []
     },
     {
@@ -43,7 +43,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:00.310Z",
+      "checkedAt": "2026-11-26T03:02:24.449Z",
       "syllabusErrors": []
     },
     {
@@ -63,7 +63,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:00.424Z",
+      "checkedAt": "2026-11-26T03:02:24.420Z",
       "syllabusErrors": []
     },
     {
@@ -82,7 +82,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:01.067Z",
+      "checkedAt": "2026-11-26T03:02:24.553Z",
       "syllabusErrors": []
     },
     {
@@ -101,7 +101,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:00.965Z",
+      "checkedAt": "2026-11-26T03:02:25.267Z",
       "syllabusErrors": []
     },
     {
@@ -121,7 +121,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:01.191Z",
+      "checkedAt": "2026-11-26T03:02:25.097Z",
       "syllabusErrors": []
     },
     {
@@ -141,7 +141,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:01.564Z",
+      "checkedAt": "2026-11-26T03:02:25.247Z",
       "syllabusErrors": []
     },
     {
@@ -161,7 +161,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:01.575Z",
+      "checkedAt": "2026-11-26T03:02:25.317Z",
       "syllabusErrors": []
     },
     {
@@ -181,7 +181,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:01.201Z",
+      "checkedAt": "2026-11-26T03:02:24.773Z",
       "syllabusErrors": []
     },
     {
@@ -202,7 +202,7 @@
         "verified": true
       },
       "error": "",
-      "checkedAt": "2026-11-24T04:57:03.753Z",
+      "checkedAt": "2026-11-26T03:02:27.437Z",
       "syllabusErrors": []
     }
   ],
@@ -516,9 +516,9 @@
       "external": false
     },
     {
-      "id": "cse-syllabus-for-mse-ii-rubrics-for-industrial-training-evaluation-notice-regard",
-      "label": "Syllabus for MSE-II Rubrics for Industrial Training Evaluation Notice regarding DMC Distribution Schedule of Major Project Evaluation and Presentation Important Notice regarding Mi",
-      "url": "https://cse.gndec.ac.in/sites/default/files/MSE%201%20%20SYLLABUS%20%28JULY-DEC%202026%29%20%28Responses%29%20%281%29.pdf",
+      "id": "cse-date-sheet-for-mse-iii-notice-regarding-reschedule-of-internal-viva-ii-trcs1",
+      "label": "Date Sheet for MSE-III Notice regarding reschedule of Internal Viva-II(TRCS102) Syllabus for MSE-II Rubrics for Industrial Training Evaluation Notice regarding DMC Distribution Sch",
+      "url": "https://cse.gndec.ac.in/sites/default/files/MSE%203%20Datesheet.pdf",
       "department": "Computer Science & Engineering",
       "departmentId": "cse",
       "sourcePage": "https://cse.gndec.ac.in/?q=node/2",
@@ -1334,5 +1334,5 @@
   },
   "noticeboardError": "",
   "unavailableDepartments": [],
-  "seededAt": "2026-11-24T04:57:12.267Z"
+  "seededAt": "2026-11-26T03:02:37.055Z"
 }
