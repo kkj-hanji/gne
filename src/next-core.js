@@ -29,11 +29,11 @@ import { officialNoticesResponse } from "./official-notices.js";
 import { ptuHolidaySourcesResponse } from "./ptu-holidays.js";
 import {
   SeatingStoreError, deleteSeatingPlan, listAdminSeatingPlans,
-  listPublicSeatingPlans, lookupPublishedSeat, saveSeatingPlan
+  listPublicSeatingPlans, lookupPublishedSeat, lookupPublishedSeats, saveSeatingPlan
 } from "./seating-store.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.2.36";
+export const APP_VERSION = "2.2.38";
 export const BUILD_DATE = "2026-11-28";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
@@ -449,8 +449,10 @@ async function seatingLookupRequest(request, env) {
     return jsonResponse({ error: "Method not allowed." }, { status: 405, headers: { Allow: "POST", "Cache-Control": "no-store" } });
   }
   if (!sameOriginMutation(request)) return jsonResponse({ error: "Cross-origin lookups are not allowed." }, { status: 403, headers: { "Cache-Control": "no-store" } });
-  const body = await readJsonBody(request, 1200);
-  const result = await lookupPublishedSeat(env, body || {}, request);
+  const body = await readJsonBody(request, 4000);
+  const result = Array.isArray(body?.planIds)
+    ? await lookupPublishedSeats(env, body, request)
+    : await lookupPublishedSeat(env, body || {}, request);
   return jsonResponse(result, { headers: { "Cache-Control": "no-store", "Pragma": "no-cache" } });
 }
 

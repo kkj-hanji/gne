@@ -6,6 +6,10 @@ const MAX_PLANS = 100;
 const MAX_SEATS_PER_PLAN = 3000;
 const MAX_TOTAL_SEATS = 12000;
 const MAX_STORE_CHARS = 3_000_000;
+const LOOKUP_LIMIT = 300;
+const LOOKUP_WINDOW_MS = 60 * 60 * 1000;
+const MAX_LOOKUP_CLIENTS = 2048;
+const lookupAttempts = new Map();
 
 export class SeatingStoreError extends Error {
   constructor(message, status = 400) {
@@ -144,15 +148,22 @@ export async function deleteSeatingPlan(env, id, { actor = "owner" } = {}) {
   return { deleted: key };
 }
 
-async function allowLookup(env, request) {
+async function allowLookup(request) {
   const ip = clean(request.headers.get("CF-Connecting-IP") || "unknown", 100);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
   const token = [...new Uint8Array(digest)].slice(0, 16).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  const key = `seating:v1:lookup:${token}`;
-  const prior = await env.CONTENT.get(key, "json");
-  const count = Number(prior?.count || 0);
-  if (count >= 30) return false;
-  await env.CONTENT.put(key, JSON.stringify({ count: count + 1 }), { expirationTtl: 3600 });
+  const now = Date.now();
+  const prior = lookupAttempts.get(token);
+  const current = prior && now - prior.startedAt < LOOKUP_WINDOW_MS ? prior : { startedAt: now, count: 0 };
+  if (current.count >= LOOKUP_LIMIT) return false;
+  lookupAttempts.delete(token);
+  lookupAttempts.set(token, { startedAt: current.startedAt, count: current.count + 1 });
+  if (lookupAttempts.size > MAX_LOOKUP_CLIENTS) {
+    for (const [key, value] of lookupAttempts) {
+      if (now - value.startedAt >= LOOKUP_WINDOW_MS || lookupAttempts.size > MAX_LOOKUP_CLIENTS) lookupAttempts.delete(key);
+      if (lookupAttempts.size <= MAX_LOOKUP_CLIENTS) break;
+    }
+  }
   return true;
 }
 
@@ -161,13 +172,35 @@ export async function lookupPublishedSeat(env, { planId: id, crn }, request) {
   const key = planId(id, "");
   const normalized = normalizeCrn(crn);
   if (!key || !normalized) throw new SeatingStoreError("Select a published exam and a roster-verified student.");
-  if (!await allowLookup(env, request)) throw new SeatingStoreError("Too many seat lookups from this connection. Try again later.", 429);
+  if (!await allowLookup(request)) throw new SeatingStoreError("Too many seat lookups from this connection. Try again later.", 429);
   const plans = await readPlans(env);
   const plan = plans.find((row) => row.id === key && row.published !== false);
   if (!plan) throw new SeatingStoreError("No published sitting plan matches that exam.", 404);
   const seat = (plan.seats || []).find((row) => row.crn === normalized);
+  return lookupResult(plan, seat);
+}
+
+function lookupResult(plan, seat) {
   return {
     plan: summary(plan),
     seat: seat ? { room: seat.room, ...(seat.row != null ? { row: seat.row } : {}), ...(seat.rowLabel ? { rowLabel: seat.rowLabel } : {}), ...(seat.section ? { section: seat.section } : {}) } : null
   };
+}
+
+/** Returns one student's assignments for several published papers in one request. */
+export async function lookupPublishedSeats(env, { planIds: ids, crn }, request) {
+  const normalized = normalizeCrn(crn);
+  const keys = Array.isArray(ids) ? [...new Set(ids.map((id) => planId(id, "")).filter(Boolean))] : [];
+  if (!normalized || !keys.length || keys.length > 40 || keys.length !== new Set(ids).size) {
+    throw new SeatingStoreError("Select one student and between 1 and 40 valid published exams.");
+  }
+  if (!await allowLookup(request)) throw new SeatingStoreError("Too many seat lookups from this connection. Try again later.", 429);
+  const plans = await readPlans(env);
+  const results = keys.map((key) => {
+    const plan = plans.find((row) => row.id === key && row.published !== false);
+    if (!plan) return null;
+    const seat = (plan.seats || []).find((row) => row.crn === normalized);
+    return lookupResult(plan, seat);
+  }).filter(Boolean);
+  return { results };
 }

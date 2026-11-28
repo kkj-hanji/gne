@@ -1515,7 +1515,7 @@ async function loadTodaySeating() {
     const data = await response.json();
     const plans = Array.isArray(data?.plans) ? data.plans : [];
     const entries = [];
-    const lookups = new Map();
+    const needsLookup = [];
     for (const exam of targets) {
       const plan = todayPlanForExam(plans, exam);
       if (!plan) { entries.push({ status: "no-plan", exam }); continue; }
@@ -1528,21 +1528,27 @@ async function loadTodaySeating() {
         entries.push({ ...previous, exam, plan });
         continue;
       }
-      const lookupKey = `${plan.id}|${plan.revision || 0}|${crn}`;
-      let result = lookups.get(lookupKey);
-      if (!result) {
-        const lookup = await fetch("/api/seatings/lookup", {
-          method: "POST", cache: "no-store",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ planId: plan.id, crn })
-        });
-        if (!lookup.ok) throw new Error("seat lookup unavailable");
-        result = await lookup.json();
-        lookups.set(lookupKey, result);
+      needsLookup.push({ exam, plan });
+    }
+    const planIds = [...new Set(needsLookup.map(({ plan }) => plan.id))];
+    if (planIds.length) {
+      const lookup = await fetch("/api/seatings/lookup", {
+        method: "POST", cache: "no-store",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ planIds, crn })
+      });
+      if (!lookup.ok) throw new Error("seat lookup unavailable");
+      const lookupData = await lookup.json();
+      const results = new Map((Array.isArray(lookupData?.results) ? lookupData.results : [])
+        .filter((result) => result?.plan?.id)
+        .map((result) => [result.plan.id, result]));
+      for (const { exam, plan } of needsLookup) {
+        const result = results.get(plan.id);
+        if (!result) throw new Error("published plan changed during lookup");
+        entries.push(result?.seat?.room && result.plan?.id === plan.id
+          ? { status: "matched", exam, plan: result.plan, seat: result.seat }
+          : { status: "missing", exam, plan });
       }
-      entries.push(result?.seat?.room && result.plan?.id === plan.id
-        ? { status: "matched", exam, plan: result.plan, seat: result.seat }
-        : { status: "missing", exam, plan });
     }
     if (todaySeatingKey(nextClassInfo()) !== key) return;
     state.todaySeating = { key, status: "ready", entries, checkedAt: Date.now() };

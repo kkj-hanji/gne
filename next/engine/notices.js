@@ -174,7 +174,7 @@ export const TRANSCRIBED_NOTICES = Object.freeze([
   Object.freeze({
     id: "mse2-theory-2026-11",
     title: "MSE-II Semester I theory date sheet · November 2026",
-    url: "/notices/mse2-theory-2026.html",
+    url: "/notices/mse2-theory-2026",
     date: "2026-11-03",
     category: "Examination",
     author: "Department of Applied Sciences",

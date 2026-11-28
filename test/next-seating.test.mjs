@@ -271,6 +271,31 @@ test("seating API publishes privately, reveals one exact assignment, and deletes
   assert.equal([...e.CONTENT.values.keys()].some((key) => key.includes("203.0.113.8")), false, "lookup limiter never stores raw IP addresses");
 });
 
+test("seating API batches one verified student's assignments without KV rate-limit writes", async () => {
+  const e = env();
+  const originalPut = e.CONTENT.put.bind(e.CONTENT);
+  e.CONTENT.put = async (key, value, options) => {
+    if (String(key).startsWith("seating:v1:lookup:")) throw new Error("KV write throttled");
+    return originalPut(key, value, options);
+  };
+  for (const [id, date, room] of [
+    ["seat-batch-math", "2026-11-23", "F-101"],
+    ["seat-batch-pps", "2026-11-25", "G-204"],
+    ["seat-batch-physics", "2026-11-26", "Drawing hall"]
+  ]) {
+    const plan = { id, title: id, subject: id, date, sourceName: `${id}.pdf`, seats: [{ crn: "1234567", room, row: 1 }] };
+    assert.equal((await handleRequest(jsonReq("/api/admin/seatings", { action: "upsert", plan }), e, ctx())).status, 200);
+  }
+  const plans = ["seat-batch-math", "seat-batch-pps", "seat-batch-physics"];
+  const lookup = await handleRequest(jsonReq("/api/seatings/lookup", { planIds: plans, crn: "1234567" }, "", { "CF-Connecting-IP": "203.0.113.18" }), e, ctx());
+  assert.equal(lookup.status, 200);
+  const result = await lookup.json();
+  assert.deepEqual(result.results.map((entry) => [entry.plan.id, entry.seat.room]), [
+    ["seat-batch-math", "F-101"], ["seat-batch-pps", "G-204"], ["seat-batch-physics", "Drawing hall"]
+  ]);
+  assert.equal([...e.CONTENT.values.keys()].some((key) => key.startsWith("seating:v1:lookup:")), false);
+});
+
 test("seating API limits public lookups and validates plan rows", async () => {
   const e = env();
   const plan = {
@@ -288,7 +313,7 @@ test("seating API limits public lookups and validates plan rows", async () => {
   const publish = await handleRequest(jsonReq("/api/admin/seatings", { action: "upsert", plan }), e, ctx());
   assert.equal(publish.status, 200);
   let final;
-  for (let index = 0; index < 31; index += 1) {
+  for (let index = 0; index < 301; index += 1) {
     final = await handleRequest(jsonReq("/api/seatings/lookup", { planId: plan.id, crn: "1234567" }, "", { "CF-Connecting-IP": "203.0.113.9" }), e, ctx());
   }
   assert.equal(final.status, 429);
@@ -298,6 +323,8 @@ test("Ask and the profile/date UI route seating queries locally and keep profile
   const app = await (await import("node:fs/promises")).readFile(new URL("../next/app.js", import.meta.url), "utf8");
   const html = await (await import("node:fs/promises")).readFile(new URL("../next/index.html", import.meta.url), "utf8");
   assert.match(app, /if \(seatingQuestion\) answer = await answerSeatingQuestion\(question\)/);
+  assert.match(app, /body: JSON\.stringify\(\{ planIds, crn \}\)/);
+  assert.match(app, /TODAY_SEATING_REFRESH_MS = 60_000/);
   assert.match(app, /const explicitlyNamed = target\.status === "matched"/);
   assert.match(app, /const crn = normalizeCrn\(record\?\.crn\)/);
   assert.match(app, /body: JSON\.stringify\(\{ planId: selected\.plan\.id, crn \}\)/);
