@@ -5717,11 +5717,14 @@ function bindEvents() {
       ]);
       const profileKey = profile.department ? syllabusBranchValue(profile.department, profile.program) : "";
       const profileSemester = syllabusProfileSemester();
-      // The profile branch opens on the student's own semester. Every other
-      // branch opens on its most recent official semester, not a stale memory.
+      const recentSemester = String(readSyllabusBrowsePreferences().semesters[key] || "");
+      const validRecentSemester = /^(?:10|[1-9])$/.test(recentSemester) && Number(recentSemester) <= branchMax
+        ? recentSemester : "";
+      // The profile branch opens on the student's own semester. Other
+      // branches restore the semester the student last browsed there.
       const selectedSemester = key === profileKey && profileSemester && Number(profileSemester) <= branchMax
         ? profileSemester
-        : (selected?.latestPublishedSemester || selected?.latestDetailedSemester || "");
+        : (validRecentSemester || selected?.latestPublishedSemester || selected?.latestDetailedSemester || "");
       state.syllabusSemester = selectedSemester;
       state.syllabusQuery = "";
       rememberSyllabusBranch(key, selectedSemester || "all");

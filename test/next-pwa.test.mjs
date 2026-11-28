@@ -501,7 +501,8 @@ test("the syllabus page uses only branch and semester selectors with immediate r
   assert.match(app, /preferences\.semesters\[selectedBranch\.key\]/);
   assert.match(app, /rememberSyllabusBranch\(key, selectedSemester \|\| "all"\)/);
   assert.match(app, /if \(syllabusBranch\) \{[\s\S]*?state\.syllabusSemester = selectedSemester;[\s\S]*?render\(\)/);
-  assert.match(app, /latestPublishedSemester \|\| selected\?\.latestDetailedSemester/, "other branches open on their most recent official semester");
+  assert.match(app, /const recentSemester = String\(readSyllabusBrowsePreferences\(\)\.semesters\[key\] \|\| ""\)/, "other branches restore their recent semester");
+  assert.match(app, /validRecentSemester \|\| selected\?\.latestPublishedSemester \|\| selected\?\.latestDetailedSemester/, "branches without a saved semester open on their most recent official source");
   assert.match(app, /href="https:\/\/academics\.gndec\.ac\.in\/datesheet\/"/);
   assert.match(page, /Provisional/);
   assert.match(page, /Official Applied Sciences Scheme 2024 for semesters 1–2/, "first-year semesters still show the shared Applied Sciences scheme");
