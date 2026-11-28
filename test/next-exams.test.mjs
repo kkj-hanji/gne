@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { answerLocally, buildAnswerContext } from "../next/engine/answer.js";
 import { dateForTimetableDay } from "../next/engine/datetime.js";
 import { examDateSheetPeriod, examEventsForSelection, examsOnDate, groupExamDatesheetEvents, nextUpcomingExam } from "../next/engine/exams.js";
+import ese2026 from "../next/data/ese-provisional-dec-2026.json" with { type: "json" };
 
 const ese = {
   source: { url: "https://docs.google.com/spreadsheets/d/test/edit" },
@@ -82,6 +83,55 @@ test("official ESE datesheet narrows chemistry and physics group rows by the sel
   assert.deepEqual(physics.map((event) => event.title), ["Mathematics 1"]);
   assert.match(chemistry[0].sourceUrl, /#gid=123$/);
   assert.equal(examEventsForSelection({ datesheet: ese, group: "ITC" }).filter((event) => event.category === "End-semester exam").length, 1);
+});
+
+test("official December 2026 ESE data covers every programme and uses the newest scheme per semester", () => {
+  assert.equal(ese2026.status, "Provisional");
+  assert.equal(ese2026.totals.programmes, 39);
+  assert.equal(ese2026.programmes.length, 78, "Full Time and Part Time selections are both checked");
+  assert.equal(ese2026.totals.sittings, 854);
+
+  const cseFirst = examEventsForSelection({ datesheet: ese2026, group: "CSD", branch: "CSE", semester: "1" });
+  const cseFirstEse = cseFirst.filter((event) => event.category === "Provisional ESE 2026");
+  assert.ok(cseFirstEse.length > 0);
+  assert.ok(cseFirstEse.every((event) => event.tab === "CSE" && event.semesterNumber === 1));
+  assert.ok(cseFirstEse.every((event) => /2024/.test(event.schemeCode)), "older 2018 scheme rows must not replace the latest semester schedule");
+  const cseSecond = examEventsForSelection({ datesheet: ese2026, group: "CSD", branch: "CSE", semester: "2" });
+  assert.ok(cseSecond.filter((event) => event.category === "Provisional ESE 2026").length > 0);
+  assert.ok(cseSecond.filter((event) => event.category === "Provisional ESE 2026").every((event) => event.semesterNumber === 2));
+
+  const semesterWithoutYearEncodedInSection = examEventsForSelection({ datesheet: ese2026, group: "CSE", branch: "CSE", semester: "3" });
+  assert.ok(semesterWithoutYearEncodedInSection.length > 0, "a selected branch and semester should work even when the section code does not encode an academic year");
+  assert.ok(semesterWithoutYearEncodedInSection.every((event) => event.category === "Provisional ESE 2026" && event.semesterNumber === 3));
+
+  const upperYear = examEventsForSelection({ datesheet: ese2026, group: "D2CSE1", branch: "CSE", semester: "3" });
+  assert.ok(upperYear.length > 0);
+  assert.ok(upperYear.every((event) => event.semesterNumber === 3 && event.tab === "CSE"));
+  const partTime = examEventsForSelection({ datesheet: ese2026, group: "D2EE1", branch: "M.Tech Electrical Engineering", semester: "4" });
+  assert.equal(partTime.length, 1);
+  assert.equal(partTime[0].studyMode, "Part Time");
+  assert.equal(partTime[0].title, "Power System Dynamics-II");
+  assert.equal(partTime[0].sourceUrl, "https://academics.gndec.ac.in/datesheet/");
+
+  const lateralEntry = examEventsForSelection({
+    datesheet: ese2026,
+    group: "D2CE1",
+    branch: "B.Tech.(Civil Engineering - Lateral Entry (for Working Professional))",
+    semester: "3"
+  });
+  assert.ok(lateralEntry.length > 0);
+  assert.ok(lateralEntry.every((event) => event.tab === "CE-LE-WP" && event.semesterNumber === 3));
+});
+
+test("Today drops completed MSE papers while a later ESE date remains upcoming", () => {
+  const events = [
+    { id: "mse", category: "MSE-II theory", title: "Last MSE paper", date: "2026-11-28", start: 660, end: 750 },
+    { id: "ese", category: "Provisional ESE 2026", title: "First ESE paper", date: "2026-12-07", start: 780, end: 960 }
+  ];
+  const period = examDateSheetPeriod(events, { dateISO: "2026-11-28", minutes: 751 });
+  assert.equal(period.active, true);
+  assert.deepEqual(period.today, []);
+  assert.deepEqual(period.remaining.map((event) => event.id), ["ese"]);
 });
 
 test("combined datesheets show all MSE-II papers before a separately headed ESE sheet", () => {

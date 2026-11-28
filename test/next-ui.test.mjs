@@ -25,6 +25,15 @@ test("mobile navigation reuses the accessible sidebar SVG icons", () => {
   assert.ok(app.includes('class="bottom-item-icon"'));
 });
 
+test("Next publishes and version-busts the current provisional ESE and syllabus indexes", () => {
+  const serviceWorker = readFile(new URL("../next/sw.js", import.meta.url), "utf8");
+  return serviceWorker.then((source) => {
+    assert.match(source, /compass-next-v3\.1\.30/);
+    assert.match(app, /fetchJson\("\/data\/ese-provisional-dec-2026\.json"/);
+    assert.match(app, /fetchJson\("\/data\/syllabus-course-index\.json"/);
+  });
+});
+
 test("chat actions stay visible on touch devices without hover", () => {
   assert.match(styles, /@media \(pointer:\s*coarse\),\s*\(hover:\s*none\)\s*\{\s*\.msg-actions\s*\{\s*opacity:\s*1;\s*\}/);
   assert.ok(app.includes('data-action="copy-message"'));

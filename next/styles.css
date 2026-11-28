@@ -1390,6 +1390,23 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
 .official-provisional-datesheet { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .official-provisional-datesheet .card-title { margin: 8px 0 4px; }
 .official-provisional-datesheet .card-sub { margin: 0; }
+.ese-provisional-card { display: grid; gap: 14px; }
+.ese-provisional-card > .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.ese-provisional-controls { display: grid; grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .7fr) minmax(200px, 1fr); gap: 10px; }
+.ese-provisional-controls label { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: .72rem; font-weight: 700; }
+.ese-provisional-controls select, .ese-provisional-controls input { width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-solid); color: var(--text); font: inherit; font-size: .84rem; }
+.ese-provisional-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; color: var(--muted); font-size: .74rem; }
+.ese-provisional-summary strong { color: var(--text); font-size: .8rem; }
+.ese-provisional-summary small { color: var(--muted); }
+.ese-provisional-results { display: grid; gap: 12px; }
+.ese-provisional-day > h3 { margin: 0 0 5px; color: var(--accent-ink); font-size: .83rem; }
+.ese-provisional-list { border-top: 1px solid var(--border); }
+.ese-provisional-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, auto); gap: 4px 12px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.ese-provisional-row > div { display: grid; gap: 3px; }
+.ese-provisional-row strong { font-size: .84rem; }
+.ese-provisional-row small, .ese-provisional-row > span { color: var(--muted); font-size: .72rem; }
+.ese-provisional-row > span { grid-column: 2; grid-row: 1; text-align: right; }
+.ese-provisional-row .ese-provisional-scheme { grid-column: 1 / -1; }
 .syllabus-course-group + .syllabus-course-group { margin-top: 16px; }
 .syllabus-course-group > h4 { margin: 0 0 8px; font-size: .82rem; }
 .syllabus-course-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 8px; }
@@ -1413,6 +1430,12 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
   .syllabus-user-branch .page-actions { justify-content: flex-start; }
   .syllabus-controls-note { grid-column: 1; }
   .official-provisional-datesheet { align-items: flex-start; flex-direction: column; }
+  .ese-provisional-card > .card-head { flex-direction: column; }
+  .ese-provisional-controls { grid-template-columns: minmax(0, 1fr) minmax(120px, .55fr); }
+  .ese-provisional-search { grid-column: 1 / -1; }
+  .ese-provisional-row { grid-template-columns: minmax(0, 1fr); }
+  .ese-provisional-row > span { grid-column: 1; grid-row: auto; text-align: left; }
+  .ese-provisional-row .ese-provisional-scheme { grid-column: 1; }
   .syllabus-coverage-branch > summary { align-items: flex-start; }
   .syllabus-coverage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .syllabus-pdf-preview iframe { height: 65vh; min-height: 300px; }

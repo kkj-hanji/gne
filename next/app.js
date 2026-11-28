@@ -89,6 +89,10 @@ const state = {
   adminValues: {},
   version: null,
   datesheet: null,
+  datesheetStatus: "idle",
+  eseProgrammeId: "",
+  eseSemester: "",
+  eseQuery: "",
   notices: [],
   noticesStatus: "idle",
   officialNotices: [],
@@ -648,10 +652,17 @@ async function loadVersion() {
 }
 
 async function loadDatesheet() {
+  state.datesheetStatus = "loading";
   try {
-    state.datesheet = await fetchJson("/api/legacy/data/end-sem-datesheet.json", {}, 20000);
+    const data = await fetchJson("/data/ese-provisional-dec-2026.json", {}, 20000);
+    if (!Array.isArray(data?.programmes) || !data.programmes.length) {
+      throw new Error("The December 2026 ESE datesheet does not contain programme records.");
+    }
+    state.datesheet = data;
+    state.datesheetStatus = "ready";
   } catch {
     state.datesheet = null;
+    state.datesheetStatus = "error";
   }
 }
 
@@ -1093,6 +1104,55 @@ function syncProfileFromRoster({ silent = true, renderOnChange = true } = {}) {
   return changed;
 }
 
+async function loadIndexedSyllabusKnowledge() {
+  if (state.indexedSyllabusStatus === "ready" || state.indexedSyllabusStatus === "error") {
+    return state.indexedSyllabusCourses;
+  }
+  if (state.indexedSyllabusPromise) return state.indexedSyllabusPromise;
+
+  state.indexedSyllabusStatus = "loading";
+  const pending = (async () => {
+    try {
+      const data = await fetchJson("/data/syllabus-course-index.json", {}, 20000);
+      if (!Array.isArray(data?.courses) || !data.courses.length) {
+        throw new Error("Syllabus index has no courses array.");
+      }
+
+      const courses = data.courses.slice(0, 12000).filter((course) => course
+        && typeof course.id === "string"
+        && typeof course.department === "string"
+        && typeof course.title === "string"
+        && typeof course.code === "string"
+        && Array.isArray(course.semesters)
+        && Array.isArray(course.units)
+        && typeof course.sourceUrl === "string"
+        && course.units.every((unit) => unit && typeof unit.number === "string" && typeof unit.title === "string"));
+      if (!courses.length) throw new Error("Syllabus index contains no valid course records.");
+
+      state.indexedSyllabusCourses = courses;
+      state.indexedSyllabusSources = (Array.isArray(data.sources) ? data.sources : []).slice(0, 1000).filter((source) => source
+        && typeof source.department === "string"
+        && typeof source.sourceTitle === "string"
+        && typeof source.sourceUrl === "string"
+        && Array.isArray(source.semesters));
+      state.indexedSyllabusStatus = "ready";
+    } catch (error) {
+      console.warn("Could not load the verified syllabus course index.", error);
+      state.indexedSyllabusCourses = [];
+      state.indexedSyllabusSources = [];
+      state.indexedSyllabusStatus = "error";
+    }
+    return state.indexedSyllabusCourses;
+  })();
+
+  state.indexedSyllabusPromise = pending;
+  try {
+    return await pending;
+  } finally {
+    if (state.indexedSyllabusPromise === pending) state.indexedSyllabusPromise = null;
+  }
+}
+
 async function loadSyllabusIndex() {
   state.directoryStatus = "loading";
   render();
@@ -1118,7 +1178,14 @@ function examsForDate(dateISO) {
 }
 
 function importantExamEvents() {
-  return importantExamEventsForSelection({ datesheet: state.datesheet, group: state.group, branch: state.profile.branch });
+  const profileSemester = String(state.profile?.semester || "").match(/(?:^|\D)([1-9]|10)(?:\D|$)/)?.[1]
+    || (academicYearForSection(state.group) === 1 ? syllabusProfileSemester() : "");
+  return importantExamEventsForSelection({
+    datesheet: state.datesheet,
+    group: state.group,
+    branch: state.profile.program || state.profile.branch,
+    semester: profileSemester
+  });
 }
 
 function examSeatInlineMarkup(entry, { hero = false } = {}) {
@@ -1836,7 +1903,7 @@ function renderExamPeriodCard(period, info = null) {
     : next
       ? `No paper is scheduled today. The next published paper is ${escapeHtml(next.title)} on ${escapeHtml(shortExamDate(next.date))}.`
       : "No paper is scheduled today.";
-  const rows = renderExamDatesheetSections(period.exams || [], info ? todaySeatingEntries(info) : []);
+  const rows = renderExamDatesheetSections(period.remaining || [], info ? todaySeatingEntries(info) : []);
   return `<section class="card exam-day-card exam-period-card">
     <div class="card-head"><div><h2 class="card-title">Exam datesheet</h2><p class="card-sub">${escapeHtml(selectionLabel())} &middot; active from ${escapeHtml(shortExamDate(period.startDate))}. MSE-II and ESE are listed in separate sections.</p></div><a class="btn btn-sm" href="/calendar#exam-datesheet">Full datesheet</a></div>
     <p class="exam-period-status" role="status">${status}</p>
@@ -2775,6 +2842,173 @@ function calendarMonthLabel(month) {
   return new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, index - 1, 1)));
 }
 
+function provisionalEseProgrammeGroups(datesheet = state.datesheet) {
+  const groups = new Map();
+  for (const programme of datesheet?.programmes || []) {
+    const id = String(programme?.id || "");
+    if (!id) continue;
+    if (!groups.has(id)) groups.set(id, { id, code: String(programme.code || ""), label: String(programme.label || ""), modes: [] });
+    groups.get(id).modes.push(programme);
+  }
+  return [...groups.values()];
+}
+
+function profileEseProgrammeCode(value) {
+  const raw = String(value || "").toUpperCase();
+  if (!raw) return "";
+  if (/LATERAL ENTRY|WORKING PROFESSIONAL/.test(raw)) {
+    if (/CIVIL|\bCE\b/.test(raw)) return "CE-LE-WP";
+    if (/MECHANICAL|\bME\b/.test(raw)) return "ME-LE-WP";
+  }
+  if (/M\.?\s*TECH/.test(raw)) {
+    if (/COMPUTER\s*SCIENCE\s*(?:AND|&)\s*INFORMATION\s*TECHNOLOGY/.test(raw)) return "MTECH-CSIT";
+    if (/COMPUTER\s*SCIENCE|\bCSE\b/.test(raw)) return "MTECH-CSE";
+    if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "MTECH-ECE";
+    if (/ELECTRICAL|\bEE\b/.test(raw)) return "MTECH-EE";
+    if (/POWER/.test(raw)) return "MTECH-POWER";
+    if (/PRODUCTION/.test(raw)) return "MTECH-PE";
+    if (/STRUCTURAL/.test(raw)) return "MTECH-SE";
+    if (/VLSI/.test(raw)) return "MTECH-VLSI";
+    if (/ENVIRONMENT/.test(raw)) return "MTECH-ENV";
+    if (/INDUSTRIAL/.test(raw)) return "MTECH-IE";
+    if (/GEO.?TECH/.test(raw)) return "MTECH-GEOTECH";
+    if (/SOIL|FOUNDATION/.test(raw)) return "MTECH-SMFE";
+    if (/ENERGY/.test(raw)) return "MTECH-ENERGY";
+    if (/MECHANICAL/.test(raw)) return "MTECH-ME";
+    if (/INFORMATION\s*TECHNOLOGY|\bIT\b/.test(raw)) return "MTECH-IT";
+  }
+  if (/P\.?\s*H\.?\s*D/.test(raw)) {
+    if (/COMPUTER\s*SCIENCE|\bCSE\b/.test(raw)) return "PHD-CSE";
+    if (/CIVIL|\bCE\b/.test(raw)) return "PHD-CE";
+    if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "PHD-ECE";
+  }
+  if (/ROBOTICS|\bRAI\b/.test(raw)) return "RAI";
+  if (/MECHANICAL\s*\(\s*PRODUCTION|\bMEP\b/.test(raw)) return "MEP";
+  if (/MINOR/.test(raw)) {
+    if (/COMPUTER\s*SCIENCE|\bCSE\b/.test(raw)) return "MINOR-CSE";
+    if (/INFORMATION\s*TECHNOLOGY|\bIT\b/.test(raw)) return "MINOR-IT";
+    if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "MINOR-ECE";
+    if (/ELECTRICAL|\bEE\b/.test(raw)) return "MINOR-EE";
+  }
+  if (/CIVIL|\bCE\b/.test(raw)) return "CE";
+  if (/COMPUTER\s*SCIENCE|\bCSE\b|\bCS\b/.test(raw)) return "CSE";
+  if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "ECE";
+  if (/ELECTRICAL|\bEE\b/.test(raw)) return "EE";
+  if (/INFORMATION\s*TECHNOLOGY|\bIT\b/.test(raw)) return "IT";
+  if (/MECHANICAL|\bME\b/.test(raw)) return "ME";
+  if (/PRODUCTION/.test(raw)) return "PE";
+  if (/B\.?\s*COM|COMMERCE/.test(raw)) return "BCOM";
+  if (/B\.?\s*VOC|VOCATIONAL/.test(raw)) return "BVOC";
+  if (/B\.?\s*CA|COMPUTER\s*APPLICATION/.test(raw)) return "BCA";
+  if (/B\.?\s*BA|BUSINESS\s*ADMINISTRATION/.test(raw)) return "BBA";
+  if (/\bMCA\b/.test(raw)) return "MCA";
+  if (/\bMBA\b/.test(raw)) return "MBA";
+  return "";
+}
+
+function preferredEseProgramme(groups) {
+  const saved = groups.find((group) => group.id === state.eseProgrammeId);
+  if (saved) return saved;
+  const values = [state.profile?.program, state.profile?.branch, state.profile?.section, state.group].filter(Boolean);
+  for (const value of values) {
+    const direct = groups.find((group) => [group.code, group.label].some((candidate) => String(candidate).toLowerCase() === String(value).toLowerCase()));
+    if (direct) return direct;
+    const code = profileEseProgrammeCode(value);
+    const match = groups.find((group) => group.code === code);
+    if (match) return match;
+  }
+  return null;
+}
+
+function initialEseSemester() {
+  const raw = String(state.profile?.semester || "");
+  const semester = Number(raw.match(/(?:^|\D)([1-8])(?:\D|$)/)?.[1]
+    || (academicYearForSection(state.group) === 1 ? syllabusProfileSemester() : ""));
+  return semester >= 1 && semester <= 8 ? String(semester) : "";
+}
+
+function selectedProvisionalEseRows(datesheet, programmeId, semester) {
+  const modes = (datesheet?.programmes || []).filter((programme) => String(programme.id) === String(programmeId));
+  if (!modes.length) return { programme: null, rows: [], mode: "" };
+  const sem = Number(semester);
+  const hasSelectedSemester = (programme) => (programme.entries || []).some((entry) => Number(entry.semesterNumber || entry.semester) === sem);
+  const withSelectedSemester = modes.filter(hasSelectedSemester);
+  const withAnyEntries = modes.filter((programme) => (programme.entries || []).length);
+  const programme = withSelectedSemester.find((candidate) => candidate.studyMode === "Full Time")
+    || withSelectedSemester[0]
+    || withAnyEntries.find((candidate) => candidate.studyMode === "Full Time")
+    || withAnyEntries[0]
+    || modes.find((candidate) => candidate.studyMode === "Full Time")
+    || modes[0];
+  if (!programme || !sem) return { programme, rows: [], mode: programme?.studyMode || "" };
+
+  const allRows = (programme.entries || []).filter((entry) => Number(entry.semesterNumber || entry.semester) === sem);
+  const newestScheme = Math.max(0, ...allRows.map((entry) => Number(String(entry.schemeCode || "").match(/20\d{2}/)?.[0]) || 0));
+  const rows = allRows.filter((entry) => {
+    const year = Number(String(entry.schemeCode || "").match(/20\d{2}/)?.[0]) || 0;
+    return !newestScheme || !year || year === newestScheme;
+  }).sort((left, right) => left.date.localeCompare(right.date)
+    || String(left.subject).localeCompare(String(right.subject)));
+  return { programme, rows, mode: programme.studyMode || "" };
+}
+
+function filteredProvisionalEseRows(datesheet, programmeId, semester, query = "") {
+  const result = selectedProvisionalEseRows(datesheet, programmeId, semester);
+  const search = String(query || "").trim().toLowerCase();
+  const rows = search ? result.rows.filter((entry) => [entry.subject, entry.subjectCode, entry.paperId, entry.schemeCode]
+    .some((value) => String(value || "").toLowerCase().includes(search))) : result.rows;
+  return { ...result, rows };
+}
+
+function provisionalEseCountLabel(datesheet, programmeId, semester, query = "") {
+  if (!programmeId) return "Choose a programme to see its provisional ESE papers.";
+  if (!semester) return "Choose a semester to see the published papers.";
+  const result = filteredProvisionalEseRows(datesheet, programmeId, semester, query);
+  const total = selectedProvisionalEseRows(datesheet, programmeId, semester).rows.length;
+  if (!result.programme) return "Choose a programme from the official list.";
+  if (!total) return `No provisional ESE paper is listed for Semester ${semester} in ${result.programme.label}.`;
+  if (!result.rows.length) return `No paper matches “${query}” in this selection.`;
+  return `${result.rows.length}${query ? ` of ${total}` : ""} paper${result.rows.length === 1 ? "" : "s"} · ${result.mode} · ${result.rows[0]?.schemeCode || "scheme not specified"}`;
+}
+
+function renderProvisionalEseRows(datesheet, programmeId, semester, query = "") {
+  if (!programmeId || !semester) return emptyState("ðŸ“…", "Choose a programme and semester", "This datesheet selector follows your profile when it is available.");
+  const { programme, rows } = filteredProvisionalEseRows(datesheet, programmeId, semester, query);
+  if (!programme) return emptyState("ðŸ“…", "Choose a programme", "Select a programme from GNDEC Academics.");
+  if (!rows.length) return emptyState("ðŸ“„", "No paper listed for this selection", "The official page currently has no provisional ESE row for this programme, mode, and semester. Check GNDEC Academics for updates.");
+  const groups = new Map();
+  for (const entry of rows) groups.set(entry.date, [...(groups.get(entry.date) || []), entry]);
+  return [...groups.entries()].map(([date, entries]) => `<section class="ese-provisional-day"><h3><time datetime="${escapeHtml(date)}">${escapeHtml(dayOfWeek(date))}, ${escapeHtml(dateOnly(date))}</time></h3><div class="ese-provisional-list">${entries.map((entry) => `<article class="ese-provisional-row"><div><strong>${escapeHtml(entry.subject)}</strong><small>${escapeHtml(entry.subjectCode || "Course code not listed")}${entry.paperId ? ` · Paper ID ${escapeHtml(entry.paperId)}` : ""}</small></div><span>${escapeHtml(entry.sessionRaw || entry.session || "Session not listed")}</span><small class="ese-provisional-scheme">${escapeHtml(entry.schemeCode || "Scheme not specified")}</small></article>`).join("")}</div></section>`).join("");
+}
+
+function renderProvisionalEsePanel(datesheet) {
+  const programmes = provisionalEseProgrammeGroups(datesheet);
+  if (!programmes.length) {
+    if (state.datesheetStatus === "loading" || state.datesheetStatus === "idle") {
+      return `<section class="card official-provisional-datesheet"><p class="card-sub">Loading the official provisional December 2026 ESE datesheetâ€¦</p></section>`;
+    }
+    return `<section class="card official-provisional-datesheet"><div><span class="badge badge-warn">Provisional</span><h2 class="card-title">ESE 2026 datesheet</h2><p class="card-sub">The official program schedules could not be loaded. You can open GNDEC Academics directly or retry.</p></div><div class="page-actions"><a class="btn btn-primary" href="https://academics.gndec.ac.in/datesheet/" target="_blank" rel="noopener noreferrer">Open official datesheet â†—</a><button type="button" class="btn" data-action="retry-datesheet">Retry</button></div></section>`;
+  }
+  const selected = preferredEseProgramme(programmes);
+  const programmeId = selected?.id || "";
+  if (!state.eseProgrammeId && programmeId) state.eseProgrammeId = programmeId;
+  const semester = state.eseSemester || initialEseSemester();
+  if (!state.eseSemester && semester) state.eseSemester = semester;
+  const programOptions = `${selected ? "" : `<option value="" selected>Choose a programme</option>`}${programmes.map((programme) => `<option value="${escapeHtml(programme.id)}" ${programme.id === programmeId ? "selected" : ""}>${escapeHtml(programme.code)} · ${escapeHtml(programme.label)}</option>`).join("")}`;
+  const semesterOptions = `<option value="" ${semester ? "" : "selected"}>Choose semester</option>${Array.from({ length: 8 }, (_, index) => String(index + 1)).map((value) => `<option value="${value}" ${semester === value ? "selected" : ""}>Semester ${value}</option>`).join("")}`;
+  const selectedSchedule = selectedProvisionalEseRows(datesheet, programmeId, semester);
+  const programmeLabel = selectedSchedule.programme
+    ? `${selectedSchedule.programme.label} · ${selectedSchedule.mode}`
+    : selected?.label || "Choose a programme";
+  const countLabel = provisionalEseCountLabel(datesheet, programmeId, semester, state.eseQuery);
+  return `<section class="card official-provisional-datesheet ese-provisional-card" style="margin-top:14px">
+    <div class="card-head"><div><span class="badge badge-warn">Provisional · December 2026</span><h2 class="card-title">End-semester datesheet</h2><p class="card-sub">${escapeHtml(datesheet.title || "GNDEC provisional ESE datesheet")} · ${Number(datesheet.totals?.programmes) || programmes.length} official programme options · ${Number(datesheet.totals?.sittings) || ""} published sittings. The official page lists 9:00 AM–12:00 Noon Morning and 1:00 PM–4:00 PM Evening theory sessions.</p></div><a class="btn btn-sm" href="${escapeHtml(datesheet.source?.url || "https://academics.gndec.ac.in/datesheet/")}" target="_blank" rel="noopener noreferrer">GNDEC Academics ↗</a></div>
+    <div class="ese-provisional-controls" aria-label="Filter the provisional ESE datesheet"><label><span>Programme</span><select data-ese-program aria-label="Choose programme">${programOptions}</select></label><label><span>Semester</span><select data-ese-semester aria-label="Choose semester">${semesterOptions}</select></label><label class="ese-provisional-search"><span>Find a paper</span><input type="search" data-ese-search value="${escapeHtml(state.eseQuery)}" placeholder="Subject or course code" aria-label="Search provisional ESE subjects" /></label></div>
+    <div class="ese-provisional-summary"><strong>${escapeHtml(programmeLabel)}</strong><span id="ese-provisional-count" role="status">${escapeHtml(countLabel)}</span>${datesheet.checkedAt ? `<small>Source checked ${escapeHtml(shortDate(datesheet.checkedAt))}</small>` : ""}</div>
+    <div id="ese-provisional-results" class="ese-provisional-results">${renderProvisionalEseRows(datesheet, programmeId, semester, state.eseQuery)}</div>
+  </section>`;
+}
+
 function renderCalendar() {
   const overrides = holidayOverrides();
   const today = now().dateISO;
@@ -2808,7 +3042,7 @@ function renderCalendar() {
     </div>
     ${upcoming.length ? `<section class="card"><div class="card-head"><div><h2 class="card-title">Coming up</h2><p class="card-sub">Next published off days from today.</p></div></div><div class="holiday-row">${upcoming.map((item) => `<div class="holiday-pill"><strong>${escapeHtml(dateOnly(item.date))}</strong><span>${escapeHtml(dayOfWeek(item.date))}</span><small>${escapeHtml(item.name)}</small></div>`).join("")}</div></section>` : ""}
     <section class="card exam-datesheet-card" id="exam-datesheet" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Exam datesheet for your selection</h2><p class="card-sub">${escapeHtml(examOwner || "Choose a section in Timetable or Settings to personalize this list")} · ${examYear ? `Your ${examYear === 1 ? "first" : examYear === 2 ? "second" : examYear === 3 ? "third" : "fourth"} year${examGroup ? ` · ${escapeHtml(examGroup)}` : ""}` : "Your matching published exams"}. MSE-II and ESE appear in separate sections; other published exams are collapsed below.</p></div><a class="btn btn-sm" href="/notices">Notice sources</a></div>${examRows.length ? renderExamDatesheetSections(examRows) : emptyState("📅", "No matching published exams", "Compass could not find a date sheet entry for this section in the currently published records.")}${otherExamMarkup}</section>
-    <section class="card official-provisional-datesheet" style="margin-top:14px"><div><span class="badge badge-warn">Provisional</span><h2 class="card-title">ESE 2026 date sheet</h2><p class="card-sub">GNDEC Academics has posted the provisional date sheet page. Open the official page for the current document and any updates.</p></div><a class="btn btn-primary" href="https://academics.gndec.ac.in/datesheet/" target="_blank" rel="noopener noreferrer">Open official date sheet ↗</a></section>
+    ${renderProvisionalEsePanel(state.datesheet)}
     ${publishedDatesheets().length ? `<section class="card" style="margin-top:14px"><div class="card-head"><div><h2 class="card-title">Published date sheets</h2><p class="card-sub">Transcribed by the college admin from an official notice. The original link is always kept.</p></div><a class="btn btn-sm" href="/notices">All notices</a></div>
       <ul class="doc-list">${publishedDatesheets().map((item) => `<li><div>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "Date sheet")}</a>` : `<strong>${escapeHtml(item.title || "Date sheet")}</strong>`}<span class="badge">${escapeHtml(item.scope || "Examination")}</span>${item.department ? `<span class="badge">${escapeHtml(item.department)}</span>` : ""}<div class="card-sub" style="margin-top:6px">${escapeHtml(item.date ? shortDate(item.date) : "Undated")}${item.body ? ` · ${escapeHtml(String(item.body).slice(0, 400)).replace(/\n/g, " ")}` : ""}</div></div></li>`).join("")}</ul>
     </section>` : ""}
@@ -4964,6 +5198,9 @@ async function handleAction(action, element) {
       render();
       ensureLiveContent();
       break;
+    case "retry-datesheet":
+      void loadDatesheet().then(() => render());
+      break;
     case "notice-category":
       state.noticeCategory = element.dataset.category || "";
       render();
@@ -5692,11 +5929,37 @@ function bindEvents() {
   });
 
   document.addEventListener("input", (event) => {
+    const eseSearch = event.target.closest("[data-ese-search]");
+    if (eseSearch) {
+      state.eseQuery = eseSearch.value;
+      const selectedId = $("[data-ese-program]")?.value || state.eseProgrammeId;
+      const selectedSemester = $("[data-ese-semester]")?.value || state.eseSemester;
+      const results = $("#ese-provisional-results");
+      if (results) results.innerHTML = renderProvisionalEseRows(state.datesheet, selectedId, selectedSemester, state.eseQuery);
+      const count = $("#ese-provisional-count");
+      if (count) count.textContent = provisionalEseCountLabel(state.datesheet, selectedId, selectedSemester, state.eseQuery);
+      return;
+    }
     const seatingField = event.target.closest("[data-seating-field]");
     if (seatingField && state.adminSeatingDraft) state.adminSeatingDraft[seatingField.dataset.seatingField] = seatingField.value;
   });
 
   document.addEventListener("change", (event) => {
+    const eseProgramme = event.target.closest("[data-ese-program]");
+    if (eseProgramme) {
+      state.eseProgrammeId = eseProgramme.value;
+      state.eseSemester = "";
+      state.eseQuery = "";
+      render();
+      return;
+    }
+    const eseSemester = event.target.closest("[data-ese-semester]");
+    if (eseSemester) {
+      state.eseSemester = eseSemester.value;
+      state.eseQuery = "";
+      render();
+      return;
+    }
     const paperDepartment = event.target.closest("[data-paper-department]");
     if (paperDepartment) {
       state.paperDepartment = paperDepartment.value;
@@ -6015,7 +6278,7 @@ async function init() {
   // Paint the cached shell immediately, then refresh independent data in the
   // background so a slow network cannot hold the first interactive view.
   void loadVersion().then(() => { if (state.route === "settings") render(); });
-  void loadDatesheet().then(() => { if (["ask", "today", "notices"].includes(state.route)) render(); });
+  void loadDatesheet().then(() => { if (["ask", "today", "notices", "calendar"].includes(state.route)) render(); });
   void loadNotices().then(() => { if (state.route === "today" || state.route === "notices") render(); });
   void loadLiveData().then(async () => {
     if (rosterIdentity().crn || rosterIdentity().registration || rosterIdentity().serial || state.profile.name) {

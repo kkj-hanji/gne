@@ -63,15 +63,60 @@ export function academicYearForSection(value) {
 }
 
 function branchForSelection(value, branch = "") {
-  let code = String(branch || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (!code) {
-    const section = canonicalSection(value);
-    code = section.match(/^(?:CS|IT|ME|CE|EE|EC|RAI|BBA|MBA|BCA|MCA|BVOC|BCOM)/)?.[0] || "";
+  const raw = String(branch || value || "").toUpperCase();
+  const compact = String(branch ? raw.replace(/[^A-Z0-9]/g, "") : canonicalSection(raw)).replace(/[^A-Z0-9]/g, "");
+  if (/LATERAL ENTRY|WORKING PROFESSIONAL/.test(raw)) {
+    if (/CIVIL|\bCE\b/.test(raw)) return "CE-LE-WP";
+    if (/MECHANICAL|\bME\b/.test(raw)) return "ME-LE-WP";
   }
+  if (/M\.?\s*TECH/.test(raw)) {
+    if (/COMPUTER\s*SCIENCE\s*(?:AND|&)\s*INFORMATION\s*TECHNOLOGY/.test(raw)) return "MTECH-CSIT";
+    if (/COMPUTER\s*SCIENCE|\bCSE\b/.test(raw)) return "MTECH-CSE";
+    if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "MTECH-ECE";
+    if (/ELECTRICAL|\bEE\b/.test(raw)) return "MTECH-EE";
+    if (/POWER/.test(raw)) return "MTECH-POWER";
+    if (/PRODUCTION/.test(raw)) return "MTECH-PE";
+    if (/STRUCTURAL/.test(raw)) return "MTECH-SE";
+    if (/INFORMATION\s*TECHNOLOGY|\bIT\b/.test(raw)) return "MTECH-IT";
+    if (/VLSI/.test(raw)) return "MTECH-VLSI";
+    if (/ENVIRONMENT/.test(raw)) return "MTECH-ENV";
+    if (/INDUSTRIAL/.test(raw)) return "MTECH-IE";
+    if (/GEO.?TECH/.test(raw)) return "MTECH-GEOTECH";
+    if (/SOIL|FOUNDATION/.test(raw)) return "MTECH-SMFE";
+    if (/ENERGY/.test(raw)) return "MTECH-ENERGY";
+    if (/MECHANICAL/.test(raw)) return "MTECH-ME";
+  }
+  if (/P\.?\s*H\.?\s*D/.test(raw)) {
+    if (/COMPUTER\s*SCIENCE|\bCSE\b/.test(raw)) return "PHD-CSE";
+    if (/CIVIL|\bCE\b/.test(raw)) return "PHD-CE";
+    if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "PHD-ECE";
+  }
+  if (/ROBOTICS|\bRAI\b/.test(raw)) return "RAI";
+  if (/B\.?\s*COM|COMMERCE/.test(raw)) return "BCOM";
+  if (/B\.?\s*VOC|VOCATIONAL/.test(raw)) return "BVOC";
+  if (/B\.?\s*CA|COMPUTER\s*APPLICATION/.test(raw)) return "BCA";
+  if (/B\.?\s*BA|BUSINESS\s*ADMINISTRATION/.test(raw)) return "BBA";
+  if (/MINOR/.test(raw)) {
+    if (/COMPUTER\s*SCIENCE|\bCSE\b/.test(raw)) return "MINOR-CSE";
+    if (/INFORMATION\s*TECHNOLOGY|\bIT\b/.test(raw)) return "MINOR-IT";
+    if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "MINOR-ECE";
+    if (/ELECTRICAL|\bEE\b/.test(raw)) return "MINOR-EE";
+  }
+  if (/CIVIL|\bCE\b/.test(raw)) return "CE";
+  if (/COMPUTER\s*SCIENCE|\bCSE\b|\bCS\b/.test(raw)) return "CSE";
+  if (/ELECTRONICS|\bECE\b|\bEC\b/.test(raw)) return "ECE";
+  if (/ELECTRICAL|\bEE\b/.test(raw)) return "EE";
+  if (/INFORMATION\s*TECHNOLOGY|\bIT\b/.test(raw)) return "IT";
+  if (/MECHANICAL|\bME\b/.test(raw)) return "ME";
+  if (/PRODUCTION/.test(raw)) return /MECHANICAL/.test(raw) ? "MEP" : "PE";
+  if (/BUSINESS\s*ADMINISTRATION|\bMBA\b/.test(raw)) return "MBA";
+  if (/\bMCA\b/.test(raw)) return "MCA";
+  if (/\bBBA\b/.test(raw)) return "BBA";
+  const code = compact.match(/^(?:CS|IT|ME|CE|EE|EC|RAI|BBA|MBA|BCA|MCA|BVOC|BCOM)/)?.[0] || compact;
   if (code === "EC") return "ECE";
   if (code === "CS") return "CSE";
-  if (code === "BCOM") return "B.COM";
-  if (code === "BVOC") return "B.VOC";
+  if (code === "BCOM") return "BCOM";
+  if (code === "BVOC") return "BVOC";
   return code;
 }
 
@@ -92,11 +137,55 @@ function tabMatchesBranch(tab, branch) {
   const label = String(tab || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const wanted = String(branch || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!wanted) return false;
-  return label === wanted || (wanted === "ECE" && label === "ECE") || (wanted === "CSE" && label === "CSE")
-    || (wanted === "BCOM" && label === "BCOM") || (wanted === "BVOC" && label === "BVOC");
+  return label === wanted || label.startsWith(wanted) && /^(?:MTECH|PHD|MINOR)/.test(label);
+}
+
+function schemeYear(value) {
+  const match = String(value || "").match(/20\d{2}/);
+  return match ? Number(match[0]) : 0;
+}
+
+function latestSchemeEntries(entries) {
+  const newestBySemester = new Map();
+  for (const entry of entries || []) {
+    const semester = Number(entry.semesterNumber || entry.semester);
+    const year = schemeYear(entry.schemeCode);
+    if (!semester || !year) continue;
+    newestBySemester.set(semester, Math.max(newestBySemester.get(semester) || 0, year));
+  }
+  return (entries || []).filter((entry) => {
+    const semester = Number(entry.semesterNumber || entry.semester);
+    const newest = newestBySemester.get(semester) || 0;
+    const year = schemeYear(entry.schemeCode);
+    return !newest || !year || year === newest;
+  });
 }
 
 function eseEntries(datesheet) {
+  if (Array.isArray(datesheet?.programmes)) {
+    return datesheet.programmes.flatMap((programme) => latestSchemeEntries(programme.entries || []).map((entry) => ({
+      id: `ese-${programme.id}-${programme.studyMode}-${entry.semesterNumber}-${entry.date}-${entry.subjectCode}-${entry.schemeCode}`,
+      category: "Provisional ESE 2026",
+      title: entry.subject || "Examination",
+      date: entry.date || "",
+      start: Number.isFinite(entry.sessionStart) ? entry.sessionStart : null,
+      end: Number.isFinite(entry.sessionEnd) ? entry.sessionEnd : null,
+      tab: programme.code || programme.label || "",
+      tabLabel: programme.label || "",
+      programmeId: programme.id || "",
+      studyMode: programme.studyMode || "",
+      semester: Number(entry.semesterNumber || entry.semester) || null,
+      semesterNumber: Number(entry.semesterNumber || entry.semester) || null,
+      schemeCode: entry.schemeCode || "",
+      subjectCode: entry.subjectCode || "",
+      paperId: entry.paperId || "",
+      sessionRaw: entry.sessionRaw || "",
+      year: semesterYear(entry, programme.label),
+      sourceLabel: "Official provisional December 2026 ESE datesheet",
+      sourceUrl: datesheet?.source?.url || "https://academics.gndec.ac.in/datesheet/"
+    })));
+  }
+
   return (datesheet?.tabs || []).flatMap((tab) => (tab.entries || []).map((entry) => {
     const sourceUrl = datesheet?.source?.url
       ? `${datesheet.source.url}${tab.gid ? `#gid=${encodeURIComponent(tab.gid)}` : ""}`
@@ -111,6 +200,8 @@ function eseEntries(datesheet) {
       tab: tab.label || "",
       sessionRaw: entry.sessionRaw || "",
       sessionNote: entry.sessionNote || "",
+      semester: Number(entry.semesterNumber || entry.semester) || null,
+      semesterNumber: Number(entry.semesterNumber || entry.semester) || null,
       year: semesterYear(entry, tab.label),
       cohort: normalizedGroup(entry.qualifier || entry.header),
       sourceLabel: "Official tentative ESE sheet",
@@ -125,16 +216,25 @@ export function allPublishedExamEvents(datesheet) {
     .sort(compareExams);
 }
 
-export function examEventsForSelection({ datesheet, group, branch = "" } = {}) {
+export function examEventsForSelection({ datesheet, group, branch = "", semester = "" } = {}) {
   const section = canonicalSection(group);
-  const year = academicYearForSection(group);
+  const sectionYear = academicYearForSection(group);
   const selectedGroup = examGroupForSection(group);
   const selectedBranch = branchForSelection(group, branch);
-  if (!section || !year) return [];
+  const selectedSemester = Number(String(semester || "").match(/\d{1,2}/)?.[0]) || 0;
+  const selectedYear = selectedSemester ? Math.ceil(selectedSemester / 2) : sectionYear;
+  if ((!section || !selectedYear) && !selectedBranch) return [];
   return allPublishedExamEvents(datesheet).filter((event) => {
-    if (event.year !== year) return false;
-    if (event.sections) return year === 1 && event.sections.includes(section);
-    if (year === 1 && selectedGroup) return event.tab === "Applied Sciences" && (!event.cohort || event.cohort === selectedGroup);
+    if (event.sections) return selectedYear === 1 && event.sections.includes(section);
+    if (event.semesterNumber) {
+      if (selectedSemester && event.semesterNumber !== selectedSemester) return false;
+      if (!selectedSemester && selectedYear && Math.ceil(event.semesterNumber / 2) !== selectedYear) return false;
+      return selectedBranch ? tabMatchesBranch(event.tab, selectedBranch) : Boolean(selectedYear);
+    }
+    if (!selectedYear || event.year !== selectedYear) return false;
+    if (selectedYear === 1 && selectedGroup && event.tab === "Applied Sciences") {
+      return !event.cohort || event.cohort === selectedGroup;
+    }
     return tabMatchesBranch(event.tab, selectedBranch);
   });
 }
@@ -150,8 +250,8 @@ export function isImportantExam(event) {
 }
 
 /** Theory/final sittings for one verified section selection. */
-export function importantExamEventsForSelection({ datesheet, group, branch = "" } = {}) {
-  return examEventsForSelection({ datesheet, group, branch }).filter(isImportantExam);
+export function importantExamEventsForSelection({ datesheet, group, branch = "", semester = "" } = {}) {
+  return examEventsForSelection({ datesheet, group, branch, semester }).filter(isImportantExam);
 }
 
 /** Keep separate published MSE-II and ESE sheets readable when both apply. */
@@ -200,7 +300,7 @@ export function examDateSheetPeriod(events, { dateISO, minutes = 0, leadDays = 3
     startDate,
     exams,
     remaining,
-    today: examsOnDate(exams, dateISO),
+    today: exams.filter((event) => event.date === dateISO && (event.end == null || event.end > minutes)).sort(compareExams),
     next: remaining[0] || null
   };
 }
