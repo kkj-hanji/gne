@@ -32,9 +32,11 @@ import {
 const IST = (iso) => getIndiaNow(new Date(iso));
 
 test("compact syllabus shorthands and official semester tables retain exact branch, semester and subject data", () => {
-  for (const [query, expected] of [["3sem", "3"], ["sem3", "3"], ["subjects3", "3"], ["3subjects", "3"], ["subject3", "3"], ["3subject", "3"], ["CSE3", "3"], ["3CSE", "3"], ["ECE5", "5"], ["5ECE", "5"], ["RAI3", "3"], ["3RAI", "3"], ["subjects10", "10"], ["10subjects", "10"], ["sem10", "10"], ["10sem", "10"]]) {
+  for (const [query, expected] of [["3sem", "3"], ["sem3", "3"], ["subjects3", "3"], ["3subjects", "3"], ["CSE3", "3"], ["3CSE", "3"], ["ECE5", "5"], ["5ECE", "5"], ["RAI3", "3"], ["3RAI", "3"], ["subjects10", "10"], ["10subjects", "10"], ["sem10", "10"], ["10sem", "10"]]) {
     assert.equal(semesterFromQuestion(query), expected, query);
   }
+  assert.equal(semesterFromQuestion("subject3"), "", "a numbered subject is not a semester shorthand");
+  assert.equal(semesterFromQuestion("3subject"), "", "a numbered subject is not a semester shorthand");
   assert.equal(semesterFromQuestion("math 2"), "", "a course level is not a semester filter");
 
   const parsed = parseSyllabusTableCourses([{ text: [
@@ -364,9 +366,37 @@ test("indexed department syllabus supports branch, semester, numbered subject an
   assert.equal(defaulted?.intent, "SYLLABUS_LIST");
   assert.equal(defaulted?.entities.firstYearSemester, "3");
 
+  for (const compactQuery of [
+    "CSE3 syllabus", "3CSE syllabus", "CSEsem3 subjects", "sem3CSE subjects",
+    "3sem CSE syllabus", "CSE3subjects", "subjects3 CSE", "3subjects CSE"
+  ]) {
+    const compact = answerIndexedSyllabus(compactQuery, courses, { sources: index.sources });
+    assert.equal(compact?.intent, "SYLLABUS_LIST", `${compactQuery} should resolve to a syllabus list`);
+    assert.equal(compact?.entities.firstYearSemester, "3", `${compactQuery} should retain its semester`);
+    assert.equal(compact?.entities.program, "B.Tech. Computer Science and Engineering", `${compactQuery} should retain its branch`);
+    assert.ok(compact?.entities.indexedSyllabusOptions.length > 0, `${compactQuery} should produce selectable subject options`);
+  }
+  const compactCount = answerIndexedSyllabus("how many subjects CSE3", courses, { sources: index.sources });
+  assert.equal(compactCount?.intent, "SYLLABUS_COUNT");
+  assert.equal(compactCount?.entities.syllabusSubjectCount, 5);
+  const chapterCount = answerIndexedSyllabus("total chapters in CSE sem3", courses, { sources: index.sources });
+  assert.equal(chapterCount?.intent, "SYLLABUS_COUNT");
+  assert.ok(chapterCount?.entities.syllabusUnitCount > 0);
+  const unclearTopic = answerIndexedSyllabus("parrot sem3 syllabus", courses, {
+    department: "Computer Science & Engineering", program: "B.Tech. Computer Science and Engineering", semester: "3", sources: index.sources
+  });
+  assert.match(unclearTopic?.html || "", /No subject or topic matched/);
+  assert.doesNotMatch(unclearTopic?.html || "", /matched matching/);
+
   const allBranches = answerIndexedSyllabus("all branches sem 3 subjects", courses);
   assert.equal(allBranches?.intent, "SYLLABUS_LIST");
   assert.ok(allBranches?.entities.indexedSyllabusOptions.length > listed.entities.indexedSyllabusOptions.length);
+  const allCseSemesters = answerIndexedSyllabus("all CSE semesters syllabus", courses, {
+    department: "Computer Science & Engineering", program: "B.Tech. Computer Science and Engineering", semester: "3", sources: index.sources
+  });
+  assert.equal(allCseSemesters?.intent, "SYLLABUS_LIST");
+  assert.equal(allCseSemesters?.entities.firstYearSemester, "");
+  assert.ok(allCseSemesters?.entities.indexedSyllabusOptions.length > listed.entities.indexedSyllabusOptions.length);
   const allCount = answerIndexedSyllabus("how many syllabus subjects are indexed across all branches", courses, { sources: index.sources });
   assert.equal(allCount?.intent, "SYLLABUS_COUNT", "counting all subjects does not ask for an unnecessary branch clarification");
   assert.ok(allCount?.entities.syllabusSubjectCount > 0);
@@ -376,6 +406,16 @@ test("indexed department syllabus supports branch, semester, numbered subject an
   });
   assert.equal(numberedChoice?.intent, "SYLLABUS_CONTENT");
   assert.equal(answerIndexedSyllabus("subject2", courses, { previousOptions: listed.entities.indexedSyllabusOptions })?.intent, "SYLLABUS_CONTENT");
+  assert.equal(answerIndexedSyllabus("subject2 syllabus", courses, { previousOptions: listed.entities.indexedSyllabusOptions })?.intent, "SYLLABUS_CONTENT");
+  for (const query of ["subject 2 syllabus", "show subject2 syllabus", "CSE subject2 syllabus", "CSE sem3 subject2 syllabus", "2nd syllabus"]) {
+    const numberedOutline = answerIndexedSyllabus(query, courses, {
+      department: "Computer Science & Engineering", program: "B.Tech. Computer Science and Engineering", semester: "3",
+      previousOptions: listed.entities.indexedSyllabusOptions, sources: index.sources
+    });
+    assert.equal(numberedOutline?.intent, "SYLLABUS_CONTENT", `${query} should select subject 2 from the active syllabus list`);
+    assert.equal(numberedOutline?.entities.firstYearSemester, "3", `${query} should retain the active Semester 3 context`);
+    assert.doesNotMatch(numberedOutline?.html || "", /not listed in your saved branch/, `${query} should not fuzzy-match the ordinal as a course name`);
+  }
 
   assert.equal(syllabusProgramFromText("RAI sem 3 syllabus", index.sources), "B.Tech. Robotics and Artificial Intelligence");
   const rai = answerIndexedSyllabus("RAI sem 3 syllabus", courses, { sources: index.sources });
@@ -401,9 +441,11 @@ test("indexed department syllabus supports branch, semester, numbered subject an
   assert.ok((missingSource?.html || "").includes('<iframe src="https://ee.gndec.ac.in/'));
 
   const partialSource = answerIndexedSyllabus("EE sem3 syllabus", courses, { sources: index.sources });
-  assert.equal(partialSource?.intent, "SYLLABUS_NOT_INDEXED", "a partial PDF parse is not presented as a complete semester list");
-  assert.match(partialSource?.html || "", /not indexed|not have verified/i);
-  assert.doesNotMatch(partialSource?.html || "", /Signals and Systems|Transformer and DC Machines/);
+  assert.equal(partialSource?.intent, "SYLLABUS_LIST", "verified courses from a partly parsed PDF remain available");
+  assert.match(partialSource?.html || "", /Partly parsed source/i, "a partial PDF parse is never presented as a complete semester list");
+  assert.match(partialSource?.html || "", /may be incomplete/i);
+  assert.match(partialSource?.html || "", /Signals and Systems/, "the verified parsed course is shown");
+  assert.match(partialSource?.html || "", /Electrical Engineering syllabus, semesters 3 and 4/, "the source PDF is linked for the missing subjects");
 
   const sourceOnly = index.sources.find((source) => source.department === "Business Administration" && source.semesters.includes("1"));
   assert.ok(sourceOnly, "unparsed official documents retain branch and semester metadata for inline preview");

@@ -472,8 +472,10 @@ test("the first-year scheme semester choice stays shared with Ask Compass", asyn
   const css = await read("../next/styles.css");
   assert.match(app, /SCHEME_SEMESTER_KEY\s*=\s*"gndec-compass-next-scheme-semester-v1"/);
   assert.match(app, /storageSet\(SCHEME_SEMESTER_KEY, semester\)/);
+  assert.match(app, /storageSet\(SCHEME_SEMESTER_KEY, state\.schemeSemesterChoice\)/);
   assert.match(app, /state\.schemeSemesterChoice = \["1", "2"\]\.includes\(syllabusSemester\.value\) \? syllabusSemester\.value : "all"/);
-  assert.match(app, /const selectedSemester = firstYearProfile && \["1", "2"\]\.includes\(state\.schemeSemesterChoice\)[\s\S]*?: firstYearProfile && state\.schemeSemesterChoice === "all" \? "" : \(profileSemester \|\| firstYear\.semester\);/);
+  assert.match(app, /const profileIsFirstYear = \["1", "2"\]\.includes\(profileSemester\)/);
+  assert.match(app, /firstYearProfile && profileIsFirstYear && \["1", "2"\]\.includes\(state\.schemeSemesterChoice\)[\s\S]*?profileSemester \|\| firstYear\.semester/);
   assert.match(app, /answerFirstYearSyllabus\(question, state\.firstYearSyllabusCourses, firstYearPreviousCourse, \{ semester \}\)/);
   assert.match(app, /answerFirstYearScheme\(question, state\.firstYearScheme, options\)/);
   assert.match(css, /\.scheme-card \.table-wrap \{ overflow-x: auto; \}/);
@@ -488,17 +490,22 @@ test("the syllabus page uses only branch and semester selectors with immediate r
   assert.equal((page.match(/<select\b/g) || []).length, 2, "exactly two selectors are rendered");
   assert.match(page, /data-syllabus-branch/);
   assert.match(page, /data-syllabus-semester/);
-  assert.doesNotMatch(page, /data-syllabus-program|data-action="scheme-semester"|type="submit"/);
-  assert.match(page, /profileMatch/);
-  assert.match(page, /All published semesters/);
+  assert.doesNotMatch(page, /data-syllabus-program|data-action="scheme-semester"|type="submit"|All published semesters/);
+  assert.match(page, /syllabusProfileBranch/, "the active profile branch is the default");
+  assert.match(page, /syllabusProfileSemester/, "the active profile semester is the default");
   assert.match(page, /Frequently used/);
+  assert.match(page, /Semester \$\{value\}/, "every semester up to the programme maximum is offered");
+  assert.match(page, /syllabusSemesterStatus/, "unpublished semesters are labelled honestly");
   assert.match(app, /function syllabusBranchOptions[\s\S]*?maximumSemesterForSyllabusProgram/);
   assert.match(app, /SYLLABUS_BROWSE_KEY\s*=\s*"gndec-compass-next-syllabus-browse-v1"/);
   assert.match(app, /preferences\.semesters\[selectedBranch\.key\]/);
   assert.match(app, /rememberSyllabusBranch\(key, selectedSemester \|\| "all"\)/);
   assert.match(app, /if \(syllabusBranch\) \{[\s\S]*?state\.syllabusSemester = selectedSemester;[\s\S]*?render\(\)/);
+  assert.match(app, /latestPublishedSemester \|\| selected\?\.latestDetailedSemester/, "other branches open on their most recent official semester");
   assert.match(app, /href="https:\/\/academics\.gndec\.ac\.in\/datesheet\/"/);
-  assert.match(app, /Provisional/);
+  assert.match(page, /Provisional/);
+  assert.match(page, /Official Applied Sciences Scheme 2024 for semesters 1–2/, "first-year semesters still show the shared Applied Sciences scheme");
+  assert.doesNotMatch(page, /All branches.*All programs.*All semesters/s);
 });
 
 test("Ask uses only the current official syllabus manifest for branch choices and source previews", async () => {

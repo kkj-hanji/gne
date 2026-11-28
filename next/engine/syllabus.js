@@ -165,7 +165,9 @@ export function semesterFromQuestion(text = "") {
       if (match) return match;
     }
   }
-  const compactSyllabus = /(?:^|[^a-z0-9])(?:syllabus|syllabi|subjects?)\s*((?:10|[1-9]))(?=$|[^0-9])|(?:^|[^0-9])((?:10|[1-9]))\s*(?:syllabus|syllabi|subjects?)(?=$|[^a-z0-9])/i.exec(query);
+  // "subject 2" is a numbered subject choice; only the plural form means
+  // "subjects for semester 2" in compact syllabus shorthand.
+  const compactSyllabus = /(?:^|[^a-z0-9])(?:syllabi?|subjects)\s*((?:10|[1-9]))(?=$|[^0-9])|(?:^|[^0-9])((?:10|[1-9]))\s*(?:syllabi?|subjects)(?=$|[^a-z0-9])/i.exec(query);
   if (compactSyllabus) return compactSyllabus[1] || compactSyllabus[2] || "";
   const compactSemester = /(?:^|[^a-z0-9])((?:10|[1-9]))\s*sem(?:ester)?s?(?=$|[^a-z0-9])|(?:^|[^a-z0-9])sem(?:ester)?s?\s*[-:]?\s*((?:10|[1-9]))(?=$|[^0-9])/i.exec(query);
   return compactSemester?.[1] || compactSemester?.[2] || "";
@@ -314,6 +316,19 @@ export function parseFirstYearSyllabus(pages = []) {
       .map((match) => {
         const raw = cleanText(match[2]);
         const hours = raw.match(/\b\d+\s*\(L\)(?:\s*\+\s*\d+\s*\([PT]\))*\s*hrs?\b/i);
+        // Some GNDEC course pages print the teaching hours before the unit
+        // title ("Unit 1: 3(L) hrs  Load – types…"). Keep that title instead
+        // of discarding the whole unit because the hours start at index 0.
+        if (hours && hours.index <= 2) {
+          const rest = raw.slice(hours.index + hours[0].length).trim();
+          const firstClause = rest.search(/[;.]/);
+          const titleEnd = firstClause >= 8 ? firstClause : Math.min(rest.length, 120);
+          return {
+            number: match[1],
+            title: rest.slice(0, titleEnd).trim(),
+            details: rest.slice(titleEnd + (firstClause >= 8 ? 1 : 0)).trim().slice(0, 1200)
+          };
+        }
         const titleEnd = hours?.index ?? raw.length;
         const detailStart = hours ? titleEnd + hours[0].length : raw.length;
         return { number: match[1], title: raw.slice(0, titleEnd).trim(), details: raw.slice(detailStart).trim().slice(0, 1200) };
@@ -586,11 +601,15 @@ export function parseSyllabusTableCourses(pages = []) {
     for (const line of lines) {
       const headingSemester = semesterInTableHeading(line);
       if (headingSemester) semester = headingSemester;
-      if (!semester) continue;
-      const rowPrefix = /^\s*(\d{1,2})\s+(?:PCC|BSC|HSS|HSMC|MNC|MPD|PEC|OEC|ESC|PW\s*&\s*S|PW&S|BS|Core\s+Course|Ability\s+Enhancement|Skill\s+Enhancement|Value\s+Added)\b/i;
-      if (!rowPrefix.test(line)) continue;
-      const trailingValues = /\s+(?:[-–—]|\d+(?:\.\d+)?)(?:\s+(?:[-–—]|\d+(?:\.\d+)?)){2,6}\s*$/;
+      const rowPrefix = /^\s*(\d{1,2})\s+(?:(T\/P|T|P)\s+)?(?:PCC|BSC|HSS|HSMC|MNC|MPD|PEC|OEC|ESC|PW\s*&\s*S|PW&S|BS|Core\s+Course|Ability\s+Enhancement|Skill\s+Enhancement|Value\s+Added)\b/i;
       const prefix = rowPrefix.exec(line);
+      if (!prefix) continue;
+      // Civil Engineering prints the semester in the first column and T/P in
+      // the second. Other scheme tables use the first number as a serial, so
+      // only trust it when the T/P marker is present.
+      const rowSemester = prefix[2] && /^(?:10|[1-9])$/.test(prefix[1]) ? prefix[1] : semester;
+      if (!rowSemester) continue;
+      const trailingValues = /\s+(?:[-–—]|\d+(?:\.\d+)?)(?:\s+(?:[-–—]|\d+(?:\.\d+)?)){2,6}\s*$/;
       const body = line.slice(prefix[0].length);
       let code = "";
       let title = "";
@@ -601,10 +620,13 @@ export function parseSyllabusTableCourses(pages = []) {
       } else {
         title = body.replace(trailingValues, "").trim();
       }
-      title = title.replace(/\s+/g, " ").replace(/[|,;\s-]+$/, "").trim();
-      if (!title || title.length > 140 || /^(?:course|subject|module|title|code|total|credit|marks|theory|practical)\b/i.test(title)) continue;
-      const key = `${semester}|${code || canonicalize(title)}`;
-      if (!courses.has(key)) courses.set(key, { code, title, semester, units: [] });
+      title = title.replace(/\s+/g, " ")
+        .replace(/^[A-Z]{2,6}\s*x{2,5}\s+/i, "")
+        .replace(/[|,;\s-]+$/, "").trim();
+      if (!title || title.length < 3 || /^[\d\s./-]+$/.test(title) || title.length > 140
+        || /^(?:course|subject|module|title|code|total|credit|marks|theory|practical)\b/i.test(title)) continue;
+      const key = `${rowSemester}|${code || canonicalize(title)}`;
+      if (!courses.has(key)) courses.set(key, { code, title, semester: rowSemester, units: [] });
     }
     for (const course of parsePositionedCourseRows(page)) {
       const key = `${course.semester}|${course.code}`;
@@ -1233,6 +1255,289 @@ export function answerFirstYearSyllabusSelection(question = "", courses = [], op
   } : null;
 }
 
+const COURSE_QUERY_STOP = new Set([
+  "a", "about", "across", "all", "also", "an", "and", "are", "as", "at", "available",
+  "be", "branch", "branches", "bata", "batao", "bta", "by", "can", "chapter", "chapters",
+  "check", "chahiye", "count", "course", "courses", "curriculum", "dedo", "department",
+  "departments", "detail", "details", "dikha", "dikhao", "do", "does", "every", "explain",
+  "find", "for", "from", "full", "get", "give", "has", "have", "help", "how", "in",
+  "indexed", "is", "it", "its", "ka", "ke", "ki", "konsa", "konsi", "kya", "list",
+  "many", "me", "mera", "meri", "mujhe", "my", "need", "no", "number", "of", "official",
+  "on", "open", "or", "outline", "paper", "papers", "please", "program", "programme",
+  "published", "read", "see", "sem", "semester", "semesters", "send", "show", "subject",
+  "subjects", "syllabi", "syllabus", "tell", "than", "that", "the", "then", "there",
+  "these", "this", "those", "to", "topic", "topics", "total", "u", "under", "unit",
+  "units", "versus", "view", "vs", "want", "what", "with", "you"
+]);
+
+const COURSE_TITLE_STOP = new Set(["a", "an", "and", "for", "in", "of", "on", "the", "to", "using", "with"]);
+
+const COURSE_SHORTHANDS = Object.freeze({
+  ai: ["artificial", "intelligence"],
+  cd: ["compiler", "design"],
+  cg: ["computer", "graphics"],
+  cn: ["computer", "network"],
+  coa: ["computer", "architecture"],
+  daa: ["design", "analysis", "algorithm"],
+  dbms: ["database", "management", "system"],
+  ds: ["data", "science"],
+  dsa: ["data", "structure"],
+  iot: ["iot"],
+  math: ["mathematics"],
+  maths: ["mathematics"],
+  ml: ["machine", "learning"],
+  nlp: ["natural", "language", "processing"],
+  oop: ["object", "oriented", "programming"],
+  os: ["operating", "system"],
+  se: ["software", "engineering"],
+  toc: ["theory", "computation"],
+  vlsi: ["vlsi"]
+});
+
+const PROGRAM_CODE_ALIASES = Object.freeze({
+  BARCH: "B.Arch.",
+  ARCH: "B.Arch.",
+  BBA: "BBA",
+  MBA: "MBA",
+  BCOM: "B.Com. Entrepreneurship",
+  COM: "B.Com. Entrepreneurship",
+  BCA: "BCA",
+  MCA: "MCA",
+  RAI: "B.Tech. Robotics and Artificial Intelligence",
+  ME: "B.Tech. Mechanical Engineering",
+  CSE: "B.Tech. Computer Science and Engineering",
+  CS: "B.Tech. Computer Science and Engineering",
+  ECE: "B.Tech. Electronics & Communication Engineering",
+  EC: "B.Tech. Electronics & Communication Engineering",
+  EE: "B.Tech. Electrical Engineering",
+  IT: "B.Tech. Information Technology",
+  CE: "B.Tech. Civil Engineering"
+});
+
+function courseWord(value = "") {
+  const word = String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return word.length > 3 ? word.replace(/s$/, "") : word;
+}
+
+function courseTitleWords(title = "") {
+  const words = canonicalize(title).replace(/[^a-z0-9]+/g, " ").split(/\s+/)
+    .filter((word) => word && !COURSE_TITLE_STOP.has(word));
+  const set = new Set(words.map(courseWord));
+  // OCR sometimes splits a word ("Oper ating System", "Embe dded system").
+  // Joining neighbouring words keeps shortforms and title matches usable.
+  for (let index = 0; index < words.length - 1; index += 1) {
+    set.add(courseWord(words[index] + words[index + 1]));
+  }
+  return { words, set };
+}
+
+function courseAcronyms(title = "") {
+  const words = canonicalize(title).replace(/[^a-z0-9]+/g, " ").split(/\s+/)
+    .filter((word) => word && !COURSE_TITLE_STOP.has(word));
+  const acronym = words.map((word) => word[0]).join("");
+  const result = new Set([acronym]);
+  if (acronym.length > 2 && acronym.endsWith("s")) result.add(acronym.slice(0, -1));
+  return result;
+}
+
+function normalizeCompactSyllabusQuestion(question = "") {
+  let value = String(question || "").replace(/\s+/g, " ").trim();
+  const aliases = [...Object.values(DEPARTMENT_ALIASES), ...Object.values(PROGRAM_ALIASES)]
+    .flat().filter((alias) => String(alias).length >= 2)
+    .sort((a, b) => String(b).length - String(a).length);
+  for (const alias of aliases) {
+    const escaped = escapedPattern(alias).replace(/\\s+/g, "\\s+");
+    value = value.replace(new RegExp("(^|[^a-z0-9])(" + escaped + ")(?=\\d|sem(?:ester)?|subjects?|syllabi?)", "ig"), "$1$2 ");
+    value = value.replace(new RegExp("(^|[^a-z0-9])(\\d{1,2})(" + escaped + ")(?=$|[^a-z0-9])", "ig"), "$1$2 $3");
+  }
+  return value
+    .replace(/(^|[^a-z0-9])(sem(?:ester)?)(10|[1-9])/gi, "$1$2 $3 ")
+    .replace(/(^|[^a-z0-9])(10|[1-9])(sem(?:ester)?)/gi, "$1$2 $3")
+    .replace(/(^|[^a-z0-9])(subjects?)(\d{1,2})/gi, "$1$2 $3")
+    .replace(/(^|[^a-z0-9])(\d{1,2})(subjects?)/gi, "$1$2 $3")
+    .replace(/(^|[^a-z0-9])(syllabi?)(\d{1,2})/gi, "$1$2 $3")
+    .replace(/(^|[^a-z0-9])(\d{1,2})(syllabi?)/gi, "$1$2 $3")
+    .replace(/\s+/g, " ").trim();
+}
+
+function courseQueryTokens(question = "") {
+  // Strip branch/programme words from the raw question first. Canonicalisation
+  // expands "cse" to "computer", which would otherwise look like a course
+  // title word and turn a plain branch list into a single subject answer.
+  let raw = String(question || "");
+  for (const aliases of [...Object.values(DEPARTMENT_ALIASES), ...Object.values(PROGRAM_ALIASES)]) {
+    for (const alias of aliases) {
+      const escaped = escapedPattern(alias).replace(/\s+/g, "\\s+");
+      raw = raw.replace(new RegExp(`(?:^|\\b)${escaped}(?=\\b|$)`, "ig"), " ");
+    }
+  }
+  const shorthandTokens = Object.keys(COURSE_SHORTHANDS)
+    .filter((word) => new RegExp(`(?:^|[^a-z0-9])${escapedPattern(word)}(?=$|[^a-z0-9])`, "i").test(raw));
+  let text = canonicalize(raw);
+  for (const aliases of Object.values(DEPARTMENT_ALIASES)) {
+    for (const alias of aliases) {
+      const escaped = escapedPattern(alias).replace(/\s+/g, "\\s+");
+      text = text.replace(new RegExp(`(?:^|\\b)${escaped}(?=\\b|$)`, "ig"), " ");
+    }
+  }
+  for (const aliases of Object.values(PROGRAM_ALIASES)) {
+    for (const alias of aliases) {
+      const escaped = escapedPattern(alias).replace(/\s+/g, "\\s+");
+      text = text.replace(new RegExp(`(?:^|\\b)${escaped}(?=\\b|$)`, "ig"), " ");
+    }
+  }
+  text = text
+    .replace(/\b(?:sem(?:ester)?s?\s*[-–]?\s*(?:10|[1-9])|(?:10|[1-9])(?:st|nd|rd|th)\s*sem(?:ester)?s?)\b/gi, " ")
+    .replace(/\b(?:sem(?:ester)?s?\s*[-–]?\s*(?:one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth))\b/gi, " ")
+    .replace(/\b(?:(?:one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s*sem(?:ester)?s?)\b/gi, " ")
+    .replace(/\b(?:unit|u|chap|chapter|topic)\s*(?:-|number|no\.?\s*)?(?:10|[1-9])\b/gi, " ")
+    .replace(/\b(?:subject|course|option)\s*\d{1,2}\b/gi, " ")
+    .replace(/\b(?:syllabus|syllabi|subjects?|courses?|papers?|units?|chapters?|topics?)\b/gi, " ");
+  const tokens = text.split(/\s+/)
+    .map((token) => token.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ""))
+    .filter((token) => token.length > 1 && !/^\d+$/.test(token) && !COURSE_QUERY_STOP.has(token));
+  return [...new Set([...tokens, ...shorthandTokens])];
+}
+
+function programCodeForText(text = "", programs = []) {
+  const cleaned = String(text || "").toLowerCase()
+    .replace(/\b(?:show|tell|give|send|find|help|remind)\s+me\b/g, " ")
+    .replace(/\b(?:is|was|will|can|could|does|do|has|have|had)\s+it\b/g, " ");
+  const entries = Object.entries(PROGRAM_CODE_ALIASES).sort((a, b) => b[0].length - a[0].length);
+  for (const [code, program] of entries) {
+    if (!programs.includes(program)) continue;
+    if (new RegExp(`(?:^|[^a-z0-9])${escapedPattern(code.toLowerCase())}(?=$|[^a-z0-9])`, "i").test(cleaned)) return program;
+  }
+  return "";
+}
+
+function resolveSyllabusScope(question = "", courses = [], sources = [], { department = "", program = "", allBranches = false } = {}) {
+  const records = [...courses, ...sources];
+  const programsFor = (name) => [...new Set(records
+    .filter((row) => row && row.department === name && row.program)
+    .map((row) => row.program))];
+  const explicitProgram = syllabusProgramFromText(question, records);
+  const explicitDepartment = syllabusDepartmentFromText(question, records);
+  if (allBranches) {
+    return { department: "", program: "", programs: [], explicitDepartment, explicitProgram, conflict: false, ambiguousProgram: false };
+  }
+  let selectedDepartment = explicitDepartment || "";
+  let selectedProgram = explicitProgram || "";
+  if (!selectedDepartment && selectedProgram) {
+    selectedDepartment = records.find((row) => row.program === selectedProgram)?.department || "";
+  }
+  if (selectedDepartment) {
+    const programs = programsFor(selectedDepartment);
+    const programDepartment = selectedProgram
+      ? records.find((row) => row.program === selectedProgram)?.department || ""
+      : "";
+    if (programDepartment && programDepartment !== selectedDepartment) {
+      return { department: selectedDepartment, program: "", programs, explicitDepartment, explicitProgram, conflict: true, ambiguousProgram: false };
+    }
+    if (!selectedProgram) selectedProgram = programCodeForText(question, programs);
+    if (!selectedProgram && programs.includes(program)) selectedProgram = program;
+    if (!selectedProgram && programs.length === 1) selectedProgram = programs[0];
+    return {
+      department: selectedDepartment, program: selectedProgram, programs, explicitDepartment, explicitProgram,
+      conflict: false, ambiguousProgram: !selectedProgram && programs.length > 1
+    };
+  }
+  selectedDepartment = department || "";
+  if (selectedDepartment) {
+    const programs = programsFor(selectedDepartment);
+    if (!selectedProgram) selectedProgram = programs.includes(program) ? program : "";
+    if (!selectedProgram) selectedProgram = programs.length === 1 ? programs[0] : programCodeForText(question, programs);
+    return {
+      department: selectedDepartment, program: selectedProgram, programs, explicitDepartment, explicitProgram,
+      conflict: false, ambiguousProgram: !selectedProgram && programs.length > 1
+    };
+  }
+  return { department: "", program: "", programs: [], explicitDepartment, explicitProgram, conflict: false, ambiguousProgram: false };
+}
+
+function courseMatchScore(course = {}, tokens = [], normalizedQuestion = "") {
+  if (!tokens.length) return 0;
+  const code = String(course.code || "").toLowerCase();
+  if (code && new RegExp(`(?:^|[^a-z0-9])${escapedPattern(code)}(?=$|[^a-z0-9])`, "i").test(normalizedQuestion)) return 100;
+  const title = canonicalize(course.title || "");
+  if (title.length >= 8 && normalizedQuestion.includes(title)) return 96;
+  const { set } = courseTitleWords(course.title);
+  const acronyms = courseAcronyms(course.title);
+  let score = 0;
+  for (const token of tokens) {
+    const rawWord = String(token || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const word = courseWord(token);
+    if (acronyms.has(rawWord) || acronyms.has(word)) { score = Math.max(score, 92); continue; }
+    const expansion = COURSE_SHORTHANDS[rawWord] || COURSE_SHORTHANDS[word];
+    if (expansion && expansion.every((part) => set.has(courseWord(part)))) { score = Math.max(score, 88); continue; }
+    if (set.has(word)) { score = Math.max(score, 72); continue; }
+    const fuzzy = [...set].some((candidate) => candidate.length > 3 && word.length > 3 && tokenSimilar(word, candidate) >= 0.86);
+    if (fuzzy) { score = Math.max(score, 64); continue; }
+    return 0;
+  }
+  return score;
+}
+
+const PROGRAM_SHORT_CODES = Object.freeze({
+  "B.Tech. Computer Science and Engineering": "CSE",
+  "B.Tech. Civil Engineering": "CE",
+  "B.Tech. Electronics & Communication Engineering": "ECE",
+  "B.Tech. Electrical Engineering": "EE",
+  "B.Tech. Information Technology": "IT",
+  "B.Tech. Mechanical Engineering": "ME",
+  "B.Tech. Robotics and Artificial Intelligence": "RAI",
+  "B.Arch.": "BArch",
+  BCA: "BCA",
+  MCA: "MCA",
+  BBA: "BBA",
+  "B.Com. Entrepreneurship": "BCom",
+  MBA: "MBA"
+});
+
+function courseSuggestion(course = {}) {
+  const title = String(course.title || "").trim();
+  const semester = (course.semesters || []).map(String).join("/");
+  // Use the short programme code so a choice chip stays parseable even when
+  // the full programme name contains words that also occur in course titles.
+  const program = PROGRAM_SHORT_CODES[String(course.program || "").trim()] || "";
+  return `${title}${program ? ` ${program}` : ""}${semester ? ` semester ${semester}` : ""} syllabus`;
+}
+
+function numberedSyllabusSelection(question = "") {
+  const value = String(question || "").trim();
+  const numberToken = "(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\\d{1,2}(?:st|nd|rd|th)?)";
+  const standalone = new RegExp(`^\\s*(?:(?:choose|select|pick|show|open|view|display|give|please)\\s+)*(?:(?:the|number|no\\.?)\\s*)?${numberToken}(?:\\s+(?:subject|course|option|one|please|syllabus|syllabi|outline))?\\s*$`, "i").exec(value);
+  const subjectFirst = new RegExp(`\\b(?:subject|course|option)\\s*(?:(?:number|no\\.?)\\s*)?${numberToken}(?=\\s|$|[.,!?])`, "i").exec(value);
+  const numberFirst = new RegExp(`\\b${numberToken}\\s+(?:subject|course|option)\\b`, "i").exec(value);
+  const match = standalone || subjectFirst || numberFirst;
+  if (!match) return null;
+  const raw = String(match[1] || "").toLowerCase();
+  const words = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 };
+  const index = words[raw] || Number(raw.replace(/(?:st|nd|rd|th)$/i, ""));
+  return Number.isInteger(index) && index > 0 ? index : null;
+}
+
+function searchableCourseMatches(base = [], tokens = []) {
+  if (!tokens.length) return base;
+  return base.filter((course) => {
+    const searchable = canonicalize(`${course.title} ${course.code} ${course.program} ${course.department} ${(course.units || []).map((unit) => `${unit.title} ${unit.details}`).join(" ")}`);
+    return tokens.every((token) => searchable.includes(token));
+  });
+}
+
+function courseChoiceAnswer(matches = [], intro = "More than one subject matches that name.") {
+  const rows = matches.slice(0, 8);
+  const suggestions = [...new Set(rows.map(({ course }) => courseSuggestion(course)))];
+  return {
+    html: `<p><strong>${escapeHtml(intro)}</strong></p><p>Choose the exact course so I open the right official outline:</p><div class="syllabus-choice-list">${rows.map(({ course }) => `<button type="button" class="chip" data-ask-question="${escapeHtml(courseSuggestion(course))}">${escapeHtml(course.title)} · ${escapeHtml(course.program || course.department)} · Semester ${escapeHtml((course.semesters || []).join("/") || "—")}</button>`).join("")}</div>`,
+    intent: "SYLLABUS_COURSE_AMBIGUOUS",
+    confidence: 0.9,
+    plan: ["match the requested subject against verified indexed courses", "keep branch and semester distinctions", "ask for the exact course instead of guessing"],
+    entities: { indexedSyllabusChoices: rows.map(({ course }) => course.id) },
+    suggestions
+  };
+}
+
 export function answerIndexedSyllabus(question = "", courses = [], {
   department = "",
   program = "",
@@ -1242,43 +1547,203 @@ export function answerIndexedSyllabus(question = "", courses = [], {
   sources = []
 } = {}) {
   if (!Array.isArray(courses) || !courses.length) return null;
-  const text = canonicalize(question);
+  const inputQuestion = String(question || "");
+  const normalizedQuestion = normalizeCompactSyllabusQuestion(inputQuestion);
+  const text = canonicalize(normalizedQuestion);
   const countIntent = /\b(?:how many|count|total|number of)\b/.test(text)
     && /\b(?:branches?|departments?|semesters?|subjects?|courses?|units?|chapters?)\b/.test(text);
   const asksSyllabus = /\b(?:syllabus|syllabi|subjects?|courses?|course outline|curriculum|topics?|units?|chapters?|semesters?)\b/.test(text) || countIntent;
   const countKind = /\b(?:units?|chapters?)\b/.test(text) ? "units"
     : /\bsemesters?\b/.test(text) && !/\bsubjects?|courses?\b/.test(text) ? "semesters"
       : /\bbranches?|departments?\b/.test(text) && !/\bsubjects?|courses?\b/.test(text) ? "branches" : "subjects";
-  const numbered = /^\s*(?:(?:choose|select)\s+)?(?:(?:(?:subject|course|option)\s+(?:(?:number|no\.?)\s*)?)|(?:number|no\.?)\s*)?(?:the\s*)?([1-9]\d?)(?:st|nd|rd|th)?(?:\s+(?:subject|course|one|please))?\s*$/i.exec(question)
-    || (/^\s*(?:subject|course|option)\s*(\d{1,2})\s*$/i.exec(question))
-    || (/^\s*(\d{1,2})\s*(?:subject|course|option)\s*$/i.exec(question))
-    || /^\s*(?:(?:choose|select)\s+)?(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s*(?:one|subject|course)?\s*$/i.exec(question);
+  const numbered = numberedSyllabusSelection(normalizedQuestion);
   if (!asksSyllabus && !previousCourseId && !numbered) return null;
 
   const sourceList = Array.isArray(sources) ? sources : [];
-  const records = [...courses, ...sourceList];
-  const explicitProgram = syllabusProgramFromText(question, records);
-  const explicitDepartment = syllabusDepartmentFromText(question, records);
-  const allBranches = /\b(?:all|every)\s+(?:branches?|departments?)|\b(?:branches?|departments?)\s+(?:all|every)\b/i.test(question);
-  const allSemesters = /\b(?:all|every)\s+semesters?\b/i.test(question);
-  const selectedProgram = explicitProgram || (allBranches ? "" : program);
-  const selectedDepartment = (explicitProgram && records.find((item) => item.program === explicitProgram)?.department)
-    || explicitDepartment || (allBranches ? "" : department);
-  const compactSubjectChoice = Array.isArray(previousOptions) && previousOptions.length > 0
-    && /^\s*(?:(?:subject|course|option)\s*\d{1,2}|\d{1,2}\s*(?:subject|course|option))\s*$/i.test(question);
-  const explicitSemester = compactSubjectChoice ? "" : semesterFromQuestion(question);
+  const allBranches = /\b(?:all|every)\s+(?:branches?|departments?)|\b(?:branches?|departments?)\s+(?:all|every)\b/i.test(normalizedQuestion);
+  const allSemesters = /\b(?:all|every)\b.{0,50}\bsemesters?\b|\bsemesters?\b.{0,30}\b(?:all|every)\b/i.test(normalizedQuestion);
+  const scope = resolveSyllabusScope(normalizedQuestion, courses, sourceList, { department, program, allBranches });
+  const selectedDepartment = scope.department;
+  const selectedProgram = scope.program;
+  // The singular "subject 2" is a numbered choice, while an explicit
+  // "CSE sem 3 subject 2" still carries Semester 3 as its scope.
+  const explicitSemester = semesterFromQuestion(normalizedQuestion);
   const selectedSemester = explicitSemester || (allSemesters ? "" : String(semester || ""));
-  const asksUnitFollowup = /\b(?:unit|units|chapter|chapters|topic|topics)\b/.test(text);
+  const asksUnitFollowup = /\b(?:unit|units|u|chap|chapter|chapters|topic|topics)\s*(?:-|number|no\.?\s*)?(?:10|[1-9])\b|\b(?:unit|units|chapter|chapters|topic|topics)\b/.test(text);
+  const wantsList = !countIntent && /\b(?:subjects?|courses?|papers?)\b/.test(text)
+    && !/\b(?:syllabus|syllabi|units?|chapters?)\b/.test(text);
+  const queryTokens = numbered ? [] : courseQueryTokens(normalizedQuestion);
+  const normalizedQuestionText = text;
+  const scored = courses
+    .map((course) => ({ course, score: courseMatchScore(course, queryTokens, normalizedQuestionText) }))
+    .filter((match) => match.score > 0)
+    .sort((a, b) => b.score - a.score
+      || String(a.course.title || "").localeCompare(String(b.course.title || ""), undefined, { numeric: true }));
+  const inScope = (course) => (!selectedDepartment || course.department === selectedDepartment)
+    && (!selectedProgram || course.program === selectedProgram);
+  const byExplicitSemester = (list) => (explicitSemester
+    ? list.filter(({ course }) => (course.semesters || []).map(String).includes(explicitSemester))
+    : list);
+  let candidates = byExplicitSemester(scored.filter(({ course }) => inScope(course)));
+  let usedGlobalFallback = false;
+  if (!candidates.length && queryTokens.length && !explicitSemester) {
+    const globalCandidates = byExplicitSemester(scored);
+    if (globalCandidates.length) {
+      candidates = globalCandidates;
+      usedGlobalFallback = true;
+    }
+  }
+
+  let course = null;
+  if (!wantsList && !numbered && candidates.length) {
+    const inProfileSemester = semester
+      ? candidates.filter(({ course: item }) => (item.semesters || []).map(String).includes(String(semester)))
+      : [];
+    if (inProfileSemester.length === 1) course = inProfileSemester[0].course;
+    else if (candidates.length === 1) course = candidates[0].course;
+    else if (candidates[0].score >= 92 && candidates[1].score < candidates[0].score) course = candidates[0].course;
+    else return courseChoiceAnswer(candidates, usedGlobalFallback
+      ? "That subject name matches more than one programme."
+      : "More than one subject matches that name.");
+  }
+
+  if (!course && numbered) {
+    const requestedSemester = explicitSemester || (allSemesters ? "" : String(semester || ""));
+    const previousId = Array.isArray(previousOptions) ? previousOptions[numbered - 1] : "";
+    const previousCourse = courses.find((item) => item.id === previousId) || null;
+    if (previousCourse && inScope(previousCourse)
+      && (!requestedSemester || (previousCourse.semesters || []).map(String).includes(requestedSemester))) {
+      course = previousCourse;
+    }
+    // Numbered requests are also useful as a direct follow-up to a branch and
+    // semester prompt. Resolve from the same deterministic course order only
+    // when that scope identifies one programme.
+    if (!course && !scope.ambiguousProgram && !allBranches && (selectedProgram || selectedDepartment)) {
+      const scopedCourses = courses.filter((item) => inScope(item)
+        && (!requestedSemester || (item.semesters || []).map(String).includes(requestedSemester)));
+      course = scopedCourses[numbered - 1] || null;
+    }
+  }
+  if (!course && !countIntent && previousCourseId && /\b(?:unit|units|u|chap|chapter|chapters|topic|topics)\b/.test(text)) {
+    course = courses.find((item) => item.id === previousCourseId) || null;
+  }
+  if (!course && asksUnitFollowup && !countIntent) {
+    const options = Array.isArray(previousOptions) ? previousOptions : [];
+    const selectable = options.map((id) => courses.find((item) => item.id === id)).filter(Boolean);
+    return {
+      html: `<p><strong>Which subject should I use for that unit?</strong></p><p>Choose a subject from the previous list first, then ask for its unit number.</p>${selectable.length ? `<div class="syllabus-choice-list">${selectable.slice(0, 12).map((item, index) => `<button type="button" class="chip" data-ask-question="subject ${index + 1}">${escapeHtml(item.title)}</button>`).join("")}</div>` : ""}`,
+      intent: "SYLLABUS_COURSE_CLARIFICATION",
+      confidence: 1,
+      plan: ["check the previous syllabus selection", "ask which course owns the requested unit", "avoid assigning a unit to an unrelated course"],
+      entities: { indexedSyllabusOptions: selectable.map((item) => item.id), department: selectedDepartment, firstYearSemester: selectedSemester }
+    };
+  }
+
+  if (course) {
+    const courseUnits = Array.isArray(course.units) ? course.units : [];
+    const courseSemesters = (course.semesters || []).map(String);
+    const courseSemester = selectedSemester && courseSemesters.includes(String(selectedSemester))
+      ? String(selectedSemester) : (courseSemesters[0] || String(selectedSemester || ""));
+    const semesterMismatch = Boolean(selectedSemester && courseSemesters.length
+      && !courseSemesters.includes(String(selectedSemester)));
+    if (countIntent) {
+      const unitCount = courseUnits.length;
+      if (countKind === "subjects" || countKind === "courses") {
+        return {
+          html: `<p><strong>${escapeHtml(course.title)} · ${escapeHtml(course.code)}</strong></p><p>This is <strong>one indexed subject</strong> in the current official syllabus catalogue. Ask for its units or chapters for a topic count.</p><p class="answer-source">Verified against GNDEC syllabus text. <a href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open the source PDF</a>.</p>`,
+          intent: "SYLLABUS_COUNT",
+          confidence: 0.98,
+          plan: ["resolve the exact course", "report the verified subject record", "link the source document"],
+          entities: { syllabusCourseId: course.id, syllabusCourseCode: course.code, subject: course.title, department: course.department, syllabusSubjectCount: 1 }
+        };
+      }
+      const statement = unitCount
+        ? `The indexed official outline contains <strong>${unitCount} unit${unitCount === 1 ? "" : "s"}</strong>.`
+        : "No unit count is available in the indexed text for this subject.";
+      return {
+        html: `<p><strong>${escapeHtml(course.title)} · ${escapeHtml(course.code)}</strong></p><p>${statement}</p><p class="answer-source">Counted from verified GNDEC syllabus text. <a href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open the source PDF</a>.</p>`,
+        intent: "SYLLABUS_COUNT",
+        confidence: 0.98,
+        plan: ["resolve the exact course and semester", "count only indexed official units", "link the source document"],
+        entities: { syllabusCourseId: course.id, syllabusCourseCode: course.code, subject: course.title, department: course.department, syllabusUnitCount: unitCount }
+      };
+    }
+    const unitMatch = text.match(/\b(?:unit|u|chap|chapter|topic)\s*(?:-|number|no\.?\s*)?(10|[1-9])\b/)
+      || text.match(/\b(?:unit|chap|chapter|topic)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
+    const unitNumber = unitMatch
+      ? Number(unitMatch[1]) || ({ one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 })[unitMatch[1]]
+      : 0;
+    const units = unitNumber ? courseUnits.filter((unit) => Number(unit.number) === unitNumber) : courseUnits;
+    if (!units.length) {
+      if (!course.sourceUrl) return null;
+      if (unitNumber) {
+        const available = courseUnits.map((unit) => String(unit.number)).filter(Boolean);
+        return {
+          html: `<p><strong>${escapeHtml(course.title)} · ${escapeHtml(course.code)}</strong></p><p>The indexed official outline does not list <strong>Unit ${escapeHtml(unitNumber)}</strong>${available.length ? `; it lists Unit ${escapeHtml(available.join(", "))}` : ""}. I will not invent the missing unit.</p><p class="answer-source"><a href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(course.sourceTitle || "the official syllabus PDF")}</a></p>`,
+          intent: "SYLLABUS_UNIT_NOT_FOUND",
+          confidence: 1,
+          plan: ["resolve the selected course", "check the requested unit number against indexed text", "avoid inventing a missing unit"],
+          entities: { syllabusCourseId: course.id, syllabusCourseCode: course.code, subject: course.title, department: course.department, syllabusUnitNumber: unitNumber }
+        };
+      }
+      return {
+        html: `<p><strong>${escapeHtml(course.title)} · ${escapeHtml(course.code)}</strong></p><p>The official GNDEC document lists this subject, but Compass does not have verified unit text for it yet. I will not invent the outline.</p><p class="answer-source"><a href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(course.sourceTitle || "the official syllabus PDF")}</a></p>`,
+        intent: "SYLLABUS_SOURCE_ONLY",
+        confidence: 1,
+        plan: ["resolve the selected course from the numbered official list", "check the indexed course outline", "provide the source PDF when unit text is unavailable"],
+        entities: { syllabusCourseId: course.id, syllabusCourseCode: course.code, subject: course.title, department: course.department, firstYearSemester: courseSemester }
+      };
+    }
+    const title = `${course.title} · ${course.code}`;
+    const context = [course.program, course.semesters?.length ? `Semester${course.semesters.length === 1 ? "" : "s"} ${course.semesters.join(", ")}` : ""].filter(Boolean).join(" · ");
+    const sourcePage = course.sourcePage
+      ? ` · <a href="${escapeHtml(course.sourcePage)}" target="_blank" rel="noopener noreferrer">department page</a>`
+      : "";
+    return {
+      html: `<p><strong>${escapeHtml(title)}${context ? ` · ${escapeHtml(context)}` : ""}</strong></p>
+        ${usedGlobalFallback ? `<p class="answer-meta">This subject is not listed in your saved branch. It is shown from ${escapeHtml(course.department)} because it is the only verified match.</p>` : ""}
+        ${semesterMismatch ? `<p class="answer-meta">Your profile semester is ${escapeHtml(selectedSemester)}, but the verified outline for this subject is listed for Semester ${escapeHtml(courseSemester)}. I have not relabelled it.</p>` : ""}
+        <ol>${units.map((unit) => `<li><strong>Unit ${escapeHtml(unit.number)}: ${escapeHtml(unit.title)}</strong>${unit.details ? `<p>${escapeHtml(unit.details)}</p>` : ""}</li>`).join("")}</ol>
+        <p class="answer-source">Extracted from the official GNDEC syllabus document. <a href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open the source PDF</a>${sourcePage}.</p>`,
+      intent: "SYLLABUS_CONTENT",
+      confidence: 0.92,
+      plan: ["match the verified department course and semester", "read the requested unit outline from indexed official text", "include its source PDF"],
+      entities: {
+        syllabusCourseId: course.id,
+        syllabusCourseCode: course.code,
+        subject: course.title,
+        department: course.department,
+        firstYearSemester: courseSemester
+      }
+    };
+  }
+
+  if (scope.conflict) {
+    return {
+      html: `<p><strong>The branch and programme in that question do not match.</strong></p><p>Choose the exact programme so I do not mix two departments.</p>${scope.programs.length ? `<div class="syllabus-choice-list">${scope.programs.map((name) => `<button type="button" class="chip" data-ask-question="${escapeHtml(`${name} semester ${selectedSemester || "3"} syllabus`)}">${escapeHtml(name)}</button>`).join("")}</div>` : ""}`,
+      intent: "SYLLABUS_PROGRAM_CLARIFICATION",
+      confidence: 1,
+      plan: ["compare the named department and programme", "decline to combine two departments", "offer the verified programmes"],
+      entities: { department: selectedDepartment, firstYearSemester: selectedSemester }
+    };
+  }
+  if (scope.ambiguousProgram && !course) {
+    const suggestions = scope.programs.map((name) => `${name} semester ${selectedSemester || "3"} syllabus`);
+    return {
+      html: `<p><strong>Which programme should I use for ${escapeHtml(selectedDepartment)}?</strong></p><p>This department publishes more than one programme, so I will not guess.</p><div class="syllabus-choice-list">${scope.programs.map((name) => `<button type="button" class="chip" data-ask-question="${escapeHtml(`${name} semester ${selectedSemester || "3"} syllabus`)}">${escapeHtml(name)}</button>`).join("")}</div>`,
+      intent: "SYLLABUS_PROGRAM_CLARIFICATION",
+      confidence: 1,
+      plan: ["detect a department with multiple programmes", "ask for the exact programme", "avoid mixing official schemes"],
+      entities: { department: selectedDepartment, firstYearSemester: selectedSemester },
+      suggestions
+    };
+  }
+
   const branchNames = [...new Set([...courses, ...sourceList].map((item) => item.department).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const mentionsCourse = courses.some((item) => {
-    const normalized = canonicalize(question);
-    const title = canonicalize(item.title);
-    return (item.code && new RegExp(`\\b${escapedPattern(item.code)}\\b`, "i").test(normalized))
-      || (title.length >= 12 && title.split(/\s+/).length >= 2 && normalized.includes(title));
-  });
   const needsBranch = asksSyllabus && !countIntent && countKind !== "branches" && !numbered
-    && !mentionsCourse && !asksUnitFollowup && !selectedDepartment && !allBranches;
-  const needsSemester = asksSyllabus && !countIntent && !numbered && !mentionsCourse && !asksUnitFollowup && selectedDepartment && !selectedSemester && !allSemesters;
+    && !asksUnitFollowup && !selectedDepartment && !allBranches && !queryTokens.length;
+  const needsSemester = asksSyllabus && !countIntent && !numbered && !asksUnitFollowup
+    && selectedDepartment && !selectedSemester && !allSemesters && !queryTokens.length;
   if (needsBranch || needsSemester) {
     const prompt = needsBranch
       ? "Which branch or programme should I use? I can also use your saved profile branch if you add it in Settings."
@@ -1297,21 +1762,16 @@ export function answerIndexedSyllabus(question = "", courses = [], {
       suggestions
     };
   }
-  const listed = courses.filter((course) => (!selectedDepartment || course.department === selectedDepartment)
-    && (!selectedProgram || course.program === selectedProgram)
-    && (!selectedSemester || allSemesters || (course.semesters || []).map(String).includes(selectedSemester))
-    && (!selectedSemester || sourceList.filter((source) => source.department === course.department
-      && source.program === course.program && (source.semesters || []).map(String).includes(selectedSemester)).length === 0
-      || sourceList.some((source) => source.department === course.department && source.program === course.program
-        && (source.semesters || []).map(String).includes(selectedSemester) && isCompleteSyllabusSemester(source, selectedSemester))));
+
   if (countIntent && countKind === "branches") {
-    const branchCount = new Set([...courses, ...sourceList].map((item) => item.department).filter(Boolean)).size;
+    const programs = new Set([...courses, ...sourceList].map((item) => item.program || item.department).filter(Boolean));
+    const departments = new Set([...courses, ...sourceList].map((item) => item.department).filter(Boolean));
     return {
-      html: `<p>Compass has current official syllabus sources for <strong>${branchCount} GNDEC branches/departments</strong>.</p><p class="answer-meta">Superseded schemes are excluded; a branch is counted only when it has a current source in the bundled official catalogue.</p>`,
+      html: `<p>Compass has current official syllabus sources for <strong>${programs.size} programme${programs.size === 1 ? "" : "s"}</strong> across <strong>${departments.size} department${departments.size === 1 ? "" : "s"}</strong>.</p><p class="answer-meta">Superseded schemes are excluded; a branch is counted only when it has a current source in the bundled official catalogue.</p>`,
       intent: "SYLLABUS_COUNT",
       confidence: 0.98,
-      plan: ["read the current official source catalogue", "count unique branches and departments", "exclude superseded documents"],
-      entities: { syllabusBranchCount: branchCount }
+      plan: ["read the current official source catalogue", "count unique programmes and departments", "exclude superseded documents"],
+      entities: { syllabusBranchCount: programs.size, syllabusDepartmentCount: departments.size }
     };
   }
   if (countIntent && countKind === "semesters") {
@@ -1331,122 +1791,21 @@ export function answerIndexedSyllabus(question = "", courses = [], {
       entities: { department: selectedDepartment, program: selectedProgram, syllabusSemesterCount: semesters.length, syllabusSemesters: semesters }
     };
   }
-  let course = null;
-  if (numbered && Array.isArray(previousOptions)) {
-    const ordinal = numbered[1].toLowerCase();
-    const optionNumber = Number(numbered[1]) || ({ first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 })[ordinal];
-    const id = previousOptions[optionNumber - 1];
-    course = listed.find((item) => item.id === id) || courses.find((item) => item.id === id) || null;
-  }
-  if (!course && previousCourseId && /\b(?:unit|units|chapter|chapters|topic|topics)\b/.test(text)) {
-    course = courses.find((item) => item.id === previousCourseId) || null;
-  }
-  if (!course && asksUnitFollowup) {
-    const options = Array.isArray(previousOptions) ? previousOptions : [];
-    const selectable = options.map((id) => courses.find((item) => item.id === id)).filter(Boolean);
-    return {
-      html: `<p><strong>Which subject should I use for that unit?</strong></p><p>Choose a subject from the previous list first, then ask for its unit number.</p>${selectable.length ? `<div class="syllabus-choice-list">${selectable.slice(0, 12).map((item, index) => `<button type="button" class="chip" data-ask-question="subject ${index + 1}">${escapeHtml(item.title)}</button>`).join("")}</div>` : ""}`,
-      intent: "SYLLABUS_COURSE_CLARIFICATION",
-      confidence: 1,
-      plan: ["check the previous syllabus selection", "ask which course owns the requested unit", "avoid assigning a unit to an unrelated course"],
-      entities: { indexedSyllabusOptions: selectable.map((item) => item.id), department: selectedDepartment, firstYearSemester: selectedSemester }
-    };
-  }
-  if (!course && asksSyllabus) {
-    const normalized = canonicalize(question);
-    const matches = listed.filter((item) => {
-      const code = String(item.code || "").toLowerCase();
-      const title = canonicalize(item.title || "");
-      return (code && new RegExp(`\\b${escapedPattern(code)}\\b`, "i").test(normalized))
-        || (title.length > 4 && normalized.includes(title));
-    });
-    if (matches.length === 1) course = matches[0];
-    else if (matches.length > 1) {
-      return {
-        html: `<p><strong>That subject appears in more than one indexed programme or semester.</strong></p><p>Choose the branch, programme or semester before opening its syllabus.</p>`,
-        intent: "SYLLABUS_AMBIGUOUS",
-        confidence: 0.9,
-        plan: ["match the subject against official indexed courses", "preserve branch and semester distinctions", "ask for a narrower selection"],
-        entities: { department: selectedDepartment, semester: selectedSemester }
-      };
-    }
-  }
 
-  if (course) {
-    if (countIntent) {
-      const unitCount = course.units.length;
-      const statement = unitCount
-        ? `The indexed official outline contains <strong>${unitCount} unit${unitCount === 1 ? "" : "s"}</strong>.`
-        : "No unit count is available in the indexed text for this subject.";
-      return {
-        html: "<p><strong>" + escapeHtml(course.title) + " · " + escapeHtml(course.code) + "</strong></p><p>" + statement
-          + "</p><p class=\"answer-source\">Counted from verified GNDEC syllabus text. <a href=\"" + escapeHtml(course.sourceUrl)
-          + "\" target=\"_blank\" rel=\"noopener noreferrer\">Open the source PDF</a>.</p>",
-        intent: "SYLLABUS_COUNT",
-        confidence: 0.98,
-        plan: ["resolve the exact course and semester", "count only indexed official units", "link the source document"],
-        entities: { syllabusCourseId: course.id, syllabusCourseCode: course.code, subject: course.title, department: course.department, syllabusUnitCount: unitCount }
-      };
-    }
-    const unitMatch = text.match(/\b(?:unit|u|chapter)\s*(?:-|number|no\.?\s*)?(10|[1-9])\b/)
-      || text.match(/\b(?:unit|chapter)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
-    const unitNumber = unitMatch
-      ? Number(unitMatch[1]) || ({ one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 })[unitMatch[1]]
-      : 0;
-    const units = unitNumber ? course.units.filter((unit) => Number(unit.number) === unitNumber) : course.units;
-    if (!units.length) {
-      if (!course.sourceUrl) return null;
-      return {
-        html: `<p><strong>${escapeHtml(course.title)} · ${escapeHtml(course.code)}</strong></p><p>The official GNDEC document lists this subject, but Compass does not have verified unit text for it yet. I will not invent the outline.</p><p class="answer-source"><a href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(course.sourceTitle || "the official syllabus PDF")}</a></p>`,
-        intent: "SYLLABUS_SOURCE_ONLY",
-        confidence: 1,
-        plan: ["resolve the selected course from the numbered official list", "check the indexed course outline", "provide the source PDF when unit text is unavailable"],
-        entities: { syllabusCourseId: course.id, syllabusCourseCode: course.code, subject: course.title, department: course.department, firstYearSemester: selectedSemester || String(course.semesters?.[0] || "") }
-      };
-    }
-    const title = `${course.title} · ${course.code}`;
-    return {
-      html: `<p><strong>${escapeHtml(title)} · ${escapeHtml(course.program)}${course.semesters?.length ? ` · Semester${course.semesters.length === 1 ? "" : "s"} ${escapeHtml(course.semesters.join(", "))}` : ""}</strong></p>
-        <ol>${units.map((unit) => `<li><strong>Unit ${escapeHtml(unit.number)}: ${escapeHtml(unit.title)}</strong>${unit.details ? `<p>${escapeHtml(unit.details)}</p>` : ""}</li>`).join("")}</ol>
-        <p class="answer-source">Extracted from the official GNDEC syllabus document. <a href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open the source PDF</a> · <a href="${escapeHtml(course.sourcePage)}" target="_blank" rel="noopener noreferrer">department page</a>.</p>`,
-      intent: "SYLLABUS_CONTENT",
-      confidence: 0.92,
-      plan: ["match the verified department course and semester", "read the requested unit outline from indexed official text", "include its source PDF"],
-      entities: {
-        syllabusCourseId: course.id,
-        syllabusCourseCode: course.code,
-        subject: course.title,
-        department: course.department,
-        firstYearSemester: selectedSemester || String(course.semesters?.[0] || "")
-      }
-    };
-  }
-  if (!asksSyllabus) return null;
+  const semesterFilter = selectedSemester && !allSemesters ? String(selectedSemester) : "";
+  // Keep every parsed course even when its PDF was only partly parsed. The
+  // list/count then warns about the incomplete source instead of pretending
+  // the whole semester is empty.
+  const base = courses.filter((item) => (!selectedDepartment || item.department === selectedDepartment)
+    && (!selectedProgram || item.program === selectedProgram)
+    && (!semesterFilter || (item.semesters || []).map(String).includes(semesterFilter)));
+  const titleMatches = queryTokens.length
+    ? base.filter((item) => courseMatchScore(item, queryTokens, normalizedQuestionText) > 0)
+    : base;
+  const filtered = queryTokens.length
+    ? (titleMatches.length ? titleMatches : searchableCourseMatches(base, queryTokens))
+    : base;
 
-  let queryText = text
-    .replace(/\b(?:cse|ece|ee|ce|it|me|mba|bba|mca|bca|appsc|arch)\s*[-:]?\s*(?:10|[1-9])(?:st|nd|rd|th)?\b/gi, " ")
-    .replace(/\b(?:syllabus|syllabi|subjects)(?:(?:10|[1-9])|\s+(?:10|[1-9]))\b|\b(?:10|[1-9])(?:syllabus|syllabi|subjects)\b/gi, " ");
-  if (selectedDepartment) {
-    for (const alias of DEPARTMENT_ALIASES[selectedDepartment] || [selectedDepartment]) {
-      queryText = queryText.replace(new RegExp(`(?:^|\\b)${escapedPattern(canonicalize(alias)).replace(/\s+/g, "\\s+")}(?=\\b|$)`, "ig"), " ");
-    }
-  }
-  if (selectedProgram) {
-    for (const alias of [selectedProgram, ...(PROGRAM_ALIASES[selectedProgram] || [])]) {
-      queryText = queryText.replace(new RegExp(`(?:^|\\b)${escapedPattern(canonicalize(alias)).replace(/\s+/g, "\\s+")}(?=\\b|$)`, "ig"), " ");
-    }
-  }
-  queryText = queryText.replace(/\b(?:sem(?:ester)?s?\s*[-–]?\s*(?:10|[1-9])|(?:10|[1-9])(?:st|nd|rd|th)\s*sem(?:ester)?s?|first|second|third|fourth|fifth|sixth|seventh|eighth)\b/gi, " ");
-  queryText = queryText.replace(/\b(?:sem(?:ester)?s?\s*[-–]?\s*(?:one|two|three|four|five|six|seven|eight|i{1,3}|iv|v|vi{0,2}|viii)|(?:one|two|three|four|five|six|seven|eight|i{1,3}|iv|v|vi{0,2}|viii)\s*sem(?:ester)?s?)\b/gi, " ");
-  queryText = queryText.replace(/\b(?:all|every|branch(?:es)?|department|semester|sem|syllabus|syllabi|subjects?|courses?|course|outline|curriculum|topics?|units?|chapters?|show|list|give|tell|please|full|for|the|my|of|in|and|ka|ki|ke|kya|dikhao|dikha|batao|bata|chahiye|konsa|konsi|mujhe|mera|meri|how|many|count|total|number|there|are|is|what|much|indexed|across|available|published|official)\b/gi, " ");
-  const queryCourseTokens = queryText.split(/\s+/).filter((token) => token.length > 2
-    && !["syllabus", "syllabi", "subjects", "subject", "courses", "course", "outline", "curriculum", "semester", "sem", "branch", "department", "show", "list", "all", "the", "for", "and", "how", "many", "count", "total", "number", "there", "are", "is", "what", "much"].includes(token));
-  const filtered = queryCourseTokens.length
-    ? listed.filter((item) => {
-      const searchable = canonicalize(`${item.title} ${item.code} ${item.program} ${item.department} ${item.units.map((unit) => `${unit.title} ${unit.details}`).join(" ")}`);
-      return queryCourseTokens.every((token) => searchable.includes(token));
-    })
-    : listed;
   const sourceMatches = sourceList.filter((source) => (!selectedDepartment || source.department === selectedDepartment)
     && (!selectedProgram || !source.program || source.program === selectedProgram)
     && (!selectedSemester || allSemesters || (source.semesters || []).map(String).includes(selectedSemester)));
@@ -1461,14 +1820,16 @@ export function answerIndexedSyllabus(question = "", courses = [], {
   const visible = filtered.slice(0, 40);
   if (countIntent && visible.length) {
     const subjectCount = new Set(filtered.map((item) => `${item.program}|${item.code}|${item.semesters?.join(",")}`)).size;
-    const unitCount = filtered.reduce((sum, item) => sum + item.units.length, 0);
+    const unitCount = filtered.reduce((sum, item) => sum + (Array.isArray(item.units) ? item.units.length : 0), 0);
     const count = countKind === "units" ? unitCount : subjectCount;
     const label = countKind === "units" ? "indexed units/chapters" : "indexed subjects/courses";
     const caveat = unindexedSources.length
       ? ` <span class="answer-meta">${unindexedSources.length} matching official PDF${unindexedSources.length === 1 ? " is" : "s are"} listed, but its subject text is not parsed; the count covers indexed records only.</span>`
       : "";
+    const scopeLabel = [selectedProgram || selectedDepartment || (allBranches ? "all branches" : "all indexed branches"),
+      selectedSemester ? `Semester ${selectedSemester}` : allSemesters ? "all semesters" : ""].filter(Boolean).join(" · ");
     return {
-      html: `<p><strong>${escapeHtml([selectedProgram || selectedDepartment, selectedSemester ? `Semester ${selectedSemester}` : allSemesters ? "all semesters" : ""].filter(Boolean).join(" · ") || "GNDEC")}</strong></p><p>Compass can verify <strong>${count} ${label}</strong> in the current official text index.${countKind === "units" ? ` This is across ${subjectCount} indexed subjects.` : ""}</p>${caveat}<p class="answer-meta">This count includes only subjects/units whose text could be extracted and checked. It does not treat an unparsed PDF as an empty curriculum.</p>`,
+      html: `<p><strong>${escapeHtml(scopeLabel)}</strong></p><p>Compass can verify <strong>${count} ${label}</strong> in the current official text index.${countKind === "units" ? ` This is across ${subjectCount} indexed subjects.` : ""}</p>${caveat}<p class="answer-meta">This count includes only subjects/units whose text could be extracted and checked. It does not treat an unparsed PDF as an empty curriculum.</p>`,
       intent: "SYLLABUS_COUNT",
       confidence: 0.98,
       plan: ["resolve the requested branch and semester", "count unique indexed courses or units", "separate source PDFs whose text is not indexed"],
@@ -1476,10 +1837,8 @@ export function answerIndexedSyllabus(question = "", courses = [], {
     };
   }
   if (!visible.length) {
-    const sourceMatches = sourceList.filter((source) => (!selectedDepartment || source.department === selectedDepartment)
-      && (!selectedProgram || !source.program || source.program === selectedProgram)
-      && (!selectedSemester || allSemesters || (source.semesters || []).map(String).includes(selectedSemester)));
-    const scope = [selectedProgram || selectedDepartment, selectedSemester ? `Semester ${selectedSemester}` : allSemesters ? "all semesters" : ""].filter(Boolean).join(" · ");
+    const scope = [selectedProgram || selectedDepartment || (allBranches ? "all branches" : ""),
+      selectedSemester ? `Semester ${selectedSemester}` : allSemesters ? "all semesters" : ""].filter(Boolean).join(" · ");
     const sourceRows = (unindexedSources.length ? unindexedSources : sourceMatches).slice(0, 5).map((source) => {
       const url = escapeHtml(source.sourceUrl);
       const title = escapeHtml(source.sourceTitle || `${source.program || source.department} official syllabus`);
@@ -1489,7 +1848,7 @@ export function answerIndexedSyllabus(question = "", courses = [], {
       return `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>${preview}</li>`;
     }).join("");
     return {
-      html: `<p><strong>No indexed subject outline matched${scope ? ` ${escapeHtml(scope)}` : " that request"}.</strong></p><p>${sourceMatches.length
+      html: `<p><strong>${queryTokens.length ? `No subject or topic matched “${escapeHtml(inputQuestion)}”` : "No indexed subject outline was found"}${scope ? ` in ${escapeHtml(scope)}` : ""}.</strong></p><p>${sourceMatches.length
         ? unindexedSources.length
           ? "I found an official document for this branch and semester, but its subject/unit text is not indexed. Preview the source below; I will not invent its contents."
           : "No matching subject phrase was found in the current text index. The latest official PDF is linked below so you can check its exact wording."
@@ -1503,17 +1862,20 @@ export function answerIndexedSyllabus(question = "", courses = [], {
   const exactScope = Boolean(selectedDepartment && selectedSemester);
   const sections = [...new Set(visible.map((item) => `${item.department} · ${item.program} · Semester${item.semesters?.length === 1 ? "" : "s"} ${item.semesters?.join(", ") || "not stated"}`))];
   let nextSubjectNumber = 1;
+  const showingTopicMatches = Boolean(queryTokens.length && !titleMatches.length);
   return {
     html: `<p><strong>Indexed syllabus subjects${selectedProgram ? ` · ${escapeHtml(selectedProgram)}` : selectedDepartment ? ` · ${escapeHtml(selectedDepartment)}` : ""}${selectedSemester ? ` · Semester ${escapeHtml(selectedSemester)}` : ""}</strong></p>
-      <p class="answer-meta">${exactScope ? "Subjects below match the selected branch and semester." : "Showing indexed official course outlines. Select a branch and semester to narrow results."}${visible.length < filtered.length ? ` Showing ${visible.length} of ${filtered.length}.` : ""}</p>
+      <p class="answer-meta">${exactScope ? "Subjects below match the selected branch and semester." : "Showing indexed official course outlines. Select a branch and semester to narrow results."}${showingTopicMatches ? " No course title matched directly; these subjects mention the requested topic." : ""}${visible.length < filtered.length ? ` Showing ${visible.length} of ${filtered.length}.` : ""}</p>
+      ${unindexedSources.length ? `<p class="answer-meta"><strong>Partly parsed source:</strong> the official PDF below was only partly indexed, so this semester list may be incomplete. Open the PDF to check every subject; Compass will not fill the gaps with an older scheme.</p>` : ""}
       ${sections.map((section) => {
         const sectionCourses = visible.filter((item) => `${item.department} · ${item.program} · Semester${item.semesters?.length === 1 ? "" : "s"} ${item.semesters?.join(", ") || "not stated"}` === section);
         const start = nextSubjectNumber;
         nextSubjectNumber += sectionCourses.length;
         return `<section class="syllabus-subject-section"><h4>${escapeHtml(section)}</h4><ol start="${start}">${sectionCourses.map((item, index) => {
           const option = start + index;
-          const topics = item.units.slice(0, 3).map((unit) => escapeHtml(unit.title)).join(" · ");
-          return `<li><strong>${escapeHtml(item.title)}</strong> <span class="answer-meta">· ${escapeHtml(item.code)} · ${item.units.length ? `${item.units.length} indexed units` : "unit text not indexed"}</span>${topics ? `<p class="answer-meta">Topics: ${topics}</p>` : ""}<button type="button" class="answer-suggestion-chip syllabus-open-course" data-ask-question="subject ${option}">Open full syllabus</button></li>`;
+          const itemUnits = Array.isArray(item.units) ? item.units : [];
+          const topics = itemUnits.slice(0, 3).map((unit) => escapeHtml(unit.title)).join(" · ");
+          return `<li><strong>${escapeHtml(item.title)}</strong> <span class="answer-meta">· ${escapeHtml(item.code)} · ${itemUnits.length ? `${itemUnits.length} indexed units` : "unit text not indexed"}</span>${topics ? `<p class="answer-meta">Topics: ${topics}</p>` : ""}<button type="button" class="answer-suggestion-chip syllabus-open-course" data-ask-question="subject ${option}">Open full syllabus</button></li>`;
         }).join("")}</ol></section>`;
       }).join("")}
       ${unindexedSources.length ? `<section class="syllabus-unindexed-sources"><h4>Official documents not yet parsed into subject records</h4><ul>${unindexedSources.slice(0, 8).map((source) => {
@@ -1647,4 +2009,3 @@ export function answerBareSemesterOptions(question = "") {
     suggestions
   };
 }
-
