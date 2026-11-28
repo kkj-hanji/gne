@@ -34,7 +34,7 @@ import {
   NOTICE_CATEGORIES, TRANSCRIBED_NOTICES, filterNotices, isRecent, mergeNotices, noticeStats, slugify
 } from "./engine/notices.js";
 import { buildPaperIndex, groupPapers, paperStats, searchPapers } from "./engine/papers.js";
-import { answerBareSemesterOptions, answerFirstYearCourseOptions, answerFirstYearScheme, answerFirstYearSemesterMismatch, answerFirstYearSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, searchSyllabus } from "./engine/syllabus.js";
+import { answerBareSemesterOptions, answerFirstYearCourseOptions, answerFirstYearScheme, answerFirstYearSemesterMismatch, answerFirstYearSyllabus, answerFirstYearSyllabusList, answerFirstYearSyllabusSelection, answerIndexedSyllabus, buildSyllabusIndex, FIRST_YEAR_SCHEME_SOURCE, groupSyllabus, inferFirstYearContext, parseFirstYearSyllabus, resolveFirstYearSchemeCourse, searchSyllabus, semesterFromQuestion, syllabusDepartmentFromText, syllabusProgramFromText } from "./engine/syllabus.js";
 import { chatQuestionToRetry, formatChatMessageCopy, htmlToChatText, writeChatClipboard } from "./engine/chat-copy.js";
 import { findProfileRosterMatches, matchProfileRecord, profileSeatingCrn } from "./engine/profile-lookup.js";
 import { normalizeProfileHistory, rememberProfile } from "./engine/profile-history.js";
@@ -108,6 +108,8 @@ const state = {
   paperDepartment: "",
   syllabusQuery: "",
   syllabusDepartment: "",
+  syllabusProgram: "",
+  syllabusSemester: "",
   schemeSemesterChoice: storageGet(SCHEME_SEMESTER_KEY) || "auto",
   adminToken: "",
   adminStatus: "idle",
@@ -138,6 +140,10 @@ const state = {
   syllabus: null,
   firstYearSyllabusCourses: [],
   firstYearSyllabusPromise: null,
+  indexedSyllabusCourses: [],
+  indexedSyllabusSources: [],
+  indexedSyllabusPromise: null,
+  indexedSyllabusStatus: "idle",
   firstYearScheme: null,
   firstYearSchemePromise: null,
   compareA: "",
@@ -727,7 +733,26 @@ function transcribedNotices() {
 }
 
 function allSyllabus() {
-  return buildSyllabusIndex([...state.campus.syllabus, ...state.content.syllabus]);
+  // Only the current-source manifest is searchable in Next. The broad campus
+  // catalogue includes superseded schemes and stays out of the syllabus UI and Brain.
+  return buildSyllabusIndex((state.indexedSyllabusSources || []).map((source) => ({
+    id: source.sourceUrl,
+    label: source.sourceTitle,
+    url: source.sourceUrl,
+    department: source.department,
+    program: source.program,
+    departmentId: source.departmentId,
+    sourcePage: source.sourcePage,
+    semesters: source.semesters || [],
+    external: Boolean(source.external),
+    maxSemester: source.maxSemester
+  })));
+}
+
+function indexedSyllabusSourceContext() {
+  return (state.indexedSyllabusSources || []).filter((source) => source
+    && typeof source.sourceUrl === "string"
+    && typeof source.sourceTitle === "string");
 }
 
 function allPapers() {
@@ -2187,26 +2212,29 @@ function renderFirstYearSchemeCard() {
         if (data && state.route === "syllabus") render();
       }).catch(() => {});
     }
+    if (!state.firstYearSyllabusPromise) {
+      loadFirstYearSyllabusKnowledge().then(() => {
+        if (state.route === "syllabus") render();
+      });
+    }
     return `<section class="card scheme-card"><div class="card-head"><div><h2 class="card-title">First-year study scheme · 2024</h2><p class="card-sub">Loading the verified Applied Sciences scheme…</p></div></div></section>`;
   }
   const inferred = inferFirstYearContext({ section: state.profile.section || state.group, schedule: state.schedule, now: now() });
   const choice = state.schemeSemesterChoice;
-  const semester = ["1", "2"].includes(choice) ? choice : (choice === "all" ? "" : inferred.semester);
+  const profileSemester = semesterFromQuestion(String(state.profile.semester || ""))
+    || (/^(?:10|[1-9])$/.test(String(state.profile.semester || "")) ? String(state.profile.semester) : "");
+  const semester = ["1", "2"].includes(choice) ? choice : (choice === "all" ? "" : (profileSemester || inferred.semester));
   const group = inferred.group;
   const semesters = ["1", "2"];
-  const semesterEvidence = inferred.semesterSource === "academic-calendar"
+  const semesterEvidence = profileSemester ? "Profile semester" : inferred.semesterSource === "academic-calendar"
     ? "Published academic calendar"
     : inferred.semesterSource === "academic-calendar-estimate" ? "Calendar estimate" : "Selected";
   const renderSemester = (sem, groups = ["Chemistry", "Physics"]) => `<div class="scheme-semester">
       <h3>Semester ${sem}${String(sem) === semester ? ` <span class="badge badge-ok">${choice === "auto" ? semesterEvidence : "Selected"}</span>` : ""}</h3>
       <div class="scheme-groups">${groups.map((groupName) => firstYearSchemeGroupTable(sem, groupName, scheme, { ...inferred, semester: semester || "" })).filter(Boolean).join("")}</div>
     </div>`;
-  const preferredGroups = group && scheme?.semesters?.[semester]?.[group] ? [group] : ["Chemistry", "Physics"];
-  const primary = semester ? renderSemester(semester, preferredGroups) : semesters.map((sem) => renderSemester(sem)).join("");
-  const alternateGroup = semester && preferredGroups.length === 1
-    ? firstYearSchemeGroupTable(semester, preferredGroups[0] === "Chemistry" ? "Physics" : "Chemistry", scheme, { ...inferred, semester }) : "";
-  const otherSemester = semester ? semesters.filter((sem) => sem !== semester).map((sem) => renderSemester(sem)).join("") : "";
-  const extra = [alternateGroup, otherSemester].filter(Boolean).join("");
+  const allGroups = ["Chemistry", "Physics"];
+  const primary = semester ? renderSemester(semester, allGroups) : semesters.map((sem) => renderSemester(sem, allGroups)).join("");
   const contextBits = [state.profile.section || state.group, group ? `${group} group` : "", semester ? `Semester ${semester}` : ""].filter(Boolean);
   const choiceButtons = [["auto", "My detected semester"], ["1", "Semester 1"], ["2", "Semester 2"], ["all", "Full scheme"]];
   return `<section class="card scheme-card">
@@ -2217,39 +2245,370 @@ function renderFirstYearSchemeCard() {
     ${contextBits.length ? `<p class="scheme-context"><strong>Your selection:</strong> ${escapeHtml(contextBits.join(" · "))}${choice === "auto" && inferred.semesterSource === "academic-calendar" ? " · current term follows the published first-year academic calendar" : ""}${choice === "auto" && inferred.semesterSource === "academic-calendar-estimate" ? " · semester is a calendar estimate because no published first-year period covers this date" : ""}</p>` : `<p class="scheme-context">Set your section in Settings or Timetable to highlight your group and semester.</p>`}
     <div class="scheme-semester-picker" role="group" aria-label="Choose which first-year semester to show">${choiceButtons.map(([value, label]) => `<button type="button" class="chip chip-button ${choice === value ? "is-active" : ""}" data-action="scheme-semester" data-semester="${value}" aria-pressed="${choice === value}">${label}</button>`).join("")}</div>
     ${primary}
-    ${extra ? `<details class="scheme-other-details"><summary>Show the other first-year semester and group</summary>${alternateGroup ? `<h3>Semester ${semester} · other group</h3><div class="scheme-groups">${alternateGroup}</div>` : ""}${otherSemester}</details>` : ""}
     <p class="answer-meta"><strong>Assessment limits in this PDF:</strong> it publishes the CA/internal total and ESE/external total. It does not define an MSE-1/MSE-2 split, assignment marks, or a universal internal sub-component breakdown, so Compass will not invent those. Course-specific exam rules appear under “Course rules”.</p>
     <p class="answer-meta">Ask Compass can answer by course code, full title or shortform such as <strong>EDG</strong>, <strong>PPS</strong>, <strong>workshop</strong>, <strong>BEEE</strong>, <strong>math</strong> or <strong>math 2</strong>. It uses the detected or selected semester for ambiguous course names.</p>
   </section>`;
 }
+
+function renderFirstYearCourseCatalogue(scheme, documents) {
+  const department = state.syllabusDepartment || syllabusDepartmentFromText(state.syllabusQuery, documents);
+  const sharedFirstYearBranches = [
+    "Civil Engineering", "Computer Science & Engineering", "Electronics & Communication Engineering",
+    "Electrical Engineering", "Information Technology", "Mechanical & Production Engineering"
+  ];
+  if (department && department !== "Applied Sciences" && !sharedFirstYearBranches.includes(department)) return "";
+  const groupFilter = /\bphysics\s+group\b/i.test(state.syllabusQuery) ? "Physics"
+    : /\bchemistry\s+group\b/i.test(state.syllabusQuery) ? "Chemistry" : "";
+  let query = state.syllabusQuery.trim().toLowerCase()
+    .replace(/\b(?:syllabus|syllabi|subjects?|courses?|sem(?:ester)?s?\s*[-–]?\s*(?:10|[1-9])|(?:10|[1-9])(?:st|nd|rd|th)\s*sem(?:ester)?s?|first|second|third|fourth|fifth|sixth|seventh|eighth|group)\b/gi, " ");
+  if (department) {
+    for (const word of department.toLowerCase().replace(/&/g, "and").split(/\s+/)) {
+      if (word.length > 2) query = query.replace(new RegExp(`\\b${word}\\b`, "gi"), " ");
+    }
+  }
+  const querySemester = state.syllabusSemester || semesterFromQuestion(state.syllabusQuery);
+  if (querySemester && !["1", "2"].includes(querySemester)) return "";
+  const queryTerms = query.split(/\s+/).filter((term) => term.length > 1);
+  const courses = new Map((state.firstYearSyllabusCourses || []).map((course) => [course.code, course]));
+  const semesters = querySemester ? [querySemester] : ["1", "2"];
+  const sections = [];
+  for (const semester of semesters) {
+    const groups = scheme?.semesters?.[semester] || {};
+    for (const groupName of ["Chemistry", "Physics"]) {
+      if (groupFilter && groupFilter !== groupName) continue;
+      const bucket = groups[groupName];
+      if (!bucket?.courses?.length) continue;
+      const rows = bucket.courses.map((code) => ({
+        schemeCourse: (scheme.courses || []).find((course) => course.code === code),
+        syllabusCourse: courses.get(code)
+      })).filter((row) => row.schemeCourse);
+      const matches = rows.filter(({ schemeCourse, syllabusCourse }) => queryTerms.every((term) =>
+        `${schemeCourse.title} ${schemeCourse.code} ${syllabusCourse?.units?.map((unit) => `${unit.title} ${unit.details}`).join(" ") || ""}`.toLowerCase().includes(term)));
+      if (!matches.length) continue;
+      sections.push(`<section class="syllabus-course-group"><h4>Semester ${semester} · ${escapeHtml(groupName)} group</h4>
+        <div class="syllabus-course-list">${matches.map(({ schemeCourse, syllabusCourse }) => `<details class="syllabus-course">
+          <summary><span><strong>${escapeHtml(schemeCourse.title)}</strong><small>${escapeHtml(schemeCourse.code)} · ${schemeCourse.credits ?? "—"} credits${syllabusCourse?.units?.length ? ` · ${syllabusCourse.units.length} units indexed` : ""}</small></span></summary>
+          ${syllabusCourse?.units?.length ? `<ol class="syllabus-unit-list">${syllabusCourse.units.map((unit) => `<li><strong>Unit ${escapeHtml(unit.number)}: ${escapeHtml(unit.title)}</strong>${unit.details ? `<p>${escapeHtml(unit.details)}</p>` : ""}</li>`).join("")}</ol>` : `<p class="answer-meta">Unit text is not available in the verified index for this subject. Use the official source PDF for its full outline.</p>`}
+          <a class="syllabus-source-link" href="${escapeHtml(FIRST_YEAR_SCHEME_SOURCE)}" target="_blank" rel="noopener noreferrer">Verify in the official syllabus PDF ↗</a>
+        </details>`).join("")}</div>
+      </section>`);
+    }
+  }
+  if (!sections.length) return "";
+  return `<section class="card syllabus-course-catalogue">
+    <div class="card-head"><div><h2 class="card-title">B.Tech first-year subjects and unit outlines</h2><p class="card-sub">Searchable subject titles, course codes and verified unit topics from the official Scheme 2024 syllabus. Expand a subject to read its outline.</p></div><span class="badge">Semesters 1–2</span></div>
+    ${sections.join("")}
+  </section>`;
+}
+
+async function loadIndexedSyllabusKnowledge() {
+  if (state.indexedSyllabusStatus === "ready" || state.indexedSyllabusStatus === "error") return state.indexedSyllabusCourses;
+  if (state.indexedSyllabusPromise) return state.indexedSyllabusPromise;
+  state.indexedSyllabusStatus = "loading";
+  const pending = (async () => {
+    try {
+      const data = await fetchJson("/data/syllabus-course-index.json", {}, 20000);
+      if (!Array.isArray(data?.courses)) throw new Error("Syllabus index has no courses array.");
+      state.indexedSyllabusCourses = data.courses.filter((course) => course
+        && typeof course.id === "string"
+        && typeof course.department === "string"
+        && typeof course.title === "string"
+        && typeof course.code === "string"
+        && Array.isArray(course.semesters)
+        && Array.isArray(course.units)
+        && typeof course.sourceUrl === "string"
+        && course.units.every((unit) => unit && typeof unit.number === "string" && typeof unit.title === "string"));
+      state.indexedSyllabusSources = Array.isArray(data.sources) ? data.sources.filter((source) => source
+        && typeof source.department === "string"
+        && typeof source.sourceTitle === "string"
+        && typeof source.sourceUrl === "string"
+        && Array.isArray(source.semesters)) : [];
+      state.indexedSyllabusStatus = "ready";
+    } catch (error) {
+      console.warn("Could not load the verified syllabus course index.", error);
+      state.indexedSyllabusCourses = [];
+      state.indexedSyllabusSources = [];
+      state.indexedSyllabusStatus = "error";
+    }
+    return state.indexedSyllabusCourses;
+  })();
+  state.indexedSyllabusPromise = pending;
+  try { return await pending; }
+  finally {
+    if (state.indexedSyllabusPromise === pending) state.indexedSyllabusPromise = null;
+  }
+}
+
+function renderIndexedSyllabusCourses(documents) {
+  const courses = state.indexedSyllabusCourses || [];
+  const sources = state.indexedSyllabusSources || [];
+  if (!courses.length && !sources.length) {
+    if (state.indexedSyllabusStatus === "error") {
+      return `<section class="card"><p class="card-sub">The searchable subject index is unavailable right now. The official branch PDF catalogue below is still available.</p><button type="button" class="btn btn-sm" data-action="retry-syllabus">Retry subject index</button></section>`;
+    }
+    return "";
+  }
+  const department = state.syllabusDepartment || syllabusDepartmentFromText(state.syllabusQuery, [...courses, ...sources]);
+  if (department === "Applied Sciences") return "";
+  const program = state.syllabusProgram || syllabusProgramFromText(state.syllabusQuery, [...courses, ...sources]);
+  const semester = state.syllabusSemester || semesterFromQuestion(state.syllabusQuery);
+  let query = state.syllabusQuery.toLowerCase()
+    .replace(/\b(?:cse|ece|ee|ce|it|me|mba|bba|mca|bca|appsc|arch)\s*[-:]?\s*(?:10|[1-9])(?:st|nd|rd|th)?\b/gi, " ")
+    .replace(/\b(?:syllabus|syllabi|subjects?)(?:(?:10|[1-9])|\s+(?:10|[1-9]))\b|\b(?:10|[1-9])(?:syllabus|syllabi|subjects?)\b|\b(?:10|[1-9])\s*sem(?:ester)?s?\b|\bsem(?:ester)?s?\s*[-:]?\s*(?:10|[1-9])\b/gi, " ")
+    .replace(/\b(?:syllabus|syllabi|subjects?|courses?|sem(?:ester)?s?\s*[-–]?\s*(?:10|[1-9])|(?:10|[1-9])(?:st|nd|rd|th)\s*sem(?:ester)?s?|first|second|third|fourth|fifth|sixth|seventh|eighth)\b/gi, " ")
+    .replace(/\b(?:cse|ece|ee|ce|it|me|mba|bba|mca|bca|appsc|arch)\b/gi, " ");
+  if (department) {
+    for (const word of department.toLowerCase().replace(/&/g, "and").split(/\s+/)) {
+      if (word.length > 2) query = query.replace(new RegExp(`\\b${word}\\b`, "gi"), " ");
+    }
+  }
+  const tokens = query.split(/\s+/).filter((token) => token.length > 1);
+  const matching = courses.filter((course) => (!department || course.department === department)
+    && (!program || course.program === program)
+    && (!semester || (course.semesters || []).map(String).includes(String(semester)))
+    && (!semester || !sources.some((source) => source.department === course.department && source.program === course.program
+      && (source.semesters || []).map(String).includes(String(semester)))
+      || sources.some((source) => source.department === course.department && source.program === course.program
+        && (source.semesters || []).map(String).includes(String(semester))
+        && indexedCourseCountForSource(source, semester) >= minimumIndexedCourseCountForSource(source, semester)))
+    && tokens.every((token) => `${course.department} ${course.program} ${course.code} ${course.title} ${course.units.map((unit) => `${unit.title} ${unit.details}`).join(" ")}`.toLowerCase().includes(token)));
+  const sourceMatches = sources.filter((source) => (!department || source.department === department)
+    && (!program || !source.program || source.program === program)
+    && (!semester || (source.semesters || []).map(String).includes(String(semester)))
+    && tokens.every((token) => `${source.department} ${source.program || ""} ${source.sourceTitle}`.toLowerCase().includes(token)));
+  const sourceOnly = sourceMatches.filter((source) => !semester
+    ? !Number(source.courseCount) || (source.semesters || []).some((value) => !sources.some((candidate) =>
+      candidate.department === source.department && candidate.program === source.program
+      && (candidate.semesters || []).map(String).includes(String(value))
+      && indexedCourseCountForSource(candidate, value) >= minimumIndexedCourseCountForSource(candidate, value)))
+    : !sources.some((candidate) => candidate.department === source.department && candidate.program === source.program
+      && (candidate.semesters || []).map(String).includes(String(semester))
+      && indexedCourseCountForSource(candidate, semester) >= minimumIndexedCourseCountForSource(candidate, semester)));
+  const syllabusPdfPreviewAllowed = (source) => {
+    try {
+      const parsed = new URL(source?.sourceUrl || "");
+      const officialGnDec = parsed.protocol === "https:" && (parsed.hostname === "gndec.ac.in" || parsed.hostname.endsWith(".gndec.ac.in"));
+      const GNDECLinkedArchitecturePdf = source?.department === "School of Architecture"
+        && source?.sourcePage === "https://architecture.gndec.ac.in/website1/node/4"
+        && source?.sourceUrl === "https://ptu.ac.in/wp-content/uploads/2022/03/Syllabus-of-B.Arch_.-1st-2nd-Sem.-Batch-2021-onwards.pdf";
+      return officialGnDec || GNDECLinkedArchitecturePdf;
+    } catch { return false; }
+  };
+  const sourceSemesterLabel = (source) => (source.semesters || []).map(String).join(", ");
+  const sourcePreview = (source) => {
+    const title = escapeHtml(source.sourceTitle || `${source.program || source.department} syllabus`);
+    const url = escapeHtml(source.sourceUrl || "");
+    const preview = syllabusPdfPreviewAllowed(source)
+      ? `<details class="syllabus-pdf-preview"><summary>Read latest official PDF here</summary><iframe src="${url}#view=FitH" title="${title} preview" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe><p class="answer-meta">This is the latest source listed by GNDEC for this programme. Its subject text could not be extracted safely.</p></details>`
+      : `<p class="answer-meta">Official source text is not indexed.</p>`;
+    return `<li><strong>${escapeHtml(source.program || source.department)}</strong>${source.semesters?.length ? ` · Semester${source.semesters.length === 1 ? "" : "s"} ${escapeHtml(sourceSemesterLabel(source))}` : ""} · <a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>${preview}</li>`;
+  };
+  if (!matching.length) {
+    if (!sourceOnly.length) return "";
+    const scope = [program || department, semester ? `Semester ${semester}` : ""].filter(Boolean).join(" · ");
+    return `<section class="card syllabus-course-catalogue"><div class="card-head"><div><h2 class="card-title">${escapeHtml(scope || "Latest official syllabi")}</h2><p class="card-sub">These are the newest official GNDEC sources tracked for this branch. The PDF is shown here when its text cannot be read safely.</p></div><span class="badge">${sourceOnly.length} official source${sourceOnly.length === 1 ? "" : "s"}</span></div><ul class="doc-list">${sourceOnly.map(sourcePreview).join("")}</ul></section>`;
+  }
+  const visible = matching.slice(0, 120);
+  const sections = new Map();
+  for (const course of visible) {
+    const section = `${course.department} · ${course.program} · Semester${course.semesters?.length === 1 ? "" : "s"} ${course.semesters?.join(", ") || "not stated"}`;
+    if (!sections.has(section)) sections.set(section, []);
+    sections.get(section).push(course);
+  }
+  return `<section class="card syllabus-course-catalogue">
+    <div class="card-head"><div><h2 class="card-title">Searchable subject and unit outlines</h2><p class="card-sub">Text extracted from current official GNDEC PDFs. Expand a subject for its indexed units and details.</p></div><span class="badge">${matching.length} subjects</span></div>
+    ${[...sections.entries()].map(([section, rows]) => `<section class="syllabus-course-group"><h4>${escapeHtml(section)}</h4><div class="syllabus-course-list">${rows.map((course) => `<details class="syllabus-course">
+      <summary><span><strong>${escapeHtml(course.title)}</strong><small>${escapeHtml(course.code)} · ${course.units.length} indexed units</small></span></summary>
+      <ol class="syllabus-unit-list">${course.units.map((unit) => `<li><strong>Unit ${escapeHtml(unit.number)}: ${escapeHtml(unit.title)}</strong>${unit.details ? `<p>${escapeHtml(unit.details)}</p>` : ""}</li>`).join("")}</ol>
+      <a class="syllabus-source-link" href="${escapeHtml(course.sourceUrl)}" target="_blank" rel="noopener noreferrer">Verify in ${escapeHtml(course.sourceTitle)} ↗</a>
+    </details>`).join("")}</div></section>`).join("")}
+    ${matching.length > visible.length ? `<p class="answer-meta">Showing the first ${visible.length} of ${matching.length} matching subjects. Narrow the branch or semester filter to see fewer results.</p>` : ""}
+    ${sourceOnly.length ? `<section class="syllabus-unindexed-sources"><h4>Latest official source PDFs with text not indexed</h4><ul>${sourceOnly.map(sourcePreview).join("")}</ul></section>` : ""}
+    ${state.indexedSyllabusStatus === "error" ? `<p class="answer-meta">The latest index could not be loaded. These entries are from the bundled current-source index.</p>` : ""}
+  </section>`;
+}
+
+function syllabusDepartmentForProfile(documents = []) {
+  const firstYear = inferFirstYearContext({
+    section: state.profile.section || state.group,
+    schedule: state.schedule,
+    now: now()
+  });
+  if (firstYear.group) return "Applied Sciences";
+  return syllabusDepartmentFromText(`${state.profile.branch || ""} ${state.profile.program || ""}`, documents);
+}
+
+function syllabusProgramForProfile(documents = []) {
+  return syllabusProgramFromText(state.profile.program || "", documents);
+}
+
+function indexedCourseCountForSource(source = {}, semester = "") {
+  const counts = source.courseCountsBySemester;
+  if (counts && typeof counts === "object") return Number(counts[String(semester)]) || 0;
+  return Number(source.courseCount) || 0;
+}
+
+function minimumIndexedCourseCountForSource(source = {}, semester = "") {
+  const program = String(source.program || "");
+  if (/^B\.Tech\./i.test(program)) return String(semester) === "8" ? 2 : 4;
+  if (program === "BCA") return 4;
+  if (program === "MCA") return 3;
+  if (program === "BBA" || program.startsWith("B.Com")) return 4;
+  return 3;
+}
+
+function maximumSemesterForSyllabusProgram(program = "", sourceRows = []) {
+  const explicit = Math.max(0, ...sourceRows.map((source) => Number(source.maxSemester) || 0));
+  if (explicit) return explicit;
+  if (/^B\.Arch\./i.test(program)) return 10;
+  if (/^B\.Tech\./i.test(program)) return 8;
+  if (program === "BCA" || program === "BBA" || program.startsWith("B.Com")) return 6;
+  if (program === "MCA") return 4;
+  return Math.max(0, ...sourceRows.flatMap((source) => (source.semesters || []).map(Number)));
+}
+
+function renderSyllabusCoverage(documents = []) {
+  const courses = state.indexedSyllabusCourses || [];
+  const sources = state.indexedSyllabusSources || [];
+  const sharedFirstYearBranches = new Set([
+    "Civil Engineering", "Computer Science & Engineering", "Electronics & Communication Engineering",
+    "Electrical Engineering", "Information Technology", "Mechanical & Production Engineering"
+  ]);
+  const departments = [...new Set([
+    ...documents.map((item) => item.department),
+    ...courses.map((item) => item.department),
+    ...sources.map((item) => item.department),
+    ...(state.firstYearScheme ? ["Applied Sciences"] : [])
+  ].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const panels = departments.map((department) => {
+    const departmentSources = sources.filter((source) => source.department === department && source.program);
+    const programs = [...new Set(departmentSources.map((source) => source.program))].sort((a, b) => a.localeCompare(b));
+    if (!programs.length) programs.push("");
+    const entries = programs.map((program) => {
+      const label = program || (department === "Applied Sciences" ? "B.Tech. first-year common scheme" : department);
+      const sourceRows = departmentSources.filter((source) => !program || source.program === program);
+      const maxSemester = Math.max(maximumSemesterForSyllabusProgram(program, sourceRows),
+        ...sourceRows.flatMap((source) => (source.semesters || []).map(Number)),
+        ...courses.filter((course) => course.department === department && (!program || course.program === program))
+          .flatMap((course) => (course.semesters || []).map(Number)));
+      const semesterCount = maxSemester || (department === "Applied Sciences" && state.firstYearScheme ? 2 : 0);
+      const semesters = Array.from({ length: semesterCount }, (_, index) => String(index + 1));
+      const semesterButtons = semesters.map((semester) => {
+        const indexedCount = courses.filter((course) => course.department === department
+          && (!program || course.program === program)
+          && (course.semesters || []).map(String).includes(semester)).length;
+        const sourceAvailable = sourceRows.some((source) => (source.semesters || []).map(String).includes(semester))
+          || documents.some((doc) => doc.department === department && (doc.semesters || []).map(String).includes(semester));
+        const sharedFirstYear = state.firstYearScheme && ["1", "2"].includes(semester)
+          && (department === "Applied Sciences" || sharedFirstYearBranches.has(department));
+        const completeSource = sourceRows.some((source) => (source.semesters || []).map(String).includes(semester)
+          && indexedCourseCountForSource(source, semester) >= minimumIndexedCourseCountForSource(source, semester));
+        const shortStatus = completeSource ? `${indexedCount} indexed subjects`
+          : sharedFirstYear ? "common B.Tech scheme"
+            : sourceAvailable ? indexedCount ? "partial text · open PDF" : "official PDF · preview"
+              : "no current source";
+        const statusClass = completeSource || sharedFirstYear ? "is-covered" : sourceAvailable ? "has-source" : "is-missing";
+        const aria = `${label}, semester ${semester}: ${shortStatus}`;
+        return `<button type="button" class="syllabus-coverage-sem ${statusClass}" data-action="syllabus-coverage" data-department="${escapeHtml(department)}" data-program="${escapeHtml(program)}" data-semester="${semester}" title="${escapeHtml(aria)}" aria-label="${escapeHtml(aria)}"><strong>${semester}</strong><small>${escapeHtml(shortStatus)}</small></button>`;
+      }).join("");
+      const coverage = courses.filter((course) => course.department === department && (!program || course.program === program)).length;
+      return `<div class="syllabus-coverage-program"><h4>${escapeHtml(label)}${coverage ? ` <span class="answer-meta">· ${coverage} indexed subjects</span>` : ""}</h4><div class="syllabus-coverage-grid">${semesterButtons}</div></div>`;
+    }).join("");
+    const totalIndexed = courses.filter((course) => course.department === department).length;
+    const sourceSemesterCount = new Set([
+      ...sources.filter((source) => source.department === department).flatMap((source) => source.semesters || []),
+      ...documents.filter((doc) => doc.department === department).flatMap((doc) => doc.semesters || [])
+    ].map(String)).size;
+    return `<details class="syllabus-coverage-branch"><summary><span><strong>${escapeHtml(department)}</strong><small>${totalIndexed} indexed subjects · ${sourceSemesterCount} semesters with official files</small></span><span class="badge">${programs.filter(Boolean).length || 1} programme${programs.filter(Boolean).length === 1 ? "" : "s"}</span></summary>${entries}</details>`;
+  }).join("");
+  if (!panels) return "";
+  const totalPrograms = new Set(sources.map((source) => source.program).filter(Boolean)).size;
+  const totalCourses = courses.length;
+  return `<section class="card syllabus-coverage"><div class="card-head"><div><h2 class="card-title">Explore current branches and semesters</h2><p class="card-sub">Choose a branch and semester to read verified subject names and topic outlines. “Official PDF” means GNDEC has published a current source but its subject text is not searchable yet. Empty semesters are not filled from superseded schemes.</p></div><span class="badge">${departments.length} branches · ${totalPrograms} programmes · ${totalCourses} indexed subjects</span></div><div class="syllabus-coverage-legend"><span class="is-covered">Subjects indexed</span><span class="has-source">Current official PDF</span><span class="is-missing">No current source</span></div><div class="syllabus-coverage-list">${panels}</div></section>`;
+}
+
+function renderSyllabusDocument(doc) {
+  const url = escapeHtml(doc.url);
+  const label = escapeHtml(doc.label);
+  let officialGndecPdf = false;
+  try {
+    const parsed = new URL(doc.url, "https://gndec-compass.invalid");
+    officialGndecPdf = parsed.protocol === "https:" && (parsed.hostname === "gndec.ac.in" || parsed.hostname.endsWith(".gndec.ac.in"));
+    officialGndecPdf ||= doc.department === "School of Architecture"
+      && doc.sourcePage === "https://architecture.gndec.ac.in/website1/node/4"
+      && doc.url === "https://ptu.ac.in/wp-content/uploads/2022/03/Syllabus-of-B.Arch_.-1st-2nd-Sem.-Batch-2021-onwards.pdf";
+  } catch {}
+  const preview = officialGndecPdf
+    ? `<details class="syllabus-pdf-preview"><summary>Preview PDF here</summary><iframe src="${url}#view=FitH" title="${label} preview" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe><p class="answer-meta">If your browser does not display this PDF, <a href="${url}" target="_blank" rel="noopener noreferrer">open the official file</a>.</p></details>`
+    : "";
+  return `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>${doc.semesters?.length ? `<span class="badge">Sem ${escapeHtml(doc.semesters.join(", "))}</span>` : ""}${doc.external ? `<span class="badge">External source</span>` : ""}${doc.sourcePage ? `<a class="syllabus-department-link" href="${escapeHtml(doc.sourcePage)}" target="_blank" rel="noopener noreferrer">Department page ↗</a>` : ""}${preview}</li>`;
+}
+
 function renderSyllabus() {
   const docs = allSyllabus();
   const groups = groupSyllabus(docs);
-  const departments = groups.map((group) => group.label);
+  const coverageSources = [...(state.indexedSyllabusSources || []), ...(state.indexedSyllabusCourses || [])];
+  const departments = [...new Set([...groups.map((group) => group.label), ...coverageSources.map((item) => item.department)].filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
   const active = state.syllabusDepartment || "";
-  const results = searchSyllabus(docs, state.syllabusQuery, { department: active, limit: 120 });
-  const visibleGroups = groupSyllabus(results);
-  const loading = state.campusStatus === "loading" || (state.campusStatus === "idle" && !docs.length);
+  const activeProgram = state.syllabusProgram || "";
+  const results = searchSyllabus(docs, state.syllabusQuery, { department: active, program: activeProgram, semester: state.syllabusSemester, limit: 200 });
+  const firstYearCatalog = state.firstYearScheme ? renderFirstYearCourseCatalogue(state.firstYearScheme, docs) : "";
+  const indexedCatalog = renderIndexedSyllabusCourses(docs);
+  const syllabusSources = state.indexedSyllabusSources || [];
+  const programOptions = [...new Set([
+    ...syllabusSources.filter((source) => !active || source.department === active).map((source) => source.program),
+    ...state.indexedSyllabusCourses.filter((course) => !active || course.department === active).map((course) => course.program)
+  ].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const profileDepartment = syllabusDepartmentForProfile([...docs, ...state.indexedSyllabusCourses, ...syllabusSources]);
+  const profileSemesterValue = String(state.profile.semester || "");
+  const profileSemester = semesterFromQuestion(profileSemesterValue)
+    || (/^(?:10|[1-9])$/.test(profileSemesterValue) ? profileSemesterValue : "");
+  const profileSemesters = [...new Set([
+    ...docs.filter((doc) => doc.department === profileDepartment).flatMap((doc) => doc.semesters || []),
+    ...state.indexedSyllabusCourses.filter((course) => course.department === profileDepartment).flatMap((course) => course.semesters || []),
+    ...syllabusSources.filter((source) => source.department === profileDepartment).flatMap((source) => source.semesters || []),
+    ...(profileDepartment === "Applied Sciences" || [
+      "Civil Engineering", "Computer Science & Engineering", "Electronics & Communication Engineering",
+      "Electrical Engineering", "Information Technology", "Mechanical & Production Engineering"
+    ].includes(profileDepartment) ? ["1", "2"] : [])
+  ])].sort((a, b) => Number(a) - Number(b));
+  const loading = state.indexedSyllabusStatus === "loading" || state.indexedSyllabusStatus === "idle"
+    || (Boolean(state.firstYearSchemePromise) && !state.firstYearScheme);
+  if (state.indexedSyllabusStatus === "idle" && !state.indexedSyllabusPromise) {
+    loadIndexedSyllabusKnowledge().then(() => {
+      if (state.route === "syllabus") render();
+    });
+  }
   return `<div class="page page-syllabus">
     <div class="page-head">
-      <div class="page-head-text"><h2 class="page-title">Syllabus</h2><p class="page-sub">Every syllabus document published by a GNDEC department. Compass links the official PDF and never re-types its contents.</p></div>
-      <div class="page-actions"><span class="badge">${docs.length} documents</span><span class="badge">${groups.length} departments</span></div>
+      <div class="page-head-text"><h2 class="page-title">Current syllabus</h2><p class="page-sub">Browse the newest GNDEC syllabus published for each programme and semester. Read subject outlines here; older schemes are excluded.</p></div>
+      <div class="page-actions"><span class="badge">${docs.length} current PDFs</span><span class="badge">${groups.length} departments</span></div>
     </div>
-    ${renderFirstYearSchemeCard()}
+    ${profileDepartment ? `<section class="card syllabus-user-branch"><div><strong>Your branch:</strong> ${escapeHtml(profileDepartment)}${profileSemester ? ` · Profile semester ${escapeHtml(profileSemester)}` : ""}<p class="card-sub">${profileSemesters.length ? `Current published coverage: Semesters ${profileSemesters.join(", ")}.` : "No current semester was found in the source index."} Select a semester to read its newest available syllabus.</p></div><div class="page-actions"><button type="button" class="btn btn-sm" data-action="syllabus-user-branch" data-department="${escapeHtml(profileDepartment)}">Browse my branch</button>${profileSemesters.map((semester) => `<button type="button" class="chip chip-button" data-action="syllabus-user-semester" data-department="${escapeHtml(profileDepartment)}" data-semester="${escapeHtml(semester)}">Sem ${escapeHtml(semester)}</button>`).join("")}</div></section>` : ""}
     <div class="filter-bar">
-      <input type="search" value="${escapeHtml(state.syllabusQuery)}" placeholder="Search department, batch, semester…" data-syllabus-search aria-label="Search syllabus" />
-      <div class="chip-row" role="group" aria-label="Filter by department">
-        <button type="button" class="chip chip-button ${active ? "" : "is-active"}" data-action="syllabus-department" data-department="">All</button>
-        ${departments.map((name) => `<button type="button" class="chip chip-button ${active === name ? "is-active" : ""}" data-action="syllabus-department" data-department="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join("")}
-      </div>
+      <input type="search" value="${escapeHtml(state.syllabusQuery)}" placeholder="Search branch, subject, code, batch or semester…" data-syllabus-search aria-label="Search syllabus" />
+      <select data-syllabus-department aria-label="Filter by branch">
+        <option value="">All branches</option>
+        ${departments.map((name) => `<option value="${escapeHtml(name)}" ${active === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+      </select>
+      <select data-syllabus-program aria-label="Filter by programme">
+        <option value="">All programmes</option>
+        ${programOptions.map((name) => `<option value="${escapeHtml(name)}" ${activeProgram === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+      </select>
+      <select data-syllabus-semester aria-label="Filter by semester">
+        <option value="">All semesters</option>
+        ${Array.from({ length: Math.max(8, ...syllabusSources.map((source) => Number(source.maxSemester) || 0)) }, (_, index) => String(index + 1)).map((semester) => `<option value="${semester}" ${state.syllabusSemester === semester ? "selected" : ""}>Semester ${semester}</option>`).join("")}
+      </select>
     </div>
-    ${loading ? `<section class="card"><p class="card-sub">Loading the published syllabus index…</p></section>` : ""}
-    ${state.campusStatus === "error" && !docs.length ? emptyState("⚠", "Syllabus index unavailable", "The department syllabus index could not be loaded. Nothing was invented.", `<button type="button" class="btn btn-primary" data-action="retry-syllabus">Try again</button>`) : ""}
-    ${visibleGroups.map((group) => `<section class="card syllabus-group" style="margin-bottom:14px">
-      <div class="card-head"><div><h2 class="card-title">${escapeHtml(group.label)}</h2><p class="card-sub">${group.count} document${group.count === 1 ? "" : "s"}${group.semesters.length ? ` · semesters ${group.semesters.join(", ")}` : ""}</p></div></div>
-      <ul class="doc-list">${group.docs.map((doc) => `<li><a href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc.label)}</a>${doc.semester ? `<span class="badge">Sem ${escapeHtml(doc.semester)}</span>` : ""}${doc.external ? `<span class="badge">External</span>` : ""}</li>`).join("")}</ul>
-    </section>`).join("")}
-    ${!loading && !visibleGroups.length && state.campusStatus !== "error" ? `<section class="card">${emptyState("📚", "No matching syllabus document", "Try a department name, batch year or semester.")}</section>` : ""}
+    <p class="syllabus-result-count">${results.length} of ${docs.length} current official sources${state.syllabusQuery ? ` · matching “${escapeHtml(state.syllabusQuery)}”` : ""}</p>
+    ${renderFirstYearSchemeCard()}
+    ${renderSyllabusCoverage(docs)}
+    ${firstYearCatalog}
+    ${indexedCatalog}
+    ${loading ? `<section class="card"><p class="card-sub">Loading the current official syllabus index…</p></section>` : ""}
+    ${state.indexedSyllabusStatus === "error" && !docs.length ? emptyState("⚠", "Current syllabus index unavailable", "The latest official syllabus index could not be loaded. Superseded schemes are hidden.", `<button type="button" class="btn btn-primary" data-action="retry-syllabus">Try again</button>`) : ""}
+    ${!loading && !results.length && !firstYearCatalog && !indexedCatalog && state.indexedSyllabusStatus !== "error" ? `<section class="card">${emptyState("📚", "No current syllabus source matches", "Try another branch or semester. Older schemes are not used as substitutes.")}</section>` : ""}
   </div>`;
 }
 
@@ -3297,8 +3656,9 @@ function chatMessageHtml(message, index) {
   const why = showDiagnostics && v("ask.why") && Array.isArray(meta.plan) && meta.plan.length
     ? `<details class="answer-meta"><summary>Why this answer</summary><ol>${meta.plan.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></details>` : "";
   const suggestions = message.meta?.suggestions || [];
+  const suggestionLimit = ["SYLLABUS_LIST", "SYLLABUS_BRANCH_CLARIFICATION", "SYLLABUS_SEMESTER_CLARIFICATION"].includes(message.meta?.intent) ? 12 : 3;
   const suggestionHtml = (message.role === "assistant" && suggestions.length && !["WELCOME","GREETING","BYE","CAPABILITIES"].includes(message.meta?.intent))
-    ? `<div class="answer-suggestions">${suggestions.slice(0,3).map((s) => `<button type="button" class="answer-suggestion-chip" data-ask-question="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("")}</div>`
+    ? `<div class="answer-suggestions">${suggestions.slice(0, suggestionLimit).map((s) => `<button type="button" class="answer-suggestion-chip" data-ask-question="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join("")}</div>`
     : "";
   return `<article class="msg ${message.role}" data-message-index="${index}">
     <div class="msg-bubble">${sanitizeHtml(message.html)}${suggestionHtml}</div>
@@ -3402,10 +3762,37 @@ async function answerSeatingQuestion(question) {
   }
 }
 
-function answerFirstYearQuestion(question, { semester, group, section, previousCourse, now: clockNow }) {
-  const options = { semester, group, section, now: clockNow, previousCourse };
+function answerFirstYearQuestion(question, { semester, group, section, previousCourse, previousCourseOptions = [], now: clockNow }) {
+  const department = syllabusDepartmentFromText(question, allSyllabus())
+    || syllabusDepartmentFromText(state.profile.branch || "", allSyllabus());
+  const firstYearDepartments = new Set([
+    "Civil Engineering", "Computer Science & Engineering", "Electronics & Communication Engineering",
+    "Electrical Engineering", "Information Technology", "Mechanical & Production Engineering"
+  ]);
+  const syllabusRecords = [...state.indexedSyllabusCourses, ...state.indexedSyllabusSources];
+  const requestedProgram = syllabusProgramFromText(question, syllabusRecords)
+    || syllabusProgramFromText(state.profile.program || "", syllabusRecords);
+  const requestedSemester = semesterNumberInQuestion(question) || String(semester || "");
+  const sharedFirstYearRequest = ["1", "2"].includes(requestedSemester)
+    && (firstYearDepartments.has(department) || /^B\.Tech\./i.test(requestedProgram) || Boolean(group));
+  const explicitGroup = /\b(?:chemistry|physics)\s+group\b/i.test(question);
+  const allBranchesFirstYear = /\b(?:all|every)\s+(?:branches?|departments?)\b/i.test(question)
+    && ["1", "2"].includes(requestedSemester);
+  const profileCourse = resolveFirstYearSchemeCourse(question, state.firstYearScheme, { semester: requestedSemester }).course;
+  const asksForCourseList = /\b(?:syllabus|syllabi|subjects?|courses?)\b/i.test(question);
+  const firstYearIdentity = department === "Applied Sciences" || firstYearDepartments.has(department)
+    || /^B\.Tech\./i.test(requestedProgram) || Boolean(group) || explicitGroup;
+  if (department && department !== "Applied Sciences" && !sharedFirstYearRequest && !allBranchesFirstYear) return null;
+  if (requestedProgram && !/^B\.Tech\./i.test(requestedProgram)) return null;
+  if (asksForCourseList && !firstYearIdentity && !profileCourse && !allBranchesFirstYear) return null;
+  const selection = answerFirstYearSyllabusSelection(question, state.firstYearSyllabusCourses, previousCourseOptions, { semester });
+  if (selection) return selection;
+  const listing = answerFirstYearSyllabusList(question, state.firstYearScheme, { semester, group, courses: state.firstYearSyllabusCourses });
+  if (listing) return listing;
+  const firstYearPreviousCourse = state.firstYearSyllabusCourses.some((course) => course.code === previousCourse) ? previousCourse : "";
+  const options = { semester, group, section, now: clockNow, previousCourse: firstYearPreviousCourse };
   const mismatch = answerFirstYearSemesterMismatch(question, state.firstYearScheme);
-  const syllabus = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, previousCourse, { semester });
+  const syllabus = answerFirstYearSyllabus(question, state.firstYearSyllabusCourses, firstYearPreviousCourse, { semester });
   const scheme = answerFirstYearScheme(question, state.firstYearScheme, options);
   const asksForSchemeFacts = /\b(?:credits?|marks?|assessment|internal|external|weightage|distribution|ca|ese|mse|mst|ltp)\b/i.test(question);
   if (mismatch) return mismatch;
@@ -3463,6 +3850,8 @@ async function sendQuestion(rawQuestion) {
     if (wantsHodDirectory && state.campusStatus !== "ready") await loadCampus();
     if (personQuestion?.role === "student" && !state.students.length) await loadStudents({ quiet: true });
     if (personQuestion?.role === "faculty" && state.facultyStatus === "idle") await loadFaculty();
+    const wantsSyllabusKnowledge = /\b(?:syllabus|syllabi|subjects?|course outline|curriculum|units?|chapters?|topics?)\b/i.test(question);
+    if (wantsSyllabusKnowledge) await Promise.all([loadCampus(), loadIndexedSyllabusKnowledge()]);
     const wantsFirstYearFacts = /\b(?:syllabus|syllabi|unit|units|chapter|chapters|course outline|scheme|subject|subjects|credits?|marks?|marking|assessment|internal|external|continuous assessment|\bca\b|\bese\b|\bmse\b|mst|weightage|distribution|prerequisites?|workshop|physics|chemistry|maths?|mathematics|pps|python|edg|bee|beee|english|economics|mentoring)\b|\bmath(?:ematics)?s?\s*[- ]?(?:11|12|21|ii|i|1|2)\b|\bpps\s*(?:sem(?:ester)?\s*)?(?:ii|2)\b/i.test(question);
     if (wantsFirstYearFacts) await Promise.all([loadFirstYearSyllabusKnowledge(), loadFirstYearSchemeKnowledge()]);
     const ctx = currentAnswerContext();
@@ -3470,16 +3859,35 @@ async function sendQuestion(rawQuestion) {
     let engine = "local";
     const previousMemory = [...state.chat.slice(0, thinkingIndex)].reverse()
       .find((message) => message.role === "assistant" && message.meta?.memory)?.meta.memory || null;
-    const previousSyllabusCode = [...state.chat.slice(0, thinkingIndex)].reverse()
-      .find((message) => message.role === "assistant" && message.meta?.entities?.syllabusCourseCode)?.meta.entities.syllabusCourseCode || "";
+    const previousAssistant = [...state.chat.slice(0, thinkingIndex)].reverse()
+      .find((message) => message.role === "assistant");
+    const previousEntities = previousAssistant?.meta?.entities || {};
+    const previousSyllabusCode = previousEntities.syllabusCourseCode || "";
+    const previousCourseOptions = Array.isArray(previousEntities.firstYearCourseOptions) ? previousEntities.firstYearCourseOptions : [];
+    const previousIndexedCourseId = previousEntities.syllabusCourseId || "";
+    const previousIndexedCourseOptions = Array.isArray(previousEntities.indexedSyllabusOptions) ? previousEntities.indexedSyllabusOptions : [];
+    const syllabusSourceContext = (wantsSyllabusKnowledge || previousIndexedCourseId || previousIndexedCourseOptions.length)
+      ? indexedSyllabusSourceContext()
+      : state.indexedSyllabusSources;
     const firstYear = inferFirstYearContext({
       section: state.profile.section || state.group,
       schedule: state.schedule,
       now: now()
     });
-    const selectedSemester = ["1", "2"].includes(state.schemeSemesterChoice)
+    const profileSemesterValue = String(state.profile.semester || "");
+    const profileSemester = semesterFromQuestion(profileSemesterValue)
+      || (/^(?:10|[1-9])$/.test(profileSemesterValue) ? profileSemesterValue : "");
+    const profileSyllabusDepartment = syllabusDepartmentForProfile([
+      ...allSyllabus(), ...state.indexedSyllabusCourses, ...state.indexedSyllabusSources
+    ]);
+    const profileSyllabusProgram = syllabusProgramForProfile([
+      ...state.indexedSyllabusCourses, ...state.indexedSyllabusSources
+    ]);
+    const firstYearProfile = Boolean(firstYear.group || profileSyllabusDepartment === "Applied Sciences");
+    const selectedSemester = firstYearProfile && ["1", "2"].includes(state.schemeSemesterChoice)
       ? state.schemeSemesterChoice
-      : state.schemeSemesterChoice === "all" ? "" : firstYear.semester;
+      : firstYearProfile && state.schemeSemesterChoice === "all" ? "" : (profileSemester || firstYear.semester);
+    const indexedProfileSemester = profileSemester || (firstYear.group ? firstYear.semester : "");
     const firstYearOptions = {
       semester: selectedSemester,
       group: firstYear.group,
@@ -3514,7 +3922,15 @@ async function sendQuestion(rawQuestion) {
             subgroup: state.subgroup
           });
         } else {
-          partAnswer = answerFirstYearQuestion(part.question, { ...firstYearOptions, previousCourse })
+          partAnswer = answerFirstYearQuestion(part.question, { ...firstYearOptions, previousCourse, previousCourseOptions })
+            || answerIndexedSyllabus(part.question, state.indexedSyllabusCourses, {
+              department: profileSyllabusDepartment,
+              program: profileSyllabusProgram,
+              semester: indexedProfileSemester,
+              previousCourseId: previousIndexedCourseId,
+              previousOptions: previousIndexedCourseOptions,
+              sources: syllabusSourceContext
+            })
             || answerLocally(part.question, ctx, turnMemory);
         }
         answers.push(partAnswer);
@@ -3536,7 +3952,17 @@ async function sendQuestion(rawQuestion) {
     }
 
     if (!answer && !isCompound) {
-      answer = answerFirstYearQuestion(question, { ...firstYearOptions, previousCourse: previousSyllabusCode });
+      answer = answerFirstYearQuestion(question, { ...firstYearOptions, previousCourse: previousSyllabusCode, previousCourseOptions });
+      if (!answer) {
+        answer = answerIndexedSyllabus(question, state.indexedSyllabusCourses, {
+          department: profileSyllabusDepartment,
+          program: profileSyllabusProgram,
+          semester: indexedProfileSemester,
+          previousCourseId: previousIndexedCourseId,
+          previousOptions: previousIndexedCourseOptions,
+          sources: syllabusSourceContext
+        });
+      }
       if (answer) engine = "local";
     }
 
@@ -4370,6 +4796,9 @@ async function handleAction(action, element) {
     case "retry-syllabus":
       state.contentStatus = "idle";
       state.campusStatus = "idle";
+      state.indexedSyllabusStatus = "idle";
+      state.indexedSyllabusCourses = [];
+      state.indexedSyllabusSources = [];
       render();
       ensureLiveContent();
       break;
@@ -4379,6 +4808,26 @@ async function handleAction(action, element) {
       break;
     case "syllabus-department":
       state.syllabusDepartment = element.dataset.department || "";
+      state.syllabusProgram = "";
+      render();
+      break;
+    case "syllabus-user-branch":
+      state.syllabusDepartment = element.dataset.department || "";
+      state.syllabusProgram = "";
+      state.syllabusSemester = "";
+      render();
+      break;
+    case "syllabus-user-semester":
+      state.syllabusDepartment = element.dataset.department || "";
+      state.syllabusProgram = "";
+      state.syllabusSemester = element.dataset.semester || "";
+      render();
+      break;
+    case "syllabus-coverage":
+      state.syllabusDepartment = element.dataset.department || "";
+      state.syllabusProgram = element.dataset.program || "";
+      state.syllabusSemester = element.dataset.semester || "";
+      state.syllabusQuery = "";
       render();
       break;
     case "scheme-semester": {
@@ -5089,6 +5538,25 @@ function bindEvents() {
     const paperDepartment = event.target.closest("[data-paper-department]");
     if (paperDepartment) {
       state.paperDepartment = paperDepartment.value;
+      render();
+      return;
+    }
+    const syllabusDepartment = event.target.closest("[data-syllabus-department]");
+    if (syllabusDepartment) {
+      state.syllabusDepartment = syllabusDepartment.value;
+      state.syllabusProgram = "";
+      render();
+      return;
+    }
+    const syllabusProgram = event.target.closest("[data-syllabus-program]");
+    if (syllabusProgram) {
+      state.syllabusProgram = syllabusProgram.value;
+      render();
+      return;
+    }
+    const syllabusSemester = event.target.closest("[data-syllabus-semester]");
+    if (syllabusSemester) {
+      state.syllabusSemester = syllabusSemester.value;
       render();
       return;
     }

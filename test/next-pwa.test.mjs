@@ -241,12 +241,17 @@ test("the worker caches only its allowlisted public endpoints and respects priva
   }
   assert.equal(calls.length, 0);
 
+  const syllabusIndex = await worker.fetch("/data/syllabus-course-index.json");
+  await syllabusIndex.waitForLifetime();
+  assert.equal(syllabusIndex.handled, true);
+  assert.equal(await syllabusIndex.response.text(), "public");
+
   for (const cacheControl of ["no-store", "private, max-age=60"]) {
     const privateWorker = await createServiceWorker(async () => new Response("sensitive", { headers: { "Cache-Control": cacheControl } }));
     const result = await privateWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
     await result.waitForLifetime();
     assert.equal(await result.response.text(), "sensitive");
-    const dataCache = await privateWorker.caches.open("compass-next-v3.1.28-data");
+    const dataCache = await privateWorker.caches.open("compass-next-v3.1.29-data");
     assert.equal((await dataCache.keys()).length, 0, `${cacheControl} responses are not stored`);
   }
 });
@@ -283,10 +288,10 @@ test("warm static assets stay cache-first and offline navigation falls back to t
   assert.equal(await second.response.text(), "module");
   assert.equal(calls, 1, "a warm launch does not revalidate every shell module");
 
-  const shell = await worker.caches.open("compass-next-v3.1.28-shell");
+  const shell = await worker.caches.open("compass-next-v3.1.29-shell");
   await shell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
   const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
-  const offlineShell = await offlineWorker.caches.open("compass-next-v3.1.28-shell");
+  const offlineShell = await offlineWorker.caches.open("compass-next-v3.1.29-shell");
   await offlineShell.put("/index.html", new Response("<main>offline shell</main>", { headers: { "Content-Type": "text/html" } }));
   const navigation = await offlineWorker.fetch("/today", { mode: "navigate" });
   assert.equal(await navigation.response.text(), "<main>offline shell</main>");
@@ -299,7 +304,7 @@ test("online navigations refresh corrected notice pages before using offline cac
     if (!online) throw new Error("offline");
     return new Response("<main>current datesheet</main>", { headers: { "Content-Type": "text/html" } });
   });
-  const shell = await worker.caches.open("compass-next-v3.1.28-shell");
+  const shell = await worker.caches.open("compass-next-v3.1.29-shell");
   await shell.put("/notices/mse2-theory-2026.html", new Response("<main>stale app shell</main>", { headers: { "Content-Type": "text/html" } }));
 
   const onlineNavigation = await worker.fetch("/notices/mse2-theory-2026.html", { mode: "navigate" });
@@ -314,7 +319,7 @@ test("online navigations refresh corrected notice pages before using offline cac
 
 test("shell trimming retains pinned startup assets while caching lazy PDF modules", async () => {
   const worker = await createServiceWorker(async () => new Response("module", { headers: { "Content-Type": "text/javascript" } }));
-  const shell = await worker.caches.open("compass-next-v3.1.28-shell");
+  const shell = await worker.caches.open("compass-next-v3.1.29-shell");
   await shell.put("/index.html", new Response("pinned shell", { headers: { "Content-Type": "text/html" } }));
   for (let index = 0; index < 120; index += 1) {
     const result = await worker.fetch(`/lazy-${index}.js`);
@@ -339,13 +344,13 @@ test("the public-data cache has a bounded entry count and retains recent offline
     const result = await worker.fetch(`/api/legacy/api/timetable?source=groups&version=${index}`);
     await result.waitForLifetime();
   }
-  const cache = await worker.caches.open("compass-next-v3.1.28-data");
+  const cache = await worker.caches.open("compass-next-v3.1.29-data");
   assert.equal((await cache.keys()).length, 80);
 
   const recent = new Response("saved datesheet", { headers: { "Cache-Control": "public", "X-Compass-Cached-At": String(Date.now() - 2 * 24 * 60 * 60 * 1000) } });
   await cache.put("/api/legacy/data/end-sem-datesheet.json", recent);
   const offlineWorker = await createServiceWorker(async () => { throw new Error("offline"); });
-  const offlineCache = await offlineWorker.caches.open("compass-next-v3.1.28-data");
+  const offlineCache = await offlineWorker.caches.open("compass-next-v3.1.29-data");
   await offlineCache.put("/api/legacy/data/end-sem-datesheet.json", recent);
   const offline = await offlineWorker.fetch("/api/legacy/data/end-sem-datesheet.json");
   assert.equal(await offline.response.text(), "saved datesheet");
@@ -421,7 +426,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.2.38");
+  assert.equal(next.vars.APP_VERSION, "2.2.39");
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");
@@ -443,11 +448,23 @@ test("the first-year scheme semester choice is persistent and shared with Ask Co
   assert.match(app, /SCHEME_SEMESTER_KEY\s*=\s*"gndec-compass-next-scheme-semester-v1"/);
   assert.match(app, /data-action="scheme-semester"/);
   assert.match(app, /storageSet\(SCHEME_SEMESTER_KEY, semester\)/);
-  assert.match(app, /const selectedSemester = \["1", "2"\]\.includes\(state\.schemeSemesterChoice\)/);
-  assert.match(app, /answerFirstYearSyllabus\(question, state\.firstYearSyllabusCourses, previousCourse, \{ semester \}\)/);
+  assert.match(app, /const selectedSemester = firstYearProfile && \["1", "2"\]\.includes\(state\.schemeSemesterChoice\)[\s\S]*?: firstYearProfile && state\.schemeSemesterChoice === "all" \? "" : \(profileSemester \|\| firstYear\.semester\);/);
+  assert.match(app, /answerFirstYearSyllabus\(question, state\.firstYearSyllabusCourses, firstYearPreviousCourse, \{ semester \}\)/);
   assert.match(app, /answerFirstYearScheme\(question, state\.firstYearScheme, options\)/);
   assert.match(css, /\.scheme-semester-picker/);
   assert.match(css, /\.scheme-card \.table-wrap \{ overflow-x: auto; \}/);
+});
+
+test("Ask uses only the current official syllabus manifest for branch choices and source previews", async () => {
+  const app = await read("../next/app.js");
+  const engine = await read("../next/engine/syllabus.js");
+  assert.match(app, /function allSyllabus\(\)[\s\S]*?buildSyllabusIndex\(\(state\.indexedSyllabusSources \|\| \[\]\)\.map\(\(source\) => \(\{/);
+  assert.match(app, /function indexedSyllabusSourceContext\(\)[\s\S]*?state\.indexedSyllabusSources \|\| \[\]/);
+  assert.doesNotMatch(app, /buildSyllabusIndex\(\[\.\.\.state\.campus\.syllabus, \.\.\.state\.content\.syllabus\]\)/);
+  assert.equal((app.match(/sources: syllabusSourceContext/g) || []).length, 2);
+  assert.match(engine, /branchNames\.slice\(0, 12\)/);
+  assert.match(engine, /Preview official PDF here/);
+  assert.match(engine, /officialGndecPdfUrl\(source\.sourceUrl\)/);
 });
 
 test("the new app ships no map, no analytics SDK and no remote inference", async () => {

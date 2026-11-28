@@ -20,7 +20,7 @@ import {
   currentAndNext, escapeHtml, freeBellSlots, keywordsOf, normalizeQuestion
 } from "../next/engine/answer.js";
 import { buildIcs, firstMonday } from "../next/engine/ics.js";
-import { answerBareSemesterOptions, answerFirstYearCourseOptions, answerFirstYearScheme, answerFirstYearSemesterMismatch, answerFirstYearSyllabus, inferFirstYearContext, parseFirstYearSyllabus, resolveFirstYearSchemeCourse } from "../next/engine/syllabus.js";
+import { answerBareSemesterOptions, answerFirstYearCourseOptions, answerFirstYearScheme, answerFirstYearSemesterMismatch, answerFirstYearSyllabus, answerFirstYearSyllabusList, answerFirstYearSyllabusSelection, answerIndexedSyllabus, inferFirstYearContext, parseFirstYearSyllabus, parseSyllabusTableCourses, resolveFirstYearSchemeCourse, semesterFromQuestion, syllabusDepartmentFromText, syllabusProgramFromText } from "../next/engine/syllabus.js";
 import {
   digestCopy, dueReminder, isQuietTime, notificationCopy, reminderWindow
 } from "../next/engine/reminders.js";
@@ -30,6 +30,74 @@ import {
 } from "../next/engine/brain-bridge.js";
 
 const IST = (iso) => getIndiaNow(new Date(iso));
+
+test("compact syllabus shorthands and official semester tables retain exact branch, semester and subject data", () => {
+  for (const [query, expected] of [["3sem", "3"], ["sem3", "3"], ["subjects3", "3"], ["3subjects", "3"], ["subject3", "3"], ["3subject", "3"], ["CSE3", "3"], ["3CSE", "3"], ["ECE5", "5"], ["5ECE", "5"], ["RAI3", "3"], ["3RAI", "3"], ["subjects10", "10"], ["10subjects", "10"], ["sem10", "10"], ["10sem", "10"]]) {
+    assert.equal(semesterFromQuestion(query), expected, query);
+  }
+  assert.equal(semesterFromQuestion("math 2"), "", "a course level is not a semester filter");
+
+  const parsed = parseSyllabusTableCourses([{ text: [
+    "Third Semester L T P Credit",
+    "1 PCC CRA101 Elements of Mechanical Engineering 3 1 2 5",
+    "2 PCC CRA102 Introduction to Artificial Intelligence 3 0 2 4",
+    "Fourth Semester L T P Credit",
+    "1 PCC CAR105 Machine Drawing and CAD 0 0 6 3",
+    "1 PEC MOOCS Elective - IV 4 0 0 3"
+  ].join("\n") }]);
+  assert.deepEqual(parsed.map(({ code, title, semester }) => [code, title, semester]), [
+    ["CRA101", "Elements of Mechanical Engineering", "3"],
+    ["CRA102", "Introduction to Artificial Intelligence", "3"],
+    ["CAR105", "Machine Drawing and CAD", "4"],
+    ["", "MOOCS Elective - IV", "4"]
+  ]);
+  assert.ok(parsed.every((course) => course.units.length === 0), "table rows only publish titles, not invented unit outlines");
+  const positioned = parseSyllabusTableCourses([
+    { text: "DEPARTMENT OF COMPUTER APPLICATIONS\nStudy Scheme 2025\nFIRST SEMESTER", rows: [
+      { y: 800, items: [{ x: 20, text: "FIRST SEMESTER" }] },
+      { y: 700, items: [{ x: 155, text: "BCA101" }, { x: 225, text: "Foundations to" }] },
+      { y: 689, items: [{ x: 225, text: "Computer Science" }] }
+    ] },
+    { text: "Scheme and syllabus of MCA\nBatch 2022 Onwards\nCourse Code: PGCA - 2202\nCourse Name: Object Oriented Programming using C++ and Java\nSemester : 2", rows: [] }
+  ]);
+  assert.deepEqual(positioned.map(({ code, title, semester }) => [code, title, semester]), [
+    ["BCA101", "Foundations to Computer Science", "1"],
+    ["PGCA2202", "Object Oriented Programming using C++ and Java", "2"]
+  ]);
+});
+
+test("current BCA and MCA course rows are extracted without cross-row titles", async () => {
+  const index = JSON.parse(await readFile(new URL("../next/data/syllabus-course-index.json", import.meta.url), "utf8"));
+  const bca = index.courses.filter((course) => course.program === "BCA");
+  const bcaTitle = (semester, code) => bca.find((course) => course.semesters.includes(String(semester)) && course.code === code)?.title;
+  assert.equal(bca.length, 41);
+  assert.equal(bcaTitle(2, "BCA107"), "Probability and Statistics");
+  assert.equal(bcaTitle(2, "BCA108"), "Digital Electronics and Computer Architecture");
+  assert.equal(bcaTitle(2, "BCA109"), "Software Engineering");
+  assert.equal(bcaTitle(4, "UGNE102"), "Indian Knowledge System");
+  assert.equal(bcaTitle(4, "NEMPD102"), "Mentoring and Professional Development");
+  assert.equal(bcaTitle(5, "NEMPD301"), "Mentoring and Professional Development");
+  assert.equal(bcaTitle(6, "PRBCA102"), "Major Project");
+  assert.deepEqual(bca.filter((course) => course.units.length).map((course) => [course.semesters[0], course.code, course.units.length]), [
+    ["1", "BCA104", 7]
+  ], "the detailed BCA outline is retained only where the official PDF prints its units");
+
+  const mca = index.courses.filter((course) => course.program === "MCA");
+  assert.equal(mca.length, 28);
+  assert.equal(mca.find((course) => course.code === "PGCA2202")?.title, "Object Oriented Programming using C++ and Java");
+  assert.ok(mca.every((course) => course.units.length === 0), "MCA course headings are indexed without inventing units");
+  assert.ok(mca.every((course) => course.sourceTitle.includes("batch 2022")), "MCA uses the newest bundled official scheme");
+  const rai = index.courses.filter((course) => course.program === "B.Tech. Robotics and Artificial Intelligence");
+  assert.equal(rai.length, 46);
+  assert.deepEqual(["3", "4", "5", "6", "7", "8"].map((semester) => rai.filter((course) => course.semesters.includes(semester)).length), [10, 9, 9, 10, 6, 2]);
+  assert.equal(rai.find((course) => course.code === "ERA101")?.title, "Introduction to Unmanned Aerial Vehicles");
+  const mechanical = index.courses.filter((course) => course.program === "B.Tech. Mechanical Engineering");
+  assert.equal(mechanical.length, 45);
+  assert.deepEqual(["3", "4", "5", "6", "7", "8"].map((semester) => mechanical.filter((course) => course.semesters.includes(semester)).length), [9, 9, 9, 10, 6, 2]);
+  assert.equal(mechanical.find((course) => course.code === "CME107")?.title, "Applied Thermodynamics-II");
+  assert.equal(mechanical.find((course) => course.code === "SMME101")?.title, "Seminar and Technical Report Writing for Engineers");
+  assert.equal(index.courses.find((course) => course.code === "CCS104")?.title, "Database Management Systems");
+});
 
 test("official first-year syllabus supports course and remembered unit follow-ups", async () => {
   const index = JSON.parse(await readFile(new URL("../public/data/first-year-syllabus-index.json", import.meta.url), "utf8"));
@@ -224,6 +292,142 @@ test("first-year scheme answers credits, CA/ESE marks and the semester-specific 
   assert.match(listing.html, /Chemistry group|Physics group/);
   assert.match(listing.html, /21 credits/);
   assert.match(listing.html, /does not publish an MSE-1\/MSE-2 split|does not publish how it is split/i);
+
+  const firstYearSubjects = answerFirstYearSyllabusList("semester 1 syllabus", scheme, { semester: "1", group: "Physics" });
+  assert.equal(firstYearSubjects?.intent, "FIRST_YEAR_SYLLABUS_LIST");
+  assert.match(firstYearSubjects?.html || "", /Physics group/);
+  assert.deepEqual(firstYearSubjects?.entities.firstYearCourseOptions, ["BSC101", "BSC102", "ESC102", "ESC103", "HSMC102", "LESC104"]);
+  const selectedSubject = answerFirstYearSyllabusSelection("subject 2", parseFirstYearSyllabus(
+    JSON.parse(await readFile(new URL("../public/data/first-year-syllabus-index.json", import.meta.url), "utf8")).pages
+  ), firstYearSubjects.entities.firstYearCourseOptions, { semester: "1" });
+  assert.equal(selectedSubject?.entities.syllabusCourseCode, "BSC102");
+  assert.match(selectedSubject?.html || "", /Mathematics\s*-\s*I/i);
+  assert.match(selectedSubject?.html || "", /Unit 3: Ordinary Differential Equations/i);
+  assert.equal(answerFirstYearSyllabusSelection("2subject", parseFirstYearSyllabus(
+    JSON.parse(await readFile(new URL("../public/data/first-year-syllabus-index.json", import.meta.url), "utf8")).pages
+  ), firstYearSubjects.entities.firstYearCourseOptions, { semester: "1" })?.entities.syllabusCourseCode, "BSC102");
+  assert.equal(answerFirstYearSyllabusSelection("subject 9", [], firstYearSubjects.entities.firstYearCourseOptions), null);
+
+  const firstYearCount = answerFirstYearSyllabusList("total subjects sem2", scheme, {
+    semester: "2", group: "Physics", courses: parseFirstYearSyllabus(
+      JSON.parse(await readFile(new URL("../public/data/first-year-syllabus-index.json", import.meta.url), "utf8")).pages
+    )
+  });
+  assert.equal(firstYearCount?.intent, "SYLLABUS_COUNT");
+  assert.equal(firstYearCount?.entities.firstYearCountsByGroup[0]?.subjects, 7);
+  const allFirstYearCount = answerFirstYearSyllabusList("how many subjects sem2 all branches", scheme, { semester: "2", group: "Physics" });
+  assert.deepEqual(allFirstYearCount?.entities.firstYearCountsByGroup.map(({ group }) => group), ["Chemistry", "Physics"]);
+});
+
+test("indexed department syllabus supports branch, semester, numbered subject and unit follow-ups", async () => {
+  const index = JSON.parse(await readFile(new URL("../next/data/syllabus-course-index.json", import.meta.url), "utf8"));
+  const courses = index.courses;
+  const listed = answerIndexedSyllabus("cse sem3 ka syllabus batao", courses);
+  assert.equal(listed?.intent, "SYLLABUS_LIST");
+  assert.equal(listed?.entities.department, "Computer Science & Engineering");
+  assert.equal(listed?.entities.firstYearSemester, "3");
+  assert.ok(listed.entities.indexedSyllabusOptions.length > 1);
+  const profileDefault = answerIndexedSyllabus("subjects", courses, {
+    department: "Computer Science & Engineering", semester: "3"
+  });
+  assert.equal(profileDefault?.intent, "SYLLABUS_LIST", "subject(s) without a semester uses the active profile semester");
+  assert.equal(profileDefault?.entities.firstYearSemester, "3");
+  assert.match(listed.html, /Computer Science &amp; Engineering/);
+  assert.match(listed.html, /Topics:/);
+  assert.match(listed.html, /data-ask-question="subject 1"/);
+
+  const selected = answerIndexedSyllabus("second", courses, {
+    previousOptions: listed.entities.indexedSyllabusOptions
+  });
+  assert.equal(selected?.intent, "SYLLABUS_CONTENT");
+  assert.ok(selected?.entities.syllabusCourseId);
+  assert.match(selected?.html || "", /Open the source PDF/);
+
+  const unit = answerIndexedSyllabus("unit two", courses, {
+    previousCourseId: selected.entities.syllabusCourseId
+  });
+  assert.equal(unit?.intent, "SYLLABUS_CONTENT");
+  assert.match(unit?.html || "", /Unit 2:/);
+  assert.doesNotMatch(unit?.html || "", /Unit 1:/);
+
+  const noBranch = answerIndexedSyllabus("semester 3 syllabus", courses);
+  assert.equal(noBranch?.intent, "SYLLABUS_BRANCH_CLARIFICATION");
+  assert.match(noBranch?.html || "", /Which branch or programme/);
+
+  const noSemester = answerIndexedSyllabus("CSE syllabus", courses);
+  assert.equal(noSemester?.intent, "SYLLABUS_SEMESTER_CLARIFICATION");
+
+  const defaulted = answerIndexedSyllabus("sem 3 subjects", courses, {
+    department: "Computer Science & Engineering",
+    semester: "3"
+  });
+  assert.equal(defaulted?.intent, "SYLLABUS_LIST");
+  assert.equal(defaulted?.entities.firstYearSemester, "3");
+
+  const allBranches = answerIndexedSyllabus("all branches sem 3 subjects", courses);
+  assert.equal(allBranches?.intent, "SYLLABUS_LIST");
+  assert.ok(allBranches?.entities.indexedSyllabusOptions.length > listed.entities.indexedSyllabusOptions.length);
+  const allCount = answerIndexedSyllabus("how many syllabus subjects are indexed across all branches", courses, { sources: index.sources });
+  assert.equal(allCount?.intent, "SYLLABUS_COUNT", "counting all subjects does not ask for an unnecessary branch clarification");
+  assert.ok(allCount?.entities.syllabusSubjectCount > 0);
+
+  const numberedChoice = answerIndexedSyllabus("choose subject number 2", courses, {
+    previousOptions: listed.entities.indexedSyllabusOptions
+  });
+  assert.equal(numberedChoice?.intent, "SYLLABUS_CONTENT");
+  assert.equal(answerIndexedSyllabus("subject2", courses, { previousOptions: listed.entities.indexedSyllabusOptions })?.intent, "SYLLABUS_CONTENT");
+
+  assert.equal(syllabusProgramFromText("RAI sem 3 syllabus", index.sources), "B.Tech. Robotics and Artificial Intelligence");
+  const rai = answerIndexedSyllabus("RAI sem 3 syllabus", courses, { sources: index.sources });
+  assert.equal(rai?.intent, "SYLLABUS_LIST");
+  assert.match(rai?.html || "", /Robotics and Artificial Intelligence/);
+  const mca = answerIndexedSyllabus("MCA semester one syllabus", courses, { sources: index.sources });
+  assert.equal(mca?.intent, "SYLLABUS_LIST");
+  assert.match(mca?.html || "", /Object Oriented Programming using C\+\+ and Java/);
+
+  const bcaSix = answerIndexedSyllabus("BCA semester 6 subjects", courses, { sources: index.sources });
+  assert.equal(bcaSix?.intent, "SYLLABUS_LIST");
+  assert.match(bcaSix?.html || "", /Android Programming/);
+  const superseded = courses.find((course) => /2018|2014|2017/.test(`${course.sourceTitle} ${course.sourceUrl}`));
+  assert.equal(superseded, undefined, "the current syllabus index excludes superseded scheme sources");
+
+  const missingSource = answerIndexedSyllabus("Electrical Engineering semester 5 syllabus", courses, {
+    sources: index.sources
+  });
+  assert.equal(missingSource?.intent, "SYLLABUS_NOT_INDEXED");
+  assert.match(missingSource?.html || "", /Electrical Engineering syllabus, semester 5/);
+  assert.match(missingSource?.html || "", /signed.*pdf|Open/i);
+  assert.match(missingSource?.html || "", /Preview official PDF here/);
+  assert.ok((missingSource?.html || "").includes('<iframe src="https://ee.gndec.ac.in/'));
+
+  const partialSource = answerIndexedSyllabus("EE sem3 syllabus", courses, { sources: index.sources });
+  assert.equal(partialSource?.intent, "SYLLABUS_NOT_INDEXED", "a partial PDF parse is not presented as a complete semester list");
+  assert.match(partialSource?.html || "", /not indexed|not have verified/i);
+  assert.doesNotMatch(partialSource?.html || "", /Signals and Systems|Transformer and DC Machines/);
+
+  const sourceOnly = index.sources.find((source) => source.department === "Business Administration" && source.semesters.includes("1"));
+  assert.ok(sourceOnly, "unparsed official documents retain branch and semester metadata for inline preview");
+  const fakeArchitectureSource = {
+    department: "School of Architecture",
+    sourceTitle: "GNDEC Architecture syllabus catalogue",
+    sourceUrl: "https://ptu.ac.in/syllabus.pdf",
+    semesters: ["1", "2"]
+  };
+  const allSources = [...index.sources, fakeArchitectureSource];
+  const branchClarification = answerIndexedSyllabus("semester 3 syllabus", courses, { sources: allSources });
+  assert.ok(branchClarification?.suggestions.includes("School of Architecture syllabus"), "branch choices include document-catalogue departments");
+  const architectureSource = answerIndexedSyllabus("architecture semester 1 syllabus", courses, { sources: [fakeArchitectureSource] });
+  assert.match(architectureSource?.html || "", /GNDEC Architecture syllabus catalogue/);
+  assert.doesNotMatch(architectureSource?.html || "", /<iframe/, "external or unverified source hosts are never embedded");
+  const GNDECLinkedArchitectureSource = index.sources.find((source) => source.department === "School of Architecture");
+  assert.ok(GNDECLinkedArchitectureSource, "the current GNDEC architecture page's linked B.Arch PDF is catalogued");
+  const architecturePdfPreview = answerIndexedSyllabus("B.Arch semester 1 syllabus", courses, { sources: index.sources });
+  assert.match(architecturePdfPreview?.html || "", /<iframe/, "only the PDF linked by GNDEC is embedded for this external programme source");
+  const supersededGap = answerIndexedSyllabus("CSE semester 7 syllabus", courses, { sources: index.sources });
+  assert.equal(supersededGap?.intent, "SYLLABUS_NOT_INDEXED");
+  assert.doesNotMatch(supersededGap?.html || "", /2018|2014|2017/);
+  assert.equal(syllabusDepartmentFromText("what is it", courses), "");
+  assert.equal(syllabusDepartmentFromText("IT sem 3 syllabus", courses), "Information Technology");
 });
 
 const schedule = [

@@ -1350,6 +1350,62 @@ code, kbd, samp { overflow-wrap: anywhere; word-break: break-word; max-width: 10
 .doc-list li { display: flex; align-items: center; gap: 8px; padding: 9px 2px; border-top: 1px dashed var(--border); flex-wrap: wrap; }
 .doc-list li:first-child { border-top: 0; }
 .doc-list a { flex: 1 1 240px; min-width: 0; font-size: .86rem; overflow-wrap: anywhere; }
+.syllabus-department-link { flex: 0 0 auto !important; color: var(--muted); font-size: .72rem !important; }
+.syllabus-result-count { margin: 0 0 10px; color: var(--muted); font-size: .76rem; }
+.syllabus-course-catalogue { margin: 14px 0; }
+.syllabus-coverage { margin: 14px 0; }
+.syllabus-coverage-legend { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 10px; }
+.syllabus-coverage-legend span { padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .69rem; }
+.syllabus-coverage-legend .is-covered { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); }
+.syllabus-coverage-legend .has-source { color: var(--text); }
+.syllabus-coverage-list { display: grid; gap: 7px; }
+.syllabus-coverage-branch { min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.syllabus-coverage-branch > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 12px; cursor: pointer; list-style-position: inside; }
+.syllabus-coverage-branch > summary span:first-child { display: inline-flex; min-width: 0; flex-direction: column; vertical-align: top; gap: 3px; }
+.syllabus-coverage-branch > summary strong { font-size: .82rem; }
+.syllabus-coverage-branch > summary small { color: var(--muted); font-size: .69rem; }
+.syllabus-coverage-program { padding: 10px 12px 12px; border-top: 1px solid var(--border); }
+.syllabus-coverage-program h4 { margin: 0 0 8px; font-size: .75rem; }
+.syllabus-coverage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
+.syllabus-coverage-sem { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+.syllabus-coverage-sem:hover { border-color: var(--accent); }
+.syllabus-coverage-sem strong { font-size: .72rem; white-space: nowrap; }
+.syllabus-coverage-sem small { color: var(--muted); font-size: .63rem; text-align: right; }
+.syllabus-coverage-sem.is-covered { border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); }
+.syllabus-coverage-sem.has-source { border-style: dashed; }
+.syllabus-coverage-sem.is-missing { opacity: .76; }
+.syllabus-document-archive { margin: 14px 0; padding: 12px 14px; }
+.syllabus-document-archive > summary { cursor: pointer; }
+.syllabus-unindexed-sources { margin: 12px 0; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; }
+.syllabus-unindexed-sources h4 { margin: 0 0 6px; font-size: .76rem; }
+.syllabus-unindexed-sources li { padding: 5px 0; font-size: .72rem; }
+.syllabus-user-branch { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.syllabus-user-branch .page-actions { justify-content: flex-end; }
+.syllabus-course-group + .syllabus-course-group { margin-top: 16px; }
+.syllabus-course-group > h4 { margin: 0 0 8px; font-size: .82rem; }
+.syllabus-course-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 8px; }
+.syllabus-course { min-width: 0; padding: 9px 11px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); }
+.syllabus-course > summary { cursor: pointer; list-style-position: inside; }
+.syllabus-course > summary span { display: inline-flex; flex-direction: column; vertical-align: top; gap: 2px; }
+.syllabus-course > summary strong { font-size: .8rem; }
+.syllabus-course > summary small { color: var(--muted); font-size: .7rem; }
+.syllabus-unit-list { padding-left: 22px; margin: 10px 0; }
+.syllabus-unit-list li { padding: 7px 0; font-size: .76rem; }
+.syllabus-unit-list p { margin: 4px 0 0; color: var(--muted); line-height: 1.5; }
+.syllabus-source-link { display: inline-block; margin-top: 5px; font-size: .74rem; }
+.syllabus-subject-section li { padding: 2px 0 9px; }
+.syllabus-open-course { margin: 2px 0 4px; }
+.syllabus-pdf-preview { flex: 1 1 100%; min-width: 0; padding: 7px 0 2px; }
+.syllabus-pdf-preview > summary { cursor: pointer; color: var(--accent-ink); font-size: .76rem; font-weight: 650; }
+.syllabus-pdf-preview iframe { display: block; width: 100%; height: min(76vh, 780px); min-height: 380px; margin-top: 9px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.syllabus-choice-list { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0; }
+@media (max-width: 700px) {
+  .syllabus-user-branch { align-items: flex-start; flex-direction: column; }
+  .syllabus-user-branch .page-actions { justify-content: flex-start; }
+  .syllabus-coverage-branch > summary { align-items: flex-start; }
+  .syllabus-coverage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .syllabus-pdf-preview iframe { height: 65vh; min-height: 300px; }
+}
 
 .holiday-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .holiday-pill {

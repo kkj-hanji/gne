@@ -1,0 +1,191 @@
+[
+  {
+    "department": "School of Architecture",
+    "departmentId": "architecture",
+    "program": "B.Arch.",
+    "sourceTitle": "B.Arch. syllabus for semesters 1 and 2 (2021 onwards; linked by GNDEC School of Architecture)",
+    "sourceUrl": "https://ptu.ac.in/wp-content/uploads/2022/03/Syllabus-of-B.Arch_.-1st-2nd-Sem.-Batch-2021-onwards.pdf",
+    "sourcePage": "https://architecture.gndec.ac.in/website1/node/4",
+    "semesters": ["1", "2"],
+    "maxSemester": 10,
+    "external": true,
+    "priority": 1
+  },
+  {
+    "department": "Civil Engineering",
+    "departmentId": "ce",
+    "program": "B.Tech. Civil Engineering",
+    "sourceTitle": "B.Tech. Civil Engineering syllabus and scheme, batch 2024 onward (published draft)",
+    "sourceUrl": "https://ce.gndec.ac.in/sites/default/files/3_4_5_6_syllabus_draft_8_3_26_Print_website%206th%20sem.pdf",
+    "sourcePage": "https://ce.gndec.ac.in/?q=node/2",
+    "priority": 1
+  },
+  {
+    "department": "Computer Science & Engineering",
+    "departmentId": "cse",
+    "program": "B.Tech. Computer Science and Engineering",
+    "sourceTitle": "B.Tech. CSE Scheme 2024 syllabus",
+    "sourceUrl": "https://cse.gndec.ac.in/sites/default/files/Syllabus_2024.pdf",
+    "sourcePage": "https://cse.gndec.ac.in/?q=node/16",
+    "priority": 2
+  },
+  {
+    "department": "Computer Science & Engineering",
+    "departmentId": "cse",
+    "program": "B.Tech. Computer Science and Engineering",
+    "sourceTitle": "B.Tech. CSE semester 3 syllabus, Scheme 2024",
+    "sourceUrl": "https://cse.gndec.ac.in/sites/default/files/Syllabus%20Sem3_Scheme%202024.pdf",
+    "sourcePage": "https://cse.gndec.ac.in/?q=node/16",
+    "semesters": ["3"],
+    "priority": 3
+  },
+  {
+    "department": "Electronics & Communication Engineering",
+    "departmentId": "ece",
+    "program": "B.Tech. Electronics & Communication Engineering",
+    "sourceTitle": "B.Tech. ECE syllabus, semester 3, Scheme 2024",
+    "sourceUrl": "https://ece.gndec.ac.in/sites/default/files/Final%203rd%20sem%20syllabus.pdf",
+    "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+    "semesters": ["3"],
+    "priority": 1
+  },
+  {
+    "department": "Electronics & Communication Engineering",
+    "departmentId": "ece",
+    "program": "B.Tech. Electronics & Communication Engineering",
+    "sourceTitle": "B.Tech. ECE syllabus, semester 4, Scheme 2024",
+    "sourceUrl": "https://ece.gndec.ac.in/sites/default/files/Final%204th%20sem%20syllabus.pdf",
+    "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+    "semesters": ["4"],
+    "priority": 1
+  },
+  {
+    "department": "Electronics & Communication Engineering",
+    "departmentId": "ece",
+    "program": "B.Tech. Electronics & Communication Engineering",
+    "sourceTitle": "B.Tech. ECE syllabus, semester 5, Scheme 2024",
+    "sourceUrl": "https://ece.gndec.ac.in/sites/default/files/05th_Sem%20syllabus%2C%20BTech%202024%20scheme.pdf",
+    "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+    "semesters": ["5"],
+    "priority": 1
+  },
+  {
+    "department": "Electronics & Communication Engineering",
+    "departmentId": "ece",
+    "program": "B.Tech. Electronics & Communication Engineering",
+    "sourceTitle": "B.Tech. ECE syllabus, semester 6, Scheme 2024",
+    "sourceUrl": "https://ece.gndec.ac.in/sites/default/files/6th%20sem%20syllebus%2C%20BTech%202024%20scheme.pdf",
+    "sourcePage": "https://ece.gndec.ac.in/?q=node/9",
+    "semesters": ["6"],
+    "priority": 1
+  },
+  {
+    "department": "Electrical Engineering",
+    "departmentId": "ee",
+    "program": "B.Tech. Electrical Engineering",
+    "sourceTitle": "B.Tech. Electrical Engineering syllabus, semesters 3 and 4, Scheme 2024",
+    "sourceUrl": "https://ee.gndec.ac.in/sites/default/files/Signed%20Scheme%20and%20Syllabus%203rdand%204th%20sem%202024%20scheme%20%281%29.pdf",
+    "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+    "semesters": ["3", "4"],
+    "priority": 1
+  },
+  {
+    "department": "Electrical Engineering",
+    "departmentId": "ee",
+    "program": "B.Tech. Electrical Engineering",
+    "sourceTitle": "B.Tech. Electrical Engineering syllabus, semester 5, Scheme 2024",
+    "sourceUrl": "https://ee.gndec.ac.in/sites/default/files/Signed%20study%20scheme%202024%20and%20Syllabus_5th%20sem_compressed.pdf",
+    "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+    "semesters": ["5"],
+    "priority": 1
+  },
+  {
+    "department": "Electrical Engineering",
+    "departmentId": "ee",
+    "program": "B.Tech. Electrical Engineering",
+    "sourceTitle": "B.Tech. Electrical Engineering syllabus, semester 6, Scheme 2024",
+    "sourceUrl": "https://ee.gndec.ac.in/sites/default/files/Signed%20Scheme%202024%20and%20sylabus_6th%20sem_compressed.pdf",
+    "sourcePage": "https://ee.gndec.ac.in/?q=node/2",
+    "semesters": ["6"],
+    "priority": 1
+  },
+  {
+    "department": "Information Technology",
+    "departmentId": "it",
+    "program": "B.Tech. Information Technology",
+    "sourceTitle": "B.Tech. IT second-year syllabus and scheme, semesters 3 and 4, Scheme 2024",
+    "sourceUrl": "https://it.gndec.ac.in/sites/default/files/Syllabus.pdf",
+    "sourcePage": "https://it.gndec.ac.in/?q=node/19",
+    "semesters": ["3", "4"],
+    "priority": 1
+  },
+  {
+    "department": "Information Technology",
+    "departmentId": "it",
+    "program": "B.Tech. Information Technology",
+    "sourceTitle": "B.Tech. IT syllabus, semester 5, Scheme 2024",
+    "sourceUrl": "https://it.gndec.ac.in/sites/default/files/B.Tech_.%20Syllabus%20of%205th%20Semester%20%28Batch%202024%20Onwards%29.pdf",
+    "sourcePage": "https://it.gndec.ac.in/?q=node/19",
+    "semesters": ["5"],
+    "priority": 2
+  },
+  {
+    "department": "Mechanical & Production Engineering",
+    "departmentId": "me",
+    "program": "B.Tech. Mechanical Engineering",
+    "sourceTitle": "B.Tech. Mechanical Engineering syllabus, batch 2024 onward",
+    "sourceUrl": "https://me.gndec.ac.in/sites/default/files/B.%20Tech.%20ME%20Syllabus%202024%20R1.pdf",
+    "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+    "priority": 1
+  },
+  {
+    "department": "Mechanical & Production Engineering",
+    "departmentId": "me",
+    "program": "B.Tech. Robotics and Artificial Intelligence",
+    "sourceTitle": "B.Tech. Robotics and Artificial Intelligence syllabus, batch 2025 onward",
+    "sourceUrl": "https://me.gndec.ac.in/sites/default/files/B.%20Tech.%20RAI%20Syllabus%202024_0.pdf",
+    "sourcePage": "https://me.gndec.ac.in/?q=node/21",
+    "semesters": ["3", "4", "5", "6", "7", "8"],
+    "priority": 1
+  },
+  {
+    "department": "Business Administration",
+    "departmentId": "mba",
+    "program": "BBA",
+    "sourceTitle": "BBA syllabus, semesters 1 to 6, 2024 onward",
+    "sourceUrl": "https://mba.gndec.ac.in/sites/default/files/BBA%20syllabus%20.pdf",
+    "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+    "semesters": ["1", "2", "3", "4", "5", "6"],
+    "priority": 1
+  },
+  {
+    "department": "Business Administration",
+    "departmentId": "mba",
+    "program": "B.Com. Entrepreneurship",
+    "sourceTitle": "B.Com. Entrepreneurship syllabus, semesters 1 to 6, 2024",
+    "sourceUrl": "https://mba.gndec.ac.in/sites/default/files/BCom_0.pdf",
+    "sourcePage": "https://mba.gndec.ac.in/?q=node/11",
+    "semesters": ["1", "2", "3", "4", "5", "6"],
+    "priority": 1
+  },
+  {
+    "department": "Computer Applications",
+    "departmentId": "mca",
+    "program": "BCA",
+    "sourceTitle": "BCA syllabus, semesters 1 to 6, batch 2025 onward",
+    "sourceUrl": "https://ca.gndec.ac.in/sites/default/files/BCA_2025Sylsch.pdf",
+    "sourcePage": "https://ca.gndec.ac.in/",
+    "semesters": ["1", "2", "3", "4", "5", "6"],
+    "priority": 1
+  },
+  {
+    "department": "Computer Applications",
+    "departmentId": "mca",
+    "program": "MCA",
+    "sourceTitle": "MCA syllabus, batch 2022 onward",
+    "sourceUrl": "https://ca.gndec.ac.in/sites/default/files/MCA%202022.pdf",
+    "sourcePage": "https://ca.gndec.ac.in/",
+    "semesters": ["1", "2", "3", "4"],
+    "priority": 1
+  }
+]

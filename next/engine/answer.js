@@ -29,7 +29,7 @@ import { computeFreeRooms, formatFreeWindow, groupRooms, isRoomFree, zoneFromQue
 import { academicPeriodFor, dayOfWeek, holidayOn, upcomingHolidays } from "./calendar.js";
 import { filterNotices, noticeStats } from "./notices.js";
 import { searchPapers } from "./papers.js";
-import { searchSyllabus } from "./syllabus.js";
+import { searchSyllabus, semesterFromQuestion, syllabusDepartmentFromText } from "./syllabus.js";
 import { examsOnDate, importantExamEventsForSelection } from "./exams.js";
 import { answerCollegeQuestion } from "./college.js";
 import {
@@ -1228,23 +1228,34 @@ function syllabusResult(question, ctx) {
   if (!wants(text, VOCAB.syllabus)) return null;
   const list = Array.isArray(ctx.syllabus) ? ctx.syllabus : [];
   if (!list.length) return null;
+  const department = syllabusDepartmentFromText(question, list)
+    || syllabusDepartmentFromText(ctx.profile?.branch || "", list);
+  const semester = semesterFromQuestion(question) || String(ctx.profile?.semester || "");
   const query = contentQuery(text);
-  const matched = searchSyllabus(list, query, { limit: 8 });
+  const matched = searchSyllabus(list, query, { department, semester, limit: 20 });
   if (!matched.length) {
+    const departmentDocs = department ? list.filter((doc) => doc.department === department) : [];
+    const sourcePages = [...new Set(departmentDocs.map((doc) => doc.sourcePage).filter(Boolean))].slice(0, 3);
     return {
-      html: `<p>No published syllabus document matches <strong>${escapeHtml(query || "that")}</strong>. ${list.length} official documents are indexed.</p>
-        <p>Open Syllabus to browse by department and batch.</p>`,
+      html: `<p>No indexed official syllabus document matches <strong>${escapeHtml([department, semester ? `Semester ${semester}` : "", query].filter(Boolean).join(" · ") || "that request")}</strong>.</p>
+        <p>${department ? `${escapeHtml(department)} has ${departmentDocs.length} indexed document${departmentDocs.length === 1 ? "" : "s"}.` : `${list.length} official documents are indexed.`} Compass does not invent a missing subject list or unit outline.</p>
+        ${sourcePages.length ? `<p>Check the official department page for a newer or separately published syllabus: ${sourcePages.map((url, index) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Department source ${index + 1} ↗</a>`).join(" · ")}</p>` : ""}
+        <p>Open Syllabus to browse other indexed departments and semesters.</p>`,
       intent: "SYLLABUS_NONE", confidence: 0.9,
       plan: ["read the official syllabus index", "match department or batch", "refuse to invent contents"]
     };
   }
   return {
-    html: `<p><strong>Official syllabus documents</strong>${query ? ` · matching “${escapeHtml(query)}”` : ""}</p>
-      <div class="answer-table">${matched.map((doc) => `<div class="answer-class"><div class="answer-class-time">${escapeHtml(doc.semester ? `Sem ${doc.semester}` : "PDF")}</div><div class="answer-class-body"><strong><a href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc.label)}</a></strong><div class="answer-class-meta">${escapeHtml(doc.department)} · official PDF</div></div></div>`).join("")}</div>
-      <p class="answer-meta">Compass links the document; it never re-types a syllabus or invents a unit.</p>`,
+    html: `<p><strong>Official syllabus documents</strong>${department ? ` · ${escapeHtml(department)}` : ""}${semester ? ` · Semester ${escapeHtml(semester)}` : ""}${query ? ` · matching “${escapeHtml(query)}”` : ""}</p>
+    <div class="answer-table">${matched.map((doc) => {
+      const semesters = (doc.semesters || [doc.semester]).filter(Boolean);
+      const semesterLabel = semesters.length ? `Sem ${semesters.join(", ")}` : "PDF";
+      return `<div class="answer-class"><div class="answer-class-time">${escapeHtml(semesterLabel)}</div><div class="answer-class-body"><strong><a href="${escapeHtml(doc.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc.label)}</a></strong><div class="answer-class-meta">${escapeHtml(doc.department)} · official PDF</div></div></div>`;
+    }).join("")}</div>
+    <p class="answer-meta">These are official document matches, not a verified per-subject outline. Ask by branch and semester to narrow the documents; Compass will not invent missing course or unit contents.</p>`,
     intent: "SYLLABUS", confidence: 0.93,
     plan: ["read the official syllabus index", "match department, batch or semester", "link the official PDF"],
-    entities: { query }
+    entities: { query, department, semester }
   };
 }
 

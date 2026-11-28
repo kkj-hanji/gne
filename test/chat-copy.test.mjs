@@ -45,6 +45,16 @@ test("general answer copy preserves paragraphs, choices, tables, labels and sour
   assert.doesNotMatch(copied, /Internal option|\nCopy\n|<p>/);
 });
 
+test("syllabus answers copy with numbered units, separate topic paragraphs and a clean source citation", () => {
+  const { document } = parseHTML("<!doctype html><html><body></body></html>");
+  const answerHtml = `<p><strong>Applied Mathematics Â· BSCS101 Â· Semester 3</strong></p>
+    <ol><li><strong>Unit 1: Laplace Transforms</strong><p>Definition, existence and standard transforms.</p></li>
+      <li><strong>Unit 2: Fourier Series</strong><p>Periodic functions and half-range expansions.</p></li></ol>
+    <p class="answer-source">Official GNDEC source: <a href="https://cse.gndec.ac.in/syllabus.pdf">Open the source PDF</a>.</p>`;
+  const copied = formatChatMessageCopy({ html: answerHtml }, {}, document);
+  assert.equal(copied, "Applied Mathematics Â· BSCS101 Â· Semester 3\n\n1. Unit 1: Laplace Transforms\n\nDefinition, existence and standard transforms.\n\n2. Unit 2: Fourier Series\n\nPeriodic functions and half-range expansions.\n\nOfficial GNDEC source: Open the source PDF (https://cse.gndec.ac.in/syllabus.pdf).");
+});
+
 test("chat HTML is decoded safely and retains readable line breaks", () => {
   const { document } = parseHTML("<!doctype html><html><body></body></html>");
   assert.equal(htmlToChatText("<p>A &amp; B</p><p>Next<br>line</p>", document), "A & B\n\nNext\nline");
