@@ -57,5 +57,5 @@ export async function extractSeatingPdf(file, { onProgress = () => {} } = {}) {
   } finally {
     await document.destroy();
   }
-  return { text: pages.join("\n\n"), pages: pages.length, layout };
+  return { text: pages.join("\n\f\n"), pages: pages.length, layout };
 }

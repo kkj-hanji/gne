@@ -156,7 +156,8 @@ function physicalRowsFromLayout(layout) {
       x: Number(item?.x) || 0,
       y: Number(item?.y) || 0
     })).filter((item) => item.value);
-    const roomHeadings = items.filter((item) => /^Room\s+No\.\s*.+$/i.test(item.value)).sort((a, b) => b.y - a.y);
+    const roomHeadings = items.filter((item) => /^Room\s+No\.\s*.+$/i.test(item.value)
+      || /^Drawing\s+hall\b.*$/i.test(item.value)).sort((a, b) => b.y - a.y);
     const headerRows = items.filter((item) => /^S\s*\.\s*No\.?$/i.test(item.value)).map((serial) => ({
       y: serial.y,
       columns: items.filter((item) => Math.abs(item.y - serial.y) < 1.5 && /^Row-[IVX]+$/i.test(item.value))
@@ -186,9 +187,23 @@ function physicalRowsFromLayout(layout) {
  * ignored. A printed total must match every room before the plan is publishable.
  */
 export function parseSeatingPlanText(value, { layout = [] } = {}) {
-  const text = String(value || "").replace(/\u0000/g, "");
-  if (!text.trim()) return { ok: false, error: "No selectable text was found. Scanned PDFs need OCR and cannot be imported safely yet.", seats: [], rooms: 0, warnings: [] };
-  if (text.length > 12_000_000) return { ok: false, error: "This PDF has too much text to process in the browser.", seats: [], rooms: 0, warnings: [] };
+  const rawText = String(value || "").replace(/\u0000/g, "");
+  if (!rawText.trim()) return { ok: false, error: "No selectable text was found. Scanned PDFs need OCR and cannot be imported safely yet.", seats: [], rooms: 0, warnings: [] };
+  if (rawText.length > 12_000_000) return { ok: false, error: "This PDF has too much text to process in the browser.", seats: [], rooms: 0, warnings: [] };
+
+  // A few official plans put the last assignment grid on its own page and
+  // label it with a venue such as "Drawing hall (Diploma building)" instead
+  // of a "Room No." heading. Preserve page boundaries so that grid can be
+  // recognized without mistaking earlier summary tables for room assignments.
+  const text = rawText.split("\f").map((page) => {
+    if (/^\s*Room\s+No\./im.test(page)) return page;
+    const tableStart = page.search(/\bS\s*\.\s*No\b/i);
+    if (tableStart < 0 || !/\bSECTION\s+ALLOTTED\b/i.test(page) || !/\bTOTAL\s+STU\s*\.\s*\d+/i.test(page)) return page;
+    const locations = [...new Set(page.slice(0, tableStart).split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter((line) => /^Drawing\s+hall\b.{0,100}$/i.test(line)))];
+    return locations.length === 1 ? `Room No. ${locations[0]}\n${page}` : page;
+  }).join("\n\f\n");
 
   const headings = [...text.matchAll(/^\s*Room\s+No\.\s*(.+?)\s*$/gim)];
   if (!headings.length || headings.length > 250) {

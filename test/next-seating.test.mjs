@@ -75,6 +75,36 @@ test("seating PDF layout preserves the physical row label as well as its numbere
   ]);
 });
 
+test("seating PDF import includes a separately headed Drawing Hall grid and preserves its row labels", () => {
+  const standaloneGrid = [
+    "MSE-II EDG exam SHIFT 1",
+    "Drawing hall (Diploma building)",
+    "S.No Row-I Row-II",
+    "1",
+    "3456789 4567890",
+    "SECTION ALLOTTED",
+    "TOTAL STU. 2"
+  ].join("\n");
+  const parsed = parseSeatingPlanText(`${roomBlock("S-201", ["2345678"])}\f${standaloneGrid}`, {
+    layout: [[], [
+      { value: "Drawing hall (Diploma building)", x: 100, y: 100 },
+      { value: "S.No", x: 10, y: 80 },
+      { value: "Row-I", x: 30, y: 80 },
+      { value: "Row-II", x: 60, y: 80 },
+      { value: "1", x: 10, y: 60 },
+      { value: "3456789", x: 30, y: 60 },
+      { value: "4567890", x: 60, y: 60 }
+    ]]
+  });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.rooms, 2);
+  assert.deepEqual(parsed.seats, [
+    { crn: "2345678", room: "S-201", row: 1 },
+    { crn: "3456789", room: "Drawing hall (Diploma building)", row: 1, rowLabel: "Row-I" },
+    { crn: "4567890", room: "Drawing hall (Diploma building)", row: 1, rowLabel: "Row-II" }
+  ]);
+});
+
 test("seating intent handles English, shorthand, misspelling, Hinglish and Hindi without catching timetable questions", () => {
   for (const question of [
     "Where is my exam room?",
