@@ -72,6 +72,29 @@ test("official course shorthand and bare semester choices resolve before timetab
   assert.ok(app.indexOf("else if (isCompound)") < app.indexOf("if (!answer && !isCompound)"), "compound course and schedule questions are handled before single-course routing");
 });
 
+test("first-year Ask semester routing calls the imported semester parser", async () => {
+  const app = await read("../next/app.js");
+  const start = app.indexOf("function answerFirstYearQuestion(");
+  const end = app.indexOf("async function sendQuestion(", start);
+  const router = app.slice(start, end);
+  assert.ok(start >= 0 && end > start, "the first-year router is available for the semester regression check");
+  assert.match(app, /searchSyllabus, semesterFromQuestion, syllabusDepartmentFromText/);
+  assert.match(router, /semesterFromQuestion\(question\) \|\| String\(semester \|\| ""\)/);
+  assert.doesNotMatch(router, /semesterNumberInQuestion/);
+});
+
+test("the PWA install warning comes from the intentional custom install prompt flow", async () => {
+  const app = await read("../next/app.js");
+  const start = app.indexOf("function setupInstallPrompt(");
+  const end = app.indexOf("function syncVisualViewportHeight(", start);
+  const installFlow = app.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(installFlow, /window\.addEventListener\("beforeinstallprompt"/);
+  assert.match(installFlow, /event\.preventDefault\(\);[\s\S]*?state\.installPrompt = event/);
+  assert.match(installFlow, /const install = async \(\) => \{[\s\S]*?state\.installPrompt\.prompt\(\)/);
+  assert.match(installFlow, /\$\("#install-button"\)\?\.addEventListener\("click", install\)/);
+});
+
 test("compound Ask prompts keep course facts, timetable answers and selectable choices together", async () => {
   const app = await read("../next/app.js");
   const engine = await read("../next/engine/answer.js");
@@ -419,6 +442,8 @@ test("the new app talks only to its own origin and the legacy proxy", async () =
 
 test("the deployment configs keep the new app and the frozen legacy build separate", async () => {
   const next = JSON.parse(await read("../wrangler.next.jsonc"));
+  const registry = await read("../next/settings-registry.js");
+  const registryVersion = registry.match(/export const APP_VERSION = "([^"]+)"/)?.[1];
   assert.equal(next.name, "gndec-compass-next");
   assert.equal(next.main, "src/next-worker.js");
   assert.equal(next.assets.directory, "next");
@@ -426,7 +451,7 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.deepEqual(next.assets.run_worker_first, ["/", "/api/*", "/today", "/timetable", "/rooms", "/teachers", "/ask", "/notices", "/papers", "/syllabus", "/calendar", "/directory", "/compare", "/settings", "/admin"]);
   assert.match(next.vars.LEGACY_ORIGIN, /^https:\/\//);
   assert.match(next.vars.PUBLIC_ORIGIN, /^https:\/\//);
-  assert.equal(next.vars.APP_VERSION, "2.2.39");
+  assert.equal(next.vars.APP_VERSION, registryVersion);
   assert.equal(next.services?.length, 1);
   assert.equal(next.services[0].binding, "LEGACY");
   assert.equal(next.services[0].service, "gndec-compass");

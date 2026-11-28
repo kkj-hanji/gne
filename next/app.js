@@ -3772,7 +3772,7 @@ function answerFirstYearQuestion(question, { semester, group, section, previousC
   const syllabusRecords = [...state.indexedSyllabusCourses, ...state.indexedSyllabusSources];
   const requestedProgram = syllabusProgramFromText(question, syllabusRecords)
     || syllabusProgramFromText(state.profile.program || "", syllabusRecords);
-  const requestedSemester = semesterNumberInQuestion(question) || String(semester || "");
+  const requestedSemester = semesterFromQuestion(question) || String(semester || "");
   const sharedFirstYearRequest = ["1", "2"].includes(requestedSemester)
     && (firstYearDepartments.has(department) || /^B\.Tech\./i.test(requestedProgram) || Boolean(group));
   const explicitGroup = /\b(?:chemistry|physics)\s+group\b/i.test(question);
