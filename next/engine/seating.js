@@ -60,8 +60,36 @@ export function inferSeatingPlanMetadata(fileName, exams = []) {
       || (subject.startsWith("EDG") && title.includes("engineering drawing"));
   });
   const unique = [...new Map(matches.map((exam) => [`${exam.date}|${exam.start}|${exam.end}|${normalizedText(exam.title)}`, exam])).values()];
-  if (unique.length !== 1) return null;
-  const exam = unique[0];
+  let exam = unique.length === 1 ? unique[0] : null;
+  if (!exam && subject.startsWith("EDG")) {
+    // The datesheet has two EDG sittings on the same date. Use the cohort
+    // printed in the filename to choose a session; a shift number alone is
+    // not enough to publish a plan safely.
+    const tokens = new Set(text.split(" "));
+    const cohortAliases = [
+      ["ME", ["me", "mechanical"]],
+      ["CE", ["ce", "civil"]],
+      ["RAI", ["rai"]],
+      ["EE", ["ee", "electrical"]],
+      ["EC", ["ec", "electronics"]]
+    ];
+    const declaredCohorts = cohortAliases
+      .filter(([, aliases]) => aliases.some((alias) => tokens.has(alias)))
+      .map(([cohort]) => cohort);
+    if (!declaredCohorts.length) return null;
+    const cohortForSection = (section) => {
+      const normalized = String(section || "").trim().toUpperCase();
+      return cohortAliases.find(([cohort]) => normalized === cohort || normalized.startsWith(cohort))?.[0] || "";
+    };
+    const cohortMatches = unique.filter((candidate) => {
+      const cohorts = [...new Set((candidate.sections || []).map(cohortForSection).filter(Boolean))];
+      return cohorts.length === declaredCohorts.length
+        && cohorts.every((cohort) => declaredCohorts.includes(cohort));
+    });
+    if (cohortMatches.length !== 1) return null;
+    exam = cohortMatches[0];
+  }
+  if (!exam) return null;
   if (exam.start == null || exam.end == null || !/mse\s*[-–]?\s*(?:ii|2)/i.test(exam.category || "")) return null;
   const dateLabel = new Date(`${exam.date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   const id = seatingPlanTargetId([], { subject, date: exam.date, start: exam.start, end: exam.end });

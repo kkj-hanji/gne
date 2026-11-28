@@ -180,6 +180,21 @@ test("admin PDF metadata matches a unique subject and session, preserving distin
   assert.equal(inferred.id, "seat-2026-11-25-pps-0915-1045");
   assert.equal(inferSeatingPlanMetadata("unknown MSE-II seating.pdf", TRANSCRIBED_EXAMS), null);
 
+  const edgShift1 = inferSeatingPlanMetadata("Seating Plan For EDG exam SHIFT 1(ME,CE,RAI) MSE 2.pdf", TRANSCRIBED_EXAMS);
+  assert.equal(edgShift1.subject, "EDG · Engineering Drawing");
+  assert.equal(edgShift1.date, "2026-11-28");
+  assert.equal(edgShift1.start, "11:00");
+  assert.equal(edgShift1.end, "12:30");
+  assert.equal(edgShift1.id, "seat-2026-11-28-edg-engineering-drawing-1100-1230");
+
+  const edgShift2 = inferSeatingPlanMetadata("Seating Plan For EDG exam SHIFT 2(EE,EC) MSE 2.pdf", TRANSCRIBED_EXAMS);
+  assert.equal(edgShift2.subject, edgShift1.subject);
+  assert.equal(edgShift2.date, edgShift1.date);
+  assert.equal(edgShift2.start, "13:00");
+  assert.equal(edgShift2.end, "14:30");
+  assert.equal(edgShift2.id, "seat-2026-11-28-edg-engineering-drawing-1300-1430");
+  assert.equal(inferSeatingPlanMetadata("Seating Plan For EDG exam SHIFT 1 MSE 2.pdf", TRANSCRIBED_EXAMS), null, "an EDG shift without its cohort remains ambiguous");
+
   const existing = [
     { id: "seat-2026-11-25-pps", subject: "PPS", date: "2026-11-25", start: 555, end: 645 },
     { id: "seat-2026-11-23-mathematics-i", subject: "Mathematics-I", date: "2026-11-23", start: 555, end: 645 }

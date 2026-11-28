@@ -33,8 +33,8 @@ import {
 } from "./seating-store.js";
 
 export const APP_NAME = "GNDEC Compass";
-export const APP_VERSION = "2.2.35";
-export const BUILD_DATE = "2026-11-25";
+export const APP_VERSION = "2.2.36";
+export const BUILD_DATE = "2026-11-28";
 export const DEFAULT_LEGACY_ORIGIN = "https://gndec-compass.koush3069.workers.dev";
 
 const PROXY_PREFIX = "/api/legacy/";
