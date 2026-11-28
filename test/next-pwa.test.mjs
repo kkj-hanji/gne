@@ -467,17 +467,38 @@ test("the deployment configs keep the new app and the frozen legacy build separa
   assert.notEqual(current.name, next.name);
 });
 
-test("the first-year scheme semester choice is persistent and shared with Ask Compass", async () => {
+test("the first-year scheme semester choice stays shared with Ask Compass", async () => {
   const app = await read("../next/app.js");
   const css = await read("../next/styles.css");
   assert.match(app, /SCHEME_SEMESTER_KEY\s*=\s*"gndec-compass-next-scheme-semester-v1"/);
-  assert.match(app, /data-action="scheme-semester"/);
   assert.match(app, /storageSet\(SCHEME_SEMESTER_KEY, semester\)/);
+  assert.match(app, /state\.schemeSemesterChoice = \["1", "2"\]\.includes\(syllabusSemester\.value\) \? syllabusSemester\.value : "all"/);
   assert.match(app, /const selectedSemester = firstYearProfile && \["1", "2"\]\.includes\(state\.schemeSemesterChoice\)[\s\S]*?: firstYearProfile && state\.schemeSemesterChoice === "all" \? "" : \(profileSemester \|\| firstYear\.semester\);/);
   assert.match(app, /answerFirstYearSyllabus\(question, state\.firstYearSyllabusCourses, firstYearPreviousCourse, \{ semester \}\)/);
   assert.match(app, /answerFirstYearScheme\(question, state\.firstYearScheme, options\)/);
-  assert.match(css, /\.scheme-semester-picker/);
   assert.match(css, /\.scheme-card \.table-wrap \{ overflow-x: auto; \}/);
+});
+
+test("the syllabus page uses only branch and semester selectors with immediate recent choices", async () => {
+  const app = await read("../next/app.js");
+  const pageStart = app.indexOf("function renderSyllabus() {");
+  const pageEnd = app.indexOf("function calendarMonthLabel(month)", pageStart);
+  assert.ok(pageStart >= 0 && pageEnd > pageStart, "the active syllabus renderer is present");
+  const page = app.slice(pageStart, pageEnd);
+  assert.equal((page.match(/<select\b/g) || []).length, 2, "exactly two selectors are rendered");
+  assert.match(page, /data-syllabus-branch/);
+  assert.match(page, /data-syllabus-semester/);
+  assert.doesNotMatch(page, /data-syllabus-program|data-action="scheme-semester"|type="submit"/);
+  assert.match(page, /profileMatch/);
+  assert.match(page, /All published semesters/);
+  assert.match(page, /Frequently used/);
+  assert.match(app, /function syllabusBranchOptions[\s\S]*?maximumSemesterForSyllabusProgram/);
+  assert.match(app, /SYLLABUS_BROWSE_KEY\s*=\s*"gndec-compass-next-syllabus-browse-v1"/);
+  assert.match(app, /preferences\.semesters\[selectedBranch\.key\]/);
+  assert.match(app, /rememberSyllabusBranch\(key, selectedSemester \|\| "all"\)/);
+  assert.match(app, /if \(syllabusBranch\) \{[\s\S]*?state\.syllabusSemester = selectedSemester;[\s\S]*?render\(\)/);
+  assert.match(app, /href="https:\/\/academics\.gndec\.ac\.in\/datesheet\/"/);
+  assert.match(app, /Provisional/);
 });
 
 test("Ask uses only the current official syllabus manifest for branch choices and source previews", async () => {
